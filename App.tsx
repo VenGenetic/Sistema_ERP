@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -28,13 +29,16 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/setup" element={<AdminSetup />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="team" element={<Team />} />
-            <Route path="partners" element={<Partners />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="finance" element={<Finance />} />
-            <Route path="settings" element={<Settings />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="team" element={<Team />} />
+              <Route path="partners" element={<Partners />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="finance" element={<Finance />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
           </Route>
         </Routes>
       </Suspense>
