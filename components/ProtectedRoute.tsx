@@ -7,20 +7,50 @@ const ProtectedRoute: React.FC = () => {
     const [authenticated, setAuthenticated] = useState(false);
 
     useEffect(() => {
+        let mounted = true;
+
         const checkUser = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            setAuthenticated(!!session);
-            setLoading(false);
+            try {
+                // Log for debugging
+                console.log("ProtectedRoute: Checking session...");
+
+                // Timeout promise to prevent hanging
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Session check timed out")), 5000)
+                );
+
+                const sessionPromise = supabase.auth.getSession();
+
+                const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
+                if (mounted) {
+                    console.log("ProtectedRoute: Session found:", !!session);
+                    setAuthenticated(!!session);
+                    setLoading(false);
+                }
+            } catch (error) {
+                console.error("ProtectedRoute: Error checking session:", error);
+                if (mounted) {
+                    setAuthenticated(false);
+                    setLoading(false);
+                }
+            }
         };
 
         checkUser();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setAuthenticated(!!session);
-            setLoading(false);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            console.log("ProtectedRoute: Auth state change:", event, !!session);
+            if (mounted) {
+                setAuthenticated(!!session);
+                setLoading(false);
+            }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     if (loading) {
@@ -29,6 +59,7 @@ const ProtectedRoute: React.FC = () => {
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                     <p className="text-sm text-gray-400">Verificando sesión...</p>
+                    <p className="text-xs text-gray-600 mt-2">Si esto tarda mucho, recarga la página.</p>
                 </div>
             </div>
         );
