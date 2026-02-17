@@ -12,6 +12,7 @@ const Finance = React.lazy(() => import('./pages/Finance'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Login = React.lazy(() => import('./pages/Login'));
 const AdminSetup = React.lazy(() => import('./pages/AdminSetup'));
+const TestConnection = React.lazy(() => import('./pages/TestConnection'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -29,6 +30,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/setup" element={<AdminSetup />} />
+          <Route path="/test-connection" element={<TestConnection />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Layout />}>
