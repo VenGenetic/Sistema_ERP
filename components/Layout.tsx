@@ -2,42 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useSearchParams } from 'react-router-dom';
 
 const Layout: React.FC = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const [searchParams] = useSearchParams();
-
-  useEffect(() => {
-    // Verificar preferencia del sistema o localStorage
-    const isDark = localStorage.getItem('theme') === 'dark' ||
-      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-    // Por defecto modo oscuro para Dashboard y Configuración para dar sensación "System"
-    if (location.pathname === '/' || location.pathname.includes('settings')) {
-      setIsDarkMode(true);
-    } else {
-      setIsDarkMode(isDark);
-    }
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
 
   // Cerrar menú móvil al cambiar de ruta
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
-
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
 
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -152,14 +123,6 @@ const Layout: React.FC = () => {
           </div>
 
           <div className="flex gap-1 items-center border-l border-slate-200 dark:border-slate-800 pl-4 md:pl-6">
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-[#161b22] text-slate-500 dark:text-slate-400 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[20px]">
-                {isDarkMode ? 'light_mode' : 'dark_mode'}
-              </span>
-            </button>
             <div className="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-md ml-2 cursor-pointer hover:ring-2 ring-offset-2 ring-indigo-500 ring-offset-black transition-all"></div>
           </div>
         </div>
