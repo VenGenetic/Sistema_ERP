@@ -8,10 +8,15 @@ import Inventory from './pages/Inventory';
 import Finance from './pages/Finance';
 import Settings from './pages/Settings';
 
+import Login from './pages/Login';
+import AdminSetup from './pages/AdminSetup';
+
 const App: React.FC = () => {
   return (
     <HashRouter>
       <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/setup" element={<AdminSetup />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="team" element={<Team />} />

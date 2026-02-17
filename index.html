@@ -17,22 +17,37 @@
       theme: {
         extend: {
           colors: {
-            primary: "#136dec",
+            primary: "#1877F2",
+            "primary-hover": "#166fe5",
             "background-light": "#f6f7f8",
             "background-dark": "#101822",
             "surface-dark": "#192433",
             "surface-hover": "#233348",
             "border-dark": "#324867",
             "text-secondary": "#92a9c9",
+            "dark-bg": "#121212",
+            "dark-card": "#1E1E1E",
+            "dark-input": "#252525",
+            "dark-border": "#333333",
           },
           fontFamily: {
             sans: ["Inter", "sans-serif"],
             display: ["Inter", "sans-serif"],
           },
+          boxShadow: {
+            "glow": "0 0 20px rgba(0, 0, 0, 0.5), 0 0 5px rgba(255, 255, 255, 0.05)",
+          }
         },
       },
     }
   </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .gradient-btn {
+        background: linear-gradient(135deg, #1877F2 0%, #0d61d1 100%);
+      }
+    }
+  </style>
   <style>
     body {
       font-family: 'Inter', sans-serif;
