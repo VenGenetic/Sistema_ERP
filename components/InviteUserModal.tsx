@@ -1,105 +1,80 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
 
 interface InviteUserModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onInvite: () => void;
 }
 
-const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onInvite }) => {
+const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose }) => {
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState('Closer');
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [role, setRole] = useState('onsite');
 
     if (!isOpen) return null;
 
-    const handleInvite = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-        setMessage(null);
-
-        try {
-            const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
-                data: { role },
-            });
-
-            if (error) throw error;
-
-            setMessage({ type: 'success', text: `Invitation sent to ${email}` });
-            setTimeout(() => {
-                onInvite();
-                onClose();
-                setEmail('');
-                setMessage(null);
-            }, 1500);
-        } catch (err: any) {
-            setMessage({ type: 'error', text: err.message || 'Failed to send invitation' });
-        } finally {
-            setLoading(false);
-        }
+        // TODO: Implement Supabase invite logic
+        console.log("Inviting user:", email, role);
+        onClose();
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-surface-dark border border-border-dark rounded-xl p-6 w-full max-w-md shadow-2xl bg-[#1e293b] text-white">
-                <h2 className="text-xl font-bold mb-4">Invite New User</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Invitar Miembro</h3>
+                    <button onClick={onClose} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
 
-                {message && (
-                    <div className={`p-3 rounded-lg mb-4 text-sm ${message.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {message.text}
-                    </div>
-                )}
-
-                <form onSubmit={handleInvite}>
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Email Address</label>
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo Electrónico</label>
                         <input
                             type="email"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-background-dark border border-border-dark rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary"
-                            placeholder="colleague@example.com"
+                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-primary focus:border-primary"
+                            placeholder="colaborador@empresa.com"
                         />
                     </div>
 
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Role</label>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Rol Asignado</label>
                         <select
                             value={role}
                             onChange={(e) => setRole(e.target.value)}
-                            className="w-full bg-background-dark border border-border-dark rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary"
+                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-primary focus:border-primary"
                         >
-                            <option value="Admin">Admin</option>
-                            <option value="Closer">Closer</option>
-                            <option value="Onsite">Onsite</option>
-                            <option value="Dev">Dev</option>
+                            <option value="admin">Admin (Acceso Total)</option>
+                            <option value="onsite">Onsite (Bodega & Envíos)</option>
+                            <option value="closer">Closer (Ventas & Clientes)</option>
+                            <option value="dev">Developer (API & Webhooks)</option>
                         </select>
-                        <p className="text-xs text-text-secondary mt-1">
-                            {role === 'Admin' && 'Full access to all modules.'}
-                            {role === 'Closer' && 'Can manage orders and view customers.'}
-                            {role === 'Onsite' && 'Warehouse and logistics management.'}
-                            {role === 'Dev' && 'Technical configuration and API access.'}
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                            {role === 'admin' && "Tiene control total sobre la configuración, usuarios y finanzas."}
+                            {role === 'onsite' && "Puede gestionar inventario, movimientos y despachos."}
+                            {role === 'closer' && "Acceso limitado a dashboard de ventas y gestión de clientes."}
+                            {role === 'dev' && "Puede gestionar API Keys, webhooks y logs del sistema."}
                         </p>
                     </div>
 
-                    <div className="flex justify-end gap-3">
+                    <div className="pt-4 flex justify-end gap-3">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-background-dark transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                         >
-                            Cancel
+                            Cancelar
                         </button>
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="bg-primary hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600"
+                            className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg shadow-sm shadow-primary/30 transition-colors flex items-center gap-2"
                         >
-                            {loading && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
-                            Send Invitation
+                            <span className="material-symbols-outlined text-[18px]">send</span>
+                            Enviar Invitación
                         </button>
                     </div>
                 </form>
