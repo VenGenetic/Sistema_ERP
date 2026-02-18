@@ -1,7 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import { Account } from '../types/finance';
 
 const FinanceConfig: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'accounts' | 'rules' | 'settings'>('accounts');
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'accounts') {
+            fetchAccounts();
+        }
+    }, [activeTab]);
+
+    const fetchAccounts = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.from('accounts').select('*').order('code');
+        if (data) {
+            setAccounts(data);
+        } else {
+            console.error(error);
+        }
+        setLoading(false);
+    };
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -34,22 +55,35 @@ const FinanceConfig: React.FC = () => {
                                 <th className="px-6 py-3">Código</th>
                                 <th className="px-6 py-3">Nombre</th>
                                 <th className="px-6 py-3">Tipo</th>
-                                <th className="px-6 py-3 text-right">Balance</th>
+                                <th className="px-6 py-3 text-right">Moneda</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            <tr>
-                                <td className="px-6 py-4 font-mono text-slate-500 text-sm">1001</td>
-                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">Caja General</td>
-                                <td className="px-6 py-4"><span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs">Activo</span></td>
-                                <td className="px-6 py-4 text-right font-mono text-slate-900 dark:text-white">$4,250.00</td>
-                            </tr>
-                            <tr>
-                                <td className="px-6 py-4 font-mono text-slate-500 text-sm">4001</td>
-                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">Ingresos por Ventas</td>
-                                <td className="px-6 py-4"><span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs">Ingresos</span></td>
-                                <td className="px-6 py-4 text-right font-mono text-slate-900 dark:text-white">$142,500.00</td>
-                            </tr>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-4 text-center text-slate-500">Cargando cuentas...</td>
+                                </tr>
+                            ) : accounts.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-4 text-center text-slate-500">No hay cuentas registradas</td>
+                                </tr>
+                            ) : (
+                                accounts.map((account) => (
+                                    <tr key={account.id}>
+                                        <td className="px-6 py-4 font-mono text-slate-500 text-sm">{account.code}</td>
+                                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{account.name}</td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs ${['asset', 'income'].includes(account.category)
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : 'bg-blue-100 text-blue-700'
+                                                }`}>
+                                                {account.category}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-mono text-slate-900 dark:text-white">{account.currency}</td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
