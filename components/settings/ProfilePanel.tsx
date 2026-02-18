@@ -59,7 +59,6 @@ const ProfilePanel: React.FC = () => {
                     nickname,
                     bio,
                     avatar_url: avatarUrl,
-                    updated_at: new Date().toISOString(),
                 });
 
             if (error) throw error;
@@ -101,7 +100,6 @@ const ProfilePanel: React.FC = () => {
                 .upsert({
                     id: user?.id,
                     avatar_url: data.publicUrl,
-                    updated_at: new Date().toISOString(),
                 });
 
             if (updateError) throw updateError;
