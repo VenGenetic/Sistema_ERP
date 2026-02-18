@@ -6,6 +6,7 @@ export interface Account {
     category: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
     is_nominal: boolean;
     currency: string;
+    position?: number;
     created_at?: string;
     updated_at?: string;
 }
