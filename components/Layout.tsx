@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useSearchParams } from 'react-router-dom';
+import HeaderAccount from './HeaderAccount';
 
 const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -54,31 +55,9 @@ const Layout: React.FC = () => {
           Finanzas
         </Link>
 
-        <div className="pt-4 mt-2">
-          <p className="px-3 text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">Sistema</p>
-          <Link to="/settings" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('settings') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'}`}>
-            <span className="material-symbols-outlined text-[20px]">settings</span>
-            Avanzado
-          </Link>
-        </div>
       </nav>
 
       {/* System Status Footer */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0c1117]/50 mt-auto md:mt-0">
-        <div className="flex items-center justify-between text-xs font-mono text-slate-500 mb-2">
-          <span>Estado API</span>
-          <span className="text-emerald-500 font-bold">● En Línea</span>
-        </div>
-        <div className="flex gap-1 h-1 w-full">
-          <div className="flex-1 bg-emerald-500 rounded-full"></div>
-          <div className="flex-1 bg-emerald-500 rounded-full opacity-80"></div>
-          <div className="flex-1 bg-emerald-500 rounded-full opacity-60"></div>
-          <div className="flex-1 bg-slate-700 rounded-full"></div>
-        </div>
-        <div className="mt-2 text-[10px] text-slate-600 dark:text-slate-500 font-mono">
-          v2.4.0 (SHA: 8f29a)
-        </div>
-      </div>
     </>
   );
 
@@ -123,7 +102,7 @@ const Layout: React.FC = () => {
           </div>
 
           <div className="flex gap-1 items-center border-l border-slate-200 dark:border-slate-800 pl-4 md:pl-6">
-            <div className="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-md ml-2 cursor-pointer hover:ring-2 ring-offset-2 ring-indigo-500 ring-offset-black transition-all"></div>
+            <HeaderAccount />
           </div>
         </div>
       </header>
