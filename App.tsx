@@ -13,6 +13,8 @@ const Settings = React.lazy(() => import('./pages/Settings'));
 const Login = React.lazy(() => import('./pages/Login'));
 const AdminSetup = React.lazy(() => import('./pages/AdminSetup'));
 const TestConnection = React.lazy(() => import('./pages/TestConnection'));
+const AuthConfirm = React.lazy(() => import('./pages/AuthConfirm'));
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -31,6 +33,8 @@ const App: React.FC = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/setup" element={<AdminSetup />} />
           <Route path="/test-connection" element={<TestConnection />} />
+          <Route path="/auth/confirm" element={<AuthConfirm />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Layout />}>
