@@ -15,6 +15,7 @@ const AdminSetup = React.lazy(() => import('./pages/AdminSetup'));
 const TestConnection = React.lazy(() => import('./pages/TestConnection'));
 const AuthConfirm = React.lazy(() => import('./pages/AuthConfirm'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
+const NotFound = React.lazy(() => import('./pages/NotFound'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -46,6 +47,9 @@ const App: React.FC = () => {
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
+
+          {/* Catch-all 404 Not Found page */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
     </HashRouter>
