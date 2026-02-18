@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import SessionTimeoutHandler from './SessionTimeoutHandler';
 
 const ProtectedRoute: React.FC = () => {
     const [loading, setLoading] = useState(true);
@@ -69,7 +70,12 @@ const ProtectedRoute: React.FC = () => {
         return <Navigate to="/login" replace />;
     }
 
-    return <Outlet />;
+    return (
+        <>
+            <SessionTimeoutHandler />
+            <Outlet />
+        </>
+    );
 };
 
 export default ProtectedRoute;
