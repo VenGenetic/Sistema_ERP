@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Account } from '../types/finance';
 import { useNavigate } from 'react-router-dom';
+import NewTransactionModal from './NewTransactionModal';
+import TransactionHistory from './TransactionHistory';
 import {
     DndContext,
     closestCenter,
@@ -76,6 +78,8 @@ const FinanceDashboard: React.FC = () => {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [balances, setBalances] = useState<Record<number, number>>({});
     const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -90,7 +94,7 @@ const FinanceDashboard: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [refreshKey]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -148,14 +152,11 @@ const FinanceDashboard: React.FC = () => {
 
                 const newItems = arrayMove(items, oldIndex, newIndex);
 
-                // Update positions in DB
-                // We update all items with their new index as position
-                const updates = newItems.map((item, index) => ({
+                const updates = newItems.map((item: Account, index: number) => ({
                     id: item.id,
                     position: index,
                 }));
 
-                // Fire and forget update (or handle error if needed)
                 updatePositions(updates);
 
                 return newItems;
@@ -165,26 +166,9 @@ const FinanceDashboard: React.FC = () => {
 
     const updatePositions = async (updates: { id: number; position: number }[]) => {
         try {
-            // Upsert allows updating multiple rows if we format it right, but Supabase simple client might need loop or custom RPC.
-            // For small number of accounts, loop is fine or Promise.all.
-            // Better: use upsert with the full object if we had it, but we only have ID and position.
-            // Let's use a loop for now as it's simple and robust for < 50 items.
-
-            // Actually, best way with Supabase/PostgREST for bulk update is usually upsert()
-            const { error } = await supabase
-                .from('accounts')
-                .upsert(updates.map(u => ({ id: u.id, position: u.position, updated_at: new Date().toISOString() })) as any, { onConflict: 'id', ignoreDuplicates: false }); // We need to include other required fields if not nullable? No, upsert updates existing.
-
-            // However, types might complain if we miss required fields. 
-            // Ideally we should just update 'position'. 
-            // RPC is cleaner but requires migration. 
-            // Loop is safest for quick implementation without new RPC.
-
-            // Let's try Promise.all for parallel updates
             await Promise.all(updates.map(u =>
                 supabase.from('accounts').update({ position: u.position }).eq('id', u.id)
             ));
-
         } catch (error) {
             console.error('Error updating positions:', error);
         }
@@ -209,7 +193,10 @@ const FinanceDashboard: React.FC = () => {
                         <span className="material-symbols-outlined text-[18px]">settings</span>
                         Configurar
                     </button>
-                    <button className="flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-primary/30">
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-primary/30"
+                    >
                         <span className="material-symbols-outlined text-[18px]">add</span>
                         Nueva Transacción
                     </button>
@@ -244,6 +231,15 @@ const FinanceDashboard: React.FC = () => {
                     )}
                 </div>
             </DndContext>
+
+            {/* Global Transactions History */}
+            <TransactionHistory key={`history-${refreshKey}`} />
+
+            <NewTransactionModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSuccess={() => setRefreshKey(prev => prev + 1)}
+            />
         </div>
     );
 };
