@@ -6,25 +6,60 @@ const HeaderAccount: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [user, setUser] = useState<any>(null);
+    const [profile, setProfile] = useState<any>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Obtener usuario actual
-        const getUser = async () => {
+        let subscription: any;
+
+        const getData = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
-        };
-        getUser();
 
-        // Cerrar al hacer clic fuera
+            if (user) {
+                // Fetch initial profile data
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                if (data) setProfile(data);
+
+                // Subscribe to realtime changes
+                const channel = supabase
+                    .channel('header_profile_updates')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'UPDATE',
+                            schema: 'public',
+                            table: 'profiles',
+                            filter: `id=eq.${user.id}`,
+                        },
+                        (payload) => {
+                            console.log('Profile updated!', payload.new);
+                            setProfile(payload.new);
+                        }
+                    )
+                    .subscribe();
+
+                subscription = channel;
+            }
+        };
+
+        getData();
+
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
+
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            if (subscription) supabase.removeChannel(subscription);
         };
     }, []);
 
@@ -33,16 +68,17 @@ const HeaderAccount: React.FC = () => {
         navigate('/login');
     };
 
-    // Obtener iniciales o usar un default
     const getInitials = () => {
-        if (user?.email) {
-            return user.email.substring(0, 2).toUpperCase();
-        }
+        const name = profile?.full_name || user?.user_metadata?.full_name;
+        if (name) return name.substring(0, 2).toUpperCase();
+        if (user?.email) return user.email.substring(0, 2).toUpperCase();
         return 'U';
     };
 
-    const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario';
+    // Derived display values
+    const displayName = profile?.nickname || profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario';
     const displayEmail = user?.email || '';
+    const avatarUrl = profile?.avatar_url;
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -54,9 +90,17 @@ const HeaderAccount: React.FC = () => {
                     <span className="text-sm font-bold text-slate-700 dark:text-white leading-none">{displayName}</span>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{displayEmail}</span>
                 </div>
-                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-primary/20">
-                    {getInitials()}
-                </div>
+
+                {avatarUrl ? (
+                    <div className="w-9 h-9 rounded-full bg-background-dark border border-border-dark overflow-hidden shadow-lg shadow-primary/20">
+                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    </div>
+                ) : (
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-primary/20">
+                        {getInitials()}
+                    </div>
+                )}
+
                 <span className={`material-symbols-outlined text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
             </button>
 
@@ -66,9 +110,15 @@ const HeaderAccount: React.FC = () => {
                     {/* Header del Dropdown */}
                     <div className="p-4 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg">
-                                {getInitials()}
-                            </div>
+                            {avatarUrl ? (
+                                <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden shadow-lg">
+                                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                </div>
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg">
+                                    {getInitials()}
+                                </div>
+                            )}
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{displayName}</p>
                                 <p className="text-xs text-slate-500 dark:text-[#92a9c9] truncate">{displayEmail}</p>
@@ -83,26 +133,16 @@ const HeaderAccount: React.FC = () => {
 
                     {/* Opciones del Menú */}
                     <div className="p-2 space-y-0.5">
-                        <Link to="/settings" className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors group" onClick={() => setIsOpen(false)}>
+                        <Link to="/settings?tab=general" className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors group" onClick={() => setIsOpen(false)}>
                             <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-[#92a9c9] group-hover:text-primary transition-colors">person</span>
                             Mi Perfil
                         </Link>
-                        <Link to="/settings" className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors group" onClick={() => setIsOpen(false)}>
-                            <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-[#92a9c9] group-hover:text-primary transition-colors">settings</span>
+                        <Link to="/settings?tab=account" className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors group" onClick={() => setIsOpen(false)}>
+                            <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-[#92a9c9] group-hover:text-primary transition-colors">shield_lock</span>
                             Configuración de Cuenta
                         </Link>
-                        {/* Opciones Estáticas (Visuales) */}
-                        <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors group cursor-not-allowed opacity-70">
-                            <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-[#92a9c9] group-hover:text-primary transition-colors">palette</span>
-                            Preferencias (Próximamente)
-                        </button>
-                        <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors group cursor-not-allowed opacity-70">
-                            <span className="material-symbols-outlined text-[20px] text-slate-400 dark:text-[#92a9c9] group-hover:text-primary transition-colors">badge</span>
-                            Cambiar Rol (Próximamente)
-                        </button>
+                        <div className="h-px bg-slate-100 dark:bg-white/5 mx-2 my-1"></div>
                     </div>
-
-                    <div className="h-px bg-slate-100 dark:bg-white/5 mx-2 my-1"></div>
 
                     {/* Logout */}
                     <div className="p-2">
