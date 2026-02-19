@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import InventoryMovementModal from '../components/InventoryMovementModal';
 import { ProductEntryForm } from '../components/ProductEntryForm';
@@ -58,6 +58,11 @@ const Inventory: React.FC = () => {
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<any>(null);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
+
+    // Advanced Search & Filter State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const [filters, setFilters] = useState<{ [key: string]: string }>({});
 
     // New State for Batch Entry
     // New State for Batch Entry
@@ -157,6 +162,82 @@ const Inventory: React.FC = () => {
         fetchData(); // Refresh to show all
     };
 
+    // Advanced Search & Sort Logic
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const handleFilterChange = (key: string, value: string) => {
+        setFilters(prev => ({ ...prev, [key]: value }));
+    };
+
+    const filteredAndSortedItems = useMemo(() => {
+        let items = [...stockItems];
+
+        // 1. Global Search (Smart Search)
+        if (searchTerm) {
+            const searchTerms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+            items = items.filter(item => {
+                const productName = item.products?.name?.toLowerCase() || '';
+                const sku = item.products?.sku?.toLowerCase() || '';
+                // Check if ALL search terms are present in EITHER name OR sku
+                return searchTerms.every(term => productName.includes(term) || sku.includes(term));
+            });
+        }
+
+        // 2. Column Filters
+        Object.keys(filters).forEach(key => {
+            const filterValue = filters[key].toLowerCase();
+            if (!filterValue) return;
+
+            items = items.filter(item => {
+                let itemValue = '';
+                if (key === 'product') itemValue = item.products?.name?.toLowerCase() || '';
+                else if (key === 'brand') itemValue = item.products?.brands?.name?.toLowerCase() || '';
+                else if (key === 'sku') itemValue = item.products?.sku?.toLowerCase() || '';
+                else if (key === 'warehouse') itemValue = item.warehouses?.name?.toLowerCase() || '';
+                else if (key === 'stock') itemValue = item.current_stock.toString();
+
+                return itemValue.includes(filterValue);
+            });
+        });
+
+        // 3. Sorting
+        if (sortConfig) {
+            items.sort((a, b) => {
+                let aValue: any = '';
+                let bValue: any = '';
+
+                if (sortConfig.key === 'product') {
+                    aValue = a.products?.name || '';
+                    bValue = b.products?.name || '';
+                } else if (sortConfig.key === 'brand') {
+                    aValue = a.products?.brands?.name || '';
+                    bValue = b.products?.brands?.name || '';
+                } else if (sortConfig.key === 'sku') {
+                    aValue = a.products?.sku || '';
+                    bValue = b.products?.sku || '';
+                } else if (sortConfig.key === 'warehouse') {
+                    aValue = a.warehouses?.name || '';
+                    bValue = b.warehouses?.name || '';
+                } else if (sortConfig.key === 'stock') {
+                    aValue = a.current_stock;
+                    bValue = b.current_stock;
+                }
+
+                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return items;
+    }, [stockItems, searchTerm, filters, sortConfig]);
+
     return (
         <div className="flex flex-col gap-6 p-6 md:p-8 max-w-[1400px] mx-auto">
             <InventoryMovementModal
@@ -247,21 +328,19 @@ const Inventory: React.FC = () => {
                 </div>
             </div>
 
-            {/* Active Filter Indicator */}
-            {activeTab === 'stock' && selectedWarehouseId && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                        <span className="material-symbols-outlined">filter_alt</span>
-                        <span className="font-medium">
-                            Filtrando por almacén: {warehouses.find(w => w.id === selectedWarehouseId)?.name || 'Desconocido'}
-                        </span>
-                    </div>
-                    <button
-                        onClick={clearWarehouseFilter}
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                    >
-                        Limpiar filtro
-                    </button>
+
+
+            {/* Advanced Search Input */}
+            {activeTab === 'stock' && (
+                <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, SKU, palabras clave..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    />
                 </div>
             )}
 
@@ -338,24 +417,46 @@ const Inventory: React.FC = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
                                     <tr>
-                                        <th className="px-6 py-3">Producto</th>
-                                        <th className="px-6 py-3">Marca</th>
-                                        <th className="px-6 py-3">SKU</th>
-                                        <th className="px-6 py-3">Almacén</th>
-                                        <th className="px-6 py-3 text-right">Stock Actual</th>
+                                        {[
+                                            { key: 'product', label: 'Producto' },
+                                            { key: 'brand', label: 'Marca' },
+                                            { key: 'sku', label: 'SKU' },
+                                            { key: 'warehouse', label: 'Almacén' },
+                                            { key: 'stock', label: 'Stock Actual', align: 'right' }
+                                        ].map(col => (
+                                            <th key={col.key} className={`px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${col.align === 'right' ? 'text-right' : ''}`} onClick={() => handleSort(col.key)}>
+                                                <div className={`flex flex-col gap-2 ${col.align === 'right' ? 'items-end' : 'items-start'}`}>
+                                                    <div className="flex items-center gap-1">
+                                                        {col.label}
+                                                        <div className="flex flex-col">
+                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_up</span>
+                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
+                                                        </div>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        placeholder={`Filtrar...`}
+                                                        value={filters[col.key] || ''}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onChange={(e) => handleFilterChange(col.key, e.target.value)}
+                                                        className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:outline-none focus:border-primary"
+                                                    />
+                                                </div>
+                                            </th>
+                                        ))}
                                         <th className="px-6 py-3 text-center">Estado</th>
                                         <th className="px-6 py-3 text-center">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                                    {stockItems.length === 0 && !loading && (
+                                    {filteredAndSortedItems.length === 0 && !loading && (
                                         <tr>
                                             <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                                                No hay registros de inventario. Comienza agregando un producto o registrando un movimiento.
+                                                No hay registros que coincidan con tu búsqueda.
                                             </td>
                                         </tr>
                                     )}
-                                    {stockItems.map(item => (
+                                    {filteredAndSortedItems.map(item => (
                                         <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                             <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                                                 {/* @ts-ignore */}
