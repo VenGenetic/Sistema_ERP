@@ -9,6 +9,7 @@ export interface Account {
     position?: number;
     created_at?: string;
     updated_at?: string;
+    current_balance?: number;
 }
 
 export interface Transaction {
