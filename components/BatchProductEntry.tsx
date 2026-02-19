@@ -3,11 +3,18 @@ import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
 
+interface Account {
+    id: number;
+    name: string;
+    code: string;
+    currency: string;
+}
+
 interface ProductRow {
     id: string; // Temporary ID for React key
     sku: string;
     name: string;
-    category: string;
+    quantity: string;
     costWithoutVat: string;
     discountedCost: string;
     profitMargin: string;
@@ -27,40 +34,85 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     const [globalBrandId, setGlobalBrandId] = useState<number | null>(null);
     const [globalWarehouseId, setGlobalWarehouseId] = useState<number | null>(null);
     const [globalVat, setGlobalVat] = useState<number>(12); // Default 12%
+    const [accounts, setAccounts] = useState<Account[]>([]);
+    const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
     // Initial row
     const [rows, setRows] = useState<ProductRow[]>([
-        { id: '1', sku: '', name: '', category: '', costWithoutVat: '', discountedCost: '', profitMargin: '0.30', costWithVat: 0, pvp: 0 }
+        { id: '1', sku: '', name: '', quantity: '1', costWithoutVat: '', discountedCost: '', profitMargin: '0.30', costWithVat: 0, pvp: 0 }
     ]);
+
+    // Computed totals
+    const [totals, setTotals] = useState({
+        totalCostExVat: 0,
+        totalCostIncVat: 0,
+        totalPvp: 0,
+        estimatedProfit: 0
+    });
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchAccounts();
+        }
+    }, [isOpen]);
+
+    const fetchAccounts = async () => {
+        try {
+            // Fetch only non-nominal accounts (payment accounts)
+            const { data, error } = await supabase
+                .from('accounts')
+                .select('*')
+                .eq('is_nominal', false)
+                .order('name');
+
+            if (error) throw error;
+            setAccounts(data || []);
+        } catch (error) {
+            console.error('Error fetching accounts:', error);
+        }
+    };
 
     // Update calculations when inputs change
     useEffect(() => {
+        let totalCostExVat = 0;
+        let totalCostIncVat = 0;
+        let totalPvp = 0;
+
         const newRows = rows.map(row => {
             const cost = parseFloat(row.discountedCost || row.costWithoutVat) || 0;
             const margin = parseFloat(row.profitMargin) || 0;
+            const qty = parseFloat(row.quantity) || 0;
 
             const costWithVat = cost * (1 + globalVat / 100);
             const pvp = costWithVat * (1 + margin);
 
+            // Accumulate totals
+            if (qty > 0) {
+                totalCostExVat += cost * qty;
+                totalCostIncVat += costWithVat * qty;
+                totalPvp += pvp * qty;
+            }
+
             return { ...row, costWithVat, pvp };
         });
 
-        // Only update if values actually changed to avoid infinite loop
+        setTotals({
+            totalCostExVat,
+            totalCostIncVat,
+            totalPvp,
+            estimatedProfit: totalPvp - totalCostIncVat
+        });
+
         if (JSON.stringify(newRows) !== JSON.stringify(rows)) {
             setRows(newRows);
         }
+
     }, [rows, globalVat]);
 
     const handleRowChange = (id: string, field: keyof ProductRow, value: string) => {
         setRows(prev => prev.map(row => {
             if (row.id === id) {
-                // Determine effective cost for calculation updates immediately
-                const updatedRow = { ...row, [field]: value };
-                const cost = parseFloat(updatedRow.discountedCost || updatedRow.costWithoutVat) || 0;
-                const margin = parseFloat(updatedRow.profitMargin) || 0;
-                const costWithVat = cost * (1 + globalVat / 100);
-                const pvp = costWithVat * (1 + margin);
-                return { ...updatedRow, costWithVat, pvp };
+                return { ...row, [field]: value };
             }
             return row;
         }));
@@ -71,7 +123,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             id: Date.now().toString(),
             sku: '',
             name: '',
-            category: '',
+            quantity: '1',
             costWithoutVat: '',
             discountedCost: '',
             profitMargin: '0.30',
@@ -97,6 +149,11 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             return;
         }
 
+        if (!selectedAccountId) {
+            alert('Por favor selecciona una cuenta de pago.');
+            return;
+        }
+
         // Validate rows
         const validRows = rows.filter(r => r.sku && r.name && r.costWithoutVat);
         if (validRows.length === 0) {
@@ -110,18 +167,8 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             const productsPayload = validRows.map(r => ({
                 sku: r.sku.toUpperCase(),
                 name: r.name,
-                category: r.category,
-                // Use discounted cost if present, logic handled by RPC/Strategy
-                // The Logic: "Si Costo S/I Descontado no es igual a null... se debe colocar"
-                // logic handled by RPC based on input? Wait, the RPC expects `cost_without_vat` as the EFFECTIVE cost.
-                // The prompt said: "Si Distcounted != null -> effective = Discounted * (1+IVA)".
-                // Wait, "Costo S/I (sin iva): no puede ser null... Costo S/I Descontado: puede ser null".
-                // "Costo con iva... si Discounted != null -> Discounted * (1+VAT)".
-                // Basically, the "Effective Cost" we send to 'process_product_entry_cost' should be the Discounted Cost if exists.
-                // So here in Frontend, we decide which 'cost' value to send as the key parameter.
+                quantity: parseInt(r.quantity) || 0,
                 cost_without_vat: r.discountedCost ? parseFloat(r.discountedCost) : parseFloat(r.costWithoutVat),
-
-                // We send profit margin as distinct field
                 profit_margin: parseFloat(r.profitMargin) || 0
             }));
 
@@ -129,6 +176,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 p_brand_id: globalBrandId,
                 p_warehouse_id: globalWarehouseId,
                 p_vat_percentage: globalVat,
+                p_payment_account_id: selectedAccountId,
                 p_products: productsPayload
             });
 
@@ -138,7 +186,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 throw new Error(data.message || 'Error desconocido al guardar el lote.');
             }
 
-            alert(`Lote procesado exitosamente.`);
+            alert(`Lote procesado exitosamente. Transacción #${data.transaction_id} generada.`);
             onSuccess();
             onClose();
         } catch (error: any) {
@@ -153,7 +201,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
                 {/* Header */}
                 <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                     <div className="flex items-center gap-3">
@@ -162,7 +210,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Entrada de Productos por Lote</h2>
-                            <p className="text-sm text-slate-500">Ingresa múltiples productos con la misma marca e IVA.</p>
+                            <p className="text-sm text-slate-500">Ingresa inventario, costos y genera transacción financiera.</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
@@ -189,6 +237,21 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                         />
                     </div>
                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cuenta de Pago (Débito)</label>
+                        <select
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                            value={selectedAccountId || ''}
+                            onChange={(e) => setSelectedAccountId(parseInt(e.target.value))}
+                        >
+                            <option value="">Seleccionar Cuenta...</option>
+                            {accounts.map(acc => (
+                                <option key={acc.id} value={acc.id}>
+                                    {acc.code} - {acc.name} ({acc.currency})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">IVA Global (%)</label>
                         <input
                             type="number"
@@ -198,11 +261,6 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                             value={globalVat}
                             onChange={(e) => setGlobalVat(parseFloat(e.target.value) || 0)}
                         />
-                    </div>
-                    <div className="flex items-end">
-                        <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg text-sm text-blue-800 dark:text-blue-300 w-full">
-                            <span className="font-semibold">Nota:</span> Se aplicará la lógica de "Mejor Margen" y "Three Strikes" automáticamente.
-                        </div>
                     </div>
                 </div>
 
@@ -214,7 +272,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-10">#</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">SKU *</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Nombre *</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Categoría</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Cant.</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 " title="Costo Unitario Sin IVA">Costo S/I *</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32" title="Opcional: Si hay descuento">Costo Desc.</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Margen</th>
@@ -247,11 +305,12 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                     </td>
                                     <td className="px-2 py-2">
                                         <input
-                                            type="text"
-                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-primary outline-none"
-                                            value={row.category}
-                                            onChange={e => handleRowChange(row.id, 'category', e.target.value)}
-                                            placeholder="General"
+                                            type="number"
+                                            min="1"
+                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-primary outline-none text-center"
+                                            value={row.quantity}
+                                            onChange={e => handleRowChange(row.id, 'quantity', e.target.value)}
+                                            placeholder="1"
                                         />
                                     </td>
                                     <td className="px-2 py-2">
@@ -318,21 +377,44 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                    >
-                        {loading && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
-                        {loading ? 'Procesando Lote...' : 'Guardar Lote Completo'}
-                    </button>
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="flex gap-6 text-sm">
+                            <div className="flex flex-col">
+                                <span className="text-slate-500">Total Costo S/IVA</span>
+                                <span className="font-bold text-slate-900 dark:text-white">${totals.totalCostExVat.toFixed(2)}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-slate-500">Total Costo C/IVA</span>
+                                <span className="font-bold text-indigo-600">${totals.totalCostIncVat.toFixed(2)}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-slate-500">Total PVP Esperado</span>
+                                <span className="font-bold text-emerald-600">${totals.totalPvp.toFixed(2)}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-slate-500">Ganancia Est.</span>
+                                <span className="font-bold text-teal-600">${totals.estimatedProfit.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {loading && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
+                                {loading ? 'Procesando...' : 'Guardar Lote Completo'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
