@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
+import { WarehouseSelect } from './WarehouseSelect';
 
 interface ProductRow {
     id: string; // Temporary ID for React key
@@ -24,6 +25,7 @@ interface BatchProductEntryProps {
 export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, onClose, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [globalBrandId, setGlobalBrandId] = useState<number | null>(null);
+    const [globalWarehouseId, setGlobalWarehouseId] = useState<number | null>(null);
     const [globalVat, setGlobalVat] = useState<number>(12); // Default 12%
 
     // Initial row
@@ -90,6 +92,11 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             return;
         }
 
+        if (!globalWarehouseId) {
+            alert('Por favor selecciona un almacén para el lote.');
+            return;
+        }
+
         // Validate rows
         const validRows = rows.filter(r => r.sku && r.name && r.costWithoutVat);
         if (validRows.length === 0) {
@@ -120,6 +127,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
 
             const { data, error } = await supabase.rpc('process_batch_product_entry', {
                 p_brand_id: globalBrandId,
+                p_warehouse_id: globalWarehouseId,
                 p_vat_percentage: globalVat,
                 p_products: productsPayload
             });
@@ -159,7 +167,15 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 </div>
 
                 {/* Global Configuration */}
-                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-slate-200 dark:border-slate-700">
+                <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 border-b border-slate-200 dark:border-slate-700">
+                    <div>
+                        <WarehouseSelect
+                            value={globalWarehouseId}
+                            onChange={setGlobalWarehouseId}
+                            label="Almacén de Entrada"
+                            required
+                        />
+                    </div>
                     <div>
                         <BrandSelect
                             value={globalBrandId}
