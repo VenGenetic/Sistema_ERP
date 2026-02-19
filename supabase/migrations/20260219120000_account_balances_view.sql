@@ -8,8 +8,6 @@ SELECT
     a.is_nominal,
     a.currency,
     a.position,
-    a.created_at,
-    a.updated_at,
     COALESCE(
         SUM(
             CASE 
@@ -21,4 +19,4 @@ SELECT
     ) AS current_balance
 FROM accounts a
 LEFT JOIN transaction_lines tl ON a.id = tl.account_id
-GROUP BY a.id;
+GROUP BY a.id, a.code, a.name, a.category, a.is_nominal, a.currency, a.position;
