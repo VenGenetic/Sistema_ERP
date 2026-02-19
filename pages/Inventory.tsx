@@ -57,6 +57,7 @@ const Inventory: React.FC = () => {
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<any>(null);
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
 
     // New State for Batch Entry
     // New State for Batch Entry
@@ -81,7 +82,7 @@ const Inventory: React.FC = () => {
                 if (error) throw error;
                 setWarehouses(data || []);
             } else if (activeTab === 'stock') {
-                const { data, error } = await supabase
+                let query = supabase
                     .from('inventory_levels')
                     .select(`
                         id, current_stock, product_id,
@@ -90,8 +91,15 @@ const Inventory: React.FC = () => {
                             brands (name)
                         ),
                         warehouses (name)
-                    `)
-                    .order('product_id');
+                    `);
+
+                // Apply filter if a warehouse is selected
+                if (selectedWarehouseId) {
+                    query = query.eq('warehouse_id', selectedWarehouseId);
+                }
+
+                const { data, error } = await query.order('product_id');
+
                 if (error) throw error;
                 // @ts-ignore
                 setStockItems(data || []);
@@ -137,6 +145,16 @@ const Inventory: React.FC = () => {
     // Replaced Logic: New Product opens Batch Entry
     const handleNewProduct = () => {
         setIsBatchEntryOpen(true);
+    };
+
+    const handleWarehouseClick = (warehouseId: number) => {
+        setSelectedWarehouseId(warehouseId);
+        setActiveTab('stock');
+    };
+
+    const clearWarehouseFilter = () => {
+        setSelectedWarehouseId(null);
+        fetchData(); // Refresh to show all
     };
 
     return (
@@ -229,11 +247,33 @@ const Inventory: React.FC = () => {
                 </div>
             </div>
 
+            {/* Active Filter Indicator */}
+            {activeTab === 'stock' && selectedWarehouseId && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                        <span className="material-symbols-outlined">filter_alt</span>
+                        <span className="font-medium">
+                            Filtrando por almacén: {warehouses.find(w => w.id === selectedWarehouseId)?.name || 'Desconocido'}
+                        </span>
+                    </div>
+                    <button
+                        onClick={clearWarehouseFilter}
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                    >
+                        Limpiar filtro
+                    </button>
+                </div>
+            )}
+
+
             {/* ... Rest of file (Tabs, Tables) ... */}
             <div className="border-b border-slate-200 dark:border-slate-700">
                 <nav className="flex gap-6">
                     <button
-                        onClick={() => setActiveTab('warehouses')}
+                        onClick={() => {
+                            setActiveTab('warehouses');
+                            setSelectedWarehouseId(null); // Optional: clear filter when going back to list
+                        }}
                         className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'warehouses' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                     >
                         <span className="material-symbols-outlined text-[20px]">warehouse</span>
@@ -265,7 +305,11 @@ const Inventory: React.FC = () => {
                             </div>
                         )}
                         {warehouses.map(wh => (
-                            <div key={wh.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 flex flex-col shadow-sm hover:shadow-md transition-shadow group">
+                            <div
+                                key={wh.id}
+                                onClick={() => handleWarehouseClick(wh.id)}
+                                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 flex flex-col shadow-sm hover:shadow-md transition-all cursor-pointer group ring-offset-2 hover:ring-2 ring-primary/50"
+                            >
                                 <div className="flex justify-between items-start mb-4">
                                     <div className={`p-3 rounded-lg ${wh.type === 'physical' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400'}`}>
                                         <span className="material-symbols-outlined text-[24px]">{wh.type === 'physical' ? 'store' : 'cloud'}</span>
@@ -274,11 +318,15 @@ const Inventory: React.FC = () => {
                                         {wh.is_active ? 'Activo' : 'Inactivo'}
                                     </span>
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{wh.name}</h3>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1 group-hover:text-primary transition-colors">{wh.name}</h3>
                                 <p className="text-sm text-slate-500 flex items-center gap-1 mb-4">
                                     <span className="material-symbols-outlined text-[16px]">location_on</span>
                                     {wh.location || 'N/A'}
                                 </p>
+                                <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Ver inventario</span>
+                                    <span className="material-symbols-outlined text-primary">arrow_forward</span>
+                                </div>
                             </div>
                         ))}
                     </div>

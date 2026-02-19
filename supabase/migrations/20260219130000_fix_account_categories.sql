@@ -1,0 +1,35 @@
+-- Migration: Fix Account Categories and Balances
+-- 1. Ensure standard categories for Bank/Cash and Merchandise
+UPDATE accounts
+SET category = 'asset'
+WHERE name IN (
+    'B. Guayaquil', 
+    'B. Pichincha', 
+    'Caja Chica', 
+    'Caja Grande', 
+    'B. Pacífico',
+    'Compra de mercadería'
+);
+
+-- 2. Update the view to handle standard accounting balances
+CREATE OR REPLACE VIEW account_balances AS
+SELECT 
+    a.id,
+    a.code,
+    a.name,
+    a.category,
+    a.is_nominal,
+    a.currency,
+    a.position,
+    COALESCE(
+        SUM(
+            CASE 
+                WHEN a.category IN ('asset', 'expense') THEN tl.debit - tl.credit
+                ELSE tl.credit - tl.debit
+            END
+        ), 
+        0
+    ) AS current_balance
+FROM accounts a
+LEFT JOIN transaction_lines tl ON a.id = tl.account_id
+GROUP BY a.id, a.code, a.name, a.category, a.is_nominal, a.currency, a.position;
