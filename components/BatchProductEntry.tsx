@@ -134,6 +134,10 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
 
             if (error) throw error;
 
+            if (!data.success) {
+                throw new Error(data.message || 'Error desconocido al guardar el lote.');
+            }
+
             alert(`Lote procesado exitosamente.`);
             onSuccess();
             onClose();
