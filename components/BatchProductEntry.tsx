@@ -37,6 +37,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     const [globalVat, setGlobalVat] = useState<number>(12); // Default 12%
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+    const [skipFinancialTransaction, setSkipFinancialTransaction] = useState(false);
 
     // Initial row
     const [rows, setRows] = useState<ProductRow[]>([
@@ -149,8 +150,13 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             return;
         }
 
-        if (!selectedAccountId) {
-            alert('Por favor selecciona una cuenta de pago.');
+        if (!globalWarehouseId) {
+            alert('Por favor selecciona un almacén para el lote.');
+            return;
+        }
+
+        if (!skipFinancialTransaction && !selectedAccountId) {
+            alert('Por favor selecciona una cuenta de pago o activa el modo "Solo Inventario".');
             return;
         }
 
@@ -172,11 +178,12 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 profit_margin: parseFloat(r.profitMargin) || 0
             }));
 
+
             const { data, error } = await supabase.rpc('process_batch_product_entry', {
                 p_brand_id: globalBrandId,
                 p_warehouse_id: globalWarehouseId,
                 p_vat_percentage: globalVat,
-                p_payment_account_id: selectedAccountId,
+                p_payment_account_id: skipFinancialTransaction ? null : selectedAccountId,
                 p_products: productsPayload
             });
 
@@ -321,13 +328,26 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cuenta de Pago / Origen</label>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className={`block text-sm font-medium ${skipFinancialTransaction ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>Cuenta de Pago / Origen</label>
+                            <label className="flex items-center cursor-pointer relative group">
+                                <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={skipFinancialTransaction}
+                                    onChange={(e) => setSkipFinancialTransaction(e.target.checked)}
+                                />
+                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                <span className="ml-2 text-xs text-slate-500 font-medium whitespace-nowrap group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">Solo Inventario</span>
+                            </label>
+                        </div>
                         <select
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                            className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors ${skipFinancialTransaction ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-primary focus:border-primary'}`}
                             value={selectedAccountId || ''}
                             onChange={(e) => setSelectedAccountId(parseInt(e.target.value))}
+                            disabled={skipFinancialTransaction}
                         >
-                            <option value="">Seleccionar Cuenta...</option>
+                            <option value="">{skipFinancialTransaction ? 'Sin transacción financiera' : 'Seleccionar Cuenta...'}</option>
                             {accounts.map(acc => (
                                 <option key={acc.id} value={acc.id}>
                                     {acc.code} - {acc.name} ({acc.currency})
