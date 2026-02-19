@@ -198,7 +198,7 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                 <option value="">Seleccionar cuenta...</option>
                                                 {accounts.map(acc => (
                                                     <option key={acc.id} value={acc.id}>
-                                                        {acc.code} - {acc.name} ({acc.currency})
+                                                        {acc.code} - {acc.name} ({acc.category}) - {acc.currency}
                                                     </option>
                                                 ))}
                                             </select>

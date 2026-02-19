@@ -1,20 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import InventoryMovementModal from '../components/InventoryMovementModal';
+import { ProductEntryForm } from '../components/ProductEntryForm';
+import { ProductModal } from '../components/ProductModal';
+import { BatchProductEntry } from '../components/BatchProductEntry'; // New Component
 
 // Define types based on our join queries
 interface StockItem {
     id: number;
+    product_id: number;
     current_stock: number;
     products: {
+        id: number;
         name: string;
         sku: string;
+        category: string;
+        brand_id: number | null;
+        min_stock_threshold: number;
+        profit_margin: number; // New field
+        brands?: {
+            name: string;
+        } | null;
     };
     warehouses: {
         name: string;
     };
 }
-
 interface Movement {
     id: number;
     created_at: string;
@@ -39,8 +50,17 @@ interface Warehouse {
 }
 
 const Inventory: React.FC = () => {
+    // ... (Existing State) ...
     const [activeTab, setActiveTab] = useState<'warehouses' | 'stock' | 'movements'>('warehouses');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isProductEntryOpen, setIsProductEntryOpen] = useState(false);
+    const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+    const [productToEdit, setProductToEdit] = useState<any>(null);
+
+    // New State for Batch Entry
+    // New State for Batch Entry
+    const [isBatchEntryOpen, setIsBatchEntryOpen] = useState(false);
 
     // Data states
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -50,8 +70,9 @@ const Inventory: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, [activeTab]); // Refetch when tab changes
+    }, [activeTab]);
 
+    // Data fetching logic
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -63,15 +84,19 @@ const Inventory: React.FC = () => {
                 const { data, error } = await supabase
                     .from('inventory_levels')
                     .select(`
-                        id, current_stock,
-                        products (name, sku),
+                        id, current_stock, product_id,
+                        products (
+                            id, name, sku, category, min_stock_threshold, brand_id, profit_margin,
+                            brands (name)
+                        ),
                         warehouses (name)
                     `)
-                    .order('product_id'); // Order by product
+                    .order('product_id');
                 if (error) throw error;
-                // @ts-ignore - Supabase types are tricky with joins sometimes
+                // @ts-ignore
                 setStockItems(data || []);
             } else if (activeTab === 'movements') {
+                // ... (movements fetch logic) ...
                 const { data, error } = await supabase
                     .from('inventory_logs')
                     .select(`
@@ -97,6 +122,23 @@ const Inventory: React.FC = () => {
         fetchData();
     };
 
+    const handleOpenProductEntry = (productId: number) => {
+        setSelectedProductId(productId);
+        setIsProductEntryOpen(true);
+    };
+
+    // Handlers
+
+    const handleEditProduct = (product: any) => {
+        setProductToEdit(product);
+        setIsProductModalOpen(true);
+    };
+
+    // Replaced Logic: New Product opens Batch Entry
+    const handleNewProduct = () => {
+        setIsBatchEntryOpen(true);
+    };
+
     return (
         <div className="flex flex-col gap-6 p-6 md:p-8 max-w-[1400px] mx-auto">
             <InventoryMovementModal
@@ -105,7 +147,49 @@ const Inventory: React.FC = () => {
                 onSuccess={handleMovementSuccess}
             />
 
-            {/* Breadcrumbs & Header */}
+            {/* Batch Entry Modal (New Product Flow) */}
+            <BatchProductEntry
+                isOpen={isBatchEntryOpen}
+                onClose={() => setIsBatchEntryOpen(false)}
+                onSuccess={() => fetchData()}
+            />
+
+            {/* Product Modal (Edit Only now) */}
+            <ProductModal
+                isOpen={isProductModalOpen}
+                onClose={() => setIsProductModalOpen(false)}
+                onSuccess={() => {
+                    fetchData();
+                }}
+                productToEdit={productToEdit}
+            />
+
+            {/* Product Entry Modal (Surtir) */}
+            {isProductEntryOpen && selectedProductId && (
+                // ... (Existing modal code)
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden relative">
+                        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-lg font-bold dark:text-white">Registrar Costo y Entrada</h3>
+                            <button
+                                onClick={() => setIsProductEntryOpen(false)}
+                                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                            >
+                                <span className="material-symbols-outlined text-slate-500">close</span>
+                            </button>
+                        </div>
+                        <ProductEntryForm
+                            productId={selectedProductId}
+                            onSave={() => {
+                                setIsProductEntryOpen(false);
+                                fetchData();
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Header ... */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                     <span className="hover:text-primary transition-colors cursor-pointer">Inicio</span>
@@ -125,6 +209,15 @@ const Inventory: React.FC = () => {
                             <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
                             Actualizar
                         </button>
+                        {activeTab === 'stock' && (
+                            <button
+                                onClick={handleNewProduct}
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-emerald-600/30"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">dataset</span>
+                                Entrada por Lote
+                            </button>
+                        )}
                         <button
                             onClick={() => setIsModalOpen(true)}
                             className="flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-primary/30"
@@ -136,7 +229,7 @@ const Inventory: React.FC = () => {
                 </div>
             </div>
 
-            {/* Navigation Tabs */}
+            {/* ... Rest of file (Tabs, Tables) ... */}
             <div className="border-b border-slate-200 dark:border-slate-700">
                 <nav className="flex gap-6">
                     <button
@@ -163,7 +256,6 @@ const Inventory: React.FC = () => {
                 </nav>
             </div>
 
-            {/* Content Area */}
             <div className="min-h-[400px]">
                 {activeTab === 'warehouses' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -199,25 +291,32 @@ const Inventory: React.FC = () => {
                                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
                                     <tr>
                                         <th className="px-6 py-3">Producto</th>
+                                        <th className="px-6 py-3">Marca</th>
                                         <th className="px-6 py-3">SKU</th>
                                         <th className="px-6 py-3">Almacén</th>
                                         <th className="px-6 py-3 text-right">Stock Actual</th>
                                         <th className="px-6 py-3 text-center">Estado</th>
+                                        <th className="px-6 py-3 text-center">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                     {stockItems.length === 0 && !loading && (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                                                No hay registros de inventario. Comienza registrando un movimiento.
+                                            <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                                                No hay registros de inventario. Comienza agregando un producto o registrando un movimiento.
                                             </td>
                                         </tr>
                                     )}
                                     {stockItems.map(item => (
-                                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                             <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                                                 {/* @ts-ignore */}
                                                 {item.products?.name}
+                                                <div className="text-xs text-slate-500 mt-0.5">{item.products?.category}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
+                                                {/* @ts-ignore */}
+                                                {item.products?.brands?.name || '-'}
                                             </td>
                                             <td className="px-6 py-4 text-slate-500 font-mono text-sm">
                                                 {/* @ts-ignore */}
@@ -229,9 +328,27 @@ const Inventory: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{item.current_stock}</td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${item.current_stock < 10 ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
-                                                    {item.current_stock < 10 ? 'Low Stock' : 'In Stock'}
+                                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${item.current_stock < (item.products?.min_stock_threshold || 10) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
+                                                    {item.current_stock < (item.products?.min_stock_threshold || 10) ? 'Bajo Stock' : 'En Stock'}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => handleEditProduct(item.products)}
+                                                        className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                        title="Editar Producto"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleOpenProductEntry(item.product_id)}
+                                                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 rounded-md text-xs font-semibold transition-colors"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+                                                        Surtir
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
