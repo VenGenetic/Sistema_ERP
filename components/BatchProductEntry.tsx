@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
+import { read, utils, writeFile } from 'xlsx';
 
 interface Account {
     id: number;
@@ -196,6 +197,67 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
         }
     };
 
+    // Excel Logic
+    const handleDownloadTemplate = () => {
+        const ws = utils.json_to_sheet([
+            { SKU: 'EJEMPLO-SKU', Nombre: 'Producto Ejemplo', Cantidad: 10, 'Costo S/I': 15.50, 'Costo Desc.': 0, Margen: 0.30 }
+        ], { header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen'] });
+        const wb = utils.book_new();
+        utils.book_append_sheet(wb, ws, "Plantilla");
+        writeFile(wb, "plantilla_importacion.xlsx");
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const bstr = evt.target?.result;
+            const wb = read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data: any[] = utils.sheet_to_json(ws);
+
+            const newRows: ProductRow[] = data.map((item, index) => {
+                // Check common variations of headers just in case
+                const sku = item['SKU'] || item['sku'] || '';
+                const name = item['Nombre'] || item['nombre'] || '';
+                const qty = item['Cantidad'] || item['cantidad'] || '1';
+                const cost = item['Costo S/I'] || item['costo'] || item['Costo'] || '0';
+                const discountCost = item['Costo Desc.'] || item['descuento'] || '';
+                const margin = item['Margen'] || item['margen'] || '0.30';
+
+                return {
+                    id: `imported-${Date.now()}-${index}`,
+                    sku: String(sku).toUpperCase(),
+                    name: String(name),
+                    quantity: String(qty),
+                    costWithoutVat: String(cost),
+                    discountedCost: String(discountCost),
+                    profitMargin: String(margin),
+                    costWithVat: 0,
+                    pvp: 0
+                };
+            }).filter(row => row.sku && row.name); // Basic validation that row has content
+
+            if (newRows.length > 0) {
+                // If the first row is empty/default, replace it, otherwise append
+                if (rows.length === 1 && !rows[0].sku && !rows[0].name) {
+                    setRows(newRows);
+                } else {
+                    setRows(prev => [...prev, ...newRows]);
+                }
+                alert(`Se han importado ${newRows.length} productos.`);
+            } else {
+                alert('No se encontraron datos válidos en el archivo Excel.');
+            }
+        };
+        reader.readAsBinaryString(file);
+        // Reset input
+        e.target.value = '';
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -212,9 +274,32 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                             <p className="text-sm text-slate-500">Ingresa inventario, costos y genera transacción financiera.</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined">close</span>
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleDownloadTemplate}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            title="Descargar plantilla Excel para importar"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">download</span>
+                            Plantilla
+                        </button>
+                        <div className="relative">
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls"
+                                onChange={handleFileUpload}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                title="Importar desde Excel"
+                            />
+                            <button className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
+                                <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                                Importar Excel
+                            </button>
+                        </div>
+                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors ml-2">
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Global Configuration */}
