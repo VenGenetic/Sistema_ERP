@@ -4,6 +4,7 @@ import InventoryMovementModal from '../components/InventoryMovementModal';
 import { ProductEntryForm } from '../components/ProductEntryForm';
 import { ProductModal } from '../components/ProductModal';
 import { BatchProductEntry } from '../components/BatchProductEntry'; // New Component
+import { utils, writeFile } from 'xlsx';
 
 // Define types based on our join queries
 interface StockItem {
@@ -17,7 +18,9 @@ interface StockItem {
         category: string;
         brand_id: number | null;
         min_stock_threshold: number;
-        profit_margin: number; // New field
+        profit_margin: number;
+        cost_without_vat: number | null;
+        vat_percentage: number | null;
         brands?: {
             name: string;
         } | null;
@@ -65,8 +68,11 @@ const Inventory: React.FC = () => {
     const [filters, setFilters] = useState<{ [key: string]: string }>({});
 
     // New State for Batch Entry
-    // New State for Batch Entry
     const [isBatchEntryOpen, setIsBatchEntryOpen] = useState(false);
+
+    // Export modal state
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportIvaPercent, setExportIvaPercent] = useState<number>(12);
 
     // Data states
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -93,6 +99,7 @@ const Inventory: React.FC = () => {
                         id, current_stock, product_id,
                         products (
                             id, name, sku, category, min_stock_threshold, brand_id, profit_margin,
+                            cost_without_vat, vat_percentage,
                             brands (name)
                         ),
                         warehouses (name)
@@ -150,6 +157,53 @@ const Inventory: React.FC = () => {
     // Replaced Logic: New Product opens Batch Entry
     const handleNewProduct = () => {
         setIsBatchEntryOpen(true);
+    };
+
+    // Export current stock view to Excel using the same format as the import template
+    const handleExportToExcel = () => {
+        const ivaMult = 1 + exportIvaPercent / 100;
+
+        const exportData = filteredAndSortedItems.map(item => {
+            const costWithoutVat = item.products?.cost_without_vat ?? null;
+            const storedVat = item.products?.vat_percentage ?? exportIvaPercent;
+            // Costo C/IVA stored in DB = cost_without_vat * (1 + storedVat/100)
+            const costWithVat = costWithoutVat !== null
+                ? parseFloat((costWithoutVat * (1 + storedVat / 100)).toFixed(4))
+                : null;
+            // Back-calculate Costo S/I using the user-supplied IVA %
+            const costoSinIva = costWithVat !== null
+                ? parseFloat((costWithVat / ivaMult).toFixed(4))
+                : '';
+
+            return {
+                'SKU': item.products?.sku || '',
+                'Nombre': item.products?.name || '',
+                'Cantidad': item.current_stock,
+                'Costo S/I': costoSinIva,
+                'Costo Desc.': '',
+                'Margen': item.products?.profit_margin ?? 0.30,
+                'Costo C/IVA': costWithVat ?? '',
+            };
+        });
+
+        const ws = utils.json_to_sheet(exportData, {
+            header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen', 'Costo C/IVA']
+        });
+
+        ws['!cols'] = [
+            { wch: 20 }, // SKU
+            { wch: 40 }, // Nombre
+            { wch: 12 }, // Cantidad
+            { wch: 14 }, // Costo S/I
+            { wch: 14 }, // Costo Desc.
+            { wch: 10 }, // Margen
+            { wch: 14 }, // Costo C/IVA
+        ];
+
+        const wb = utils.book_new();
+        utils.book_append_sheet(wb, ws, 'Inventario');
+        writeFile(wb, `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        setShowExportModal(false);
     };
 
     const handleWarehouseClick = (warehouseId: number) => {
@@ -240,6 +294,60 @@ const Inventory: React.FC = () => {
 
     return (
         <div className="flex flex-col gap-6 p-6 md:p-8 max-w-[1400px] mx-auto">
+            {/* Export IVA Modal */}
+            {showExportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="flex items-center gap-3 p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                            <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg">
+                                <span className="material-symbols-outlined text-[22px]">table_view</span>
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Exportar a Excel</h3>
+                                <p className="text-xs text-slate-500">Configura el IVA para el cálculo de costos</p>
+                            </div>
+                        </div>
+                        <div className="p-5 flex flex-col gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    IVA para calcular <span className="font-mono text-slate-500">Costo S/I</span> (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={exportIvaPercent}
+                                    onChange={e => setExportIvaPercent(parseFloat(e.target.value) || 0)}
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm"
+                                />
+                                <p className="text-xs text-slate-400 mt-1.5">
+                                    <span className="font-mono">Costo S/I = Costo C/IVA ÷ (1 + {exportIvaPercent}%)</span>
+                                </p>
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3 text-xs text-slate-500 space-y-1">
+                                <p>Se exportarán <span className="font-semibold text-slate-700 dark:text-slate-300">{filteredAndSortedItems.length}</span> productos visibles.</p>
+                                <p>Columnas: SKU · Nombre · Cantidad · Costo S/I · Costo Desc. · Margen · Costo C/IVA</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 px-5 pb-5">
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleExportToExcel}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">download</span>
+                                Descargar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <InventoryMovementModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
@@ -309,13 +417,23 @@ const Inventory: React.FC = () => {
                             Actualizar
                         </button>
                         {activeTab === 'stock' && (
-                            <button
-                                onClick={handleNewProduct}
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-emerald-600/30"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">dataset</span>
-                                Entrada por Lote
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => setShowExportModal(true)}
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                                    title="Exportar inventario visible como Excel (mismo formato que importación)"
+                                >
+                                    <span className="material-symbols-outlined text-[18px] text-emerald-600">table_view</span>
+                                    Exportar Excel
+                                </button>
+                                <button
+                                    onClick={handleNewProduct}
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-emerald-600/30"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">dataset</span>
+                                    Entrada por Lote
+                                </button>
+                            </>
                         )}
                         <button
                             onClick={() => setIsModalOpen(true)}

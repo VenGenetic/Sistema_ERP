@@ -18,4 +18,4 @@ async function checkAccounts() {
     }
 }
 
-checkAccounts();
+checkAccounts(); 
