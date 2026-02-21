@@ -12,6 +12,8 @@ const Products = React.lazy(() => import('./pages/Products'));
 const Finance = React.lazy(() => import('./pages/Finance'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Login = React.lazy(() => import('./pages/Login'));
+const POS = React.lazy(() => import('./pages/POS'));
+const Orders = React.lazy(() => import('./pages/Orders'));
 const AdminSetup = React.lazy(() => import('./pages/AdminSetup'));
 const TestConnection = React.lazy(() => import('./pages/TestConnection'));
 const AuthConfirm = React.lazy(() => import('./pages/AuthConfirm'));
@@ -39,12 +41,14 @@ const App: React.FC = () => {
           <Route path="/auth/reset-password" element={<ResetPassword />} />
 
           <Route element={<ProtectedRoute />}>
+            <Route path="/pos" element={<POS />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="team" element={<Team />} />
               <Route path="partners" element={<Partners />} />
-              <Route path="inventory" element={<Inventory />} />
               <Route path="products" element={<Products />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="orders/*" element={<Orders />} />
               <Route path="finance/*" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
             </Route>
