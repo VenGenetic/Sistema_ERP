@@ -8,6 +8,7 @@ const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Team = React.lazy(() => import('./pages/Team'));
 const Partners = React.lazy(() => import('./pages/Partners'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
+const Products = React.lazy(() => import('./pages/Products'));
 const Finance = React.lazy(() => import('./pages/Finance'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Login = React.lazy(() => import('./pages/Login'));
@@ -43,6 +44,7 @@ const App: React.FC = () => {
               <Route path="team" element={<Team />} />
               <Route path="partners" element={<Partners />} />
               <Route path="inventory" element={<Inventory />} />
+              <Route path="products" element={<Products />} />
               <Route path="finance/*" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
             </Route>

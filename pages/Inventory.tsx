@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import InventoryMovementModal from '../components/InventoryMovementModal';
 import { ProductEntryForm } from '../components/ProductEntryForm';
-import { ProductModal } from '../components/ProductModal';
 import { BatchProductEntry } from '../components/BatchProductEntry'; // New Component
 import { utils, writeFile } from 'xlsx';
 
@@ -58,8 +57,6 @@ const Inventory: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isProductEntryOpen, setIsProductEntryOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-    const [productToEdit, setProductToEdit] = useState<any>(null);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
 
     // Advanced Search & Filter State
@@ -148,11 +145,6 @@ const Inventory: React.FC = () => {
     };
 
     // Handlers
-
-    const handleEditProduct = (product: any) => {
-        setProductToEdit(product);
-        setIsProductModalOpen(true);
-    };
 
     // Replaced Logic: New Product opens Batch Entry
     const handleNewProduct = () => {
@@ -359,16 +351,6 @@ const Inventory: React.FC = () => {
                 isOpen={isBatchEntryOpen}
                 onClose={() => setIsBatchEntryOpen(false)}
                 onSuccess={() => fetchData()}
-            />
-
-            {/* Product Modal (Edit Only now) */}
-            <ProductModal
-                isOpen={isProductModalOpen}
-                onClose={() => setIsProductModalOpen(false)}
-                onSuccess={() => {
-                    fetchData();
-                }}
-                productToEdit={productToEdit}
             />
 
             {/* Product Entry Modal (Surtir) */}
@@ -601,13 +583,6 @@ const Inventory: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEditProduct(item.products)}
-                                                        className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                                        title="Editar Producto"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[18px]">edit</span>
-                                                    </button>
                                                     <button
                                                         onClick={() => handleOpenProductEntry(item.product_id)}
                                                         className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 rounded-md text-xs font-semibold transition-colors"

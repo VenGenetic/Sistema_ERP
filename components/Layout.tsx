@@ -45,6 +45,11 @@ const Layout: React.FC = () => {
           Partners
         </Link>
 
+        <Link to="/products" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('products') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'}`}>
+          <span className="material-symbols-outlined text-[20px]">category</span>
+          Catálogo
+        </Link>
+
         <Link to="/inventory" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('inventory') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'}`}>
           <span className="material-symbols-outlined text-[20px]">inventory_2</span>
           Almacenes
