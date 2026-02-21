@@ -71,6 +71,9 @@ const Inventory: React.FC = () => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportIvaPercent, setExportIvaPercent] = useState<number>(12);
 
+    // Expanded products state for grouped view
+    const [expandedProductIds, setExpandedProductIds] = useState<number[]>([]);
+
     // Data states
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -155,9 +158,9 @@ const Inventory: React.FC = () => {
     const handleExportToExcel = () => {
         const ivaMult = 1 + exportIvaPercent / 100;
 
-        const exportData = filteredAndSortedItems.map(item => {
-            const costWithoutVat = item.products?.cost_without_vat ?? null;
-            const storedVat = item.products?.vat_percentage ?? exportIvaPercent;
+        const exportData = groupedStockItems.map(group => {
+            const costWithoutVat = group.product?.cost_without_vat ?? null;
+            const storedVat = group.product?.vat_percentage ?? exportIvaPercent;
             // Costo C/IVA stored in DB = cost_without_vat * (1 + storedVat/100)
             const costWithVat = costWithoutVat !== null
                 ? parseFloat((costWithoutVat * (1 + storedVat / 100)).toFixed(4))
@@ -168,12 +171,12 @@ const Inventory: React.FC = () => {
                 : '';
 
             return {
-                'SKU': item.products?.sku || '',
-                'Nombre': item.products?.name || '',
-                'Cantidad': item.current_stock,
+                'SKU': group.product?.sku || '',
+                'Nombre': group.product?.name || '',
+                'Cantidad': group.global_stock,
                 'Costo S/I': costoSinIva,
                 'Costo Desc.': '',
-                'Margen': item.products?.profit_margin ?? 0.30,
+                'Margen': group.product?.profit_margin ?? 0.30,
                 'Costo C/IVA': costWithVat ?? '',
             };
         });
@@ -284,6 +287,30 @@ const Inventory: React.FC = () => {
         return items;
     }, [stockItems, searchTerm, filters, sortConfig]);
 
+    const groupedStockItems = useMemo(() => {
+        const groups = new Map<number, any>();
+        filteredAndSortedItems.forEach(item => {
+            if (!groups.has(item.product_id)) {
+                groups.set(item.product_id, {
+                    product_id: item.product_id,
+                    product: item.products,
+                    global_stock: 0,
+                    details: []
+                });
+            }
+            const group = groups.get(item.product_id)!;
+            group.global_stock += item.current_stock;
+            group.details.push(item);
+        });
+        return Array.from(groups.values());
+    }, [filteredAndSortedItems]);
+
+    const toggleExpandProduct = (productId: number) => {
+        setExpandedProductIds(prev =>
+            prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+        );
+    };
+
     return (
         <div className="flex flex-col gap-6 p-6 md:p-8 max-w-[1400px] mx-auto">
             {/* Export IVA Modal */}
@@ -317,7 +344,7 @@ const Inventory: React.FC = () => {
                                 </p>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3 text-xs text-slate-500 space-y-1">
-                                <p>Se exportarán <span className="font-semibold text-slate-700 dark:text-slate-300">{filteredAndSortedItems.length}</span> productos visibles.</p>
+                                <p>Se exportarán <span className="font-semibold text-slate-700 dark:text-slate-300">{groupedStockItems.length}</span> productos visibles.</p>
                                 <p>Columnas: SKU · Nombre · Cantidad · Costo S/I · Costo Desc. · Margen · Costo C/IVA</p>
                             </div>
                         </div>
@@ -521,8 +548,7 @@ const Inventory: React.FC = () => {
                                             { key: 'product', label: 'Producto' },
                                             { key: 'brand', label: 'Marca' },
                                             { key: 'sku', label: 'SKU' },
-                                            { key: 'warehouse', label: 'Almacén' },
-                                            { key: 'stock', label: 'Stock Actual', align: 'right' }
+                                            { key: 'stock', label: 'Stock Global', align: 'right' }
                                         ].map(col => (
                                             <th key={col.key} className={`px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${col.align === 'right' ? 'text-right' : ''}`} onClick={() => handleSort(col.key)}>
                                                 <div className={`flex flex-col gap-2 ${col.align === 'right' ? 'items-end' : 'items-start'}`}>
@@ -549,50 +575,64 @@ const Inventory: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                                    {filteredAndSortedItems.length === 0 && !loading && (
+                                    {groupedStockItems.length === 0 && !loading && (
                                         <tr>
-                                            <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                                            <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                                                 No hay registros que coincidan con tu búsqueda.
                                             </td>
                                         </tr>
                                     )}
-                                    {filteredAndSortedItems.map(item => (
-                                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
-                                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                                                {/* @ts-ignore */}
-                                                {item.products?.name}
-                                                <div className="text-xs text-slate-500 mt-0.5">{item.products?.category}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
-                                                {/* @ts-ignore */}
-                                                {item.products?.brands?.name || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-500 font-mono text-sm">
-                                                {/* @ts-ignore */}
-                                                {item.products?.sku}
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                                                {/* @ts-ignore */}
-                                                {item.warehouses?.name}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{item.current_stock}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${item.current_stock < (item.products?.min_stock_threshold || 10) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
-                                                    {item.current_stock < (item.products?.min_stock_threshold || 10) ? 'Bajo Stock' : 'En Stock'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleOpenProductEntry(item.product_id)}
-                                                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 rounded-md text-xs font-semibold transition-colors"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
-                                                        Surtir
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                    {groupedStockItems.map(group => (
+                                        <React.Fragment key={group.product_id}>
+                                            <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group cursor-pointer" onClick={() => toggleExpandProduct(group.product_id)}>
+                                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform ${expandedProductIds.includes(group.product_id) ? 'rotate-90' : ''}`}>chevron_right</span>
+                                                        <div>
+                                                            {group.product?.name}
+                                                            <div className="text-xs text-slate-500 mt-0.5">{group.product?.category}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
+                                                    {group.product?.brands?.name || '-'}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-500 font-mono text-sm">
+                                                    {group.product?.sku}
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{group.global_stock}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${group.global_stock < (group.product?.min_stock_threshold || 10) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
+                                                        {group.global_stock < (group.product?.min_stock_threshold || 10) ? 'Bajo Stock' : 'En Stock'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                        <button
+                                                            onClick={() => handleOpenProductEntry(group.product_id)}
+                                                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 rounded-md text-xs font-semibold transition-colors"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+                                                            Surtir
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {expandedProductIds.includes(group.product_id) && group.details.map((detail: StockItem) => (
+                                                <tr key={detail.id} className="bg-slate-50/50 dark:bg-slate-800/50 border-t-0">
+                                                    <td className="px-6 py-3 pl-14 text-sm text-slate-600 dark:text-slate-400" colSpan={3}>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-[16px] text-slate-400">subdirectory_arrow_right</span>
+                                                            Almacén: <span className="font-medium text-slate-900 dark:text-white">{detail.warehouses?.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-3 text-right font-semibold text-slate-700 dark:text-slate-300">
+                                                        {detail.current_stock}
+                                                    </td>
+                                                    <td colSpan={2}></td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
                                     ))}
                                 </tbody>
                             </table>

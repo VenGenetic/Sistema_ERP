@@ -12,10 +12,10 @@ const Products: React.FC = () => {
 
     const fetchProducts = async () => {
         setLoading(true);
-        // Fetching directly from the master products table
+        // Fetching directly from the master products table with inventory levels
         const { data, error } = await supabase
             .from('products')
-            .select('*, brands(name)')
+            .select('*, brands(name), inventory_levels(current_stock)')
             .order('name');
 
         if (!error && data) {
@@ -58,6 +58,7 @@ const Products: React.FC = () => {
                                 <th className="px-6 py-4">SKU</th>
                                 <th className="px-6 py-4">Nombre</th>
                                 <th className="px-6 py-4">Categoría</th>
+                                <th className="px-6 py-4 text-center">Stock Global</th>
                                 <th className="px-6 py-4 text-center">Acciones</th>
                             </tr>
                         </thead>
@@ -67,6 +68,9 @@ const Products: React.FC = () => {
                                     <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400">{prod.sku}</td>
                                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{prod.name}</td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.category}</td>
+                                    <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white">
+                                        {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
+                                    </td>
                                     <td className="px-6 py-4 text-center">
                                         <button
                                             onClick={() => handleOpenModal(prod)}
@@ -80,7 +84,7 @@ const Products: React.FC = () => {
                             ))}
                             {products.length === 0 && !loading && (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
                                         No hay productos registrados.
                                     </td>
                                 </tr>

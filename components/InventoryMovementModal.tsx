@@ -21,7 +21,8 @@ const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({ isOpen,
     const [formData, setFormData] = useState({
         productId: '',
         warehouseId: '',
-        type: 'IN', // 'IN' or 'OUT'
+        destinationWarehouseId: '',
+        type: 'IN', // 'IN', 'OUT', or 'TRANSFER'
         quantity: '',
         reason: '',
         reference: '' // Optional reference
@@ -63,20 +64,34 @@ const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({ isOpen,
             return;
         }
 
-        const finalQty = formData.type === 'OUT' ? -qty : qty;
+        if (formData.type === 'TRANSFER' && formData.warehouseId === formData.destinationWarehouseId) {
+            setError('El almacén origen y destino no pueden ser el mismo');
+            setSubmitting(false);
+            return;
+        }
 
         try {
-            // Call the ACID RPC
-            const { data, error: rpcError } = await supabase.rpc('process_inventory_movement', {
-                p_product_id: parseInt(formData.productId),
-                p_warehouse_id: parseInt(formData.warehouseId),
-                p_quantity_change: finalQty,
-                p_reason: formData.reason,
-                p_reference_type: 'manual_adjustment',
-                p_reference_id: formData.reference || null
-            });
-
-            if (rpcError) throw rpcError;
+            if (formData.type === 'TRANSFER') {
+                const { error: rpcError } = await supabase.rpc('process_inventory_transfer', {
+                    p_product_id: parseInt(formData.productId),
+                    p_source_warehouse: parseInt(formData.warehouseId),
+                    p_destination_warehouse: parseInt(formData.destinationWarehouseId),
+                    p_quantity: qty,
+                    p_reason: formData.reason
+                });
+                if (rpcError) throw rpcError;
+            } else {
+                const finalQty = formData.type === 'OUT' ? -qty : qty;
+                const { error: rpcError } = await supabase.rpc('process_inventory_movement', {
+                    p_product_id: parseInt(formData.productId),
+                    p_warehouse_id: parseInt(formData.warehouseId),
+                    p_quantity_change: finalQty,
+                    p_reason: formData.reason,
+                    p_reference_type: 'manual_adjustment',
+                    p_reference_id: formData.reference || null
+                });
+                if (rpcError) throw rpcError;
+            }
 
             onSuccess();
             onClose();
@@ -84,6 +99,7 @@ const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({ isOpen,
             setFormData({
                 productId: '',
                 warehouseId: '',
+                destinationWarehouseId: '',
                 type: 'IN',
                 quantity: '',
                 reason: '',
@@ -128,6 +144,7 @@ const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({ isOpen,
                             >
                                 <option value="IN">Entrada (+)</option>
                                 <option value="OUT">Salida (-)</option>
+                                <option value="TRANSFER">Traslado (Entre almacenes)</option>
                             </select>
                         </div>
                         <div>
@@ -159,19 +176,41 @@ const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({ isOpen,
                         </select>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Almacén</label>
-                        <select
-                            required
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                            value={formData.warehouseId}
-                            onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
-                        >
-                            <option value="">Seleccionar Almacén...</option>
-                            {warehouses.map(w => (
-                                <option key={w.id} value={w.id}>{w.name}</option>
-                            ))}
-                        </select>
+                    <div className={formData.type === 'TRANSFER' ? 'grid grid-cols-2 gap-4' : ''}>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                {formData.type === 'TRANSFER' ? 'Almacén Origen' : 'Almacén'}
+                            </label>
+                            <select
+                                required
+                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                                value={formData.warehouseId}
+                                onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                            >
+                                <option value="">Seleccionar Almacén...</option>
+                                {warehouses.map(w => (
+                                    <option key={w.id} value={w.id}>{w.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {formData.type === 'TRANSFER' && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    Almacén Destino
+                                </label>
+                                <select
+                                    required
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                                    value={formData.destinationWarehouseId}
+                                    onChange={(e) => setFormData({ ...formData, destinationWarehouseId: e.target.value })}
+                                >
+                                    <option value="">Seleccionar Almacén...</option>
+                                    {warehouses.map(w => (
+                                        <option key={w.id} value={w.id}>{w.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     <div>
@@ -207,7 +246,7 @@ const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({ isOpen,
                         </button>
                         <button
                             type="submit"
-                            disabled={submitting}
+                            disabled={submitting || (formData.type === 'TRANSFER' && formData.warehouseId !== '' && formData.warehouseId === formData.destinationWarehouseId)}
                             className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
                             {submitting && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
