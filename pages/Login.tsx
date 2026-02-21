@@ -15,14 +15,27 @@ const Login: React.FC = () => {
         setError(null);
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
             if (error) throw error;
 
-            navigate('/');
+            // Check role in profiles
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role_id')
+                .eq('id', data.session?.user.id)
+                .single();
+
+            if (profile && profile.role_id === 2) {
+                // Vendedor / Cashier
+                navigate('/pos', { replace: true });
+            } else {
+                // Admin or others
+                navigate('/', { replace: true });
+            }
         } catch (err: any) {
             setError(err.message || 'Error al iniciar sesión');
         } finally {

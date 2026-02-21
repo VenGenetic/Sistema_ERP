@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import SessionTimeoutHandler from './SessionTimeoutHandler';
 
 const ProtectedRoute: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [authenticated, setAuthenticated] = useState(false);
+    const [roleId, setRoleId] = useState<number | null>(null);
+    const location = useLocation();
 
     useEffect(() => {
         let mounted = true;
@@ -23,6 +25,15 @@ const ProtectedRoute: React.FC = () => {
                 const sessionPromise = supabase.auth.getSession();
 
                 const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
+                if (session) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role_id')
+                        .eq('id', session.user.id)
+                        .single();
+                    if (profile) setRoleId(profile.role_id);
+                }
 
                 if (mounted) {
                     console.log("ProtectedRoute: Session found:", !!session);
@@ -67,7 +78,12 @@ const ProtectedRoute: React.FC = () => {
     }
 
     if (!authenticated) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to="/login" replace state={{ from: location }} />;
+    }
+
+    // Role Fencing: Prevent cashiers from accessing anything but /pos
+    if (roleId === 2 && location.pathname !== '/pos') {
+        return <Navigate to="/pos" replace />;
     }
 
     return (

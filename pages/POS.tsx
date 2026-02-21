@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Trash2, ArrowLeft, LogOut } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 interface Product {
     id: number;
@@ -38,6 +39,7 @@ const POS: React.FC = () => {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [customer, setCustomer] = useState<Customer>(defaultConsumidorFinal);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isCashier, setIsCashier] = useState(false);
 
     const searchInputRef = useRef<HTMLInputElement>(null);
     const quantityInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
@@ -53,6 +55,21 @@ const POS: React.FC = () => {
     useEffect(() => {
         searchQueryRef.current = searchQuery;
     }, [searchQuery]);
+
+    useEffect(() => {
+        const fetchUserRole = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role_id')
+                    .eq('id', session.user.id)
+                    .single();
+                if (profile?.role_id === 2) setIsCashier(true);
+            }
+        };
+        fetchUserRole();
+    }, []);
 
     // Global Keyboard Shortcuts
     useEffect(() => {
@@ -90,6 +107,14 @@ const POS: React.FC = () => {
         } else {
             navigate('/');
         }
+    };
+
+    const handleLogout = async () => {
+        if (cartRef.current.length > 0 && !window.confirm("¿Estás seguro que deseas salir? El carrito no está vacío y se perderán los datos.")) {
+            return;
+        }
+        await supabase.auth.signOut();
+        navigate('/login');
     };
 
     const handleRegistrarDemanda = (term: string) => {
@@ -187,14 +212,25 @@ const POS: React.FC = () => {
             {/* Zone A: Header */}
             <header className="bg-white px-6 py-3 shadow-md flex justify-between items-center z-10">
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={handleExit}
-                        className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors"
-                        title="Volver al Dashboard (ESC)"
-                    >
-                        <ArrowLeft size={20} />
-                        <span className="font-medium text-sm hidden sm:inline">Volver</span>
-                    </button>
+                    {!isCashier ? (
+                        <button
+                            onClick={handleExit}
+                            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors"
+                            title="Volver al Dashboard (ESC)"
+                        >
+                            <ArrowLeft size={20} />
+                            <span className="font-medium text-sm hidden sm:inline">Volver</span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
+                            title="Cerrar Sesión"
+                        >
+                            <LogOut size={18} />
+                            <span className="font-medium text-sm hidden sm:inline">Cerrar Sesión</span>
+                        </button>
+                    )}
                     <div className="h-6 w-px bg-gray-300 mx-2"></div>
 
                     <div className="flex items-center gap-2">

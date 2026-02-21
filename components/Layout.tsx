@@ -1,15 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useSearchParams } from 'react-router-dom';
 import HeaderAccount from './HeaderAccount';
+import { supabase } from '../supabaseClient';
 
 const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
 
   // Cerrar menú móvil al cambiar de ruta
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role_id')
+          .eq('id', session.user.id)
+          .single();
+        if (profile?.role_id === 1) {
+          setIsAdmin(true);
+        }
+      }
+    };
+    fetchUserRole();
+  }, []);
 
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -103,6 +122,19 @@ const Layout: React.FC = () => {
         </div>
 
         <div className="flex flex-1 justify-end gap-3 md:gap-6 items-center">
+
+          {/* Admin POS Auto-Access Button */}
+          {isAdmin && (
+            <Link
+              to="/pos"
+              target="_blank"
+              className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-semibold transition-colors shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">point_of_sale</span>
+              <span>Abrir Caja (POS)</span>
+            </Link>
+          )}
+
           <div className="relative hidden md:block w-64">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[18px] text-slate-400">search</span>
             <input
