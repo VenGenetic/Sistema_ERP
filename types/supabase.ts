@@ -103,6 +103,11 @@ export interface Database {
                     category: string | null
                     min_stock_threshold: number
                     created_at: string
+                    price: number
+                    cost_without_vat: number
+                    vat_percentage: number
+                    profit_margin: number
+                    brand_id: number | null
                 }
                 Insert: {
                     id?: number
@@ -111,6 +116,11 @@ export interface Database {
                     category?: string | null
                     min_stock_threshold?: number
                     created_at?: string
+                    price?: number
+                    cost_without_vat?: number
+                    vat_percentage?: number
+                    profit_margin?: number
+                    brand_id?: number | null
                 }
                 Update: {
                     id?: number
@@ -119,6 +129,11 @@ export interface Database {
                     category?: string | null
                     min_stock_threshold?: number
                     created_at?: string
+                    price?: number
+                    cost_without_vat?: number
+                    vat_percentage?: number
+                    profit_margin?: number
+                    brand_id?: number | null
                 }
             }
             inventory_levels: {
@@ -292,6 +307,96 @@ export interface Database {
                     account_id?: number
                     debit?: number
                     credit?: number
+                }
+            }
+            customers: {
+                Row: {
+                    id: number
+                    name: string
+                    email: string | null
+                    phone: string | null
+                    document_id: string | null
+                    address: string | null
+                    created_at: string
+                }
+                Insert: {
+                    id?: number
+                    name: string
+                    email?: string | null
+                    phone?: string | null
+                    document_id?: string | null
+                    address?: string | null
+                    created_at?: string
+                }
+                Update: {
+                    id?: number
+                    name?: string
+                    email?: string | null
+                    phone?: string | null
+                    document_id?: string | null
+                    address?: string | null
+                    created_at?: string
+                }
+            }
+            lost_demand: {
+                Row: {
+                    id: number
+                    search_query: string | null
+                    product_requested: string
+                    customer_name: string | null
+                    customer_contact: string | null
+                    notes: string | null
+                    created_at: string
+                    user_id: string | null
+                }
+                Insert: {
+                    id?: number
+                    search_query?: string | null
+                    product_requested: string
+                    customer_name?: string | null
+                    customer_contact?: string | null
+                    notes?: string | null
+                    created_at?: string
+                    user_id?: string | null
+                }
+                Update: {
+                    id?: number
+                    search_query?: string | null
+                    product_requested?: string
+                    customer_name?: string | null
+                    customer_contact?: string | null
+                    notes?: string | null
+                    created_at?: string
+                    user_id?: string | null
+                }
+            }
+            product_compatibilities: {
+                Row: {
+                    id: number
+                    product_id: number
+                    make: string
+                    model: string
+                    year_from: number
+                    year_to: number
+                    created_at: string
+                }
+                Insert: {
+                    id?: number
+                    product_id: number
+                    make: string
+                    model: string
+                    year_from: number
+                    year_to: number
+                    created_at?: string
+                }
+                Update: {
+                    id?: number
+                    product_id?: number
+                    make?: string
+                    model?: string
+                    year_from?: number
+                    year_to?: number
+                    created_at?: string
                 }
             }
         }

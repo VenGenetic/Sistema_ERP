@@ -6,7 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Lazy load pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Team = React.lazy(() => import('./pages/Team'));
-const Partners = React.lazy(() => import('./pages/Partners'));
+const Customers = React.lazy(() => import('./pages/Customers'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
 const Products = React.lazy(() => import('./pages/Products'));
 const Finance = React.lazy(() => import('./pages/Finance'));
@@ -47,7 +47,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="team" element={<Team />} />
-              <Route path="partners" element={<Partners />} />
+              <Route path="customers" element={<Customers />} />
               <Route path="products" element={<Products />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="orders/*" element={<Orders />} />

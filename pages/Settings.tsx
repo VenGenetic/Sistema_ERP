@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import TeamPanel from '../components/settings/TeamPanel';
 import ProfilePanel from '../components/settings/ProfilePanel';
 import AccountPanel from '../components/settings/AccountPanel';
+import BrandsPanel from '../components/settings/BrandsPanel';
 
 // --- Local Panels for Inventory, Finance, Dev (with persistence) ---
 
@@ -216,6 +217,7 @@ const Settings: React.FC = () => {
             case 'general': return <ProfilePanel />;
             case 'account': return <AccountPanel />;
             case 'team': return <TeamPanel />;
+            case 'brands': return <BrandsPanel />;
             case 'partners': return <PartnersPanel />;
             case 'inventory': return <InventoryPanel />;
             case 'finance': return <FinancePanel />;
@@ -229,6 +231,7 @@ const Settings: React.FC = () => {
             case 'general': return 'Mi Perfil';
             case 'account': return 'Seguridad de Cuenta';
             case 'team': return 'Gestión de Equipos';
+            case 'brands': return 'Gestión de Marcas';
             case 'partners': return 'Dropshipping';
             case 'inventory': return 'Bodegas y Logística';
             case 'finance': return 'Configuración Financiera';
@@ -242,6 +245,7 @@ const Settings: React.FC = () => {
             case 'general': return 'Gestiona tu identidad pública, avatar y biografía.';
             case 'account': return 'Actualiza tu email, contraseña y verifica tu cuenta.';
             case 'team': return 'Miembros del equipo y sus roles.';
+            case 'brands': return 'Administra las marcas del catálogo de productos.';
             case 'partners': return 'Conexiones con proveedores externos.';
             case 'inventory': return 'Alertas de stock y ubicaciones.';
             case 'finance': return 'Preferencias de moneda y año fiscal.';
@@ -254,6 +258,7 @@ const Settings: React.FC = () => {
         { id: 'general', label: 'Mi Perfil', icon: 'person' },
         { id: 'account', label: 'Cuenta & Seguridad', icon: 'shield_lock' },
         { id: 'team', label: 'Equipo', icon: 'group' },
+        { id: 'brands', label: 'Marcas', icon: 'verified' },
         { id: 'inventory', label: 'Logística', icon: 'warehouse' },
         { id: 'finance', label: 'Finanzas', icon: 'payments' },
         { id: 'partners', label: 'Dropshipping', icon: 'hub' },

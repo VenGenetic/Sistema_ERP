@@ -1,69 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Trash2, ArrowLeft, LogOut, Package, MapPin, DollarSign, AlertTriangle } from 'lucide-react';
+import { MapPin, DollarSign, AlertTriangle, ArrowLeft, LogOut, Package, Search, Trash2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-
-// Interfaces
-interface Product {
-    id: number;
-    sku: string;
-    name: string;
-    price: number;
-    cost_without_vat?: number;
-    vat_percentage?: number;
-    final_cost_with_vat?: number;
-}
-
-interface InventoryResult {
-    product: Product;
-    warehouse_id: number;
-    warehouse_name: string;
-    current_stock: number;
-}
-
-interface Customer {
-    id: number;
-    identification_number: string;
-    name: string;
-    is_final_consumer: boolean;
-}
-
-interface CartItem {
-    id: string; // unique cart row id
-    product: Product;
-    warehouse_id: number;
-    warehouse_name: string;
-    quantity: number;
-    unitPrice: number;
-    unitCost: number;
-    subtotal: number;
-}
-
-const defaultConsumidorFinal: Customer = { id: 1, identification_number: '9999999999', name: 'CONSUMIDOR FINAL', is_final_consumer: true };
+import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { PaymentModal } from '../components/pos/PaymentModal';
 
 const POS: React.FC = () => {
     const navigate = useNavigate();
 
-    // State
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [customer, setCustomer] = useState<Customer>(defaultConsumidorFinal);
+    // Global State
+    const {
+        cart, customer, shippingCost,
+        setCustomer, setShippingCost, addToCart,
+        updateQuantity, removeFromCart, clearCart,
+        getSubtotal, getTotal
+    } = useCartStore();
+
+    // Local UI State
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<InventoryResult[]>([]);
     const [isCashier, setIsCashier] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
-    const [shippingCost, setShippingCost] = useState<number>(0);
     const [paymentAccounts, setPaymentAccounts] = useState<{ id: number, name: string }[]>([]);
     const [selectedPaymentAccount, setSelectedPaymentAccount] = useState<number | null>(null);
-    const [isProcessing, setIsProcessing] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+    const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+    const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
+
+    const [isLostDemandModalOpen, setIsLostDemandModalOpen] = useState(false);
+    const [lostDemandBikeModel, setLostDemandBikeModel] = useState('');
+    const [lostDemandBrand, setLostDemandBrand] = useState('');
 
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
     const cartRef = useRef(cart);
-    const searchQueryRef = useRef(searchQuery);
 
     useEffect(() => { cartRef.current = cart; }, [cart]);
-    useEffect(() => { searchQueryRef.current = searchQuery; }, [searchQuery]);
 
     // Initial Load
     useEffect(() => {
@@ -102,12 +77,67 @@ const POS: React.FC = () => {
             }
             if (e.key === 'F12') {
                 e.preventDefault();
-                handleCheckout();
+                handleCheckoutClick();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
+
+    // Barcode Scanner Integration
+    // When a barcode is fired, look it up instantly and add
+    const handleBarcodeScan = useCallback(async (barcode: string) => {
+        setIsSearching(true);
+        const { data, error } = await supabase
+            .from('products')
+            .select(`
+                id, sku, name, price, cost_without_vat, vat_percentage,
+                inventory_levels (
+                    current_stock,
+                    warehouse_id,
+                    warehouses (name)
+                )
+            `)
+            .eq('sku', barcode)
+            .limit(1);
+
+        setIsSearching(false);
+
+        if (!error && data && data.length > 0) {
+            const p = data[0];
+            const stockLevel = p.inventory_levels?.find((il: any) => il.current_stock > 0);
+
+            if (stockLevel) {
+                // Safely handle if warehouses is array or object
+                const whName = Array.isArray(stockLevel.warehouses)
+                    ? (stockLevel.warehouses as any)[0]?.name
+                    : (stockLevel.warehouses as any)?.name;
+
+                const mappedItem: InventoryResult = {
+                    product: {
+                        id: p.id,
+                        sku: p.sku,
+                        name: p.name,
+                        price: p.price,
+                        cost_without_vat: p.cost_without_vat || 0,
+                        vat_percentage: p.vat_percentage || 0,
+                        final_cost_with_vat: (p.cost_without_vat || 0) * (1 + (p.vat_percentage || 0) / 100)
+                    },
+                    warehouse_id: stockLevel.warehouse_id,
+                    warehouse_name: whName || 'Desconocido',
+                    current_stock: stockLevel.current_stock
+                };
+                // Instantly add to Zustand store
+                addToCart(mappedItem);
+            } else {
+                alert(`¡Producto escaneado (${barcode}) no tiene stock en ninguna bodega!`);
+            }
+        } else {
+            alert(`Producto no encontrado para el SKU escaneado: ${barcode}`);
+        }
+    }, [addToCart]);
+
+    useBarcodeScanner(handleBarcodeScan);
 
     // Debounced Search
     useEffect(() => {
@@ -162,10 +192,15 @@ const POS: React.FC = () => {
 
                 p.inventory_levels?.forEach((il: any) => {
                     if (il.current_stock > 0) {
+                        // In some queries, joined relation is an object, in others an array. Safely handle both:
+                        const whName = Array.isArray(il.warehouses)
+                            ? il.warehouses[0]?.name
+                            : il.warehouses?.name;
+
                         results.push({
                             product: mappedProduct,
                             warehouse_id: il.warehouse_id,
-                            warehouse_name: il.warehouses?.name || 'Desconocido',
+                            warehouse_name: whName || 'Desconocido',
                             current_stock: il.current_stock
                         });
                     }
@@ -187,6 +222,29 @@ const POS: React.FC = () => {
         };
     }, [searchQuery]);
 
+    // Watch for customer search query changes
+    useEffect(() => {
+        if (customerSearchQuery.length < 3) {
+            setCustomerSearchResults([]);
+            return;
+        }
+
+        const fetchCustomers = async () => {
+            const { data, error } = await supabase
+                .from('customers')
+                .select('*')
+                .or(`name.ilike.%${customerSearchQuery}%,identification_number.ilike.%${customerSearchQuery}%`)
+                .limit(5);
+
+            if (!error && data) {
+                setCustomerSearchResults(data as Customer[]);
+            }
+        };
+
+        const timeout = setTimeout(fetchCustomers, 300);
+        return () => clearTimeout(timeout);
+    }, [customerSearchQuery]);
+
 
     const handleExit = () => {
         if (cartRef.current.length > 0) {
@@ -206,12 +264,13 @@ const POS: React.FC = () => {
         navigate('/login');
     };
 
-    const handleRegistrarDemanda = async (term: string, reason: string) => {
+    const handleRegistrarDemanda = async (term: string, reason: string, customData?: any) => {
         try {
             await supabase.from('lost_demand').insert([{
                 search_term: term,
                 reason: reason,
-                channel: 'POS'
+                channel: 'POS',
+                ...customData
             }]);
             console.log("Lost demand logged:", term);
         } catch (e) {
@@ -219,59 +278,42 @@ const POS: React.FC = () => {
         }
     };
 
+    const handleManualLostDemandSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await handleRegistrarDemanda(searchQuery, 'not_in_catalog');
+        // If we expand the DB to hold brand/model for lost demand, we'd pass it in customData
+        alert('Demanda registrada exitosamente.');
+        setIsLostDemandModalOpen(false);
+        setLostDemandBrand('');
+        setLostDemandBikeModel('');
+        setSearchQuery('');
+    };
+
     const handleAddToCart = (item: InventoryResult) => {
-        const newItemId = crypto.randomUUID();
-        // Calculate unit cost from the product data
-        const unitCost = item.product.final_cost_with_vat || item.product.cost_without_vat || 0;
-
-        const cartItem: CartItem = {
-            id: newItemId,
-            product: item.product,
-            warehouse_id: item.warehouse_id,
-            warehouse_name: item.warehouse_name,
-            quantity: 1,
-            unitPrice: item.product.price,
-            unitCost: unitCost,
-            subtotal: item.product.price,
-        };
-
-        setCart(prev => [...prev, cartItem]);
+        addToCart(item);
         setSearchQuery('');
         setSearchResults([]);
     };
 
     const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
-        if (newQuantity < 0) return;
-        setCart(prev => prev.map(item => {
-            if (item.id === itemId) {
-                // Check stock bounds
-                const currentStockAvailable = searchResults.find(r => r.product.id === item.product.id && r.warehouse_id === item.warehouse_id)?.current_stock || 999;
-                // We don't have perfect stock checking inside the cart after search clears unless we fetch again, but the RPC will enforce it.
-                return {
-                    ...item,
-                    quantity: newQuantity,
-                    subtotal: newQuantity * item.unitPrice
-                };
-            }
-            return item;
-        }));
+        updateQuantity(itemId, newQuantity);
     };
 
     const handleRemoveFromCart = (itemId: string) => {
-        setCart(prev => prev.filter(item => item.id !== itemId));
+        removeFromCart(itemId);
     };
 
-    const handleCheckout = async () => {
+    const handleCheckoutClick = () => {
         if (cartRef.current.length === 0) {
             alert("El carrito está vacío");
             return;
         }
-        if (!selectedPaymentAccount) {
-            alert("Por favor selecciona una cuenta de pago.");
-            return;
-        }
+        setIsPaymentModalOpen(true);
+    };
 
-        setIsProcessing(true);
+    const processCheckout = async (paymentAccountId: number) => {
+        if (cartRef.current.length === 0) return;
+
         try {
             const itemsPayload = cartRef.current.map(c => ({
                 product_id: c.product.id,
@@ -283,7 +325,7 @@ const POS: React.FC = () => {
 
             const { data, error } = await supabase.rpc('process_pos_sale', {
                 p_customer_id: customer.id,
-                p_payment_account_id: selectedPaymentAccount,
+                p_payment_account_id: paymentAccountId,
                 p_shipping_cost: shippingCost,
                 p_items: itemsPayload
             });
@@ -294,23 +336,26 @@ const POS: React.FC = () => {
             }
 
             alert("¡Venta completada con éxito!");
-            setCart([]);
+            clearCart();
             setSearchQuery('');
-            setCustomer(defaultConsumidorFinal);
-            setShippingCost(0);
         } catch (err) {
             console.error("Checkout failed", err);
-        } finally {
-            setIsProcessing(false);
+            throw err; // Re-throw for PaymentModal to handle
         }
     };
 
-    // Derived State
-    const subtotal = cart.reduce((acc, item) => acc + item.subtotal, 0);
-    const orderTotal = subtotal + shippingCost; // Assuming prices already include IVA as per standard POS operations here, or if not, add it.
+    // Derived State from Zustand
+    const subtotal = getSubtotal();
+    const orderTotal = getTotal();
 
     return (
         <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-slate-800 font-sans">
+            <PaymentModal
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                paymentAccounts={paymentAccounts}
+                onProcess={processCheckout}
+            />
 
             {/* Header */}
             <header className="bg-white px-4 md:px-6 py-3 shadow-md flex justify-between items-center z-20">
@@ -497,10 +542,17 @@ const POS: React.FC = () => {
                         </h2>
 
                         <div className="space-y-3 mb-6">
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-600 font-medium">Subtotal</span>
-                                <span className="text-slate-900 font-bold">${subtotal.toFixed(2)}</span>
+                            <div className="flex justify-between items-center text-slate-500 font-medium">
+                                <span>Subtotal</span>
+                                <span>${subtotal.toFixed(2)}</span>
                             </div>
+
+                            {customer.discount_percentage && customer.discount_percentage > 0 ? (
+                                <div className="flex justify-between items-center text-emerald-600 font-semibold text-sm">
+                                    <span>Descuento ({customer.discount_percentage}%)</span>
+                                    <span>-${(subtotal * (customer.discount_percentage / 100)).toFixed(2)}</span>
+                                </div>
+                            ) : null}
 
                             <div className="flex justify-between items-center text-sm">
                                 <span className="text-slate-600 font-medium whitespace-nowrap mr-2">Costo de Envío</span>
@@ -525,34 +577,134 @@ const POS: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="mt-6">
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Método de Pago</label>
-                            <select
-                                value={selectedPaymentAccount || ''}
-                                onChange={(e) => setSelectedPaymentAccount(Number(e.target.value))}
-                                className="w-full border border-slate-300 rounded p-2 text-sm bg-white font-medium outline-none focus:border-blue-500"
-                            >
-                                {paymentAccounts.map(acc => (
-                                    <option key={acc.id} value={acc.id}>{acc.name}</option>
-                                ))}
-                            </select>
-                        </div>
+                        {/* Removed duplicate payment selector here since it is now in the modal */}
 
                     </div>
 
                     <div className="p-4 bg-white border-t border-slate-200">
                         <button
-                            onClick={handleCheckout}
-                            disabled={cart.length === 0 || isProcessing}
+                            onClick={handleCheckoutClick}
+                            disabled={cart.length === 0}
                             className="w-full h-16 md:h-20 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl md:text-2xl uppercase rounded-xl shadow-lg transition-transform active:scale-95 flex flex-col items-center justify-center gap-0.5"
                         >
-                            <span>{isProcessing ? 'Procesando...' : 'Facturar'}</span>
-                            {!isProcessing && <span className="text-[10px] md:text-xs font-semibold opacity-70 tracking-wider hidden md:inline">(F12)</span>}
+                            <span>Facturar</span>
+                            <span className="text-[10px] md:text-xs font-semibold opacity-70 tracking-wider hidden md:inline">(F12)</span>
                         </button>
                     </div>
                 </div>
 
             </div>
+            {/* Customer Lookup Modal */}
+            {isCustomerModalOpen && (
+                <div className="fixed inset-0 z-[150] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                            <h2 className="font-bold text-slate-800 uppercase tracking-tight">Vincular Cliente al Carrito</h2>
+                            <button onClick={() => setIsCustomerModalOpen(false)} className="text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded hover:bg-slate-200 transition-colors">
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <input
+                                autoFocus
+                                type="text"
+                                className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-blue-500 outline-none mb-4"
+                                placeholder="Escribe el nombre o documento..."
+                                value={customerSearchQuery}
+                                onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                            />
+
+                            <div className="space-y-2 max-h-60 overflow-y-auto w-full">
+                                {customerSearchResults.map(c => (
+                                    <div
+                                        key={c.id}
+                                        onClick={() => {
+                                            setCustomer(c);
+                                            setIsCustomerModalOpen(false);
+                                            setCustomerSearchQuery('');
+                                            setCustomerSearchResults([]);
+                                        }}
+                                        className="p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors"
+                                    >
+                                        <div className="font-bold text-slate-800">{c.name}</div>
+                                        <div className="text-xs text-slate-500 flex justify-between mt-1">
+                                            <span>{c.identification_number}</span>
+                                            {c.customer_type && <span className="uppercase text-[10px] font-bold text-blue-500">{c.customer_type}</span>}
+                                        </div>
+                                    </div>
+                                ))}
+                                {customerSearchQuery.length >= 3 && customerSearchResults.length === 0 && (
+                                    <div className="p-4 text-center text-sm text-slate-500 font-medium">
+                                        No se encontró ningún cliente.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-200 text-center">
+                            <span className="text-xs text-slate-400">Consejo: Si no lo encuentras, créalo primero en <b>Directorio</b>.</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Lost Demand Modal */}
+            {isLostDemandModalOpen && (
+                <div className="fixed inset-0 z-[160] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-amber-50">
+                            <h2 className="font-bold text-amber-800 uppercase tracking-tight flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5" />
+                                Registrar Demanda Perdida
+                            </h2>
+                            <button onClick={() => setIsLostDemandModalOpen(false)} className="text-amber-500 hover:text-amber-800 font-bold px-2 py-1 rounded hover:bg-amber-200 transition-colors">
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleManualLostDemandSubmit} className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Repuesto Buscado</label>
+                                <input
+                                    type="text"
+                                    disabled
+                                    className="w-full bg-slate-100 border border-slate-200 rounded-lg p-3 text-sm font-medium text-slate-600 outline-none"
+                                    value={searchQuery}
+                                />
+                            </div>
+
+                            {/* Potential Future DB expansions below. For now UI only. */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Marca de Moto (Opcional)</label>
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    placeholder="Ej: Yamaha"
+                                    value={lostDemandBrand}
+                                    onChange={(e) => setLostDemandBrand(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    placeholder="Ej: FZ16 2015"
+                                    value={lostDemandBikeModel}
+                                    onChange={(e) => setLostDemandBikeModel(e.target.value)}
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full py-3 px-4 bg-amber-500 text-white font-black uppercase rounded-lg hover:bg-amber-600 shadow-md transition-all active:scale-95"
+                            >
+                                Registrar Demanda
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,6 +1,82 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 const Dashboard: React.FC = () => {
+    // Phase 5: Dynamic State
+    const [todaySales, setTodaySales] = useState<number>(0);
+    const [lowStockCount, setLowStockCount] = useState<number>(0);
+    const [topLostDemand, setTopLostDemand] = useState<{ term: string, count: number }[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                // 1. Today's Sales
+                const startOfDay = new Date();
+                startOfDay.setHours(0, 0, 0, 0);
+
+                const { data: orders } = await supabase
+                    .from('orders')
+                    .select('total_amount')
+                    .gte('created_at', startOfDay.toISOString());
+
+                const sales = orders?.reduce((acc, order) => acc + Number(order.total_amount), 0) || 0;
+                setTodaySales(sales);
+
+                // 2. Low Stock Alerts
+                const { data: inventory } = await supabase
+                    .from('inventory_levels')
+                    .select('current_stock, products(id, min_stock_threshold)');
+
+                if (inventory) {
+                    const stockByProduct: Record<string, { total: number, min: number }> = {};
+                    inventory.forEach((il: any) => {
+                        const pid = il.products?.id;
+                        if (!pid) return;
+                        if (!stockByProduct[pid]) {
+                            stockByProduct[pid] = { total: 0, min: Math.max(il.products.min_stock_threshold || 10, 1) };
+                        }
+                        stockByProduct[pid].total += il.current_stock;
+                    });
+
+                    let lowStock = 0;
+                    for (const pid in stockByProduct) {
+                        if (stockByProduct[pid].total <= stockByProduct[pid].min) lowStock++;
+                    }
+                    setLowStockCount(lowStock);
+                }
+
+                // 3. Lost Demand Rank
+                const { data: lostDemand } = await supabase
+                    .from('lost_demand')
+                    .select('*');
+
+                if (lostDemand) {
+                    const counts: Record<string, number> = {};
+                    lostDemand.forEach(row => {
+                        if (row.search_term) {
+                            const term = String(row.search_term).toUpperCase();
+                            counts[term] = (counts[term] || 0) + 1;
+                        }
+                    });
+
+                    const top5 = Object.entries(counts)
+                        .map(([term, count]) => ({ term, count: count as number }))
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 5);
+
+                    setTopLostDemand(top5);
+                }
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+    }, []);
+
     // Activity Stream consolidado basado en INVENTORY_LOGS, TRANSACTIONS y ORDERS
     const activityStream = [
         { type: 'PEDIDO', id: 'ORD-9942', time: '10:42 AM', user: 'Sistema (Auto)', detail: 'Nuevo Pedido Dropship vía TrendyShop UK', status: 'Pendiente', amount: '$124.00' },
@@ -49,17 +125,17 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Orders Metric */}
-                <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] flex flex-col justify-between h-32 hover:border-slate-400 dark:hover:border-slate-600 transition-colors group cursor-pointer shadow-sm">
+                {/* Alertas de Stock Metric */}
+                <div className="p-5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-900/10 flex flex-col justify-between h-32 hover:border-rose-400 dark:hover:border-rose-600 transition-colors group cursor-pointer shadow-sm">
                     <div className="flex justify-between items-start">
-                        <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">Pendientes de Despacho</span>
-                        <span className="material-symbols-outlined text-slate-400 group-hover:text-white transition-colors">local_shipping</span>
+                        <span className="text-xs font-mono text-rose-600 dark:text-rose-400 uppercase tracking-wider">Alertas de Stock</span>
+                        <span className="material-symbols-outlined text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300 transition-colors">warning</span>
                     </div>
                     <div>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">24 Pedidos</div>
-                        <div className="text-xs text-amber-500 mt-1 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">schedule</span>
-                            4 requieren atención
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">{isLoading ? '...' : lowStockCount} SKUs</div>
+                        <div className="text-xs text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">trending_down</span>
+                            Bajo el mínimo
                         </div>
                     </div>
                 </div>
@@ -79,17 +155,19 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                 {/* Partners Metric */}
-                 <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] flex flex-col justify-between h-32 hover:border-slate-400 dark:hover:border-slate-600 transition-colors group cursor-pointer shadow-sm">
+                {/* Ventas Hoy Metric */}
+                <div className="p-5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-900/10 flex flex-col justify-between h-32 hover:border-emerald-400 dark:hover:border-emerald-600 transition-colors group cursor-pointer shadow-sm">
                     <div className="flex justify-between items-start">
-                        <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">Socios Activos</span>
-                        <span className="material-symbols-outlined text-slate-400 group-hover:text-white transition-colors">hub</span>
+                        <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Ventas de Hoy</span>
+                        <span className="material-symbols-outlined text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors">point_of_sale</span>
                     </div>
                     <div>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">142</div>
-                        <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                            {isLoading ? '...' : `$${todaySales.toFixed(2)}`}
+                        </div>
+                        <div className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                            Sistemas operativos
+                            Corte de Caja local
                         </div>
                     </div>
                 </div>
@@ -97,14 +175,14 @@ const Dashboard: React.FC = () => {
 
             {/* Main Operational Split */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* Left Col: Live Operations Feed */}
                 <div className="lg:col-span-2 flex flex-col gap-4">
                     <div className="flex items-center justify-between">
-                         <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Flujo de Operaciones Unificado</h3>
-                         <div className="flex gap-2">
-                             <span className="px-2 py-1 rounded bg-slate-200 dark:bg-[#161b22] text-[10px] font-mono text-slate-500 border border-slate-300 dark:border-slate-800">TIEMPO REAL</span>
-                         </div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Flujo de Operaciones Unificado</h3>
+                        <div className="flex gap-2">
+                            <span className="px-2 py-1 rounded bg-slate-200 dark:bg-[#161b22] text-[10px] font-mono text-slate-500 border border-slate-300 dark:border-slate-800">TIEMPO REAL</span>
+                        </div>
                     </div>
 
                     <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
@@ -202,35 +280,35 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Quick Transfer Widget */}
-                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 shadow-sm">
-                         <div className="flex items-center gap-2 mb-3 text-primary">
-                            <span className="material-symbols-outlined">move_up</span>
-                            <span className="text-sm font-bold uppercase tracking-wide">Movimiento Rápido</span>
-                         </div>
-                         <div className="space-y-3">
-                             <div>
-                                 <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">SKU del Producto</label>
-                                 <input type="text" className="w-full bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-slate-800 rounded px-3 py-2 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="ej. SKU-123" />
-                             </div>
-                             <div className="flex gap-2">
-                                <div className="flex-1">
-                                    <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Desde</label>
-                                    <select className="w-full bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-slate-800 rounded px-2 py-2 text-sm text-slate-500">
-                                        <option>Bodega Central</option>
-                                    </select>
-                                </div>
-                                <div className="flex-1">
-                                    <label className="text-[10px] text-slate-500 uppercase font-bold mb-1 block">Hasta</label>
-                                    <select className="w-full bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-slate-800 rounded px-2 py-2 text-sm text-slate-500">
-                                        <option>Socio X</option>
-                                    </select>
-                                </div>
-                             </div>
-                             <button className="w-full bg-primary hover:bg-primary/90 text-white text-sm font-bold py-2 rounded shadow-sm mt-1 transition-colors">
-                                 Transferir Stock
-                             </button>
-                         </div>
+                    {/* Lost Demand Widget */}
+                    <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/50 rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4 text-amber-700 dark:text-amber-500">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined">radar</span>
+                                <span className="text-sm font-bold uppercase tracking-wide">Demanda Perdida</span>
+                            </div>
+                            <span className="text-[10px] font-mono bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded">TOP 5</span>
+                        </div>
+                        <div className="space-y-3">
+                            {isLoading ? (
+                                <div className="text-center text-xs text-amber-600 py-4">Cargando radar...</div>
+                            ) : topLostDemand.length === 0 ? (
+                                <div className="text-center text-xs text-amber-600 py-4">No hay demanda registrada.</div>
+                            ) : (
+                                topLostDemand.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center bg-white dark:bg-[#161b22] px-3 py-2 border border-amber-100 dark:border-amber-900/30 rounded">
+                                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.term}</span>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-sm font-black text-amber-600">{item.count}</span>
+                                            <span className="text-[10px] text-amber-500 uppercase">req</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                            <button className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2 rounded shadow-sm mt-2 transition-colors">
+                                Revisar en Compras
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

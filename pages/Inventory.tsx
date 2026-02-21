@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient';
 import InventoryMovementModal from '../components/InventoryMovementModal';
 import { ProductEntryForm } from '../components/ProductEntryForm';
 import { BatchProductEntry } from '../components/BatchProductEntry'; // New Component
+import { PartProfileModal } from '../components/PartProfileModal'; // New Component
+import { FitmentSearch } from '../components/FitmentSearch'; // New Component
 import { utils, writeFile } from 'xlsx';
 
 // Define types based on our join queries
@@ -75,6 +77,13 @@ const Inventory: React.FC = () => {
     // Expanded products state for grouped view
     const [expandedProductIds, setExpandedProductIds] = useState<number[]>([]);
 
+    // Part Profile 360 Modal
+    const [isPartProfileOpen, setIsPartProfileOpen] = useState(false);
+    const [selectedPartProfileData, setSelectedPartProfileData] = useState<any>(null);
+
+    // Fitment Filter
+    const [fitmentFilter, setFitmentFilter] = useState<{ make: string; model: string; year: number | null } | null>(null);
+
     // Data states
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -83,7 +92,7 @@ const Inventory: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, [activeTab]);
+    }, [activeTab, fitmentFilter]);
 
     // Data fetching logic
     const fetchData = async () => {
@@ -94,24 +103,55 @@ const Inventory: React.FC = () => {
                 if (error) throw error;
                 setWarehouses(data || []);
             } else if (activeTab === 'stock') {
-                let query = supabase
-                    .from('inventory_levels')
-                    .select(`
-                        id, warehouse_id, current_stock, product_id,
-                        products (
-                            id, name, sku, category, min_stock_threshold, brand_id, profit_margin,
-                            cost_without_vat, vat_percentage,
-                            brands (name)
-                        ),
-                        warehouses (name)
-                    `);
+                if (fitmentFilter) {
+                    const { data, error } = await supabase.rpc('search_inventory_by_fitment', {
+                        p_make: fitmentFilter.make || null,
+                        p_model: fitmentFilter.model || null,
+                        p_year: fitmentFilter.year || null
+                    });
 
-                // Removed backend filter to allow frontend contextual filtering
-                const { data, error } = await query.order('product_id');
+                    if (error) throw error;
 
-                if (error) throw error;
-                // @ts-ignore
-                setStockItems(data || []);
+                    const mappedData = (data || []).map((row: any) => ({
+                        id: row.inventory_id,
+                        product_id: row.product_id,
+                        warehouse_id: row.warehouse_id,
+                        current_stock: Number(row.current_stock),
+                        products: {
+                            id: row.product_id,
+                            name: row.product_name,
+                            sku: row.product_sku,
+                            category: row.product_category,
+                            min_stock_threshold: row.product_min_stock,
+                            price: row.product_price,
+                            cost_without_vat: row.product_cost,
+                            profit_margin: row.product_margin,
+                            brands: { name: row.brand_name }
+                        },
+                        warehouses: { name: row.warehouse_name }
+                    }));
+
+                    setStockItems(mappedData as StockItem[]);
+                } else {
+                    let query = supabase
+                        .from('inventory_levels')
+                        .select(`
+                            id, warehouse_id, current_stock, product_id,
+                            products (
+                                id, name, sku, category, min_stock_threshold, brand_id, profit_margin, price,
+                                cost_without_vat, vat_percentage,
+                                brands (name)
+                            ),
+                            warehouses (name)
+                        `);
+
+                    // Removed backend filter to allow frontend contextual filtering
+                    const { data, error } = await query.order('product_id');
+
+                    if (error) throw error;
+                    // @ts-ignore
+                    setStockItems(data || []);
+                }
             } else if (activeTab === 'movements') {
                 // ... (movements fetch logic) ...
                 const { data, error } = await supabase
@@ -142,6 +182,11 @@ const Inventory: React.FC = () => {
     const handleOpenProductEntry = (productId: number) => {
         setSelectedProductId(productId);
         setIsProductEntryOpen(true);
+    };
+
+    const handleOpenPartProfile = (groupData: void) => {
+        setSelectedPartProfileData(groupData);
+        setIsPartProfileOpen(true);
     };
 
     // Handlers
@@ -402,6 +447,13 @@ const Inventory: React.FC = () => {
                 </div>
             )}
 
+            {/* Part Profile Modal */}
+            <PartProfileModal
+                isOpen={isPartProfileOpen}
+                onClose={() => setIsPartProfileOpen(false)}
+                product={selectedPartProfileData}
+            />
+
             {/* Header ... */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -475,15 +527,22 @@ const Inventory: React.FC = () => {
 
             {/* Advanced Search Input */}
             {activeTab === 'stock' && (
-                <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre, SKU, palabras clave..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                <div className="flex flex-col gap-4 mb-4">
+                    <FitmentSearch
+                        onSearch={(make, model, year) => setFitmentFilter({ make, model, year })}
+                        onReset={() => setFitmentFilter(null)}
                     />
+
+                    <div className="relative">
+                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                        <input
+                            type="text"
+                            placeholder="Buscar por nombre, SKU, palabras clave..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        />
+                    </div>
                 </div>
             )}
 
@@ -614,11 +673,16 @@ const Inventory: React.FC = () => {
 
                                         return (
                                             <React.Fragment key={group.product_id}>
-                                                <tr className={`transition-colors group cursor-pointer ${isContextuallyDimmed ? 'opacity-60 bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`} onClick={() => toggleExpandProduct(group.product_id)}>
+                                                <tr className={`transition-colors group cursor-pointer ${isContextuallyDimmed ? 'opacity-60 bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`} onClick={() => handleOpenPartProfile(group)}>
                                                     <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>chevron_right</span>
-                                                            <div>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); toggleExpandProduct(group.product_id); }}
+                                                                className={`material-symbols-outlined text-[20px] p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                                            >
+                                                                chevron_right
+                                                            </button>
+                                                            <div className="hover:text-primary transition-colors">
                                                                 {group.product?.name}
                                                                 <div className="text-xs text-slate-500 mt-0.5">{group.product?.category}</div>
                                                             </div>

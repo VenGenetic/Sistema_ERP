@@ -51,6 +51,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!formData.brandId) {
+            alert('Por favor seleccione una marca.');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -148,6 +154,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             <BrandSelect
                                 value={formData.brandId}
                                 onChange={(val) => setFormData({ ...formData, brandId: val })}
+                                required={true}
                             />
                         </div>
 
