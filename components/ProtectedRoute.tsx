@@ -81,9 +81,14 @@ const ProtectedRoute: React.FC = () => {
         return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
-    // Role Fencing: Prevent cashiers from accessing anything but /pos
-    if (roleId === 2 && location.pathname !== '/pos') {
-        return <Navigate to="/pos" replace />;
+    // Role Fencing: Prevent cashiers from accessing unallowed routes
+    if (roleId === 2) {
+        const allowedRoutes = ['/pos', '/rep-dashboard', '/settings'];
+        const isAllowed = allowedRoutes.includes(location.pathname) || location.pathname.startsWith('/orders');
+
+        if (!isAllowed) {
+            return <Navigate to="/rep-dashboard" replace />;
+        }
     }
 
     return (

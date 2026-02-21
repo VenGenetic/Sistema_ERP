@@ -1,13 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Trash2, ArrowLeft, LogOut } from 'lucide-react';
+import { Search, Plus, Trash2, ArrowLeft, LogOut, Package, MapPin, DollarSign, AlertTriangle } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
+// Interfaces
 interface Product {
     id: number;
     sku: string;
     name: string;
     price: number;
+    cost_without_vat?: number;
+    vat_percentage?: number;
+    final_cost_with_vat?: number;
+}
+
+interface InventoryResult {
+    product: Product;
+    warehouse_id: number;
+    warehouse_name: string;
+    current_stock: number;
 }
 
 interface Customer {
@@ -18,46 +29,45 @@ interface Customer {
 }
 
 interface CartItem {
-    id: string; // unique string for the table row
+    id: string; // unique cart row id
     product: Product;
+    warehouse_id: number;
+    warehouse_name: string;
     quantity: number;
     unitPrice: number;
+    unitCost: number;
     subtotal: number;
 }
 
-// Dummy Data
 const defaultConsumidorFinal: Customer = { id: 1, identification_number: '9999999999', name: 'CONSUMIDOR FINAL', is_final_consumer: true };
-
-const dummyProducts: Product[] = [
-    { id: 1, sku: 'PROD-001', name: 'Aceite de Motor 5W-30', price: 15.50 },
-    { id: 2, sku: 'PROD-002', name: 'Filtro de Aire', price: 8.75 },
-    { id: 3, sku: 'PROD-003', name: 'Bujía', price: 4.25 },
-];
 
 const POS: React.FC = () => {
     const navigate = useNavigate();
+
+    // State
     const [cart, setCart] = useState<CartItem[]>([]);
     const [customer, setCustomer] = useState<Customer>(defaultConsumidorFinal);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<InventoryResult[]>([]);
     const [isCashier, setIsCashier] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const [shippingCost, setShippingCost] = useState<number>(0);
+    const [paymentAccounts, setPaymentAccounts] = useState<{ id: number, name: string }[]>([]);
+    const [selectedPaymentAccount, setSelectedPaymentAccount] = useState<number | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
+    // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const quantityInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
-
-    // Refs for keyboard listeners to access latest state without stale closures
+    const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
     const cartRef = useRef(cart);
     const searchQueryRef = useRef(searchQuery);
 
-    useEffect(() => {
-        cartRef.current = cart;
-    }, [cart]);
+    useEffect(() => { cartRef.current = cart; }, [cart]);
+    useEffect(() => { searchQueryRef.current = searchQuery; }, [searchQuery]);
 
+    // Initial Load
     useEffect(() => {
-        searchQueryRef.current = searchQuery;
-    }, [searchQuery]);
-
-    useEffect(() => {
-        const fetchUserRole = async () => {
+        const fetchInitialData = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 const { data: profile } = await supabase
@@ -67,8 +77,20 @@ const POS: React.FC = () => {
                     .single();
                 if (profile?.role_id === 2) setIsCashier(true);
             }
+
+            // Fetch payment accounts (assets)
+            const { data: accounts } = await supabase
+                .from('accounts')
+                .select('id, name')
+                .eq('category', 'asset')
+                .order('position');
+
+            if (accounts && accounts.length > 0) {
+                setPaymentAccounts(accounts);
+                setSelectedPaymentAccount(accounts[0].id);
+            }
         };
-        fetchUserRole();
+        fetchInitialData();
     }, []);
 
     // Global Keyboard Shortcuts
@@ -78,34 +100,101 @@ const POS: React.FC = () => {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            if (e.key === 'F4') {
-                e.preventDefault();
-                const currentSearch = searchQueryRef.current;
-                if (currentSearch.trim() !== '') {
-                    handleRegistrarDemanda(currentSearch);
-                }
-            }
             if (e.key === 'F12') {
                 e.preventDefault();
                 handleCheckout();
             }
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                handleExit();
-            }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    // Debounced Search
+    useEffect(() => {
+        if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
+        const query = searchQuery.trim();
+        if (!query) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
+
+        setIsSearching(true);
+        debounceTimeout.current = setTimeout(async () => {
+            // Search logic
+            // We need to fetch products that match and unnest their inventory levels
+            const { data, error } = await supabase
+                .from('products')
+                .select(`
+                    id, sku, name, price, cost_without_vat, vat_percentage,
+                    inventory_levels (
+                        current_stock,
+                        warehouse_id,
+                        warehouses (name)
+                    )
+                `)
+                .or(`sku.ilike.%${query}%,name.ilike.%${query}%`)
+                .limit(20);
+
+            if (error) {
+                console.error("Search error:", error);
+                setSearchResults([]);
+                setIsSearching(false);
+                return;
+            }
+
+            let results: InventoryResult[] = [];
+            data?.forEach((p: any) => {
+                const cost = p.cost_without_vat || 0;
+                const vat = p.vat_percentage || 0;
+                const finalCost = cost * (1 + vat / 100);
+
+                const mappedProduct: Product = {
+                    id: p.id,
+                    sku: p.sku,
+                    name: p.name,
+                    price: p.price,
+                    cost_without_vat: cost,
+                    vat_percentage: vat,
+                    final_cost_with_vat: finalCost
+                };
+
+                p.inventory_levels?.forEach((il: any) => {
+                    if (il.current_stock > 0) {
+                        results.push({
+                            product: mappedProduct,
+                            warehouse_id: il.warehouse_id,
+                            warehouse_name: il.warehouses?.name || 'Desconocido',
+                            current_stock: il.current_stock
+                        });
+                    }
+                });
+            });
+
+            setSearchResults(results);
+            setIsSearching(false);
+
+            // Lost demand tracking
+            if (results.length === 0) {
+                await handleRegistrarDemanda(query, 'out_of_stock');
+            }
+
+        }, 300);
+
+        return () => {
+            if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+        };
+    }, [searchQuery]);
+
+
     const handleExit = () => {
         if (cartRef.current.length > 0) {
             if (window.confirm("¿Estás seguro que deseas salir? El carrito no está vacío y se perderán los datos.")) {
-                navigate('/');
+                navigate(-1);
             }
         } else {
-            navigate('/');
+            navigate(-1);
         }
     };
 
@@ -117,49 +206,47 @@ const POS: React.FC = () => {
         navigate('/login');
     };
 
-    const handleRegistrarDemanda = (term: string) => {
-        console.log("Registrando demanda para:", term);
-        alert(`Demanda registrada: ${term}`);
-        setSearchQuery('');
-        searchInputRef.current?.focus();
-    };
-
-    const handleCheckout = () => {
-        if (cartRef.current.length === 0) {
-            alert("El carrito está vacío");
-            return;
+    const handleRegistrarDemanda = async (term: string, reason: string) => {
+        try {
+            await supabase.from('lost_demand').insert([{
+                search_term: term,
+                reason: reason,
+                channel: 'POS'
+            }]);
+            console.log("Lost demand logged:", term);
+        } catch (e) {
+            console.error(e);
         }
-        alert("Cobrando factura...");
-        setCart([]);
-        setSearchQuery('');
-        setCustomer(defaultConsumidorFinal);
     };
 
-    const handleAddToCart = (product: Product) => {
+    const handleAddToCart = (item: InventoryResult) => {
         const newItemId = crypto.randomUUID();
-        const newItem: CartItem = {
-            id: newItemId,
-            product,
-            quantity: 1,
-            unitPrice: product.price,
-            subtotal: product.price,
-        };
-        setCart(prev => [...prev, newItem]);
-        setSearchQuery('');
+        // Calculate unit cost from the product data
+        const unitCost = item.product.final_cost_with_vat || item.product.cost_without_vat || 0;
 
-        // Jump focus to the new quantity input in next tick
-        setTimeout(() => {
-            if (quantityInputRefs.current[newItemId]) {
-                quantityInputRefs.current[newItemId]?.focus();
-                quantityInputRefs.current[newItemId]?.select();
-            }
-        }, 50);
+        const cartItem: CartItem = {
+            id: newItemId,
+            product: item.product,
+            warehouse_id: item.warehouse_id,
+            warehouse_name: item.warehouse_name,
+            quantity: 1,
+            unitPrice: item.product.price,
+            unitCost: unitCost,
+            subtotal: item.product.price,
+        };
+
+        setCart(prev => [...prev, cartItem]);
+        setSearchQuery('');
+        setSearchResults([]);
     };
 
     const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
         if (newQuantity < 0) return;
         setCart(prev => prev.map(item => {
             if (item.id === itemId) {
+                // Check stock bounds
+                const currentStockAvailable = searchResults.find(r => r.product.id === item.product.id && r.warehouse_id === item.warehouse_id)?.current_stock || 999;
+                // We don't have perfect stock checking inside the cart after search clears unless we fetch again, but the RPC will enforce it.
                 return {
                     ...item,
                     quantity: newQuantity,
@@ -174,220 +261,293 @@ const POS: React.FC = () => {
         setCart(prev => prev.filter(item => item.id !== itemId));
     };
 
-    const handleQuantityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, itemId: string) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            searchInputRef.current?.focus();
+    const handleCheckout = async () => {
+        if (cartRef.current.length === 0) {
+            alert("El carrito está vacío");
+            return;
         }
-    }
+        if (!selectedPaymentAccount) {
+            alert("Por favor selecciona una cuenta de pago.");
+            return;
+        }
 
-    const handleProductSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!searchQuery.trim()) return;
+        setIsProcessing(true);
+        try {
+            const itemsPayload = cartRef.current.map(c => ({
+                product_id: c.product.id,
+                warehouse_id: c.warehouse_id,
+                quantity: c.quantity,
+                unit_price: c.unitPrice,
+                unit_cost: c.unitCost
+            }));
 
-        const foundProduct = dummyProducts.find(p =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.sku.toLowerCase() === searchQuery.toLowerCase()
-        );
+            const { data, error } = await supabase.rpc('process_pos_sale', {
+                p_customer_id: customer.id,
+                p_payment_account_id: selectedPaymentAccount,
+                p_shipping_cost: shippingCost,
+                p_items: itemsPayload
+            });
 
-        if (foundProduct) {
-            handleAddToCart(foundProduct);
-        } else {
-            // Did not find anything, show button for F4
+            if (error) {
+                alert(`Error procesando la venta: ${error.message}`);
+                throw error;
+            }
+
+            alert("¡Venta completada con éxito!");
+            setCart([]);
+            setSearchQuery('');
+            setCustomer(defaultConsumidorFinal);
+            setShippingCost(0);
+        } catch (err) {
+            console.error("Checkout failed", err);
+        } finally {
+            setIsProcessing(false);
         }
     };
 
-    const isSearchNotFound = searchQuery.trim() !== '' && !dummyProducts.some(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.sku.toLowerCase() === searchQuery.toLowerCase()
-    );
-
+    // Derived State
     const subtotal = cart.reduce((acc, item) => acc + item.subtotal, 0);
-    const iva = subtotal * 0.15; // Assuming 15% IVA
-    const total = subtotal + iva;
+    const orderTotal = subtotal + shippingCost; // Assuming prices already include IVA as per standard POS operations here, or if not, add it.
 
     return (
-        <div className="flex flex-col h-screen bg-gray-100 overflow-hidden text-gray-800 font-sans">
+        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-slate-800 font-sans">
 
-            {/* Zone A: Header */}
-            <header className="bg-white px-6 py-3 shadow-md flex justify-between items-center z-10">
-                <div className="flex items-center gap-4">
+            {/* Header */}
+            <header className="bg-white px-4 md:px-6 py-3 shadow-md flex justify-between items-center z-20">
+                <div className="flex items-center gap-2 md:gap-4">
                     {!isCashier ? (
-                        <button
-                            onClick={handleExit}
-                            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors"
-                            title="Volver al Dashboard (ESC)"
-                        >
+                        <button onClick={handleExit} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors">
                             <ArrowLeft size={20} />
                             <span className="font-medium text-sm hidden sm:inline">Volver</span>
                         </button>
                     ) : (
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-2 text-red-500 hover:text-red-700 transition-colors bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-md"
-                            title="Cerrar Sesión"
-                        >
+                        <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 md:px-3 md:py-1.5 rounded-md">
                             <LogOut size={18} />
-                            <span className="font-medium text-sm hidden sm:inline">Cerrar Sesión</span>
+                            <span className="font-medium text-sm hidden sm:inline">Salir</span>
                         </button>
                     )}
-                    <div className="h-6 w-px bg-gray-300 mx-2"></div>
+                    <div className="h-6 w-px bg-slate-300 mx-1 md:mx-2"></div>
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-500 uppercase">Cliente:</span>
-                        <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-md border border-gray-200">
-                            <span className="font-bold text-gray-800">{customer.name}</span>
-                            <span className="text-xs text-gray-500">[{customer.identification_number}]</span>
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2">
+                        <span className="text-[10px] md:text-sm font-semibold text-slate-500 uppercase hidden md:inline">Cliente:</span>
+                        <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 md:px-3 md:py-1.5 rounded-md border border-slate-200">
+                            <span className="font-bold text-slate-800 text-xs md:text-sm truncate max-w-[120px] md:max-w-xs">{customer.name}</span>
                         </div>
                     </div>
-
-                    <button className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        <Plus size={16} />
-                        <span>Cambiar/Nuevo</span>
-                    </button>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-500 uppercase">Cajero:</span>
-                    <span className="font-bold text-gray-800">Admin</span>
+                    <span className="text-[10px] md:text-sm font-semibold text-slate-500 uppercase hidden md:inline">Cajero_POS</span>
                 </div>
             </header>
 
             {/* Main Content Area */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
 
-                {/* Left Side: Product Search & Cart Grid */}
-                <div className="flex-1 flex flex-col pt-4 px-6 pb-4">
+                {/* Left Side: Product Search & Cart */}
+                <div className="flex-1 flex flex-col p-4 md:p-6 pb-2 md:pb-4 overflow-y-auto">
 
-                    {/* Zone B: Product Search */}
-                    <div className="mb-4 relative">
-                        <form onSubmit={handleProductSearch} className="flex gap-2 w-full">
-                            <div className="relative flex-1">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Search className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <input
-                                    ref={searchInputRef}
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Buscar producto por código o nombre (F2)"
-                                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-lg shadow-sm"
-                                    autoFocus
-                                />
+                    {/* Search Bar */}
+                    <div className="mb-4 relative z-10">
+                        <div className="relative flex-1">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                {isSearching ? (
+                                    <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                ) : (
+                                    <Search className="h-5 w-5 text-slate-400" />
+                                )}
                             </div>
-                        </form>
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Buscar producto (F2)"
+                                className="block w-full pl-10 pr-3 py-3 md:py-4 border border-slate-300 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-lg shadow-sm"
+                                autoFocus
+                            />
+                        </div>
 
-                        {isSearchNotFound && (
-                            <div className="absolute top-14 left-0 right-0 z-20 flex justify-center">
-                                <button
-                                    onClick={() => handleRegistrarDemanda(searchQuery)}
-                                    className="bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-md shadow-lg font-medium hover:bg-red-200 transition-colors flex items-center gap-2"
-                                >
-                                    <span className="text-xl">⚠️</span>
-                                    Registrar Demanda: "{searchQuery}" <span className="text-sm font-bold ml-2">(F4)</span>
-                                </button>
+                        {/* Search Results Dropdown */}
+                        {searchQuery.trim().length > 0 && (
+                            <div className="absolute top-full mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-96 overflow-y-auto">
+                                {searchResults.length > 0 ? (
+                                    <ul className="divide-y divide-slate-100">
+                                        {searchResults.map((result, idx) => (
+                                            <li
+                                                key={idx}
+                                                className="p-3 hover:bg-blue-50 cursor-pointer transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-2"
+                                                onClick={() => handleAddToCart(result)}
+                                            >
+                                                <div>
+                                                    <div className="font-bold text-slate-800">{result.product.name}</div>
+                                                    <div className="text-xs font-mono text-slate-500">{result.product.sku}</div>
+                                                    <div className="flex items-center gap-3 mt-1.5">
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                                                            <MapPin size={10} /> {result.warehouse_name}
+                                                        </span>
+                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded ${result.current_stock > 5 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                            <Package size={10} /> {result.current_stock} u.
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                                                            <DollarSign size={10} /> Costo: ${(result.product.final_cost_with_vat || 0).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="font-bold text-blue-600 text-lg">
+                                                    ${result.product.price.toFixed(2)}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : !isSearching ? (
+                                    <div className="p-6 text-center text-slate-500">
+                                        <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2" />
+                                        <p>No se encontraron resultados.</p>
+                                        <p className="text-xs text-slate-400 mt-1">Se ha registrado esta demanda.</p>
+                                    </div>
+                                ) : null}
                             </div>
                         )}
                     </div>
 
-                    {/* Zone B: The Grid */}
-                    <div className="flex-1 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
-                        <div className="overflow-x-auto flex-1">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
-                                    <tr>
-                                        <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Código</th>
-                                        <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Descripción</th>
-                                        <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Precio Unit.</th>
-                                        <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Cantidad</th>
-                                        <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Subtotal</th>
-                                        <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-16">Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {cart.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                                <div className="flex flex-col items-center justify-center">
-                                                    <Search className="h-10 w-10 text-gray-300 mb-2" />
-                                                    <p className="text-lg">El carrito está vacío</p>
-                                                    <p className="text-sm text-gray-400">Escanea o busca un producto para comenzar</p>
+                    {/* Cart Items (Mobile Stack / Desktop Table) */}
+                    <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+
+                        {/* Desktop Table Header */}
+                        <div className="hidden md:flex bg-slate-50 border-b border-slate-200 px-4 py-3 sticky top-0">
+                            <div className="flex-1 text-xs font-bold text-slate-500 uppercase tracking-wider">Producto</div>
+                            <div className="w-24 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Precio</div>
+                            <div className="w-28 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Cant</div>
+                            <div className="w-28 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Subtotal</div>
+                            <div className="w-12 text-center text-xs font-bold text-slate-500 uppercase tracking-wider"></div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto w-full">
+                            {cart.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center p-6 text-slate-400">
+                                    <Search className="h-12 w-12 text-slate-200 mb-3" />
+                                    <p className="text-lg font-medium text-slate-500">El carrito está vacío</p>
+                                    <p className="text-sm">Busca y selecciona productos para agregarlos</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {cart.map((item) => (
+                                        <div key={item.id} className="p-3 md:px-4 md:py-3 hover:bg-slate-50 flex flex-col md:flex-row md:items-center gap-3">
+                                            {/* Mobile & Desktop Info Layer */}
+                                            <div className="flex-1">
+                                                <div className="text-sm font-bold text-slate-900">{item.product.name}</div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded">{item.product.sku}</span>
+                                                    <span className="text-[10px] text-slate-400">{item.warehouse_name}</span>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        cart.map((item) => (
-                                            <tr key={item.id} className="hover:bg-blue-50/50 transition-colors">
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.product.sku}</td>
-                                                <td className="px-4 py-3 text-sm text-gray-800 font-medium">{item.product.name}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-medium text-gray-600">${item.unitPrice.toFixed(2)}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
-                                                    <input
-                                                        ref={el => quantityInputRefs.current[item.id] = el}
-                                                        type="number"
-                                                        min="1"
-                                                        value={item.quantity || ''}
-                                                        onChange={(e) => handleUpdateQuantity(item.id, parseFloat(e.target.value) || 0)}
-                                                        onKeyDown={(e) => handleQuantityKeyDown(e, item.id)}
-                                                        className="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-bold"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-gray-900">${item.subtotal.toFixed(2)}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-center text-sm font-medium">
-                                                    <button
-                                                        onClick={() => handleRemoveFromCart(item.id)}
-                                                        className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded transition-colors"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                                            </div>
+
+                                            {/* Responsive Pricing/Qty Layer */}
+                                            <div className="flex items-center justify-between md:gap-4 mt-2 md:mt-0">
+                                                <div className="text-sm font-medium text-slate-500 md:w-24 md:text-center">
+                                                    <span className="md:hidden text-xs text-slate-400 mr-1">Pu:</span>
+                                                    ${item.unitPrice.toFixed(2)}
+                                                </div>
+
+                                                <div className="md:w-28 flex justify-center">
+                                                    <div className="flex items-center border border-slate-300 rounded overflow-hidden">
+                                                        <button
+                                                            onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                                                            className="px-2 py-1 bg-slate-50 text-slate-600 hover:bg-slate-200"
+                                                        >-</button>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            value={item.quantity || ''}
+                                                            onChange={(e) => handleUpdateQuantity(item.id, parseFloat(e.target.value) || 0)}
+                                                            className="w-12 px-1 py-1 text-center text-sm font-bold outline-none"
+                                                        />
+                                                        <button
+                                                            onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                                                            className="px-2 py-1 bg-slate-50 text-slate-600 hover:bg-slate-200"
+                                                        >+</button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-base font-bold text-slate-900 md:w-28 md:text-right">
+                                                    ${item.subtotal.toFixed(2)}
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleRemoveFromCart(item.id)}
+                                                    className="md:w-12 flex justify-center text-red-400 hover:text-red-600 p-2 ml-2"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Right Side / Sidebar: Total & Checkout (Zone C equivalent but placed on the side for wider screens, or could be bottom) 
-            Let's put it on the right side for a true POS feel, taking up about 1/4 of the screen width */}
-                <div className="w-80 bg-white border-l border-gray-200 shadow-sm flex flex-col z-10 items-stretch h-full">
-                    <div className="p-6 bg-gray-50 border-b border-gray-200 flex-1">
-                        <h2 className="text-lg font-bold text-gray-800 mb-6 uppercase tracking-winder">Resumen de Venta</h2>
+                {/* Right Side / Bottom: Total & Checkout */}
+                <div className="md:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 shadow-lg md:shadow-none flex flex-col z-20 shrink-0">
+                    <div className="p-5 flex-1 bg-slate-50/50">
+                        <h2 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-wider flex items-center justify-between">
+                            Resumen de Venta
+                        </h2>
 
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600 font-medium">Subtotal</span>
-                                <span className="text-gray-900 font-bold tracking-tight text-lg">${subtotal.toFixed(2)}</span>
+                        <div className="space-y-3 mb-6">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-600 font-medium">Subtotal</span>
+                                <span className="text-slate-900 font-bold">${subtotal.toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600 font-medium">Descuento</span>
-                                <span className="text-gray-900 font-bold tracking-tight text-lg">$0.00</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600 font-medium">IVA (15%)</span>
-                                <span className="text-gray-900 font-bold tracking-tight text-lg">${iva.toFixed(2)}</span>
+
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-600 font-medium whitespace-nowrap mr-2">Costo de Envío</span>
+                                <div className="relative">
+                                    <span className="absolute left-2 top-1.5 text-slate-400 text-xs">$</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={shippingCost || ''}
+                                        onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                                        className="w-24 pl-5 pr-2 py-1 text-right text-sm border border-slate-300 rounded focus:border-blue-500 outline-none font-bold"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="mt-8 pt-4 border-t border-gray-300">
+                        <div className="mt-4 pt-4 border-t border-slate-200">
                             <div className="flex justify-between items-center">
-                                <span className="text-xl font-bold text-gray-800 uppercase">Total</span>
-                                <span className="text-4xl font-extrabold text-green-600 tracking-tighter">${total.toFixed(2)}</span>
+                                <span className="text-lg font-black text-slate-800 uppercase">Total</span>
+                                <span className="text-4xl font-black text-blue-600 tracking-tighter">${orderTotal.toFixed(2)}</span>
                             </div>
                         </div>
+
+                        <div className="mt-6">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Método de Pago</label>
+                            <select
+                                value={selectedPaymentAccount || ''}
+                                onChange={(e) => setSelectedPaymentAccount(Number(e.target.value))}
+                                className="w-full border border-slate-300 rounded p-2 text-sm bg-white font-medium outline-none focus:border-blue-500"
+                            >
+                                {paymentAccounts.map(acc => (
+                                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
                     </div>
 
-                    <div className="p-4 bg-white">
+                    <div className="p-4 bg-white border-t border-slate-200">
                         <button
                             onClick={handleCheckout}
-                            disabled={cart.length === 0}
-                            className="w-full h-20 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold text-2xl uppercase rounded-lg shadow-md transition-colors flex flex-col items-center justify-center gap-1"
+                            disabled={cart.length === 0 || isProcessing}
+                            className="w-full h-16 md:h-20 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl md:text-2xl uppercase rounded-xl shadow-lg transition-transform active:scale-95 flex flex-col items-center justify-center gap-0.5"
                         >
-                            <span>Cobrar / Facturar</span>
-                            <span className="text-sm font-semibold opacity-80">(F12)</span>
+                            <span>{isProcessing ? 'Procesando...' : 'Facturar'}</span>
+                            {!isProcessing && <span className="text-[10px] md:text-xs font-semibold opacity-70 tracking-wider hidden md:inline">(F12)</span>}
                         </button>
                     </div>
                 </div>

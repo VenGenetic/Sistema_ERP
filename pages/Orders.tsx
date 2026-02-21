@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, X, MessageCircle, FileText, CheckCircle2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 // Interfaces
 interface Product { id: number; sku: string; name: string; price: number; }
@@ -43,6 +44,24 @@ const Orders: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [cart, setCart] = useState<OrderItem[]>([]);
     const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '' });
+    const [isReadOnly, setIsReadOnly] = useState(false);
+
+    useEffect(() => {
+        const checkRole = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role_id')
+                    .eq('id', session.user.id)
+                    .single();
+                if (profile && profile.role_id === 2) {
+                    setIsReadOnly(true);
+                }
+            }
+        };
+        checkRole();
+    }, []);
 
     // Order Creation Logic
     const handleProductSearch = (e: React.FormEvent) => {
@@ -117,13 +136,15 @@ const Orders: React.FC = () => {
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Órdenes (Online)</h1>
                     <p className="text-slate-500 text-sm mt-1">Gestión de pedidos asíncronos y cotizaciones WhatsApp</p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors flex items-center gap-2"
-                >
-                    <Plus size={18} />
-                    Nueva Cotización
-                </button>
+                {!isReadOnly && (
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors flex items-center gap-2"
+                    >
+                        <Plus size={18} />
+                        Nueva Cotización
+                    </button>
+                )}
             </div>
 
             {/* Kanban Board */}

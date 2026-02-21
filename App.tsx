@@ -14,6 +14,7 @@ const Settings = React.lazy(() => import('./pages/Settings'));
 const Login = React.lazy(() => import('./pages/Login'));
 const POS = React.lazy(() => import('./pages/POS'));
 const Orders = React.lazy(() => import('./pages/Orders'));
+const RepDashboard = React.lazy(() => import('./pages/RepDashboard'));
 const AdminSetup = React.lazy(() => import('./pages/AdminSetup'));
 const TestConnection = React.lazy(() => import('./pages/TestConnection'));
 const AuthConfirm = React.lazy(() => import('./pages/AuthConfirm'));
@@ -42,6 +43,7 @@ const App: React.FC = () => {
 
           <Route element={<ProtectedRoute />}>
             <Route path="/pos" element={<POS />} />
+            <Route path="/rep-dashboard" element={<RepDashboard />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="team" element={<Team />} />

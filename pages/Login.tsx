@@ -31,7 +31,7 @@ const Login: React.FC = () => {
 
             if (profile && profile.role_id === 2) {
                 // Vendedor / Cashier
-                navigate('/pos', { replace: true });
+                navigate('/rep-dashboard', { replace: true });
             } else {
                 // Admin or others
                 navigate('/', { replace: true });
