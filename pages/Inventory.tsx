@@ -9,6 +9,7 @@ import { utils, writeFile } from 'xlsx';
 interface StockItem {
     id: number;
     product_id: number;
+    warehouse_id: number;
     current_stock: number;
     products: {
         id: number;
@@ -96,7 +97,7 @@ const Inventory: React.FC = () => {
                 let query = supabase
                     .from('inventory_levels')
                     .select(`
-                        id, current_stock, product_id,
+                        id, warehouse_id, current_stock, product_id,
                         products (
                             id, name, sku, category, min_stock_threshold, brand_id, profit_margin,
                             cost_without_vat, vat_percentage,
@@ -105,11 +106,7 @@ const Inventory: React.FC = () => {
                         warehouses (name)
                     `);
 
-                // Apply filter if a warehouse is selected
-                if (selectedWarehouseId) {
-                    query = query.eq('warehouse_id', selectedWarehouseId);
-                }
-
+                // Removed backend filter to allow frontend contextual filtering
                 const { data, error } = await query.order('product_id');
 
                 if (error) throw error;
@@ -457,6 +454,25 @@ const Inventory: React.FC = () => {
 
 
 
+            {/* Active Warehouse Filter Banner */}
+            {activeTab === 'stock' && selectedWarehouseId && (
+                <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-xl mb-2">
+                    <div className="flex items-center gap-2 text-primary font-medium text-sm">
+                        <span className="material-symbols-outlined text-[20px]">location_on</span>
+                        <span>
+                            Mostrando inventario en: <span className="font-bold">{warehouses.find(w => w.id === selectedWarehouseId)?.name}</span>
+                        </span>
+                    </div>
+                    <button
+                        onClick={clearWarehouseFilter}
+                        className="p-1 hover:bg-primary/20 rounded-full transition-colors text-primary flex items-center justify-center"
+                        title="Quitar filtro"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                </div>
+            )}
+
             {/* Advanced Search Input */}
             {activeTab === 'stock' && (
                 <div className="relative">
@@ -582,58 +598,81 @@ const Inventory: React.FC = () => {
                                             </td>
                                         </tr>
                                     )}
-                                    {groupedStockItems.map(group => (
-                                        <React.Fragment key={group.product_id}>
-                                            <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group cursor-pointer" onClick={() => toggleExpandProduct(group.product_id)}>
-                                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform ${expandedProductIds.includes(group.product_id) ? 'rotate-90' : ''}`}>chevron_right</span>
-                                                        <div>
-                                                            {group.product?.name}
-                                                            <div className="text-xs text-slate-500 mt-0.5">{group.product?.category}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
-                                                    {group.product?.brands?.name || '-'}
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-500 font-mono text-sm">
-                                                    {group.product?.sku}
-                                                </td>
-                                                <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{group.global_stock}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${group.global_stock < (group.product?.min_stock_threshold || 10) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
-                                                        {group.global_stock < (group.product?.min_stock_threshold || 10) ? 'Bajo Stock' : 'En Stock'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                                        <button
-                                                            onClick={() => handleOpenProductEntry(group.product_id)}
-                                                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 rounded-md text-xs font-semibold transition-colors"
-                                                        >
-                                                            <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
-                                                            Surtir
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {expandedProductIds.includes(group.product_id) && group.details.map((detail: StockItem) => (
-                                                <tr key={detail.id} className="bg-slate-50/50 dark:bg-slate-800/50 border-t-0">
-                                                    <td className="px-6 py-3 pl-14 text-sm text-slate-600 dark:text-slate-400" colSpan={3}>
+                                    {groupedStockItems.map(group => {
+                                        // Contextual filtering logic
+                                        const hasStockInSelectedWarehouse = selectedWarehouseId
+                                            ? group.details.some((d: StockItem) => d.warehouse_id === selectedWarehouseId && d.current_stock > 0)
+                                            : true;
+
+                                        // If there's a warehouse filter and this product has 0 stock in it, don't render it at all
+                                        if (selectedWarehouseId && !hasStockInSelectedWarehouse) {
+                                            return null;
+                                        }
+
+                                        const isContextuallyDimmed = selectedWarehouseId !== null;
+                                        const isExpanded = selectedWarehouseId !== null || expandedProductIds.includes(group.product_id);
+
+                                        return (
+                                            <React.Fragment key={group.product_id}>
+                                                <tr className={`transition-colors group cursor-pointer ${isContextuallyDimmed ? 'opacity-60 bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`} onClick={() => toggleExpandProduct(group.product_id)}>
+                                                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="material-symbols-outlined text-[16px] text-slate-400">subdirectory_arrow_right</span>
-                                                            Almacén: <span className="font-medium text-slate-900 dark:text-white">{detail.warehouses?.name}</span>
+                                                            <span className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>chevron_right</span>
+                                                            <div>
+                                                                {group.product?.name}
+                                                                <div className="text-xs text-slate-500 mt-0.5">{group.product?.category}</div>
+                                                            </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-3 text-right font-semibold text-slate-700 dark:text-slate-300">
-                                                        {detail.current_stock}
+                                                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
+                                                        {group.product?.brands?.name || '-'}
                                                     </td>
-                                                    <td colSpan={2}></td>
+                                                    <td className="px-6 py-4 text-slate-500 font-mono text-sm">
+                                                        {group.product?.sku}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{group.global_stock}</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${group.global_stock < (group.product?.min_stock_threshold || 10) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
+                                                            {group.global_stock < (group.product?.min_stock_threshold || 10) ? 'Bajo Stock' : 'En Stock'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                            <button
+                                                                onClick={() => handleOpenProductEntry(group.product_id)}
+                                                                className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-colors ${isContextuallyDimmed ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/10 dark:text-blue-400' : 'bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50'}`}
+                                                            >
+                                                                <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+                                                                Surtir
+                                                            </button>
+                                                        </div>
+                                                    </td>
                                                 </tr>
-                                            ))}
-                                        </React.Fragment>
-                                    ))}
+                                                {isExpanded && group.details.map((detail: StockItem) => {
+                                                    if (selectedWarehouseId && detail.warehouse_id !== selectedWarehouseId) {
+                                                        return null;
+                                                    }
+
+                                                    const isHighlighted = selectedWarehouseId === detail.warehouse_id;
+
+                                                    return (
+                                                        <tr key={detail.id} className={`${isHighlighted ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-l-primary' : 'bg-slate-50/50 dark:bg-slate-800/50'} border-t-0`}>
+                                                            <td className={`px-6 py-3 pl-14 text-sm ${isHighlighted ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`} colSpan={3}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="material-symbols-outlined text-[16px] opacity-70">subdirectory_arrow_right</span>
+                                                                    Almacén: <span className={`font-medium ${isHighlighted ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{detail.warehouses?.name}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className={`px-6 py-3 text-right font-semibold ${isHighlighted ? 'text-primary text-base' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                                {detail.current_stock}
+                                                            </td>
+                                                            <td colSpan={2}></td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
