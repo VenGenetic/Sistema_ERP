@@ -3,10 +3,14 @@ import { supabase } from '../supabaseClient';
 import { read, utils } from 'xlsx';
 
 interface CatalogRow {
-    id: string; // Unique ID for react key
+    id: string;
     sku: string;
     name: string;
     cost: string;
+    // Optional smart-merge fields
+    profitMargin: string;
+    category: string;
+    vatPercentage: string;
 }
 
 interface CatalogImportWizardProps {
@@ -32,7 +36,6 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
         if (isOpen) {
             fetchBaseline();
         } else {
-            // Reset state when closed
             setExcelRows([]);
             setDbProducts({});
         }
@@ -41,10 +44,9 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
     const fetchBaseline = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.from('products').select('sku, name, cost_without_vat');
+            const { data, error } = await supabase.from('products').select('sku, name, cost_without_vat, profit_margin, category, vat_percentage');
             if (error) throw error;
 
-            // Convert to dictionary for O(1) fast lookups: { "SKU-1": { name: "...", cost: 10 } }
             const lookup = (data || []).reduce((acc: Record<string, any>, prod) => {
                 acc[prod.sku] = prod;
                 return acc;
@@ -73,18 +75,24 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                 const data: any[] = utils.sheet_to_json(ws);
 
                 const newRows: CatalogRow[] = data.map((item, index) => {
-                    // Support different column names
                     const sku = item['SKU'] || item['sku'] || '';
-                    const name = item['Nombre'] || item['nombre'] || '';
-                    const cost = item['Costo S/I'] || item['costo'] || item['Costo'] || item['cost'] || '';
+                    const name = item['Nombre'] || item['nombre'] || item['Name'] || item['name'] || '';
+                    const cost = item['Costo S/IVA'] || item['Costo S/I'] || item['costo'] || item['Costo'] || item['cost'] || '';
+                    // Optional fields — keep as raw string; empty string = will become null in payload
+                    const margin = item['Margen'] || item['margen'] || item['profit_margin'] || '';
+                    const category = item['Categoría'] || item['categoria'] || item['Category'] || item['category'] || '';
+                    const vat = item['IVA %'] || item['IVA'] || item['iva'] || item['vat_percentage'] || '';
 
                     return {
                         id: `imported-${Date.now()}-${index}`,
                         sku: String(sku),
                         name: String(name),
-                        cost: String(cost)
+                        cost: String(cost),
+                        profitMargin: String(margin),
+                        category: String(category),
+                        vatPercentage: String(vat),
                     };
-                }).filter(row => row.sku || row.name || row.cost); // Keep if any data exists to show errors
+                }).filter(row => row.sku || row.name || row.cost);
 
                 setExcelRows(newRows);
             } catch (error) {
@@ -94,7 +102,6 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
         };
         reader.readAsBinaryString(file);
 
-        // Reset input
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -111,7 +118,7 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
         setExcelRows(prevRows => prevRows.filter(row => row.id !== id));
     };
 
-    // 4. THE LIVE ENGINE (This is the magic part!)
+    // 4. THE LIVE ENGINE
     const categorizedData = useMemo(() => {
         const buckets = { errors: [] as any[], new: [] as any[], modified: [] as any[], unchanged: [] as any[] };
 
@@ -119,8 +126,8 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
             const costNum = parseFloat(row.cost);
             const cleanSku = row.sku?.trim().toUpperCase();
 
-            // Bucket 1: Errors (Missing critical data)
-            if (!cleanSku || !row.name || isNaN(costNum) || costNum < 0) {
+            // Bucket 1: Errors (Missing mandatory data)
+            if (!cleanSku || !row.name?.trim() || isNaN(costNum) || costNum < 0) {
                 buckets.errors.push(row);
                 return;
             }
@@ -133,15 +140,34 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                 return;
             }
 
-            // Bucket 3 & 4: Check for modifications
-            const isNameDiff = dbMatch.name !== row.name;
+            // Bucket 3 & 4: Check for modifications (mandatory + optional fields)
+            const isNameDiff = dbMatch.name !== row.name.trim();
             const isCostDiff = Number(dbMatch.cost_without_vat) !== costNum;
 
-            if (isNameDiff || isCostDiff) {
+            // Optional fields: only count as changed if the Excel provides a value AND it differs
+            const excelMargin = row.profitMargin !== '' ? parseFloat(row.profitMargin) : null;
+            const isMarginDiff = excelMargin !== null && !isNaN(excelMargin) && Number(dbMatch.profit_margin) !== excelMargin;
+
+            const excelCategory = row.category?.trim() || null;
+            const isCategoryDiff = excelCategory !== null && dbMatch.category !== excelCategory;
+
+            const excelVat = row.vatPercentage !== '' ? parseFloat(row.vatPercentage) : null;
+            const isVatDiff = excelVat !== null && !isNaN(excelVat) && Number(dbMatch.vat_percentage) !== excelVat;
+
+            if (isNameDiff || isCostDiff || isMarginDiff || isCategoryDiff || isVatDiff) {
                 buckets.modified.push({
                     ...row,
                     oldName: dbMatch.name,
-                    oldCost: Number(dbMatch.cost_without_vat)
+                    oldCost: Number(dbMatch.cost_without_vat),
+                    oldMargin: Number(dbMatch.profit_margin),
+                    oldCategory: dbMatch.category,
+                    oldVat: Number(dbMatch.vat_percentage),
+                    // Flags for what changed
+                    isNameDiff,
+                    isCostDiff,
+                    isMarginDiff,
+                    isCategoryDiff,
+                    isVatDiff,
                 });
             } else {
                 buckets.unchanged.push(row);
@@ -149,7 +175,7 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
         });
 
         return buckets;
-    }, [excelRows, dbProducts]); // Re-runs instantly if user edits an excel row!
+    }, [excelRows, dbProducts]);
 
     // 5. THE FINAL SAVE TRIGGER
     const handleSync = async () => {
@@ -158,11 +184,15 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
             return;
         }
 
-        // Combine New and Modified lists
+        // Combine New and Modified lists. Send null for blank optional fields.
         const payload = [...categorizedData.new, ...categorizedData.modified].map(item => ({
             sku: item.sku.trim().toUpperCase(),
-            name: item.name,
-            cost_without_vat: parseFloat(item.cost)
+            name: item.name.trim(),
+            cost_without_vat: parseFloat(item.cost),
+            // Smart merge: send null if blank, so COALESCE in SQL preserves the DB value
+            profit_margin: item.profitMargin !== '' && !isNaN(parseFloat(item.profitMargin)) ? parseFloat(item.profitMargin) : null,
+            category: item.category?.trim() || null,
+            vat_percentage: item.vatPercentage !== '' && !isNaN(parseFloat(item.vatPercentage)) ? parseFloat(item.vatPercentage) : null,
         }));
 
         if (payload.length === 0) {
@@ -205,7 +235,6 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        {/* File Upload Button */}
                         <div className="relative">
                             <input
                                 ref={fileInputRef}
@@ -239,7 +268,13 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                 <span className="material-symbols-outlined text-[48px] text-primary/40">post_add</span>
                             </div>
                             <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Sube tu archivo Excel</h3>
-                            <p className="text-slate-500 mb-6">El archivo debe contener las columnas <span className="font-mono bg-slate-200 dark:bg-slate-800 px-1 rounded">SKU</span>, <span className="font-mono bg-slate-200 dark:bg-slate-800 px-1 rounded">Nombre</span>, y <span className="font-mono bg-slate-200 dark:bg-slate-800 px-1 rounded">Costo S/I</span>.</p>
+                            <p className="text-slate-500 mb-4">El archivo debe contener las columnas obligatorias:</p>
+                            <div className="flex flex-wrap gap-2 justify-center mb-2">
+                                <span className="font-mono bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-sm">SKU</span>
+                                <span className="font-mono bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-sm">Nombre</span>
+                                <span className="font-mono bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-sm">Costo S/IVA</span>
+                            </div>
+                            <p className="text-slate-400 text-xs mb-6">Opcionales: <span className="font-mono">Margen</span>, <span className="font-mono">Categoría</span>, <span className="font-mono">IVA %</span></p>
                             <button
                                 onClick={() => fileInputRef.current?.click()}
                                 className="px-6 py-3 bg-primary text-white rounded-xl shadow-lg shadow-primary/30 font-medium hover:bg-primary/90 transition-all active:scale-95 flex items-center gap-2"
@@ -349,20 +384,23 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                             <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
                                                 <tr>
                                                     <th className="px-6 py-3 font-semibold text-slate-500">SKU</th>
-                                                    <th className="px-6 py-3 font-semibold text-slate-500">Nombre (Cambio)</th>
-                                                    <th className="px-6 py-3 font-semibold text-slate-500">Costo (Cambio)</th>
+                                                    <th className="px-6 py-3 font-semibold text-slate-500">Nombre</th>
+                                                    <th className="px-6 py-3 font-semibold text-slate-500">Costo</th>
+                                                    <th className="px-6 py-3 font-semibold text-slate-500">Otros Cambios</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                                                 {categorizedData.modified.map((row: any) => {
-                                                    const nameChanged = row.name !== row.oldName;
-                                                    const costChanged = parseFloat(row.cost) !== row.oldCost;
+                                                    const otherChanges: string[] = [];
+                                                    if (row.isMarginDiff) otherChanges.push(`Margen: ${row.oldMargin} ➔ ${parseFloat(row.profitMargin)}`);
+                                                    if (row.isCategoryDiff) otherChanges.push(`Cat: ${row.oldCategory || '—'} ➔ ${row.category}`);
+                                                    if (row.isVatDiff) otherChanges.push(`IVA: ${row.oldVat}% ➔ ${parseFloat(row.vatPercentage)}%`);
 
                                                     return (
                                                         <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                                                             <td className="px-6 py-3 font-mono text-slate-700 dark:text-slate-300 font-medium">{row.sku}</td>
                                                             <td className="px-6 py-3">
-                                                                {nameChanged ? (
+                                                                {row.isNameDiff ? (
                                                                     <div className="flex flex-col gap-1">
                                                                         <span className="text-slate-400 line-through text-xs">{row.oldName}</span>
                                                                         <span className="text-amber-700 dark:text-amber-400 font-medium bg-amber-100/50 dark:bg-amber-900/20 px-2 py-0.5 rounded inline-block w-fit">{row.name}</span>
@@ -372,7 +410,7 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                                                 )}
                                                             </td>
                                                             <td className="px-6 py-3">
-                                                                {costChanged ? (
+                                                                {row.isCostDiff ? (
                                                                     <div className="flex flex-col gap-1 font-mono">
                                                                         <span className="text-slate-400 line-through text-xs">${row.oldCost.toFixed(2)}</span>
                                                                         <div className="flex items-center gap-1">
@@ -382,6 +420,17 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                                                     </div>
                                                                 ) : (
                                                                     <span className="text-slate-700 dark:text-slate-300 font-mono">${parseFloat(row.cost).toFixed(2)}</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-6 py-3">
+                                                                {otherChanges.length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {otherChanges.map((change, i) => (
+                                                                            <span key={i} className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-md">{change}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-slate-400">—</span>
                                                                 )}
                                                             </td>
                                                         </tr>
@@ -410,6 +459,12 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                                     <span className="font-mono text-xs text-slate-500 mb-1">{row.sku}</span>
                                                     <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate" title={row.name}>{row.name}</span>
                                                     <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium mt-2">${parseFloat(row.cost).toFixed(2)}</span>
+                                                    {(row.profitMargin || row.category) && (
+                                                        <div className="flex flex-wrap gap-1 mt-2">
+                                                            {row.profitMargin && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded">Margen: {row.profitMargin}</span>}
+                                                            {row.category && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded">{row.category}</span>}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
