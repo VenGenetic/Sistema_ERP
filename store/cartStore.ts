@@ -26,6 +26,7 @@ export interface Customer {
     is_final_consumer: boolean;
     customer_type?: 'retail' | 'mechanic' | 'trade';
     discount_percentage?: number;
+    claimed_by?: string;
 }
 
 export interface CartItem {

@@ -32,6 +32,7 @@ const POS: React.FC = () => {
     const [isLostDemandModalOpen, setIsLostDemandModalOpen] = useState(false);
     const [lostDemandBikeModel, setLostDemandBikeModel] = useState('');
     const [lostDemandBrand, setLostDemandBrand] = useState('');
+    const [promoCode, setPromoCode] = useState('');
 
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -327,7 +328,9 @@ const POS: React.FC = () => {
                 p_customer_id: customer.id,
                 p_payment_account_id: paymentAccountId,
                 p_shipping_cost: shippingCost,
-                p_items: itemsPayload
+                p_items: itemsPayload,
+                p_closer_id: customer.claimed_by || null,
+                p_promo_code: promoCode || null
             });
 
             if (error) {
@@ -377,6 +380,11 @@ const POS: React.FC = () => {
                         <span className="text-[10px] md:text-sm font-semibold text-slate-500 uppercase hidden md:inline">Cliente:</span>
                         <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 md:px-3 md:py-1.5 rounded-md border border-slate-200">
                             <span className="font-bold text-slate-800 text-xs md:text-sm truncate max-w-[120px] md:max-w-xs">{customer.name}</span>
+                            {customer.claimed_by && (
+                                <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                    Referido 2%
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -554,6 +562,18 @@ const POS: React.FC = () => {
                                 </div>
                             ) : null}
 
+                            {!customer.claimed_by && (
+                                <div className="flex items-center gap-2 mt-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Código Promo (Opcional)"
+                                        value={promoCode}
+                                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                                        className="w-full border border-slate-300 rounded p-1.5 text-sm uppercase outline-none focus:border-blue-500 font-mono text-slate-700"
+                                    />
+                                </div>
+                            )}
+
                             <div className="flex justify-between items-center text-sm">
                                 <span className="text-slate-600 font-medium whitespace-nowrap mr-2">Costo de Envío</span>
                                 <div className="relative">
@@ -627,9 +647,12 @@ const POS: React.FC = () => {
                                         className="p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors"
                                     >
                                         <div className="font-bold text-slate-800">{c.name}</div>
-                                        <div className="text-xs text-slate-500 flex justify-between mt-1">
+                                        <div className="text-xs text-slate-500 flex justify-between mt-1 items-center">
                                             <span>{c.identification_number}</span>
-                                            {c.customer_type && <span className="uppercase text-[10px] font-bold text-blue-500">{c.customer_type}</span>}
+                                            <div className="flex gap-2 items-center">
+                                                {c.claimed_by && <span className="bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold text-[9px]">REFERIDO</span>}
+                                                {c.customer_type && <span className="uppercase text-[10px] font-bold text-slate-400">{c.customer_type}</span>}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
