@@ -41,7 +41,7 @@ const Team: React.FC = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, role, is_active, created_at, avatar_url');
+        .select('id, full_name, email, is_active, avatar_url, roles(name)');
 
       if (error) throw error;
 
@@ -58,12 +58,12 @@ const Team: React.FC = () => {
           return {
             id: p.id,
             name: name,
-            email: 'Usuario Sistema', // Supabase profiles don't typically expose email to other users directly due to security
+            email: p.email || 'Sin correo',
             initials: initials || 'U',
-            role: (p.role || 'Usuario').charAt(0).toUpperCase() + (p.role || 'Usuario').slice(1),
-            roleColor: getRoleColor(p.role),
+            role: (p.roles && (p.roles as any).name) ? (p.roles as any).name.charAt(0).toUpperCase() + (p.roles as any).name.slice(1) : 'Usuario',
+            roleColor: getRoleColor((p.roles && (p.roles as any).name) ? (p.roles as any).name : ''),
             status: p.is_active ? 'Active' : 'Inactive',
-            lastActive: new Date(p.created_at).toLocaleDateString(),
+            lastActive: 'Registrado', // or calculate based on last activity if that data becomes available
             avatarType: p.avatar_url ? 'img' : 'initials',
             img: p.avatar_url,
           };
