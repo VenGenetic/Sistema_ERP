@@ -1,6 +1,7 @@
--- Creating the sync_vendor_catalog RPC
--- Supports smart merge: optional fields (profit_margin, category, vat_percentage)
--- use COALESCE to preserve existing DB values when Excel cells are blank.
+-- sync_vendor_catalog RPC
+-- Supports smart merge with COALESCE for optional fields.
+-- React enforces all required values before calling this function.
+-- For new products: profit_margin and vat_percentage MUST be provided by the UI.
 
 CREATE OR REPLACE FUNCTION sync_vendor_catalog(
     p_products JSONB
@@ -17,7 +18,6 @@ BEGIN
             (elem->>'sku')::TEXT AS sku,
             (elem->>'name')::TEXT AS name,
             (elem->>'cost_without_vat')::NUMERIC AS cost_without_vat,
-            -- For optional fields, if Excel is blank, the JSON will pass NULL
             (elem->>'profit_margin')::NUMERIC AS profit_margin,
             (elem->>'category')::TEXT AS category,
             (elem->>'vat_percentage')::NUMERIC AS vat_percentage
@@ -31,18 +31,17 @@ BEGIN
             sku, 
             name, 
             cost_without_vat,
-            COALESCE(profit_margin, 0.30), -- Default to 30% if entirely new and blank
+            profit_margin,      -- React ensures this is always set for new products
             category,
-            COALESCE(vat_percentage, 12.0), -- Default to 12% if entirely new and blank
+            vat_percentage,     -- React ensures this is always set (via fallback prompt)
             0 AS strike_count,              
             NULL AS strike_price_candidate  
         FROM parsed_data
         
-        -- IF THE SKU ALREADY EXISTS, DO THIS INSTEAD:
         ON CONFLICT (sku) DO UPDATE 
         SET 
-            name = EXCLUDED.name, -- Always overwrite name
-            cost_without_vat = EXCLUDED.cost_without_vat, -- Always overwrite cost
+            name = EXCLUDED.name,
+            cost_without_vat = EXCLUDED.cost_without_vat,
             
             -- SMART MERGE: If Excel didn't provide it (NULL), keep the current table data
             profit_margin = COALESCE(EXCLUDED.profit_margin, products.profit_margin),
