@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
+import { WarehouseSelect } from './WarehouseSelect';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -51,8 +52,18 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         price: 0
     });
 
+    // Stock Adjustment State
+    const [stockAdjustment, setStockAdjustment] = useState({
+        warehouse_id: null as number | null,
+        quantity: '',
+        isPurchase: false,
+        account_id: null as number | null
+    });
+    const [accounts, setAccounts] = useState<any[]>([]);
+
     useEffect(() => {
         if (isOpen) {
+            fetchAccounts();
             if (productToEdit) {
                 const cwv = productToEdit.cost_without_vat || 0;
                 const vat = productToEdit.vat_percentage || 12.0;
@@ -85,8 +96,19 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     price: 0
                 });
             }
+            // Reset stock adjustment
+            setStockAdjustment({ warehouse_id: null, quantity: '', isPurchase: false, account_id: null });
         }
     }, [isOpen, productToEdit]);
+
+    const fetchAccounts = async () => {
+        try {
+            const { data } = await supabase.from('accounts').select('*').order('name');
+            if (data) setAccounts(data);
+        } catch (error) {
+            console.error('Error fetching accounts', error);
+        }
+    };
 
     // ─── Change handlers that keep everything in sync ───
 
@@ -137,21 +159,49 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 price: formData.price
             };
 
-            let error;
+            let productId = productToEdit?.id;
+
             if (productToEdit && productToEdit.id) {
+                // Update existing
                 const { error: updateError } = await supabase
                     .from('products')
                     .update(payload)
                     .eq('id', productToEdit.id);
-                error = updateError;
+                if (updateError) throw updateError;
             } else {
-                const { error: insertError } = await supabase
+                // Insert new
+                const { data: newProd, error: insertError } = await supabase
                     .from('products')
-                    .insert([payload]);
-                error = insertError;
+                    .insert([payload])
+                    .select('id')
+                    .single();
+                if (insertError) throw insertError;
+                productId = newProd.id;
             }
 
-            if (error) throw error;
+            // Handle Stock Adjustment
+            const qty = parseInt(stockAdjustment.quantity);
+            if (qty && qty !== 0 && stockAdjustment.warehouse_id && productId) {
+                if (stockAdjustment.isPurchase && !stockAdjustment.account_id) {
+                    throw new Error('Debe seleccionar una cuenta de pago para realizar la compra.');
+                }
+
+                const unit_cost_with_vat = costWithVat(formData.costWithoutVat, formData.vatPercentage);
+                const { data: stockData, error: stockError } = await supabase.rpc('process_quick_stock_adjustment', {
+                    p_warehouse_id: stockAdjustment.warehouse_id,
+                    p_payment_account_id: stockAdjustment.isPurchase ? stockAdjustment.account_id : null,
+                    p_products: [{
+                        product_id: productId,
+                        quantity_change: qty,
+                        unit_cost_with_vat: unit_cost_with_vat
+                    }]
+                });
+
+                if (stockError) throw stockError;
+                if (!stockData.success) {
+                    console.warn('Ajuste de stock reportó problema:', stockData.message);
+                }
+            }
 
             onSuccess();
             onClose();
@@ -284,6 +334,78 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 </div>
                             </div>
                         )}
+
+                        {/* ═══ AJUSTE DE STOCK RÁPIDO ═══ */}
+                        <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-[18px]">inventory</span>
+                                Ajuste de Stock Rápido
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <WarehouseSelect
+                                        value={stockAdjustment.warehouse_id}
+                                        onChange={(val) => setStockAdjustment(prev => ({ ...prev, warehouse_id: val }))}
+                                        label="Almacén:"
+                                    />
+                                    <div className="mt-2 text-xs text-slate-500">
+                                        Selecciona un almacén para modificar el stock de este producto al guardar.
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className={labelClass}>
+                                            Cantidad (+ para sumar, - para restar):
+                                        </label>
+                                        <input
+                                            type="number"
+                                            className={inputClass}
+                                            value={stockAdjustment.quantity}
+                                            onChange={e => setStockAdjustment(prev => ({ ...prev, quantity: e.target.value }))}
+                                            placeholder="Ej: 5 o -2"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <label className="flex items-center cursor-pointer relative group">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={stockAdjustment.isPurchase}
+                                                onChange={(e) => setStockAdjustment(prev => ({ ...prev, isPurchase: e.target.checked }))}
+                                            />
+                                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                            <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Es una compra financiera</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {stockAdjustment.isPurchase && (
+                                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-3 animate-in fade-in slide-in-from-top-2">
+                                    <label className={labelClass}>
+                                        Cuenta de Pago (Se debitará el costo total):
+                                    </label>
+                                    <select
+                                        className={inputClass}
+                                        value={stockAdjustment.account_id || ''}
+                                        onChange={(e) => setStockAdjustment(prev => ({ ...prev, account_id: parseInt(e.target.value) }))}
+                                    >
+                                        <option value="">Seleccionar Cuenta...</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.code} - {acc.name} ({acc.currency})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {stockAdjustment.account_id && stockAdjustment.quantity && parseInt(stockAdjustment.quantity) > 0 && (
+                                        <div className="mt-2 text-xs font-semibold text-orange-700 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[14px]">info</span>
+                                            Se debitarán ${(costoConIva * parseInt(stockAdjustment.quantity)).toFixed(2)} de esta cuenta de forma automática.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* ═══ Actions ═══ */}

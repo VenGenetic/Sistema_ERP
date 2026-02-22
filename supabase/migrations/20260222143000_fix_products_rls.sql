@@ -1,6 +1,20 @@
 -- Migration: Add missing INSERT and UPDATE RLS policies for products table
--- The products table had RLS enabled since 20260218232000 but only had a SELECT policy.
--- This caused all direct UPDATE and INSERT operations from the frontend to silently fail.
+-- Safely drop existing policies first to avoid "already exists" errors
+
+DO $$ 
+BEGIN
+    -- PRODUCTS
+    DROP POLICY IF EXISTS "Allow update access for authenticated users" ON public.products;
+    DROP POLICY IF EXISTS "Allow insert access for authenticated users" ON public.products;
+    
+    -- INVENTORY_LEVELS
+    DROP POLICY IF EXISTS "Allow update access for authenticated users" ON public.inventory_levels;
+    DROP POLICY IF EXISTS "Allow insert access for authenticated users" ON public.inventory_levels;
+
+    -- WAREHOUSES
+    DROP POLICY IF EXISTS "Allow update access for authenticated users" ON public.warehouses;
+    DROP POLICY IF EXISTS "Allow insert access for authenticated users" ON public.warehouses;
+END $$;
 
 -- Add UPDATE policy for authenticated users
 CREATE POLICY "Allow update access for authenticated users"

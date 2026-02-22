@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
+import { WarehouseSelect } from './WarehouseSelect';
 
 // ─── Editable fields config ───
 const BULK_FIELDS = [
@@ -10,6 +11,7 @@ const BULK_FIELDS = [
     { key: 'cost_without_vat', label: 'Costo sin IVA ($)', type: 'currency', icon: 'payments' },
     { key: 'vat_percentage', label: 'IVA (%)', type: 'percent', icon: 'percent' },
     { key: 'profit_margin', label: 'Margen de Ganancia', type: 'margin', icon: 'trending_up' },
+    { key: 'add_stock', label: 'Añadir Stock', type: 'stock', icon: 'add_box' }
 ] as const;
 
 type BulkFieldKey = typeof BULK_FIELDS[number]['key'];
@@ -32,14 +34,33 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<{ success: number; failed: number } | null>(null);
 
+    // Stock specific state
+    const [stockAdjustment, setStockAdjustment] = useState({
+        warehouse_id: null as number | null,
+        isPurchase: false,
+        account_id: null as number | null
+    });
+    const [accounts, setAccounts] = useState<any[]>([]);
+
     // Reset state when opened
     useEffect(() => {
         if (isOpen) {
             setSelectedField('');
             setValue('');
             setResult(null);
+            setStockAdjustment({ warehouse_id: null, isPurchase: false, account_id: null });
+            fetchAccounts();
         }
     }, [isOpen]);
+
+    const fetchAccounts = async () => {
+        try {
+            const { data } = await supabase.from('accounts').select('*').order('name');
+            if (data) setAccounts(data);
+        } catch (error) {
+            console.error('Error fetching accounts', error);
+        }
+    };
 
     const fieldConfig = BULK_FIELDS.find(f => f.key === selectedField);
     const isFinancialField = ['cost_without_vat', 'vat_percentage', 'profit_margin'].includes(selectedField);
@@ -77,6 +98,33 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                     } else {
                         success++;
                     }
+                }
+            } else if (selectedField === 'add_stock') {
+                if (!stockAdjustment.warehouse_id) throw new Error('Debe seleccionar un almacén destino.');
+                if (stockAdjustment.isPurchase && !stockAdjustment.account_id) throw new Error('Seleccione cuenta de pago.');
+                const qty = Number(value);
+                if (!qty) throw new Error('Ingrese una cantidad válida.');
+
+                const productsMap = selectedProducts.map(p => ({
+                    product_id: p.id,
+                    quantity_change: qty,
+                    unit_cost_with_vat: costWithVat(p.cost_without_vat || 0, p.vat_percentage || 12)
+                }));
+
+                const { data, error } = await supabase.rpc('process_quick_stock_adjustment', {
+                    p_warehouse_id: stockAdjustment.warehouse_id,
+                    p_payment_account_id: stockAdjustment.isPurchase ? stockAdjustment.account_id : null,
+                    p_products: productsMap
+                });
+
+                if (error) {
+                    console.error('Add stock error:', error);
+                    failed = selectedProducts.length;
+                } else if (!data.success) {
+                    failed = selectedProducts.length;
+                    alert(data.message);
+                } else {
+                    success = selectedProducts.length;
                 }
             } else {
                 // Non-financial: batch update with a single value
@@ -138,6 +186,17 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
         });
     };
 
+    const getStockPreviewTotal = () => {
+        if (selectedField !== 'add_stock' || !value) return 0;
+        const qty = Number(value);
+        if (!qty) return 0;
+        let total = 0;
+        for (const p of selectedProducts) {
+            total += costWithVat(p.cost_without_vat || 0, p.vat_percentage || 12) * qty;
+        }
+        return total;
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-xl overflow-hidden border border-slate-200 dark:border-slate-700 my-8">
@@ -169,8 +228,8 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                     key={f.key}
                                     onClick={() => { setSelectedField(f.key); setValue(''); }}
                                     className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${selectedField === f.key
-                                            ? 'bg-primary/10 border-primary text-primary ring-2 ring-primary/20'
-                                            : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                                        ? 'bg-primary/10 border-primary text-primary ring-2 ring-primary/20'
+                                        : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400'
                                         }`}
                                 >
                                     <span className="material-symbols-outlined text-[18px]">{f.icon}</span>
@@ -224,6 +283,61 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                             {fieldConfig?.type === 'brand' && (
                                 <BrandSelect value={value || null} onChange={(val) => setValue(val)} />
                             )}
+
+                            {fieldConfig?.type === 'stock' && (
+                                <div className="space-y-4">
+                                    <input type="number" className={inputClass} placeholder="Cantidad a sumar (Ej: 10 o -5)"
+                                        value={value} onChange={e => setValue(e.target.value)} autoFocus />
+
+                                    <div className="bg-slate-50 dark:bg-slate-700/30 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-4">
+                                        <WarehouseSelect
+                                            value={stockAdjustment.warehouse_id}
+                                            onChange={(val) => setStockAdjustment(prev => ({ ...prev, warehouse_id: val }))}
+                                            label="Almacén de destino:"
+                                        />
+
+                                        <div className="flex items-center gap-3 pt-2">
+                                            <label className="flex items-center cursor-pointer relative group">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={stockAdjustment.isPurchase}
+                                                    onChange={(e) => setStockAdjustment(prev => ({ ...prev, isPurchase: e.target.checked }))}
+                                                />
+                                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                                <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Es una compra financiera</span>
+                                            </label>
+                                        </div>
+
+                                        {stockAdjustment.isPurchase && (
+                                            <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-3 animate-in fade-in slide-in-from-top-2">
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    Cuenta de Pago (De donde sale el dinero):
+                                                </label>
+                                                <select
+                                                    className={inputClass}
+                                                    value={stockAdjustment.account_id || ''}
+                                                    onChange={(e) => setStockAdjustment(prev => ({ ...prev, account_id: parseInt(e.target.value) }))}
+                                                >
+                                                    <option value="">Seleccionar Cuenta...</option>
+                                                    {accounts.map(acc => (
+                                                        <option key={acc.id} value={acc.id}>
+                                                            {acc.code} - {acc.name} ({acc.currency})
+                                                        </option>
+                                                    ))}
+                                                </select>
+
+                                                {stockAdjustment.account_id && Number(value) > 0 && (
+                                                    <div className="mt-2 text-xs font-semibold text-orange-700 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px]">info</span>
+                                                        Se debitarán aprox. ${getStockPreviewTotal().toFixed(2)} de esta cuenta.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -258,8 +372,8 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                     {/* Result message */}
                     {result && (
                         <div className={`p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${result.failed === 0
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
-                                : 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400'
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                            : 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400'
                             }`}>
                             <span className="material-symbols-outlined text-[18px]">
                                 {result.failed === 0 ? 'check_circle' : 'warning'}
