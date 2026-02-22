@@ -143,22 +143,22 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     const handleCostChange = (newCost: number) => {
         const price = calcPrice(newCost, formData.vatPercentage, formData.profitMargin);
-        setFormData(prev => ({ ...prev, costWithoutVat: newCost, price }));
+        setFormData(prev => ({ ...prev, costWithoutVat: newCost, price: Math.round(price * 100) / 100 }));
     };
 
     const handleVatChange = (newVat: number) => {
         const price = calcPrice(formData.costWithoutVat, newVat, formData.profitMargin);
-        setFormData(prev => ({ ...prev, vatPercentage: newVat, price }));
+        setFormData(prev => ({ ...prev, vatPercentage: newVat, price: Math.round(price * 100) / 100 }));
     };
 
     const handleMarginChange = (newMargin: number) => {
         const price = calcPrice(formData.costWithoutVat, formData.vatPercentage, newMargin);
-        setFormData(prev => ({ ...prev, profitMargin: newMargin, price }));
+        setFormData(prev => ({ ...prev, profitMargin: newMargin, price: Math.round(price * 100) / 100 }));
     };
 
     const handlePriceChange = (newPrice: number) => {
         const margin = calcMargin(formData.costWithoutVat, formData.vatPercentage, newPrice);
-        setFormData(prev => ({ ...prev, price: newPrice, profitMargin: margin }));
+        setFormData(prev => ({ ...prev, price: newPrice, profitMargin: Math.round(margin * 100) / 100 }));
     };
 
     // ─── Computed display values ───
