@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
+import { CatalogImportWizard } from '../components/CatalogImportWizard';
 
 const Products: React.FC = () => {
     const [products, setProducts] = useState<any[]>([]);
@@ -9,6 +10,7 @@ const Products: React.FC = () => {
     // Modal states
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<any>(null);
+    const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
 
     const fetchProducts = async () => {
         setLoading(true);
@@ -40,13 +42,23 @@ const Products: React.FC = () => {
                     <h1 className="text-3xl font-bold dark:text-white">Catálogo de Productos</h1>
                     <p className="text-slate-500">Gestiona la información maestra de tus productos (SKU, Nombres, Categorías).</p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="px-4 py-2 bg-primary text-white rounded-lg flex items-center gap-2 shadow-sm shadow-primary/30 hover:bg-primary/90 transition-colors"
-                >
-                    <span className="material-symbols-outlined">add</span>
-                    Nuevo Producto
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setIsImportWizardOpen(true)}
+                        className="px-4 py-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors shadow-sm"
+                        title="Master Data Override"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">magic_button</span>
+                        Importar Catálogo
+                    </button>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="px-4 py-2 bg-primary text-white rounded-lg flex items-center gap-2 shadow-sm shadow-primary/30 hover:bg-primary/90 transition-colors"
+                    >
+                        <span className="material-symbols-outlined">add</span>
+                        Nuevo Producto
+                    </button>
+                </div>
             </div>
 
             {/* Basic Table */}
@@ -99,6 +111,12 @@ const Products: React.FC = () => {
                 onClose={() => setIsModalOpen(false)}
                 onSuccess={fetchProducts}
                 productToEdit={productToEdit}
+            />
+
+            <CatalogImportWizard
+                isOpen={isImportWizardOpen}
+                onClose={() => setIsImportWizardOpen(false)}
+                onSuccess={fetchProducts}
             />
         </div>
     );
