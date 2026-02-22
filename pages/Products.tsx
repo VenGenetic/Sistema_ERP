@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
 import { CatalogImportWizard } from '../components/CatalogImportWizard';
+import { BulkEditModal } from '../components/BulkEditModal';
 
 const Products: React.FC = () => {
     // ──────────────────────────────────────────────
@@ -13,6 +14,10 @@ const Products: React.FC = () => {
     // Modal states
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<any>(null);
+
+    // Selection & Bulk Edit
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
     const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
 
     // ──────────────────────────────────────────────
@@ -130,6 +135,31 @@ const Products: React.FC = () => {
         fetchCatalogData(pagination.page);
     };
 
+    // ── Selection handlers ──
+    const toggleSelectAll = () => {
+        if (selectedIds.size === products.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(products.map(p => p.id)));
+        }
+    };
+
+    const toggleSelectRow = (id: number) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const selectedProducts = products.filter(p => selectedIds.has(p.id));
+
+    const handleBulkEditSuccess = () => {
+        setSelectedIds(new Set());
+        fetchCatalogData(pagination.page);
+    };
+
     // ──────────────────────────────────────────────
     // PAGINATION HELPERS
     // ──────────────────────────────────────────────
@@ -205,6 +235,14 @@ const Products: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
                             <tr>
+                                <th className="px-3 py-3 w-10">
+                                    <input
+                                        type="checkbox"
+                                        checked={products.length > 0 && selectedIds.size === products.length}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                    />
+                                </th>
                                 {columns.map(col => (
                                     <th
                                         key={col.key}
@@ -238,7 +276,15 @@ const Products: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                             {products.map(prod => (
-                                <tr key={prod.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                <tr key={prod.id} className={`transition-colors group ${selectedIds.has(prod.id) ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                                    <td className="px-3 py-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(prod.id)}
+                                            onChange={() => toggleSelectRow(prod.id)}
+                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400">{prod.sku}</td>
                                     <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{prod.name}</td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.category || '—'}</td>
@@ -342,6 +388,38 @@ const Products: React.FC = () => {
                 onClose={() => setIsImportWizardOpen(false)}
                 onSuccess={() => fetchCatalogData(1)}
             />
+
+            <BulkEditModal
+                isOpen={isBulkEditOpen}
+                onClose={() => setIsBulkEditOpen(false)}
+                onSuccess={handleBulkEditSuccess}
+                selectedProducts={selectedProducts}
+            />
+
+            {/* ═══════ FLOATING ACTION BAR ═══════ */}
+            {selectedIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 dark:bg-slate-700 text-white rounded-2xl shadow-2xl shadow-slate-900/50 px-6 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4">
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="bg-primary text-white font-bold px-2.5 py-0.5 rounded-full text-xs">{selectedIds.size}</span>
+                        <span className="text-slate-300">seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="w-px h-6 bg-slate-600"></div>
+                    <button
+                        onClick={() => setIsBulkEditOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                        Edición Rápida
+                    </button>
+                    <button
+                        onClick={() => setSelectedIds(new Set())}
+                        className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600"
+                        title="Deseleccionar todo"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
