@@ -4,6 +4,7 @@ import TeamPanel from '../components/settings/TeamPanel';
 import ProfilePanel from '../components/settings/ProfilePanel';
 import AccountPanel from '../components/settings/AccountPanel';
 import BrandsPanel from '../components/settings/BrandsPanel';
+import ApiKeysPanel from '../components/settings/ApiKeysPanel';
 
 // --- Local Panels for Inventory, Finance, Dev (with persistence) ---
 
@@ -187,6 +188,7 @@ const DevPanel = () => {
                     ))}
                 </div>
             </div>
+            <ApiKeysPanel />
         </div>
     )
 }
