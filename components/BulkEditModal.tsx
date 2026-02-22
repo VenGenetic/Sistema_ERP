@@ -64,11 +64,32 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
             console.error('Error fetching accounts', error);
         }
     };
-    // Helper to fetch all product IDs when applying to whole system
-    const fetchAllProductIds = async () => {
-        const { data, error } = await supabase.from('products').select('id');
-        if (error) throw error;
-        return data?.map((p: any) => p.id) ?? [];
+    // Helper to fetch all products when applying to whole system
+    const fetchAllProductsChunked = async () => {
+        let allProducts: any[] = [];
+        let from = 0;
+        const limit = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+            const { data, error } = await supabase
+                .from('products')
+                .select('id, cost_without_vat, vat_percentage, profit_margin')
+                .range(from, from + limit - 1);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                allProducts = [...allProducts, ...data];
+                from += limit;
+                if (data.length < limit) {
+                    hasMore = false;
+                }
+            } else {
+                hasMore = false;
+            }
+        }
+        return allProducts;
     };
 
     const fieldConfig = BULK_FIELDS.find(f => f.key === selectedField);
@@ -78,18 +99,18 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
         if (!selectedField) return;
         setLoading(true);
         setResult(null);
-        // Determine target product IDs based on toggle
-        let targetIds: number[] = [];
+        // Determine target products based on toggle
+        let targetProducts: any[] = [];
         if (applyToAll) {
             try {
-                targetIds = await fetchAllProductIds();
+                targetProducts = await fetchAllProductsChunked();
             } catch (e) {
-                console.error('Failed to fetch all product IDs', e);
+                console.error('Failed to fetch all products', e);
                 setLoading(false);
                 return;
             }
         } else {
-            targetIds = selectedProducts.map(p => p.id);
+            targetProducts = selectedProducts;
         }
 
         let success = 0;
@@ -98,30 +119,33 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
         try {
             if (isFinancialField) {
                 // Financial fields: update per-product to recalculate PVP
-                for (const prodId of targetIds) {
-                    // Fetch product details if needed for cost calculations
-                    const { data: prod } = await supabase.from('products').select('*').eq('id', prodId).single();
-                    const cost = selectedField === 'cost_without_vat' ? Number(value) : (prod?.cost_without_vat || 0);
-                    const vat = selectedField === 'vat_percentage' ? Number(value) : (prod?.vat_percentage || 12);
-                    const margin = selectedField === 'profit_margin' ? Number(value) : (prod?.profit_margin || 0.30);
-                    const newPrice = calcPrice(cost, vat, margin);
+                // chunk updates to avoid blocking UI for too long, but run concurrently
+                const CHUNK_SIZE = 50;
+                for (let i = 0; i < targetProducts.length; i += CHUNK_SIZE) {
+                    const chunk = targetProducts.slice(i, i + CHUNK_SIZE);
+                    await Promise.all(chunk.map(async (prod) => {
+                        const cost = selectedField === 'cost_without_vat' ? Number(value) : (prod.cost_without_vat || 0);
+                        const vat = selectedField === 'vat_percentage' ? Number(value) : (prod.vat_percentage || 12);
+                        const margin = selectedField === 'profit_margin' ? Number(value) : (prod.profit_margin || 0.30);
+                        const newPrice = calcPrice(cost, vat, margin);
 
-                    const payload: any = {
-                        [selectedField]: Number(value),
-                        price: newPrice
-                    };
+                        const payload: any = {
+                            [selectedField]: Number(value),
+                            price: newPrice
+                        };
 
-                    const { error } = await supabase
-                        .from('products')
-                        .update(payload)
-                        .eq('id', prodId);
+                        const { error } = await supabase
+                            .from('products')
+                            .update(payload)
+                            .eq('id', prod.id);
 
-                    if (error) {
-                        console.error(`Failed to update product ${prodId}:`, error);
-                        failed++;
-                    } else {
-                        success++;
-                    }
+                        if (error) {
+                            console.error(`Failed to update product ${prod.id}:`, error);
+                            failed++;
+                        } else {
+                            success++;
+                        }
+                    }));
                 }
             } else if (selectedField === 'add_stock') {
                 if (!stockAdjustment.warehouse_id) throw new Error('Debe seleccionar un almacén destino.');
@@ -129,17 +153,10 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                 const qty = Number(value);
                 if (!qty) throw new Error('Ingrese una cantidad válida.');
 
-                // Determine product list based on toggle
-                const productIds = applyToAll ? targetIds : selectedProducts.map(p => p.id);
-                const productsMap = productIds.map(id => ({
-                    product_id: id,
+                const productsMap = targetProducts.map(prod => ({
+                    product_id: prod.id,
                     quantity_change: qty,
-                    unit_cost_with_vat: (() => {
-                        const prod = applyToAll ? null : selectedProducts.find(p => p.id === id);
-                        const cost = prod?.cost_without_vat || 0;
-                        const vat = prod?.vat_percentage || 12;
-                        return costWithVat(cost, vat);
-                    })()
+                    unit_cost_with_vat: costWithVat(prod.cost_without_vat || 0, prod.vat_percentage || 12)
                 }));
 
                 const { data, error } = await supabase.rpc('process_quick_stock_adjustment', {
@@ -159,7 +176,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                 }
             } else {
                 // Non-financial: batch update with a single value
-                const ids = targetIds;
+                const ids = targetProducts.map(p => p.id);
                 const payload: any = {};
 
                 if (selectedField === 'brand_id') {
@@ -170,16 +187,21 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                     payload[selectedField] = value;
                 }
 
-                const { error } = await supabase
-                    .from('products')
-                    .update(payload)
-                    .in('id', ids);
+                // Chunk the generic update to avoid URL length limits with .in()
+                const CHUNK_SIZE = 500;
+                for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+                    const chunk = ids.slice(i, i + CHUNK_SIZE);
+                    const { error } = await supabase
+                        .from('products')
+                        .update(payload)
+                        .in('id', chunk);
 
-                if (error) {
-                    console.error('Bulk update error:', error);
-                    failed = ids.length;
-                } else {
-                    success = ids.length;
+                    if (error) {
+                        console.error('Bulk update error:', error);
+                        failed += chunk.length;
+                    } else {
+                        success += chunk.length;
+                    }
                 }
             }
 
