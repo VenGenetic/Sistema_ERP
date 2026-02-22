@@ -57,7 +57,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         warehouse_id: null as number | null,
         quantity: '',
         isPurchase: false,
-        account_id: null as number | null
+        account_id: null as number | null,
+        isMerma: false,
+        merma_account_id: null as number | null
     });
     const [accounts, setAccounts] = useState<any[]>([]);
     const [currentStock, setCurrentStock] = useState<number | null>(null);
@@ -126,7 +128,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 });
             }
             // Reset stock adjustment
-            setStockAdjustment({ warehouse_id: null, quantity: '', isPurchase: false, account_id: null });
+            setStockAdjustment({ warehouse_id: null, quantity: '', isPurchase: false, account_id: null, isMerma: false, merma_account_id: null });
         }
     }, [isOpen, productToEdit]);
 
@@ -221,14 +223,18 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             const qtyChange = isQtyValid ? submittedQty - originalQty : 0;
 
             if (qtyChange !== 0 && stockAdjustment.warehouse_id && productId) {
-                if (stockAdjustment.isPurchase && !stockAdjustment.account_id) {
-                    throw new Error('Debe seleccionar una cuenta de pago para realizar la compra.');
+                if (qtyChange > 0 && stockAdjustment.isPurchase && !stockAdjustment.account_id) {
+                    throw new Error('Debe seleccionar una cuenta de pago para registrar la compra.');
+                }
+                if (qtyChange < 0 && stockAdjustment.isMerma && !stockAdjustment.merma_account_id) {
+                    throw new Error('Debe seleccionar una cuenta de gasto/pérdida para registrar la merma.');
                 }
 
                 const unit_cost_with_vat = costWithVat(formData.costWithoutVat, formData.vatPercentage);
                 const { data: stockData, error: stockError } = await supabase.rpc('process_quick_stock_adjustment', {
                     p_warehouse_id: stockAdjustment.warehouse_id,
-                    p_payment_account_id: stockAdjustment.isPurchase ? stockAdjustment.account_id : null,
+                    p_payment_account_id: (qtyChange > 0 && stockAdjustment.isPurchase) ? stockAdjustment.account_id : null,
+                    p_merma_account_id: (qtyChange < 0 && stockAdjustment.isMerma) ? stockAdjustment.merma_account_id : null,
                     p_products: [{
                         product_id: productId,
                         quantity_change: qtyChange,
@@ -238,7 +244,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
                 if (stockError) throw stockError;
                 if (!stockData.success) {
-                    console.warn('Ajuste de stock reportó problema:', stockData.message);
+                    throw new Error('Error en ajuste de stock: ' + stockData.message);
                 }
             }
 
@@ -404,62 +410,92 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             onChange={e => setStockAdjustment(prev => ({ ...prev, quantity: e.target.value }))}
                                             placeholder="Ej: 50"
                                         />
-                                        {stockAdjustment.warehouse_id && (
-                                            <div className="mt-2 text-xs font-medium">
-                                                <span className="text-slate-500 block mb-1">
-                                                    Stock actual en este almacén: <strong className="text-slate-700 dark:text-slate-300">{currentStock !== null ? currentStock : '...'}</strong>
-                                                </span>
-                                                {(() => {
-                                                    const qt = parseInt(stockAdjustment.quantity);
-                                                    if (isNaN(qt) || currentStock === null) return null;
-                                                    const diff = qt - currentStock;
-                                                    if (diff > 0) return <span className="text-emerald-600 dark:text-emerald-400">Se añadirán <strong>{diff}</strong> unidades.</span>;
-                                                    if (diff < 0) return <span className="text-rose-600 dark:text-rose-400">Se restarán <strong>{Math.abs(diff)}</strong> unidades.</span>;
-                                                    return <span className="text-slate-500">El stock no cambiará.</span>;
-                                                })()}
-                                            </div>
-                                        )}
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <label className="flex items-center cursor-pointer relative group">
-                                            <input
-                                                type="checkbox"
-                                                className="sr-only peer"
-                                                checked={stockAdjustment.isPurchase}
-                                                onChange={(e) => setStockAdjustment(prev => ({ ...prev, isPurchase: e.target.checked }))}
-                                            />
-                                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                                            <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Es una compra financiera</span>
-                                        </label>
-                                    </div>
+                                    {/* Delta indicator and conditional toggles */}
+                                    {stockAdjustment.warehouse_id && (() => {
+                                        const qt = parseInt(stockAdjustment.quantity);
+                                        if (isNaN(qt) || currentStock === null) return null;
+                                        const diff = qt - currentStock;
+                                        if (diff === 0) return <div className="mt-2 text-xs text-slate-500">El stock no cambiará.</div>;
+                                        if (diff > 0) {
+                                            return (
+                                                <div className="mt-3 space-y-3">
+                                                    <div className="flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                                                        <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                                                        Se añadirán <strong>{diff}</strong> unidades al inventario.
+                                                    </div>
+                                                    <label className="flex items-center cursor-pointer relative group">
+                                                        <input type="checkbox" className="sr-only peer"
+                                                            checked={stockAdjustment.isPurchase}
+                                                            onChange={(e) => setStockAdjustment(prev => ({ ...prev, isPurchase: e.target.checked }))}
+                                                        />
+                                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                                                        <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Registrar como compra financiera</span>
+                                                    </label>
+                                                    {stockAdjustment.isPurchase && (
+                                                        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+                                                            <label className={labelClass}>Cuenta de Pago:</label>
+                                                            <select className={inputClass}
+                                                                value={stockAdjustment.account_id || ''}
+                                                                onChange={(e) => setStockAdjustment(prev => ({ ...prev, account_id: parseInt(e.target.value) }))}
+                                                            >
+                                                                <option value="">Seleccionar Cuenta...</option>
+                                                                {accounts.map(acc => (
+                                                                    <option key={acc.id} value={acc.id}>{acc.code} - {acc.name} ({acc.currency})</option>
+                                                                ))}
+                                                            </select>
+                                                            {stockAdjustment.account_id && (
+                                                                <div className="mt-2 text-xs font-semibold text-orange-700 flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-[14px]">info</span>
+                                                                    Se debitarán ${(costoConIva * diff).toFixed(2)} de esta cuenta.
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        } else {
+                                            // diff < 0 — stock reduction
+                                            return (
+                                                <div className="mt-3 space-y-3">
+                                                    <div className="flex items-center gap-2 p-2 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-400">
+                                                        <span className="material-symbols-outlined text-[16px]">remove_circle</span>
+                                                        Se restarán <strong>{Math.abs(diff)}</strong> unidades del inventario.
+                                                    </div>
+                                                    <label className="flex items-center cursor-pointer relative group">
+                                                        <input type="checkbox" className="sr-only peer"
+                                                            checked={stockAdjustment.isMerma}
+                                                            onChange={(e) => setStockAdjustment(prev => ({ ...prev, isMerma: e.target.checked }))}
+                                                        />
+                                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500"></div>
+                                                        <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Registrar como merma (pérdida contable)</span>
+                                                    </label>
+                                                    {stockAdjustment.isMerma && (
+                                                        <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-lg p-3">
+                                                            <label className={labelClass}>Cuenta de Gasto / Pérdida:</label>
+                                                            <select className={inputClass}
+                                                                value={stockAdjustment.merma_account_id || ''}
+                                                                onChange={(e) => setStockAdjustment(prev => ({ ...prev, merma_account_id: parseInt(e.target.value) }))}
+                                                            >
+                                                                <option value="">Seleccionar Cuenta...</option>
+                                                                {accounts.map(acc => (
+                                                                    <option key={acc.id} value={acc.id}>{acc.code} - {acc.name} ({acc.currency})</option>
+                                                                ))}
+                                                            </select>
+                                                            {stockAdjustment.merma_account_id && (
+                                                                <div className="mt-2 text-xs font-semibold text-rose-700 flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-[14px]">info</span>
+                                                                    Se registrará una pérdida de ${(costoConIva * Math.abs(diff)).toFixed(2)} en contabilidad.
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+                                    })()}
                                 </div>
                             </div>
-
-                            {stockAdjustment.isPurchase && (
-                                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-3 animate-in fade-in slide-in-from-top-2">
-                                    <label className={labelClass}>
-                                        Cuenta de Pago (Se debitará el costo total):
-                                    </label>
-                                    <select
-                                        className={inputClass}
-                                        value={stockAdjustment.account_id || ''}
-                                        onChange={(e) => setStockAdjustment(prev => ({ ...prev, account_id: parseInt(e.target.value) }))}
-                                    >
-                                        <option value="">Seleccionar Cuenta...</option>
-                                        {accounts.map(acc => (
-                                            <option key={acc.id} value={acc.id}>
-                                                {acc.code} - {acc.name} ({acc.currency})
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {stockAdjustment.account_id && stockAdjustment.quantity && !isNaN(parseInt(stockAdjustment.quantity)) && (parseInt(stockAdjustment.quantity) - (currentStock || 0)) > 0 && (
-                                        <div className="mt-2 text-xs font-semibold text-orange-700 flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-[14px]">info</span>
-                                            Se debitarán ${(costoConIva * (parseInt(stockAdjustment.quantity) - (currentStock || 0))).toFixed(2)} de esta cuenta de forma automática.
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
 
