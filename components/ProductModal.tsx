@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { BrandSelect } from './BrandSelect'; // Assuming in same folder
+import { BrandSelect } from './BrandSelect';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -20,6 +20,23 @@ interface ProductModalProps {
     } | null;
 }
 
+// ─── Helper: round to 4 decimals to avoid floating-point noise ───
+const r = (n: number) => Math.round(n * 10000) / 10000;
+
+// ─── Derived cost WITH VAT ───
+const costWithVat = (costWithoutVat: number, vatPercentage: number) =>
+    r(costWithoutVat * (1 + vatPercentage / 100));
+
+// ─── PVP from cost + margin ───
+const calcPrice = (costWithoutVat: number, vatPercentage: number, profitMargin: number) =>
+    r(costWithVat(costWithoutVat, vatPercentage) * (1 + profitMargin));
+
+// ─── Margin from PVP + cost ───
+const calcMargin = (costWithoutVat: number, vatPercentage: number, price: number) => {
+    const c = costWithVat(costWithoutVat, vatPercentage);
+    return c > 0 ? r(price / c - 1) : 0;
+};
+
 export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -37,19 +54,25 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     useEffect(() => {
         if (isOpen) {
             if (productToEdit) {
+                const cwv = productToEdit.cost_without_vat || 0;
+                const vat = productToEdit.vat_percentage || 12.0;
+                const margin = productToEdit.profit_margin || 0.30;
+                // Derive PVP from cost data if stored price is 0 or missing
+                const storedPrice = productToEdit.price || 0;
+                const derivedPrice = storedPrice > 0 ? storedPrice : calcPrice(cwv, vat, margin);
+
                 setFormData({
                     sku: productToEdit.sku || '',
                     name: productToEdit.name || '',
                     category: productToEdit.category || '',
                     brandId: productToEdit.brand_id,
                     minStock: productToEdit.min_stock_threshold || 10,
-                    profitMargin: productToEdit.profit_margin || 0.30,
-                    costWithoutVat: productToEdit.cost_without_vat || 0,
-                    vatPercentage: productToEdit.vat_percentage || 12.0,
-                    price: productToEdit.price || 0
+                    profitMargin: margin,
+                    costWithoutVat: cwv,
+                    vatPercentage: vat,
+                    price: derivedPrice
                 });
             } else {
-                // Reset for new product
                 setFormData({
                     sku: '',
                     name: '',
@@ -65,6 +88,32 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         }
     }, [isOpen, productToEdit]);
 
+    // ─── Change handlers that keep everything in sync ───
+
+    const handleCostChange = (newCost: number) => {
+        const price = calcPrice(newCost, formData.vatPercentage, formData.profitMargin);
+        setFormData(prev => ({ ...prev, costWithoutVat: newCost, price }));
+    };
+
+    const handleVatChange = (newVat: number) => {
+        const price = calcPrice(formData.costWithoutVat, newVat, formData.profitMargin);
+        setFormData(prev => ({ ...prev, vatPercentage: newVat, price }));
+    };
+
+    const handleMarginChange = (newMargin: number) => {
+        const price = calcPrice(formData.costWithoutVat, formData.vatPercentage, newMargin);
+        setFormData(prev => ({ ...prev, profitMargin: newMargin, price }));
+    };
+
+    const handlePriceChange = (newPrice: number) => {
+        const margin = calcMargin(formData.costWithoutVat, formData.vatPercentage, newPrice);
+        setFormData(prev => ({ ...prev, price: newPrice, profitMargin: margin }));
+    };
+
+    // ─── Computed display values ───
+    const costoConIva = costWithVat(formData.costWithoutVat, formData.vatPercentage);
+    const gananciaAbsoluta = r(formData.price - costoConIva);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -76,7 +125,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         setLoading(true);
 
         try {
-            // Match the payload keys exactly to your public.products table schema
             const payload = {
                 sku: formData.sku,
                 name: formData.name,
@@ -91,14 +139,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             let error;
             if (productToEdit && productToEdit.id) {
-                // Update
                 const { error: updateError } = await supabase
                     .from('products')
                     .update(payload)
                     .eq('id', productToEdit.id);
                 error = updateError;
             } else {
-                // Insert
                 const { error: insertError } = await supabase
                     .from('products')
                     .insert([payload]);
@@ -107,7 +153,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             if (error) throw error;
 
-            onSuccess(); // This triggers fetchData() in Inventory.tsx to refresh the UI
+            onSuccess();
             onClose();
 
         } catch (error: any) {
@@ -120,10 +166,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     if (!isOpen) return null;
 
+    const inputClass = "w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-sm";
+    const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1";
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700 my-8">
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                {/* Header */}
+                <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
                             <span className="material-symbols-outlined text-[24px]">inventory_2</span>
@@ -137,127 +187,113 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+                <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5">
+                    {/* ═══ Core Fields ═══ */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Core Fields */}
                         <div className="col-span-1 md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre del Producto *</label>
-                            <input
-                                required
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                                value={formData.name}
-                                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            />
+                            <label className={labelClass}>Nombre del Producto *</label>
+                            <input required type="text" className={inputClass}
+                                value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">SKU *</label>
-                            <input
-                                required
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono uppercase"
-                                value={formData.sku}
-                                onChange={e => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                            />
+                            <label className={labelClass}>SKU *</label>
+                            <input required type="text" className={`${inputClass} font-mono uppercase`}
+                                value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value.toUpperCase() })} />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoría</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                                value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value })}
-                            />
+                            <label className={labelClass}>Categoría</label>
+                            <input type="text" className={inputClass}
+                                value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
                         </div>
 
                         <div className="col-span-1 md:col-span-2">
-                            <BrandSelect
-                                value={formData.brandId}
-                                onChange={(val) => setFormData({ ...formData, brandId: val })}
-                                required={true}
-                            />
-                        </div>
-
-                        {/* Divider for Financial Section */}
-                        <div className="col-span-1 md:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 mt-1">
-                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">payments</span>
-                                Inventario y Finanzas
-                            </h3>
-                        </div>
-
-                        {/* Inventory & Financial Fields */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Stock Mínimo</label>
-                            <input
-                                type="number"
-                                min="0"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                                value={formData.minStock}
-                                onChange={e => setFormData({ ...formData, minStock: parseInt(e.target.value) || 0 })}
-                            />
+                            <BrandSelect value={formData.brandId} onChange={(val) => setFormData({ ...formData, brandId: val })} required={true} />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Margen de Ganancia (Ej: 0.30 = 30%)</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                                value={formData.profitMargin}
-                                onChange={e => setFormData({ ...formData, profitMargin: parseFloat(e.target.value) || 0 })}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Costo sin IVA ($)</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                                value={formData.costWithoutVat}
-                                onChange={e => setFormData({ ...formData, costWithoutVat: parseFloat(e.target.value) || 0 })}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">IVA (%)</label>
-                            <input
-                                type="number"
-                                step="0.1"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                                value={formData.vatPercentage}
-                                onChange={e => setFormData({ ...formData, vatPercentage: parseFloat(e.target.value) || 0 })}
-                            />
-                        </div>
-
-                        <div className="col-span-1 md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Precio de Venta al Público (PVP) ($)</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                                value={formData.price}
-                                onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                            />
+                            <label className={labelClass}>Stock Mínimo</label>
+                            <input type="number" min="0" className={inputClass}
+                                value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: parseInt(e.target.value) || 0 })} />
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
-                        >
+                    {/* ═══ Financial Section — auto-linked ═══ */}
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
+                            <span className="material-symbols-outlined text-[18px]">payments</span>
+                            Precios y Costos
+                            <span className="text-xs font-normal normal-case text-slate-400 ml-1">— los campos se auto-calculan</span>
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={labelClass}>Costo sin IVA ($)</label>
+                                <input type="number" step="0.01" min="0" className={inputClass}
+                                    value={formData.costWithoutVat}
+                                    onChange={e => handleCostChange(parseFloat(e.target.value) || 0)} />
+                            </div>
+
+                            <div>
+                                <label className={labelClass}>IVA (%)</label>
+                                <input type="number" step="0.1" min="0" className={inputClass}
+                                    value={formData.vatPercentage}
+                                    onChange={e => handleVatChange(parseFloat(e.target.value) || 0)} />
+                            </div>
+
+                            <div>
+                                <label className={labelClass}>Margen de Ganancia (decimal)</label>
+                                <input type="number" step="0.01" className={inputClass}
+                                    value={formData.profitMargin}
+                                    onChange={e => handleMarginChange(parseFloat(e.target.value) || 0)} />
+                                <p className="text-xs text-slate-400 mt-1">
+                                    Ej: 0.30 = 30%. Cambia automáticamente al editar PVP.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className={labelClass}>PVP — Precio de Venta ($)</label>
+                                <input type="number" step="0.01" min="0" className={`${inputClass} font-semibold`}
+                                    value={formData.price}
+                                    onChange={e => handlePriceChange(parseFloat(e.target.value) || 0)} />
+                                <p className="text-xs text-slate-400 mt-1">
+                                    Al cambiar, el margen se recalcula automáticamente.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Live summary card */}
+                        {formData.costWithoutVat > 0 && (
+                            <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg grid grid-cols-3 gap-4 text-center text-sm">
+                                <div>
+                                    <div className="text-slate-400 text-xs mb-0.5">Costo c/ IVA</div>
+                                    <div className="font-bold text-slate-700 dark:text-slate-200">${costoConIva.toFixed(2)}</div>
+                                </div>
+                                <div>
+                                    <div className="text-slate-400 text-xs mb-0.5">Margen</div>
+                                    <div className={`font-bold ${formData.profitMargin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {(formData.profitMargin * 100).toFixed(1)}%
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-slate-400 text-xs mb-0.5">Ganancia</div>
+                                    <div className={`font-bold ${gananciaAbsoluta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        ${gananciaAbsoluta.toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ═══ Actions ═══ */}
+                    <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                        <button type="button" onClick={onClose}
+                            className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium">
                             Cancelar
                         </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                        >
+                        <button type="submit" disabled={loading}
+                            className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
                             {loading && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
                             {loading ? 'Guardando...' : 'Guardar Producto'}
                         </button>
