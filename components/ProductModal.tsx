@@ -60,6 +60,35 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         account_id: null as number | null
     });
     const [accounts, setAccounts] = useState<any[]>([]);
+    const [currentStock, setCurrentStock] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchStock = async () => {
+            if (stockAdjustment.warehouse_id) {
+                if (productToEdit?.id) {
+                    const { data } = await supabase
+                        .from('inventory_levels')
+                        .select('quantity')
+                        .eq('warehouse_id', stockAdjustment.warehouse_id)
+                        .eq('product_id', productToEdit.id)
+                        .single();
+                    if (data) {
+                        setCurrentStock(data.quantity);
+                        setStockAdjustment(prev => ({ ...prev, quantity: prev.quantity === '' ? data.quantity.toString() : prev.quantity }));
+                    } else {
+                        setCurrentStock(0);
+                        setStockAdjustment(prev => ({ ...prev, quantity: prev.quantity === '' ? '0' : prev.quantity }));
+                    }
+                } else {
+                    setCurrentStock(0);
+                    setStockAdjustment(prev => ({ ...prev, quantity: prev.quantity === '' ? '0' : prev.quantity }));
+                }
+            } else {
+                setCurrentStock(null);
+            }
+        };
+        fetchStock();
+    }, [stockAdjustment.warehouse_id, productToEdit?.id]);
 
     useEffect(() => {
         if (isOpen) {
@@ -180,8 +209,18 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             }
 
             // Handle Stock Adjustment
-            const qty = parseInt(stockAdjustment.quantity);
-            if (qty && qty !== 0 && stockAdjustment.warehouse_id && productId) {
+            const submittedQtyStr = stockAdjustment.quantity.toString().trim();
+            const submittedQty = parseInt(submittedQtyStr);
+            const isQtyValid = submittedQtyStr !== '' && !isNaN(submittedQty);
+
+            if (isQtyValid && !stockAdjustment.warehouse_id) {
+                throw new Error('Debe marcar obligatoriamente el Almacén/Sucursal si va a editar la cantidad de stock.');
+            }
+
+            const originalQty = currentStock !== null ? currentStock : 0;
+            const qtyChange = isQtyValid ? submittedQty - originalQty : 0;
+
+            if (qtyChange !== 0 && stockAdjustment.warehouse_id && productId) {
                 if (stockAdjustment.isPurchase && !stockAdjustment.account_id) {
                     throw new Error('Debe seleccionar una cuenta de pago para realizar la compra.');
                 }
@@ -192,7 +231,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     p_payment_account_id: stockAdjustment.isPurchase ? stockAdjustment.account_id : null,
                     p_products: [{
                         product_id: productId,
-                        quantity_change: qty,
+                        quantity_change: qtyChange,
                         unit_cost_with_vat: unit_cost_with_vat
                     }]
                 });
@@ -347,6 +386,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         value={stockAdjustment.warehouse_id}
                                         onChange={(val) => setStockAdjustment(prev => ({ ...prev, warehouse_id: val }))}
                                         label="Almacén:"
+                                        required={stockAdjustment.quantity.toString().trim() !== ''}
                                     />
                                     <div className="mt-2 text-xs text-slate-500">
                                         Selecciona un almacén para modificar el stock de este producto al guardar.
@@ -355,15 +395,30 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 <div className="space-y-4">
                                     <div>
                                         <label className={labelClass}>
-                                            Cantidad (+ para sumar, - para restar):
+                                            Nuevo Stock Total:
                                         </label>
                                         <input
                                             type="number"
                                             className={inputClass}
                                             value={stockAdjustment.quantity}
                                             onChange={e => setStockAdjustment(prev => ({ ...prev, quantity: e.target.value }))}
-                                            placeholder="Ej: 5 o -2"
+                                            placeholder="Ej: 50"
                                         />
+                                        {stockAdjustment.warehouse_id && (
+                                            <div className="mt-2 text-xs font-medium">
+                                                <span className="text-slate-500 block mb-1">
+                                                    Stock actual en este almacén: <strong className="text-slate-700 dark:text-slate-300">{currentStock !== null ? currentStock : '...'}</strong>
+                                                </span>
+                                                {(() => {
+                                                    const qt = parseInt(stockAdjustment.quantity);
+                                                    if (isNaN(qt) || currentStock === null) return null;
+                                                    const diff = qt - currentStock;
+                                                    if (diff > 0) return <span className="text-emerald-600 dark:text-emerald-400">Se añadirán <strong>{diff}</strong> unidades.</span>;
+                                                    if (diff < 0) return <span className="text-rose-600 dark:text-rose-400">Se restarán <strong>{Math.abs(diff)}</strong> unidades.</span>;
+                                                    return <span className="text-slate-500">El stock no cambiará.</span>;
+                                                })()}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <label className="flex items-center cursor-pointer relative group">
@@ -397,10 +452,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             </option>
                                         ))}
                                     </select>
-                                    {stockAdjustment.account_id && stockAdjustment.quantity && parseInt(stockAdjustment.quantity) > 0 && (
+                                    {stockAdjustment.account_id && stockAdjustment.quantity && !isNaN(parseInt(stockAdjustment.quantity)) && (parseInt(stockAdjustment.quantity) - (currentStock || 0)) > 0 && (
                                         <div className="mt-2 text-xs font-semibold text-orange-700 flex items-center gap-1">
                                             <span className="material-symbols-outlined text-[14px]">info</span>
-                                            Se debitarán ${(costoConIva * parseInt(stockAdjustment.quantity)).toFixed(2)} de esta cuenta de forma automática.
+                                            Se debitarán ${(costoConIva * (parseInt(stockAdjustment.quantity) - (currentStock || 0))).toFixed(2)} de esta cuenta de forma automática.
                                         </div>
                                     )}
                                 </div>

@@ -56,6 +56,31 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
         }
     }, [isOpen]);
 
+    // Fetch stock for preview when configuring add_stock
+    useEffect(() => {
+        const fetchStockPreview = async () => {
+            if (selectedField === 'add_stock' && stockAdjustment.warehouse_id && selectedProducts.length > 0) {
+                const top5Ids = selectedProducts.slice(0, 5).map(p => p.id);
+                const { data } = await supabase
+                    .from('inventory_levels')
+                    .select('product_id, quantity')
+                    .eq('warehouse_id', stockAdjustment.warehouse_id)
+                    .in('product_id', top5Ids);
+                
+                const stockMap: Record<number, number> = {};
+                if (data) {
+                    data.forEach(d => {
+                        stockMap[d.product_id] = d.quantity;
+                    });
+                }
+                setPreviewStock(stockMap);
+            } else {
+                setPreviewStock({});
+            }
+        };
+        fetchStockPreview();
+    }, [selectedField, stockAdjustment.warehouse_id, selectedProducts]);
+
     const fetchAccounts = async () => {
         try {
             const { data } = await supabase.from('accounts').select('*').order('name');
@@ -251,6 +276,17 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
             const newPvp = calcPrice(cost, vat, margin);
             const oldPvp = prod.price || 0;
             return { name: prod.name, sku: prod.sku, oldPvp, newPvp };
+        });
+    };
+
+    // Preview for stock adjustments
+    const getStockPreviewRows = () => {
+        if (selectedField !== 'add_stock' || !value || !stockAdjustment.warehouse_id) return [];
+        const qty = Number(value) || 0;
+        return selectedProducts.slice(0, 5).map(prod => {
+            const currentStock = previewStock[prod.id] || 0;
+            const newStock = currentStock + qty;
+            return { name: prod.name, sku: prod.sku, oldStock: currentStock, newStock: newStock };
         });
     };
 
