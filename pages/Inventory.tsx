@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import InventoryMovementModal from '../components/InventoryMovementModal';
 import { ProductEntryForm } from '../components/ProductEntryForm';
@@ -55,19 +55,28 @@ interface Warehouse {
 }
 
 const Inventory: React.FC = () => {
-    // ... (Existing State) ...
+    // ──────────────────────────────────────────────
+    // 1. CORE UI STATES
+    // ──────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<'warehouses' | 'stock' | 'movements'>('warehouses');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isProductEntryOpen, setIsProductEntryOpen] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
 
-    // Advanced Search & Filter State
+    // ──────────────────────────────────────────────
+    // 2. SEARCH, FILTER, SORT, PAGINATION
+    // ──────────────────────────────────────────────
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const [filters, setFilters] = useState<{ [key: string]: string }>({});
+    const [pagination, setPagination] = useState({
+        page: 1,
+        pageSize: 20,
+        totalRecords: 0
+    });
 
-    // New State for Batch Entry
+    // Batch Entry
     const [isBatchEntryOpen, setIsBatchEntryOpen] = useState(false);
 
     // Export modal state
@@ -90,92 +99,216 @@ const Inventory: React.FC = () => {
     const [movements, setMovements] = useState<Movement[]>([]);
     const [loading, setLoading] = useState(false);
 
+    // ──────────────────────────────────────────────
+    // 3. DEBOUNCED SEARCH EFFECT
+    // ──────────────────────────────────────────────
     useEffect(() => {
-        fetchData();
+        if (activeTab !== 'stock') return;
+        const delayDebounceFn = setTimeout(() => {
+            setPagination(prev => ({ ...prev, page: 1 }));
+            fetchStockData(1);
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, filters]);
+
+    // Direct fetch on pagination or sort change (no debounce needed)
+    useEffect(() => {
+        if (activeTab !== 'stock') return;
+        fetchStockData(pagination.page);
+    }, [pagination.page, pagination.pageSize, sortConfig, selectedWarehouseId]);
+
+    // Fetch warehouses / movements when those tabs change
+    useEffect(() => {
+        if (activeTab === 'warehouses') {
+            fetchWarehouses();
+        } else if (activeTab === 'movements') {
+            fetchMovements();
+        } else if (activeTab === 'stock') {
+            // Initial stock load when switching to stock tab
+            fetchStockData(pagination.page);
+        }
     }, [activeTab, fitmentFilter]);
 
-    // Data fetching logic
-    const fetchData = async () => {
+    // ──────────────────────────────────────────────
+    // 4. SUPABASE QUERY ENGINE (STOCK TAB)
+    // ──────────────────────────────────────────────
+    const fetchStockData = useCallback(async (page?: number) => {
         setLoading(true);
         try {
-            if (activeTab === 'warehouses') {
-                const { data, error } = await supabase.from('warehouses').select('*').order('id');
+            const currentPage = page || pagination.page;
+
+            if (fitmentFilter) {
+                // ── Fitment RPC: client-side pagination ──
+                const { data, error } = await supabase.rpc('search_inventory_by_fitment', {
+                    p_make: fitmentFilter.make || null,
+                    p_model: fitmentFilter.model || null,
+                    p_year: fitmentFilter.year || null
+                });
+
                 if (error) throw error;
-                setWarehouses(data || []);
-            } else if (activeTab === 'stock') {
-                if (fitmentFilter) {
-                    const { data, error } = await supabase.rpc('search_inventory_by_fitment', {
-                        p_make: fitmentFilter.make || null,
-                        p_model: fitmentFilter.model || null,
-                        p_year: fitmentFilter.year || null
+
+                const mappedData = (data || []).map((row: any) => ({
+                    id: row.inventory_id,
+                    product_id: row.product_id,
+                    warehouse_id: row.warehouse_id,
+                    current_stock: Number(row.current_stock),
+                    products: {
+                        id: row.product_id,
+                        name: row.product_name,
+                        sku: row.product_sku,
+                        category: row.product_category,
+                        min_stock_threshold: row.product_min_stock,
+                        price: row.product_price,
+                        cost_without_vat: row.product_cost,
+                        profit_margin: row.product_margin,
+                        brands: { name: row.brand_name }
+                    },
+                    warehouses: { name: row.warehouse_name }
+                }));
+
+                // Client-side search filter for fitment results
+                let filtered = mappedData as unknown as StockItem[];
+                if (searchTerm) {
+                    const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+                    filtered = filtered.filter(item => {
+                        const name = item.products?.name?.toLowerCase() || '';
+                        const sku = item.products?.sku?.toLowerCase() || '';
+                        return terms.every(t => name.includes(t) || sku.includes(t));
                     });
-
-                    if (error) throw error;
-
-                    const mappedData = (data || []).map((row: any) => ({
-                        id: row.inventory_id,
-                        product_id: row.product_id,
-                        warehouse_id: row.warehouse_id,
-                        current_stock: Number(row.current_stock),
-                        products: {
-                            id: row.product_id,
-                            name: row.product_name,
-                            sku: row.product_sku,
-                            category: row.product_category,
-                            min_stock_threshold: row.product_min_stock,
-                            price: row.product_price,
-                            cost_without_vat: row.product_cost,
-                            profit_margin: row.product_margin,
-                            brands: { name: row.brand_name }
-                        },
-                        warehouses: { name: row.warehouse_name }
-                    }));
-
-                    setStockItems(mappedData as StockItem[]);
-                } else {
-                    let query = supabase
-                        .from('inventory_levels')
-                        .select(`
-                            id, warehouse_id, current_stock, product_id,
-                            products (
-                                id, name, sku, category, min_stock_threshold, brand_id, profit_margin, price,
-                                cost_without_vat, vat_percentage,
-                                brands (name)
-                            ),
-                            warehouses (name)
-                        `);
-
-                    // Removed backend filter to allow frontend contextual filtering
-                    const { data, error } = await query.order('product_id');
-
-                    if (error) throw error;
-                    // @ts-ignore
-                    setStockItems(data || []);
                 }
-            } else if (activeTab === 'movements') {
-                // ... (movements fetch logic) ...
-                const { data, error } = await supabase
-                    .from('inventory_logs')
-                    .select(`
-                        id, created_at, quantity_change, reason, user_id,
-                        products (name),
-                        warehouses (name)
-                    `)
-                    .order('created_at', { ascending: false })
-                    .limit(50);
+
+                setPagination(prev => ({ ...prev, totalRecords: filtered.length }));
+
+                // Client-side paginate the filtered fitment results
+                const from = (currentPage - 1) * pagination.pageSize;
+                const to = from + pagination.pageSize;
+                setStockItems(filtered.slice(from, to));
+            } else {
+                // ── Standard server-side paginated query ──
+                // We query inventory_levels and apply filters via the nested products relation
+                let selectStr = `
+                    id, warehouse_id, current_stock, product_id,
+                    products${selectedWarehouseId ? '!inner' : ''} (
+                        id, name, sku, category, min_stock_threshold, brand_id, profit_margin, price,
+                        cost_without_vat, vat_percentage,
+                        brands (name)
+                    ),
+                    warehouses (name)
+                `;
+
+                let query = supabase
+                    .from('inventory_levels')
+                    .select(selectStr, { count: 'exact' });
+
+                // Warehouse filter
+                if (selectedWarehouseId) {
+                    query = query.eq('warehouse_id', selectedWarehouseId);
+                }
+
+                // Global Search (OR across product name and sku via products relation)
+                if (searchTerm) {
+                    query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`, { referencedTable: 'products' });
+                }
+
+                // Column Filters (AND logic, applied to the products relation)
+                if (filters.product) {
+                    query = query.ilike('products.name', `%${filters.product}%`);
+                }
+                if (filters.sku) {
+                    query = query.ilike('products.sku', `%${filters.sku}%`);
+                }
+                if (filters.brand) {
+                    // Brand filter is trickier with nested relation – we use textSearch on a computed field
+                    // For now, we'll handle brand filtering client-side after fetch
+                }
+
+                // Sorting
+                const isAscending = sortConfig.direction === 'asc';
+                if (sortConfig.key === 'product') {
+                    query = query.order('name', { referencedTable: 'products', ascending: isAscending });
+                } else if (sortConfig.key === 'sku') {
+                    query = query.order('sku', { referencedTable: 'products', ascending: isAscending });
+                } else if (sortConfig.key === 'stock') {
+                    query = query.order('current_stock', { ascending: isAscending });
+                } else {
+                    query = query.order('product_id', { ascending: isAscending });
+                }
+
+                // Pagination (range is 0-indexed)
+                const from = (currentPage - 1) * pagination.pageSize;
+                const to = from + pagination.pageSize - 1;
+                query = query.range(from, to);
+
+                // Execute
+                const { data, error, count } = await query;
+
                 if (error) throw error;
+
+                // Apply client-side brand filter if needed
+                let items = (data || []) as unknown as StockItem[];
+                if (filters.brand) {
+                    const brandFilter = filters.brand.toLowerCase();
+                    items = items.filter(item =>
+                        (item.products?.brands?.name?.toLowerCase() || '').includes(brandFilter)
+                    );
+                }
+
                 // @ts-ignore
-                setMovements(data || []);
+                setStockItems(items);
+                if (count !== null) {
+                    setPagination(prev => ({ ...prev, totalRecords: count }));
+                }
             }
         } catch (error) {
-            console.error('Error fetching data:', error);
+            console.error('Error fetching stock data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [searchTerm, filters, sortConfig, pagination.page, pagination.pageSize, fitmentFilter, selectedWarehouseId]);
+
+    const fetchWarehouses = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase.from('warehouses').select('*').order('id');
+            if (error) throw error;
+            setWarehouses(data || []);
+        } catch (error) {
+            console.error('Error fetching warehouses:', error);
         } finally {
             setLoading(false);
         }
     };
 
+    const fetchMovements = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('inventory_logs')
+                .select(`
+                    id, created_at, quantity_change, reason, user_id,
+                    products (name),
+                    warehouses (name)
+                `)
+                .order('created_at', { ascending: false })
+                .limit(50);
+            if (error) throw error;
+            // @ts-ignore
+            setMovements(data || []);
+        } catch (error) {
+            console.error('Error fetching movements:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Legacy compat helper
+    const fetchData = () => {
+        if (activeTab === 'warehouses') fetchWarehouses();
+        else if (activeTab === 'stock') fetchStockData(pagination.page);
+        else if (activeTab === 'movements') fetchMovements();
+    };
+
     const handleMovementSuccess = () => {
-        // Refresh data after successful transaction
         fetchData();
     };
 
@@ -189,12 +322,31 @@ const Inventory: React.FC = () => {
         setIsPartProfileOpen(true);
     };
 
-    // Handlers
-
     // Replaced Logic: New Product opens Batch Entry
     const handleNewProduct = () => {
         setIsBatchEntryOpen(true);
     };
+
+    // ──────────────────────────────────────────────
+    // GROUPING (works on paginated data)
+    // ──────────────────────────────────────────────
+    const groupedStockItems = useMemo(() => {
+        const groups = new Map<number, any>();
+        stockItems.forEach(item => {
+            if (!groups.has(item.product_id)) {
+                groups.set(item.product_id, {
+                    product_id: item.product_id,
+                    product: item.products,
+                    global_stock: 0,
+                    details: []
+                });
+            }
+            const group = groups.get(item.product_id)!;
+            group.global_stock += item.current_stock;
+            group.details.push(item);
+        });
+        return Array.from(groups.values());
+    }, [stockItems]);
 
     // Export current stock view to Excel using the same format as the import template
     const handleExportToExcel = () => {
@@ -245,113 +397,39 @@ const Inventory: React.FC = () => {
 
     const handleWarehouseClick = (warehouseId: number) => {
         setSelectedWarehouseId(warehouseId);
+        setPagination(prev => ({ ...prev, page: 1 }));
         setActiveTab('stock');
     };
 
     const clearWarehouseFilter = () => {
         setSelectedWarehouseId(null);
-        fetchData(); // Refresh to show all
+        setPagination(prev => ({ ...prev, page: 1 }));
     };
 
-    // Advanced Search & Sort Logic
+    // Sort handler
     const handleSort = (key: string) => {
-        let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
     };
 
     const handleFilterChange = (key: string, value: string) => {
         setFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    const filteredAndSortedItems = useMemo(() => {
-        let items = [...stockItems];
-
-        // 1. Global Search (Smart Search)
-        if (searchTerm) {
-            const searchTerms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
-            items = items.filter(item => {
-                const productName = item.products?.name?.toLowerCase() || '';
-                const sku = item.products?.sku?.toLowerCase() || '';
-                // Check if ALL search terms are present in EITHER name OR sku
-                return searchTerms.every(term => productName.includes(term) || sku.includes(term));
-            });
-        }
-
-        // 2. Column Filters
-        Object.keys(filters).forEach(key => {
-            const filterValue = filters[key].toLowerCase();
-            if (!filterValue) return;
-
-            items = items.filter(item => {
-                let itemValue = '';
-                if (key === 'product') itemValue = item.products?.name?.toLowerCase() || '';
-                else if (key === 'brand') itemValue = item.products?.brands?.name?.toLowerCase() || '';
-                else if (key === 'sku') itemValue = item.products?.sku?.toLowerCase() || '';
-                else if (key === 'warehouse') itemValue = item.warehouses?.name?.toLowerCase() || '';
-                else if (key === 'stock') itemValue = item.current_stock.toString();
-
-                return itemValue.includes(filterValue);
-            });
-        });
-
-        // 3. Sorting
-        if (sortConfig) {
-            items.sort((a, b) => {
-                let aValue: any = '';
-                let bValue: any = '';
-
-                if (sortConfig.key === 'product') {
-                    aValue = a.products?.name || '';
-                    bValue = b.products?.name || '';
-                } else if (sortConfig.key === 'brand') {
-                    aValue = a.products?.brands?.name || '';
-                    bValue = b.products?.brands?.name || '';
-                } else if (sortConfig.key === 'sku') {
-                    aValue = a.products?.sku || '';
-                    bValue = b.products?.sku || '';
-                } else if (sortConfig.key === 'warehouse') {
-                    aValue = a.warehouses?.name || '';
-                    bValue = b.warehouses?.name || '';
-                } else if (sortConfig.key === 'stock') {
-                    aValue = a.current_stock;
-                    bValue = b.current_stock;
-                }
-
-                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
-
-        return items;
-    }, [stockItems, searchTerm, filters, sortConfig]);
-
-    const groupedStockItems = useMemo(() => {
-        const groups = new Map<number, any>();
-        filteredAndSortedItems.forEach(item => {
-            if (!groups.has(item.product_id)) {
-                groups.set(item.product_id, {
-                    product_id: item.product_id,
-                    product: item.products,
-                    global_stock: 0,
-                    details: []
-                });
-            }
-            const group = groups.get(item.product_id)!;
-            group.global_stock += item.current_stock;
-            group.details.push(item);
-        });
-        return Array.from(groups.values());
-    }, [filteredAndSortedItems]);
-
     const toggleExpandProduct = (productId: number) => {
         setExpandedProductIds(prev =>
             prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
         );
     };
+
+    // ──────────────────────────────────────────────
+    // PAGINATION HELPERS
+    // ──────────────────────────────────────────────
+    const totalPages = Math.ceil(pagination.totalRecords / pagination.pageSize);
+    const showingFrom = pagination.totalRecords === 0 ? 0 : ((pagination.page - 1) * pagination.pageSize) + 1;
+    const showingTo = Math.min(pagination.page * pagination.pageSize, pagination.totalRecords);
 
     return (
         <div className="flex flex-col gap-6 p-6 md:p-8 max-w-[1400px] mx-auto">
@@ -424,7 +502,6 @@ const Inventory: React.FC = () => {
 
             {/* Product Entry Modal (Surtir) */}
             {isProductEntryOpen && selectedProductId && (
-                // ... (Existing modal code)
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden relative">
                         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
@@ -542,18 +619,26 @@ const Inventory: React.FC = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                         />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
 
 
-            {/* ... Rest of file (Tabs, Tables) ... */}
+            {/* Tabs */}
             <div className="border-b border-slate-200 dark:border-slate-700">
                 <nav className="flex gap-6">
                     <button
                         onClick={() => {
                             setActiveTab('warehouses');
-                            setSelectedWarehouseId(null); // Optional: clear filter when going back to list
+                            setSelectedWarehouseId(null);
                         }}
                         className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'warehouses' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                     >
@@ -614,7 +699,7 @@ const Inventory: React.FC = () => {
                 )}
 
                 {activeTab === 'stock' && (
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-opacity ${loading ? 'opacity-60' : 'opacity-100'}`}>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
@@ -630,18 +715,20 @@ const Inventory: React.FC = () => {
                                                     <div className="flex items-center gap-1">
                                                         {col.label}
                                                         <div className="flex flex-col">
-                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_up</span>
-                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig?.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
+                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_up</span>
+                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
                                                         </div>
                                                     </div>
-                                                    <input
-                                                        type="text"
-                                                        placeholder={`Filtrar...`}
-                                                        value={filters[col.key] || ''}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                                                        className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:outline-none focus:border-primary"
-                                                    />
+                                                    {col.key !== 'stock' && (
+                                                        <input
+                                                            type="text"
+                                                            placeholder={`Filtrar...`}
+                                                            value={filters[col.key] || ''}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            onChange={(e) => handleFilterChange(col.key, e.target.value)}
+                                                            className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:outline-none focus:border-primary"
+                                                        />
+                                                    )}
                                                 </div>
                                             </th>
                                         ))}
@@ -652,22 +739,25 @@ const Inventory: React.FC = () => {
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                     {groupedStockItems.length === 0 && !loading && (
                                         <tr>
-                                            <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
-                                                No hay registros que coincidan con tu búsqueda.
+                                            <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
+                                                    <span>No hay registros que coincidan con tu búsqueda.</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {groupedStockItems.length === 0 && loading && (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
+                                                    <span>Cargando inventario...</span>
+                                                </div>
                                             </td>
                                         </tr>
                                     )}
                                     {groupedStockItems.map(group => {
-                                        // Contextual filtering logic
-                                        const hasStockInSelectedWarehouse = selectedWarehouseId
-                                            ? group.details.some((d: StockItem) => d.warehouse_id === selectedWarehouseId && d.current_stock > 0)
-                                            : true;
-
-                                        // If there's a warehouse filter and this product has 0 stock in it, don't render it at all
-                                        if (selectedWarehouseId && !hasStockInSelectedWarehouse) {
-                                            return null;
-                                        }
-
                                         const isContextuallyDimmed = selectedWarehouseId !== null;
                                         const isExpanded = selectedWarehouseId !== null || expandedProductIds.includes(group.product_id);
 
@@ -740,6 +830,53 @@ const Inventory: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* ═══════ PAGINATION FOOTER ═══════ */}
+                        {pagination.totalRecords > 0 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
+                                <div className="text-sm text-slate-500">
+                                    Mostrando <span className="font-semibold text-slate-700 dark:text-slate-300">{showingFrom}–{showingTo}</span> de <span className="font-semibold text-slate-700 dark:text-slate-300">{pagination.totalRecords.toLocaleString()}</span> registros
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    {/* Page size selector */}
+                                    <select
+                                        value={pagination.pageSize}
+                                        onChange={(e) => setPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value), page: 1 }))}
+                                        className="px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value={20}>20 / pág</option>
+                                        <option value={50}>50 / pág</option>
+                                        <option value={100}>100 / pág</option>
+                                    </select>
+
+                                    {/* Previous */}
+                                    <button
+                                        disabled={pagination.page === 1}
+                                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                        className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                                        Anterior
+                                    </button>
+
+                                    {/* Page indicator */}
+                                    <span className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg">
+                                        {pagination.page} / {totalPages || 1}
+                                    </span>
+
+                                    {/* Next */}
+                                    <button
+                                        disabled={pagination.page >= totalPages || totalPages === 0}
+                                        onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                        className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        Siguiente
+                                        <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
