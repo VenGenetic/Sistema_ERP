@@ -131,3 +131,83 @@ BEGIN
     );
 END;
 $$;
+
+-- Migration: Save POS Draft RPC
+CREATE OR REPLACE FUNCTION save_draft_order(
+    p_customer_id INTEGER,
+    p_shipping_cost NUMERIC,
+    p_items pos_item_input[],
+    p_closer_id UUID DEFAULT NULL,
+    p_promo_code TEXT DEFAULT NULL,
+    p_draft_id INTEGER DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_order_id INTEGER;
+    v_total_amount NUMERIC := 0;
+    v_item pos_item_input;
+BEGIN
+    -- 1. Calculate totals (no stock deduction for drafts yet)
+    FOREACH v_item IN ARRAY p_items
+    LOOP
+        v_total_amount := v_total_amount + (v_item.quantity * v_item.unit_price);
+    END LOOP;
+
+    v_total_amount := v_total_amount + p_shipping_cost;
+
+    -- 2. Create or Update the Order Draft
+    IF p_draft_id IS NOT NULL THEN
+        -- Verify it's still a draft
+        IF NOT EXISTS (SELECT 1 FROM orders WHERE id = p_draft_id AND status = 'draft') THEN
+            RAISE EXCEPTION 'This order cannot be edited because it is no longer a draft.';
+        END IF;
+
+        UPDATE orders SET
+            customer_id = p_customer_id,
+            closer_id = p_closer_id,
+            promo_code = p_promo_code,
+            total_amount = v_total_amount,
+            shipping_cost = p_shipping_cost
+        WHERE id = p_draft_id
+        RETURNING id INTO v_order_id;
+        
+        -- Delete old items to replace them
+        DELETE FROM order_items WHERE order_id = v_order_id;
+    ELSE
+        INSERT INTO orders (
+            customer_id, 
+            closer_id, 
+            promo_code, 
+            status, 
+            total_amount, 
+            shipping_cost
+        )
+        VALUES (
+            p_customer_id, 
+            p_closer_id, 
+            p_promo_code, 
+            'draft',
+            v_total_amount, 
+            p_shipping_cost
+        )
+        RETURNING id INTO v_order_id;
+    END IF;
+
+    -- 3. Insert new Order Items
+    FOREACH v_item IN ARRAY p_items
+    LOOP
+        INSERT INTO order_items (order_id, product_id, quantity, unit_price, unit_cost)
+        VALUES (v_order_id, v_item.product_id, v_item.quantity, v_item.unit_price, v_item.unit_cost);
+    END LOOP;
+
+    -- 4. Return Success
+    RETURN jsonb_build_object(
+        'success', true, 
+        'order_id', v_order_id, 
+        'total_amount', v_total_amount
+    );
+END;
+$$;

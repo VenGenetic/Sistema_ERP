@@ -347,6 +347,48 @@ const POS: React.FC = () => {
         }
     };
 
+    const handleSaveDraft = async () => {
+        if (cartRef.current.length === 0) {
+            alert("El carrito está vacío");
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const itemsPayload = cartRef.current.map(c => ({
+                product_id: c.product.id,
+                warehouse_id: c.warehouse_id,
+                quantity: c.quantity,
+                unit_price: c.unitPrice,
+                unit_cost: c.unitCost
+            }));
+
+            // We pass null for draft_id for now, allowing purely new drafts
+            const { data, error } = await supabase.rpc('save_draft_order', {
+                p_customer_id: customer.id,
+                p_shipping_cost: shippingCost,
+                p_items: itemsPayload,
+                p_closer_id: customer.claimed_by || null,
+                p_promo_code: promoCode || null,
+                p_draft_id: null
+            });
+
+            if (error) {
+                alert(`Error guardando el borrador: ${error.message}`);
+                throw error;
+            }
+
+            alert("¡Borrador guardado con éxito! Puedes verlo en la vista de Pipeline de Órdenes.");
+            clearCart();
+            setSearchQuery('');
+            navigate('/orders'); // Optionally redirect to the pipeline
+        } catch (err) {
+            console.error("Draft save failed", err);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     // Derived State from Zustand
     const subtotal = getSubtotal();
     const orderTotal = getTotal();
@@ -603,8 +645,15 @@ const POS: React.FC = () => {
 
                     <div className="p-4 bg-white border-t border-slate-200">
                         <button
+                            onClick={handleSaveDraft}
+                            disabled={cart.length === 0 || isSearching}
+                            className="w-full h-12 md:h-14 mb-3 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-sm md:text-md uppercase rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+                        >
+                            <span>💾 Guardar Borrador</span>
+                        </button>
+                        <button
                             onClick={handleCheckoutClick}
-                            disabled={cart.length === 0}
+                            disabled={cart.length === 0 || isSearching}
                             className="w-full h-16 md:h-20 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl md:text-2xl uppercase rounded-xl shadow-lg transition-transform active:scale-95 flex flex-col items-center justify-center gap-0.5"
                         >
                             <span>Facturar</span>
