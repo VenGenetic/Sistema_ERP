@@ -8,6 +8,7 @@ CREATE OR REPLACE FUNCTION sync_vendor_catalog(
 )
 RETURNS JSON
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
     v_inserted INT := 0;
