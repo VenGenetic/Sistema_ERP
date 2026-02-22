@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
+interface ActivityItem {
+    type: string;
+    id: string;
+    time: string;
+    user: string;
+    detail: string;
+    status: string;
+    amount?: string;
+    timestamp: number;
+}
+
 const Dashboard: React.FC = () => {
-    // Phase 5: Dynamic State
+    // Dynamic State
     const [todaySales, setTodaySales] = useState<number>(0);
     const [lowStockCount, setLowStockCount] = useState<number>(0);
+    const [inventoryHealth, setInventoryHealth] = useState<number>(100);
+    const [netLiquidity, setNetLiquidity] = useState<number>(0);
     const [topLostDemand, setTopLostDemand] = useState<{ term: string, count: number }[]>([]);
+    const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -17,13 +31,13 @@ const Dashboard: React.FC = () => {
 
                 const { data: orders } = await supabase
                     .from('orders')
-                    .select('total_amount')
+                    .select('id, total_amount, created_at, status, user:profiles!orders_customer_id_fkey(full_name)')
                     .gte('created_at', startOfDay.toISOString());
 
                 const sales = orders?.reduce((acc, order) => acc + Number(order.total_amount), 0) || 0;
                 setTodaySales(sales);
 
-                // 2. Low Stock Alerts
+                // 2. Low Stock Alerts & Inventory Health
                 const { data: inventory } = await supabase
                     .from('inventory_levels')
                     .select('current_stock, products(id, min_stock_threshold)');
@@ -36,14 +50,17 @@ const Dashboard: React.FC = () => {
                         if (!stockByProduct[pid]) {
                             stockByProduct[pid] = { total: 0, min: Math.max(il.products.min_stock_threshold || 10, 1) };
                         }
-                        stockByProduct[pid].total += il.current_stock;
+                        stockByProduct[pid].total += Number(il.current_stock);
                     });
 
                     let lowStock = 0;
+                    let totalSkus = 0;
                     for (const pid in stockByProduct) {
+                        totalSkus++;
                         if (stockByProduct[pid].total <= stockByProduct[pid].min) lowStock++;
                     }
                     setLowStockCount(lowStock);
+                    setInventoryHealth(totalSkus > 0 ? ((totalSkus - lowStock) / totalSkus) * 100 : 100);
                 }
 
                 // 3. Lost Demand Rank
@@ -67,6 +84,95 @@ const Dashboard: React.FC = () => {
 
                     setTopLostDemand(top5);
                 }
+
+                // 4. Net Liquidity (Liquidez Neta)
+                const { data: accountsData } = await supabase
+                    .from('account_balances')
+                    .select('current_balance')
+                    .eq('category', 'asset');
+
+                if (accountsData) {
+                    const totalLiquidity = accountsData.reduce((acc, account) => acc + Number(account.current_balance), 0);
+                    setNetLiquidity(totalLiquidity);
+                }
+
+                // 5. Activity Stream (Orders, Inventory Logs, Transactions)
+                const activities: ActivityItem[] = [];
+
+                // Fetch recent orders
+                const { data: recentOrders } = await supabase
+                    .from('orders')
+                    .select('id, created_at, total_amount, status, profiles:customer_id(full_name)')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                if (recentOrders) {
+                    recentOrders.forEach(o => {
+                        const date = new Date(o.created_at);
+                        activities.push({
+                            type: 'PEDIDO',
+                            id: `ORD-${o.id}`,
+                            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            user: (o.profiles as any)?.full_name || 'Cliente Web',
+                            detail: `Pedido ${o.status}`,
+                            status: o.status === 'completed' ? 'Completado' : 'Pendiente',
+                            amount: `$${Number(o.total_amount).toFixed(2)}`,
+                            timestamp: date.getTime()
+                        });
+                    });
+                }
+
+                // Fetch recent inventory logs
+                const { data: recentLogs } = await supabase
+                    .from('inventory_logs')
+                    .select('id, created_at, quantity_change, reason, type:transaction_type, products:product_id(sku), users:user_id(email)')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                if (recentLogs) {
+                    recentLogs.forEach(l => {
+                        const date = new Date(l.created_at);
+                        activities.push({
+                            type: 'STOCK',
+                            id: `LOG-${l.id}`,
+                            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            user: (l.users as any)?.email || 'Sistema',
+                            detail: `${Number(l.quantity_change) > 0 ? 'Entrada' : 'Salida'} de ${Math.abs(Number(l.quantity_change))}u SKU: ${(l.products as any)?.sku || 'N/A'}${l.reason ? ` - ${l.reason}` : ''}`,
+                            status: 'Completado',
+                            timestamp: date.getTime()
+                        });
+                    });
+                }
+
+                // Fetch recent transactions
+                const { data: recentTxes } = await supabase
+                    .from('transactions')
+                    .select('id, created_at, description, transaction_entries(amount, is_debit, account_id), accounts:transaction_entries(account_id, name)')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                if (recentTxes) {
+                    recentTxes.forEach(tx => {
+                        const date = new Date(tx.created_at);
+                        // find a primary amount to show
+                        const firstEntry = tx.transaction_entries && tx.transaction_entries.length > 0 ? tx.transaction_entries[0] : null;
+                        activities.push({
+                            type: 'FINANZAS',
+                            id: `TX-${tx.id}`,
+                            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            user: 'Sistema Contable',
+                            detail: tx.description || 'Transacción Financiera',
+                            status: 'Registrado',
+                            amount: firstEntry ? `$${Number(firstEntry.amount).toFixed(2)}` : '',
+                            timestamp: date.getTime()
+                        });
+                    });
+                }
+
+                // Sort activities by timestamp descending and take top 5
+                activities.sort((a, b) => b.timestamp - a.timestamp);
+                setActivityStream(activities.slice(0, 6));
+
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {
@@ -76,15 +182,6 @@ const Dashboard: React.FC = () => {
 
         fetchDashboardData();
     }, []);
-
-    // Activity Stream consolidado basado en INVENTORY_LOGS, TRANSACTIONS y ORDERS
-    const activityStream = [
-        { type: 'PEDIDO', id: 'ORD-9942', time: '10:42 AM', user: 'Sistema (Auto)', detail: 'Nuevo Pedido Dropship vía TrendyShop UK', status: 'Pendiente', amount: '$124.00' },
-        { type: 'STOCK', id: 'LOG-4421', time: '10:38 AM', user: 'Juan Pérez', detail: 'Movidas 50u SKU-991 Bodega Central -> Oeste', status: 'Completado', meta: 'Bodega' },
-        { type: 'FINANZAS', id: 'TX-1102', time: '10:15 AM', user: 'Stripe API', detail: 'Pago recibido en Cuenta Stripe Web', status: 'Liquidado', amount: '+$2,450.00' },
-        { type: 'ALERTA', id: 'SYS-001', time: '09:55 AM', user: 'Bot Inventario', detail: 'Alerta Stock Bajo: Audífonos (5 restantes)', status: 'Advertencia', meta: 'SKU-882' },
-        { type: 'PEDIDO', id: 'ORD-9941', time: '09:30 AM', user: 'Sara M.', detail: 'Pedido completado manualmente', status: 'Completado', amount: '$45.00' },
-    ];
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
@@ -117,10 +214,12 @@ const Dashboard: React.FC = () => {
                         <span className="material-symbols-outlined text-slate-400 group-hover:text-white transition-colors">account_balance</span>
                     </div>
                     <div>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">$71,680.50</div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                            {isLoading ? '...' : `$${netLiquidity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        </div>
                         <div className="text-xs text-emerald-500 mt-1 flex items-center gap-1">
                             <span className="material-symbols-outlined text-[14px]">trending_up</span>
-                            +12.5% esta semana
+                            Actualizado en tiempo real
                         </div>
                     </div>
                 </div>
@@ -147,10 +246,21 @@ const Dashboard: React.FC = () => {
                         <span className="material-symbols-outlined text-slate-400 group-hover:text-white transition-colors">inventory_2</span>
                     </div>
                     <div>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">98.2%</div>
-                        <div className="text-xs text-rose-500 mt-1 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">warning</span>
-                            3 SKUs bajo umbral
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                            {isLoading ? '...' : `${inventoryHealth.toFixed(1)}%`}
+                        </div>
+                        <div className={`text-xs mt-1 flex items-center gap-1 ${inventoryHealth < 90 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {inventoryHealth < 90 ? (
+                                <>
+                                    <span className="material-symbols-outlined text-[14px]">warning</span>
+                                    {lowStockCount} SKUs bajo umbral
+                                </>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                    Niveles Óptimos
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
