@@ -20,6 +20,7 @@ const Dashboard: React.FC = () => {
     const [netLiquidity, setNetLiquidity] = useState<number>(0);
     const [topLostDemand, setTopLostDemand] = useState<{ term: string, count: number }[]>([]);
     const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
+    const [counts, setCounts] = useState({ warehouses: 0, accounts: 0, users: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -173,6 +174,19 @@ const Dashboard: React.FC = () => {
                 activities.sort((a, b) => b.timestamp - a.timestamp);
                 setActivityStream(activities.slice(0, 6));
 
+                // 6. Header Counts
+                const [{ count: wCount }, { count: aCount }, { count: uCount }] = await Promise.all([
+                    supabase.from('warehouses').select('*', { count: 'exact', head: true }),
+                    supabase.from('accounts').select('*', { count: 'exact', head: true }),
+                    supabase.from('profiles').select('*', { count: 'exact', head: true })
+                ]);
+
+                setCounts({
+                    warehouses: wCount || 0,
+                    accounts: aCount || 0,
+                    users: uCount || 0
+                });
+
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {
@@ -190,7 +204,7 @@ const Dashboard: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Centro de Comando</h1>
                     <p className="text-slate-500 text-sm font-mono mt-1">
-                        <span className="text-emerald-500 animate-pulse">● En Vivo</span> | Monitoreando 3 Bodegas, 5 Cuentas, 142 Socios
+                        <span className="text-emerald-500 animate-pulse">● En Vivo</span> | Monitoreando {counts.warehouses} Bodegas, {counts.accounts} Cuentas, {counts.users} Socios
                     </p>
                 </div>
                 <div className="flex gap-3">

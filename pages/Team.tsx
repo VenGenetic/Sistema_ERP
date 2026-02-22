@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import InviteUserModal from '../components/InviteUserModal';
 
-// Mock data type - replace with Supabase type later
+import { supabase } from '../supabaseClient';
+
 interface User {
   id: string;
   name: string;
@@ -15,23 +16,92 @@ interface User {
   img?: string;
 }
 
+const getRoleColor = (role: string) => {
+  const r = (role || '').toLowerCase();
+  if (r.includes('admin')) return 'purple';
+  if (r.includes('closer')) return 'amber';
+  if (r.includes('onsite')) return 'emerald';
+  if (r.includes('dev')) return 'cyan';
+  return 'emerald'; // default
+};
+
 const Team: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([
-    { id: '1', name: "John Doe", email: "john@example.com", initials: "JD", role: "Admin", roleColor: "purple", status: "Active", lastActive: "2 mins ago", avatarType: "initials" },
-    { id: '2', name: "Sarah Smith", email: "sarah@example.com", initials: "SS", role: "Onsite", roleColor: "emerald", status: "Active", lastActive: "4 hours ago", avatarType: "img", img: "https://lh3.googleusercontent.com/aida-public/AB6AXuBNqrmWF5X-GT77B_zoPTAxQ4FqTtJjF4amtudbJVCfegZcmRsxS51uFxsc3FPa51I2G_Xl-C1YCIppbyMPz98fPvup0Fq7_ijEBP1EAaPxRy5AiM6U6Qt9-rSWIwtukRjxirzqPKLFsenYZZJEIp222SqAqzPozLXCxh56ZBfGyTjnMlz4O3ZQ3MbTDCgDrNqWmWlW0bOZWHfQEkjbcjwCP4ICSbXhA36BmgmRQEdx2ieQTlW7rw7XeASo2bbiP0KO0Htxy8r7" },
-    { id: '3', name: "Mike Johnson", email: "mike@example.com", initials: "MJ", role: "Closer", roleColor: "amber", status: "Inactive", lastActive: "2 days ago", avatarType: "initials" },
-    { id: '4', name: "Emily Davis", email: "emily@example.com", initials: "ED", role: "Dev", roleColor: "cyan", status: "Active", lastActive: "1 week ago", avatarType: "img", img: "https://lh3.googleusercontent.com/aida-public/AB6AXuC93lzdbdkdIVNvOdSlJBTNAUQvBCn1Nt9YDASG9zdgydOD3hLcDbBnv91sgCfcyVJ3Jfo4SGrgptiiXkWUqaqLB7lvMWpdhnTo1MgONzTNwp2OH4MBtTLzztEoRMisvq0nkJ387hkbY1MJXNED4pMqnT1ahPbRu-UOk2oaDfKwxyyNWpqjyu3yzM93pdqm5NY3zwgZ6yOybacv1Ub-4V6GkH18nZFED-wKM89U2_4l5-i1XmPXD05e3MowKSJmMx_5Z2FGYxJr" },
-    { id: '5', name: "Chris Lee", email: "chris@example.com", initials: "CL", role: "Onsite", roleColor: "emerald", status: "Active", lastActive: "Yesterday", avatarType: "initials" },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [showRoleEditor, setShowRoleEditor] = useState(false);
 
-  const toggleUserStatus = (id: string) => {
-    setUsers(users.map(user =>
-      user.id === id ? { ...user, status: user.status === 'Active' ? 'Inactive' : 'Active' } : user
-    ));
-    // Here you would also call Supabase to update the user's metadata or status in DB
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, is_active, created_at, avatar_url');
+
+      if (error) throw error;
+
+      if (data) {
+        const mappedUsers: User[] = data.map(p => {
+          const name = p.full_name || 'Usuario Sin Nombre';
+          const initials = name
+            .split(' ')
+            .map((n: string) => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+
+          return {
+            id: p.id,
+            name: name,
+            email: 'Usuario Sistema', // Supabase profiles don't typically expose email to other users directly due to security
+            initials: initials || 'U',
+            role: (p.role || 'Usuario').charAt(0).toUpperCase() + (p.role || 'Usuario').slice(1),
+            roleColor: getRoleColor(p.role),
+            status: p.is_active ? 'Active' : 'Inactive',
+            lastActive: new Date(p.created_at).toLocaleDateString(),
+            avatarType: p.avatar_url ? 'img' : 'initials',
+            img: p.avatar_url,
+          };
+        });
+        setUsers(mappedUsers);
+      }
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleUserStatus = async (id: string) => {
+    try {
+      const user = users.find(u => u.id === id);
+      if (!user) return;
+
+      const newStatus = user.status === 'Active' ? false : true;
+
+      // Optimistic upate
+      setUsers(users.map(u =>
+        u.id === id ? { ...u, status: newStatus ? 'Active' : 'Inactive' } : u
+      ));
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: newStatus })
+        .eq('id', id);
+
+      if (error) {
+        throw error;
+      }
+    } catch (err) {
+      console.error("Error updating user status:", err);
+      // Revert on error
+      fetchUsers();
+    }
   };
 
   const handleInvite = () => {
@@ -141,66 +211,76 @@ const Team: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-dark">
-              {users.map((user, index) => (
-                <tr key={index} className="group hover:bg-surface-hover transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-4">
-                      {user.avatarType === 'initials' ? (
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md
-                          ${index === 0 ? 'bg-gradient-to-br from-blue-500 to-purple-600' : ''}
-                          ${index === 2 ? 'bg-surface-hover border border-border-dark text-text-secondary' : ''}
-                          ${index === 4 ? 'bg-gradient-to-br from-indigo-500 to-blue-600' : ''}
-                        `}>
-                          {user.initials}
-                        </div>
-                      ) : (
-                        <img alt={`${user.name} portrait`} className="h-10 w-10 rounded-full object-cover border border-border-dark" src={user.img} />
-                      )}
-                      <div>
-                        <div className="text-sm font-semibold text-white">{user.name}</div>
-                        <div className="text-sm text-text-secondary">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="relative inline-block text-left">
-                      <span className="inline-flex justify-between items-center w-36 rounded-md border border-border-dark shadow-sm px-3 py-1.5 bg-background-dark text-sm font-medium text-white">
-                        <span className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full 
-                            ${user.roleColor === 'purple' ? 'bg-purple-500' : ''}
-                            ${user.roleColor === 'emerald' ? 'bg-emerald-500' : ''}
-                            ${user.roleColor === 'amber' ? 'bg-amber-500' : ''}
-                            ${user.roleColor === 'cyan' ? 'bg-cyan-500' : ''}
-                          `}></span>
-                          {user.role}
-                        </span>
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={user.status === 'Active'}
-                        onChange={() => toggleUserStatus(user.id)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                      <span className={`ml-3 text-sm font-medium ${user.status === 'Active' ? 'text-white' : 'text-text-secondary'}`}>
-                        {user.status === 'Active' ? 'Activo' : 'Bloqueado'}
-                      </span>
-                    </label>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                    {user.lastActive}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-text-secondary hover:text-white transition-colors p-2 rounded-full hover:bg-background-dark/50">
-                      <span className="material-symbols-outlined">more_vert</span>
-                    </button>
-                  </td>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-text-secondary">Cargando equipo...</td>
                 </tr>
-              ))}
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-text-secondary">No hay usuarios registrados.</td>
+                </tr>
+              ) : (
+                users.map((user, index) => (
+                  <tr key={user.id} className="group hover:bg-surface-hover transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-4">
+                        {user.avatarType === 'initials' ? (
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md
+                            ${index % 3 === 0 ? 'bg-gradient-to-br from-blue-500 to-purple-600' : ''}
+                            ${index % 3 === 1 ? 'bg-surface-hover border border-border-dark text-text-secondary' : ''}
+                            ${index % 3 === 2 ? 'bg-gradient-to-br from-indigo-500 to-blue-600' : ''}
+                          `}>
+                            {user.initials}
+                          </div>
+                        ) : (
+                          <img alt={`${user.name} portrait`} className="h-10 w-10 rounded-full object-cover border border-border-dark" src={user.img} />
+                        )}
+                        <div>
+                          <div className="text-sm font-semibold text-white">{user.name}</div>
+                          <div className="text-sm text-text-secondary">{user.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="relative inline-block text-left">
+                        <span className="inline-flex justify-between items-center w-36 rounded-md border border-border-dark shadow-sm px-3 py-1.5 bg-background-dark text-sm font-medium text-white">
+                          <span className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full 
+                              ${user.roleColor === 'purple' ? 'bg-purple-500' : ''}
+                              ${user.roleColor === 'emerald' ? 'bg-emerald-500' : ''}
+                              ${user.roleColor === 'amber' ? 'bg-amber-500' : ''}
+                              ${user.roleColor === 'cyan' ? 'bg-cyan-500' : ''}
+                            `}></span>
+                            {user.role}
+                          </span>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={user.status === 'Active'}
+                          onChange={() => toggleUserStatus(user.id)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        <span className={`ml-3 text-sm font-medium ${user.status === 'Active' ? 'text-white' : 'text-text-secondary'}`}>
+                          {user.status === 'Active' ? 'Activo' : 'Bloqueado'}
+                        </span>
+                      </label>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                      {user.lastActive}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button className="text-text-secondary hover:text-white transition-colors p-2 rounded-full hover:bg-background-dark/50">
+                        <span className="material-symbols-outlined">more_vert</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
