@@ -70,13 +70,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 if (productToEdit?.id) {
                     const { data } = await supabase
                         .from('inventory_levels')
-                        .select('quantity')
+                        .select('current_stock')
                         .eq('warehouse_id', stockAdjustment.warehouse_id)
                         .eq('product_id', productToEdit.id)
                         .single();
                     if (data) {
-                        setCurrentStock(data.quantity);
-                        setStockAdjustment(prev => ({ ...prev, quantity: prev.quantity === '' ? data.quantity.toString() : prev.quantity }));
+                        setCurrentStock(data.current_stock);
+                        setStockAdjustment(prev => ({ ...prev, quantity: prev.quantity === '' ? data.current_stock.toString() : prev.quantity }));
                     } else {
                         setCurrentStock(0);
                         setStockAdjustment(prev => ({ ...prev, quantity: prev.quantity === '' ? '0' : prev.quantity }));

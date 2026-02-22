@@ -41,6 +41,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
         account_id: null as number | null
     });
     const [accounts, setAccounts] = useState<any[]>([]);
+    const [previewStock, setPreviewStock] = useState<Record<number, number>>({});
     // New toggle to apply changes to all products
     const [applyToAll, setApplyToAll] = useState(false);
 
@@ -63,14 +64,14 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                 const top5Ids = selectedProducts.slice(0, 5).map(p => p.id);
                 const { data } = await supabase
                     .from('inventory_levels')
-                    .select('product_id, quantity')
+                    .select('product_id, current_stock')
                     .eq('warehouse_id', stockAdjustment.warehouse_id)
                     .in('product_id', top5Ids);
-                
+
                 const stockMap: Record<number, number> = {};
                 if (data) {
                     data.forEach(d => {
-                        stockMap[d.product_id] = d.quantity;
+                        stockMap[d.product_id] = d.current_stock;
                     });
                 }
                 setPreviewStock(stockMap);
