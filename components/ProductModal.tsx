@@ -107,10 +107,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     category: productToEdit.category || '',
                     brandId: productToEdit.brand_id,
                     minStock: productToEdit.min_stock_threshold || 10,
-                    profitMargin: margin,
+                    profitMargin: Math.round(margin * 100) / 100,
                     costWithoutVat: cwv,
                     vatPercentage: vat,
-                    price: derivedPrice
+                    price: Math.round(derivedPrice * 100) / 100
                 });
             } else {
                 setFormData({
