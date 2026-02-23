@@ -44,6 +44,8 @@ interface Movement {
         name: string;
     };
     user_id: string; // We might want to join profiles if available
+    reference_type: string | null;
+    reference_id: number | null;
 }
 
 interface Warehouse {
@@ -92,6 +94,11 @@ const Inventory: React.FC = () => {
 
     // Fitment Filter
     const [fitmentFilter, setFitmentFilter] = useState<{ make: string; model: string; year: number | null } | null>(null);
+
+    // Lost Demand
+    const [isLostDemandModalOpen, setIsLostDemandModalOpen] = useState(false);
+    const [lostDemandBrand, setLostDemandBrand] = useState('');
+    const [lostDemandBikeModel, setLostDemandBikeModel] = useState('');
 
     // Data states
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -285,7 +292,7 @@ const Inventory: React.FC = () => {
             const { data, error } = await supabase
                 .from('inventory_logs')
                 .select(`
-                    id, created_at, quantity_change, reason, user_id,
+                    id, created_at, quantity_change, reason, user_id, reference_type, reference_id,
                     products (name),
                     warehouses (name)
                 `)
@@ -325,6 +332,32 @@ const Inventory: React.FC = () => {
     // Replaced Logic: New Product opens Batch Entry
     const handleNewProduct = () => {
         setIsBatchEntryOpen(true);
+    };
+
+    const handleRegistrarDemanda = async (term: string, reason: string, customData?: any) => {
+        try {
+            await supabase.from('lost_demand').insert([{
+                search_term: term,
+                reason: reason,
+                channel: 'INVENTORY',
+                ...customData
+            }]);
+            console.log("Lost demand logged:", term);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleManualLostDemandSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await handleRegistrarDemanda(searchTerm || 'Búsqueda Manual', 'not_in_catalog', {
+            custom_brand: lostDemandBrand,
+            custom_model: lostDemandBikeModel
+        });
+        alert('Demanda registrada exitosamente.');
+        setIsLostDemandModalOpen(false);
+        setLostDemandBrand('');
+        setLostDemandBikeModel('');
     };
 
     // ──────────────────────────────────────────────
@@ -579,6 +612,18 @@ const Inventory: React.FC = () => {
                         </button>
                     </div>
                 </div>
+                {activeTab === 'stock' && (
+                    <div className="flex justify-end mt-2">
+                        <button
+                            onClick={() => setIsLostDemandModalOpen(true)}
+                            className="flex items-center justify-center gap-2 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-xs font-bold transition-colors shadow-sm border border-amber-200"
+                            title="Registrar una alerta si el cliente pidió algo que no tenemos."
+                        >
+                            <span className="material-symbols-outlined text-[16px]">warning</span>
+                            Registrar Demanda Perdida
+                        </button>
+                    </div>
+                )}
             </div>
 
 
@@ -891,6 +936,7 @@ const Inventory: React.FC = () => {
                                         <th className="px-6 py-3">Producto</th>
                                         <th className="px-6 py-3">Almacén</th>
                                         <th className="px-6 py-3">Motivo</th>
+                                        <th className="px-6 py-3">Ref</th>
                                         <th className="px-6 py-3 text-right">Cantidad</th>
                                         <th className="px-6 py-3">Usuario</th>
                                     </tr>
@@ -898,7 +944,7 @@ const Inventory: React.FC = () => {
                                 <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                     {movements.length === 0 && !loading && (
                                         <tr>
-                                            <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                                            <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
                                                 No hay movimientos registrados.
                                             </td>
                                         </tr>
@@ -923,6 +969,13 @@ const Inventory: React.FC = () => {
                                                 {mov.warehouses?.name}
                                             </td>
                                             <td className="px-6 py-4 text-slate-600 dark:text-slate-300 text-sm">{mov.reason}</td>
+                                            <td className="px-6 py-4 text-slate-500 text-sm whitespace-nowrap">
+                                                {mov.reference_type ? (
+                                                    <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs font-mono">
+                                                        {mov.reference_type} #{mov.reference_id}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
                                             <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{Math.abs(mov.quantity_change)}</td>
                                             <td className="px-6 py-4 text-slate-500 text-sm">{mov.user_id?.substring(0, 8)}...</td>
                                         </tr>
@@ -933,6 +986,66 @@ const Inventory: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Lost Demand Modal */}
+            {isLostDemandModalOpen && (
+                <div className="fixed inset-0 z-[160] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-amber-50">
+                            <h2 className="font-bold text-amber-800 uppercase tracking-tight flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[20px]">warning</span>
+                                Registrar Demanda Perdida
+                            </h2>
+                            <button onClick={() => setIsLostDemandModalOpen(false)} className="text-amber-500 hover:text-amber-800 font-bold px-2 py-1 rounded hover:bg-amber-200 transition-colors">
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleManualLostDemandSubmit} className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Repuesto Buscado</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-slate-100 border border-slate-200 rounded-lg p-3 text-sm font-medium text-slate-600 outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Ej: Filtro de aceite"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Marca de Moto (Opcional)</label>
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    placeholder="Ej: Yamaha"
+                                    value={lostDemandBrand}
+                                    onChange={(e) => setLostDemandBrand(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    placeholder="Ej: FZ16 2015"
+                                    value={lostDemandBikeModel}
+                                    onChange={(e) => setLostDemandBikeModel(e.target.value)}
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full py-3 px-4 bg-amber-500 text-white font-black uppercase rounded-lg hover:bg-amber-600 shadow-md transition-all active:scale-95"
+                            >
+                                Registrar Demanda
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

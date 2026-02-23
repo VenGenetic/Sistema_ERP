@@ -8,6 +8,7 @@ const ProfilePanel: React.FC = () => {
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [fullName, setFullName] = useState('');
     const [nickname, setNickname] = useState('');
+    const [referralCode, setReferralCode] = useState('');
     const [bio, setBio] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -24,7 +25,7 @@ const ProfilePanel: React.FC = () => {
                 setUser(user);
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('full_name, nickname, bio, avatar_url')
+                    .select('full_name, nickname, referral_code, bio, avatar_url')
                     .eq('id', user.id)
                     .single();
 
@@ -35,6 +36,7 @@ const ProfilePanel: React.FC = () => {
                 if (data) {
                     setFullName(data.full_name || '');
                     setNickname(data.nickname || '');
+                    setReferralCode(data.referral_code || '');
                     setBio(data.bio || '');
                     setAvatarUrl(data.avatar_url);
                 }
@@ -57,6 +59,7 @@ const ProfilePanel: React.FC = () => {
                     id: user?.id,
                     full_name: fullName,
                     nickname,
+                    referral_code: referralCode,
                     bio,
                     avatar_url: avatarUrl,
                 });
@@ -180,6 +183,20 @@ const ProfilePanel: React.FC = () => {
                                         placeholder="Ej. alexm"
                                     />
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-1.5">Código de Referido (Promo 3%)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 material-symbols-outlined text-text-secondary text-[20px]">sell</span>
+                                    <input
+                                        type="text"
+                                        value={referralCode}
+                                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all uppercase"
+                                        placeholder="Ej. ALEX2024"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-text-secondary mt-1">Este código será usado en el POS para vincular tus ventas.</p>
                             </div>
                         </div>
 

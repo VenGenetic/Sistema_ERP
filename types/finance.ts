@@ -1,31 +1,17 @@
+import { Database } from './supabase';
 
-export interface Account {
-    id: number;
-    code: string;
-    name: string;
-    category: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
-    is_nominal: boolean;
-    currency: string;
-    position?: number;
-    created_at?: string;
-    updated_at?: string;
+type AccountRow = Database['public']['Tables']['accounts']['Row'];
+type TransactionRow = Database['public']['Tables']['transactions']['Row'];
+type TransactionLineRow = Database['public']['Tables']['transaction_lines']['Row'];
+
+export interface Account extends AccountRow {
     current_balance?: number;
 }
 
-export interface Transaction {
-    id: number;
-    order_id?: number;
-    reference_type: string;
-    description: string;
-    created_at: string;
+export interface Transaction extends TransactionRow {
     transaction_lines?: TransactionLine[];
 }
 
-export interface TransactionLine {
-    id: number;
-    transaction_id: number;
-    account_id: number;
-    debit: number;
-    credit: number;
+export interface TransactionLine extends TransactionLineRow {
     account?: Account;
 }

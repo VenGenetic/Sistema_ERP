@@ -527,13 +527,17 @@ const POS: React.FC = () => {
 
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2">
                         <span className="text-[10px] md:text-sm font-semibold text-slate-500 uppercase hidden md:inline">Cliente:</span>
-                        <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 md:px-3 md:py-1.5 rounded-md border border-slate-200">
+                        <div
+                            onClick={() => setIsCustomerModalOpen(true)}
+                            className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 px-2 py-1 md:px-3 md:py-1.5 rounded-md border border-slate-200 cursor-pointer transition-colors"
+                        >
                             <span className="font-bold text-slate-800 text-xs md:text-sm truncate max-w-[120px] md:max-w-xs">{customer.name}</span>
                             {customer.claimed_by && (
                                 <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
                                     Referido 2%
                                 </span>
                             )}
+                            <span className="material-symbols-outlined text-slate-400 ml-1 text-[16px]">edit</span>
                         </div>
                     </div>
                 </div>
@@ -891,24 +895,24 @@ const POS: React.FC = () => {
             {/* Customer Lookup Modal */}
             {isCustomerModalOpen && (
                 <div className="fixed inset-0 z-[150] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                             <h2 className="font-bold text-slate-800 uppercase tracking-tight">Vincular Cliente al Carrito</h2>
                             <button onClick={() => setIsCustomerModalOpen(false)} className="text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded hover:bg-slate-200 transition-colors">
                                 ✕
                             </button>
                         </div>
-                        <div className="p-4">
+                        <div className="p-4 flex-1 overflow-y-auto">
                             <input
                                 autoFocus
                                 type="text"
                                 className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-blue-500 outline-none mb-4"
-                                placeholder="Escribe el nombre o documento..."
+                                placeholder="Buscar por nombre o cédula..."
                                 value={customerSearchQuery}
                                 onChange={(e) => setCustomerSearchQuery(e.target.value)}
                             />
 
-                            <div className="space-y-2 max-h-60 overflow-y-auto w-full">
+                            <div className="space-y-2">
                                 {customerSearchResults.map(c => (
                                     <div
                                         key={c.id}
@@ -922,23 +926,58 @@ const POS: React.FC = () => {
                                     >
                                         <div className="font-bold text-slate-800">{c.name}</div>
                                         <div className="text-xs text-slate-500 flex justify-between mt-1 items-center">
-                                            <span>{c.identification_number}</span>
+                                            <span>{c.identification_number || 'Sin Doc'}</span>
                                             <div className="flex gap-2 items-center">
                                                 {c.claimed_by && <span className="bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold text-[9px]">REFERIDO</span>}
-                                                {c.customer_type && <span className="uppercase text-[10px] font-bold text-slate-400">{c.customer_type}</span>}
+                                                {c.phone && <span>📞 {c.phone}</span>}
+                                                {c.customer_type && <span className="uppercase text-[10px] font-bold text-slate-400 border border-slate-200 px-1 py-0.5 rounded bg-white">{c.customer_type}</span>}
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                                 {customerSearchQuery.length >= 3 && customerSearchResults.length === 0 && (
-                                    <div className="p-4 text-center text-sm text-slate-500 font-medium">
-                                        No se encontró ningún cliente.
+                                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-center">
+                                        <p className="text-sm text-blue-800 font-medium mb-3">No se encontró el cliente "{customerSearchQuery}".</p>
+                                        <button
+                                            onClick={async () => {
+                                                const newIdNum = prompt("Ingrese Cédula/RUC:");
+                                                if (newIdNum) {
+                                                    const { data, error } = await supabase.from('customers').insert([{
+                                                        name: customerSearchQuery.trim(),
+                                                        identification_number: newIdNum,
+                                                        customer_type: 'individual'
+                                                    }]).select().single();
+
+                                                    if (!error && data) {
+                                                        setCustomer(data as Customer);
+                                                        setIsCustomerModalOpen(false);
+                                                        setCustomerSearchQuery('');
+                                                        alert("Cliente creado y vinculado exitosamente.");
+                                                    } else {
+                                                        alert("Error creando cliente: " + (error?.message || 'Error desconocido'));
+                                                    }
+                                                }
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors shadow-sm w-full"
+                                        >
+                                            Crear Rápidamente
+                                        </button>
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 border-t border-slate-200 text-center">
-                            <span className="text-xs text-slate-400">Consejo: Si no lo encuentras, créalo primero en <b>Directorio</b>.</span>
+                        <div className="p-4 bg-slate-50 border-t border-slate-200 text-center flex justify-between items-center">
+                            <span className="text-xs text-slate-400">Selecciona "Consumidor Final" si no requiere datos.</span>
+                            <button
+                                onClick={() => {
+                                    setCustomer(defaultConsumidorFinal);
+                                    setIsCustomerModalOpen(false);
+                                    setCustomerSearchQuery('');
+                                }}
+                                className="text-xs text-blue-600 font-bold hover:underline"
+                            >
+                                Usar C. Final
+                            </button>
                         </div>
                     </div>
                 </div>

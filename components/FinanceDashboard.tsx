@@ -77,6 +77,8 @@ const FinanceDashboard: React.FC = () => {
     const navigate = useNavigate();
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [balances, setBalances] = useState<Record<number, number>>({});
+    const [cogs, setCogs] = useState(0);
+    const [grossMargin, setGrossMargin] = useState(0);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -131,6 +133,23 @@ const FinanceDashboard: React.FC = () => {
                     newBalances[accountId] += (credit - debit);
                 }
             });
+
+            // Fetch COGS and Sales from order_items
+            const { data: orderItemsData, error: orderItemsError } = await supabase
+                .from('order_items')
+                .select('quantity, unit_price, unit_cost, orders!inner(status)')
+                .eq('orders.status', 'completed'); // Only calculate for completed sales
+
+            if (!orderItemsError && orderItemsData) {
+                let totalCogs = 0;
+                let totalSales = 0;
+                orderItemsData.forEach((item: any) => {
+                    totalCogs += (Number(item.unit_cost) || 0) * Number(item.quantity);
+                    totalSales += (Number(item.unit_price) || 0) * Number(item.quantity);
+                });
+                setCogs(totalCogs);
+                setGrossMargin(totalSales > 0 ? ((totalSales - totalCogs) / totalSales) * 100 : 0);
+            }
 
             setAccounts(accountsData || []);
             setBalances(newBalances);
@@ -208,6 +227,35 @@ const FinanceDashboard: React.FC = () => {
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
             >
+                {/* Metrics row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between h-32 hover:border-blue-400 dark:hover:border-blue-600 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Costo de Ventas (COGS)</span>
+                            <span className="material-symbols-outlined text-blue-500">inventory_2</span>
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                                {loading ? '...' : formatCurrency(cogs, 'USD')}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">Acumulado ventas completadas</div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between h-32 hover:border-emerald-400 dark:hover:border-emerald-600 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Margen Bruto</span>
+                            <span className="material-symbols-outlined text-emerald-500">trending_up</span>
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                                {loading ? '...' : `${grossMargin.toFixed(1)}%`}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">Margen real sobre costo promedio</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {loading ? (
                         <div className="col-span-3 text-center py-8 text-slate-500">Cargando cuentas...</div>
