@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, DollarSign, AlertTriangle, ArrowLeft, LogOut, Package, Search, Trash2 } from 'lucide-react';
+import { MapPin, DollarSign, AlertTriangle, ArrowLeft, LogOut, Package, Search, Trash2, Tag, CheckCircle, XCircle, Edit3 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -11,9 +11,9 @@ const POS: React.FC = () => {
 
     // Global State
     const {
-        cart, customer, shippingCost,
-        setCustomer, setShippingCost, addToCart,
-        updateQuantity, removeFromCart, clearCart,
+        cart, customer, shippingCost, promoDiscount,
+        setCustomer, setShippingCost, setPromoDiscount, addToCart,
+        updateQuantity, updateUnitPrice, removeFromCart, clearCart,
         getSubtotal, getTotal
     } = useCartStore();
 
@@ -33,6 +33,12 @@ const POS: React.FC = () => {
     const [lostDemandBikeModel, setLostDemandBikeModel] = useState('');
     const [lostDemandBrand, setLostDemandBrand] = useState('');
     const [promoCode, setPromoCode] = useState('');
+    const [promoCloserName, setPromoCloserName] = useState('');
+    const [promoCloserId, setPromoCloserId] = useState<string | null>(null);
+    const [promoError, setPromoError] = useState('');
+    const [promoValidating, setPromoValidating] = useState(false);
+    const [customerDataWarning, setCustomerDataWarning] = useState('');
+    const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
 
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -312,6 +318,99 @@ const POS: React.FC = () => {
         setIsPaymentModalOpen(true);
     };
 
+    // Promo code validation
+    const validatePromoCode = useCallback(async (code: string) => {
+        const trimmed = code.trim().toUpperCase();
+        if (!trimmed) {
+            setPromoCloserName('');
+            setPromoCloserId(null);
+            setPromoError('');
+            setCustomerDataWarning('');
+            setPromoDiscount(0);
+            return;
+        }
+
+        setPromoValidating(true);
+        setPromoError('');
+        setPromoCloserName('');
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, referral_code')
+            .eq('referral_code', trimmed)
+            .single();
+
+        setPromoValidating(false);
+
+        if (error || !data) {
+            setPromoError('Código inválido');
+            setPromoCloserId(null);
+            setPromoDiscount(0);
+            return;
+        }
+
+        setPromoCloserName(data.full_name || 'Closer');
+        setPromoCloserId(data.id);
+
+        // Check customer data
+        if (!customer.email || !customer.phone) {
+            setCustomerDataWarning('El cliente necesita email y teléfono para el 3%.');
+            setPromoDiscount(0);
+        } else {
+            setCustomerDataWarning('');
+            // Calculate promo discount (3% of subtotal) — non-stackable check
+            const sub = getSubtotal();
+            const maxManualDiscountPct = getMaxManualDiscountPct();
+            if (maxManualDiscountPct <= 3) {
+                setPromoDiscount(sub * 0.03);
+            } else {
+                setPromoDiscount(0);
+            }
+        }
+    }, [customer, getSubtotal, setPromoDiscount]);
+
+    // Helper: get max manual discount % across cart items
+    const getMaxManualDiscountPct = useCallback(() => {
+        let maxPct = 0;
+        cart.forEach(item => {
+            if (item.unitPrice < item.product.price) {
+                const pct = ((item.product.price - item.unitPrice) / item.product.price) * 100;
+                if (pct > maxPct) maxPct = pct;
+            }
+        });
+        return maxPct;
+    }, [cart]);
+
+    // Re-calculate promo discount when cart changes
+    useEffect(() => {
+        if (promoCloserId && customer.email && customer.phone) {
+            const sub = getSubtotal();
+            const maxPct = getMaxManualDiscountPct();
+            setPromoDiscount(maxPct <= 3 ? sub * 0.03 : 0);
+        }
+    }, [cart, promoCloserId, customer, getSubtotal, getMaxManualDiscountPct, setPromoDiscount]);
+
+    // Price guardrail helpers
+    const getPriceFloor = (product: Product) => ((product.final_cost_with_vat || (product.cost_without_vat || 0) * (1 + (product.vat_percentage || 0) / 100))) * 1.05;
+    const getPriceCeiling = (product: Product) => product.price * 1.15;
+
+    const handlePriceChange = (itemId: string, product: Product, newPrice: number) => {
+        const floor = getPriceFloor(product);
+        const ceiling = getPriceCeiling(product);
+
+        if (newPrice < floor) {
+            alert(`Precio mínimo: $${floor.toFixed(2)} (costo + 5% margen mínimo). Para vender a menos, se requiere autorización de un gerente.`);
+            updateUnitPrice(itemId, parseFloat(floor.toFixed(2)));
+            return;
+        }
+        if (newPrice > ceiling) {
+            alert(`Precio máximo: $${ceiling.toFixed(2)} (15% sobre PVP). No se permite sobreprecio excesivo.`);
+            updateUnitPrice(itemId, parseFloat(ceiling.toFixed(2)));
+            return;
+        }
+        updateUnitPrice(itemId, newPrice);
+    };
+
     const processCheckout = async (paymentAccountId: number) => {
         if (cartRef.current.length === 0) return;
 
@@ -329,7 +428,7 @@ const POS: React.FC = () => {
                 p_payment_account_id: paymentAccountId,
                 p_shipping_cost: shippingCost,
                 p_items: itemsPayload,
-                p_closer_id: customer.claimed_by || null,
+                p_closer_id: promoCloserId || customer.claimed_by || null,
                 p_promo_code: promoCode || null
             });
 
@@ -341,9 +440,14 @@ const POS: React.FC = () => {
             alert("¡Venta completada con éxito!");
             clearCart();
             setSearchQuery('');
+            setPromoCode('');
+            setPromoCloserName('');
+            setPromoCloserId(null);
+            setPromoError('');
+            setCustomerDataWarning('');
         } catch (err) {
             console.error("Checkout failed", err);
-            throw err; // Re-throw for PaymentModal to handle
+            throw err;
         }
     };
 
@@ -363,12 +467,11 @@ const POS: React.FC = () => {
                 unit_cost: c.unitCost
             }));
 
-            // We pass null for draft_id for now, allowing purely new drafts
             const { data, error } = await supabase.rpc('save_draft_order', {
                 p_customer_id: customer.id,
                 p_shipping_cost: shippingCost,
                 p_items: itemsPayload,
-                p_closer_id: customer.claimed_by || null,
+                p_closer_id: promoCloserId || customer.claimed_by || null,
                 p_promo_code: promoCode || null,
                 p_draft_id: null
             });
@@ -381,7 +484,10 @@ const POS: React.FC = () => {
             alert("¡Borrador guardado con éxito! Puedes verlo en la vista de Pipeline de Órdenes.");
             clearCart();
             setSearchQuery('');
-            navigate('/orders'); // Optionally redirect to the pipeline
+            setPromoCode('');
+            setPromoCloserName('');
+            setPromoCloserId(null);
+            navigate('/orders');
         } catch (err) {
             console.error("Draft save failed", err);
         } finally {
@@ -540,9 +646,56 @@ const POS: React.FC = () => {
 
                                             {/* Responsive Pricing/Qty Layer */}
                                             <div className="flex items-center justify-between md:gap-4 mt-2 md:mt-0">
-                                                <div className="text-sm font-medium text-slate-500 md:w-24 md:text-center">
-                                                    <span className="md:hidden text-xs text-slate-400 mr-1">Pu:</span>
-                                                    ${item.unitPrice.toFixed(2)}
+                                                <div className="md:w-28 text-center">
+                                                    {editingPriceId === item.id ? (
+                                                        <div className="relative">
+                                                            <span className="absolute left-1.5 top-1 text-slate-400 text-xs">$</span>
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                autoFocus
+                                                                defaultValue={item.unitPrice}
+                                                                onBlur={(e) => {
+                                                                    const val = parseFloat(e.target.value) || item.product.price;
+                                                                    handlePriceChange(item.id, item.product, val);
+                                                                    setEditingPriceId(null);
+                                                                }}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        const val = parseFloat((e.target as HTMLInputElement).value) || item.product.price;
+                                                                        handlePriceChange(item.id, item.product, val);
+                                                                        setEditingPriceId(null);
+                                                                    }
+                                                                    if (e.key === 'Escape') setEditingPriceId(null);
+                                                                }}
+                                                                className="w-20 pl-4 pr-1 py-1 text-right text-sm font-bold border-2 border-blue-400 rounded outline-none bg-blue-50"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => setEditingPriceId(item.id)}
+                                                            className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded cursor-pointer transition-colors ${item.unitPrice < item.product.price
+                                                                ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                                                                : item.unitPrice > item.product.price
+                                                                    ? 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+                                                                    : 'text-slate-500 hover:bg-slate-100 border border-transparent'
+                                                                }`}
+                                                            title="Click para editar precio"
+                                                        >
+                                                            <span className="md:hidden text-xs text-slate-400 mr-0.5">Pu:</span>
+                                                            ${item.unitPrice.toFixed(2)}
+                                                            <Edit3 size={10} className="opacity-50" />
+                                                        </button>
+                                                    )}
+                                                    {item.unitPrice !== item.product.price && (
+                                                        <div className={`text-[9px] font-bold mt-0.5 ${item.unitPrice < item.product.price ? 'text-amber-500' : 'text-purple-500'
+                                                            }`}>
+                                                            PVP: ${item.product.price.toFixed(2)}
+                                                            {' '}({item.unitPrice < item.product.price ? '-' : '+'}
+                                                            {Math.abs(((item.unitPrice - item.product.price) / item.product.price) * 100).toFixed(1)}%)
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div className="md:w-28 flex justify-center">
@@ -604,15 +757,86 @@ const POS: React.FC = () => {
                                 </div>
                             ) : null}
 
-                            {!customer.claimed_by && (
-                                <div className="flex items-center gap-2 mt-2">
+                            {/* Promo Code Section */}
+                            <div className="mt-2 space-y-2">
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                        <Tag size={14} className="text-slate-400" />
+                                    </div>
                                     <input
                                         type="text"
                                         placeholder="Código Promo (Opcional)"
                                         value={promoCode}
-                                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                                        className="w-full border border-slate-300 rounded p-1.5 text-sm uppercase outline-none focus:border-blue-500 font-mono text-slate-700"
+                                        onChange={(e) => {
+                                            const val = e.target.value.toUpperCase();
+                                            setPromoCode(val);
+                                            // Clear states when typing
+                                            if (!val.trim()) {
+                                                setPromoCloserName('');
+                                                setPromoCloserId(null);
+                                                setPromoError('');
+                                                setCustomerDataWarning('');
+                                                setPromoDiscount(0);
+                                            }
+                                        }}
+                                        onBlur={() => validatePromoCode(promoCode)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') validatePromoCode(promoCode);
+                                        }}
+                                        className={`w-full pl-7 pr-8 border rounded p-1.5 text-sm uppercase outline-none font-mono text-slate-700 ${promoCloserName ? 'border-emerald-400 bg-emerald-50/50' :
+                                            promoError ? 'border-red-400 bg-red-50/50' :
+                                                'border-slate-300 focus:border-blue-500'
+                                            }`}
                                     />
+                                    {/* Status icon */}
+                                    <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+                                        {promoValidating && (
+                                            <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                        )}
+                                        {promoCloserName && !promoValidating && (
+                                            <CheckCircle size={16} className="text-emerald-500" />
+                                        )}
+                                        {promoError && !promoValidating && (
+                                            <XCircle size={16} className="text-red-500" />
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Promo Feedback */}
+                                {promoCloserName && (
+                                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                                        <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                                        <div className="text-xs">
+                                            <span className="font-bold text-emerald-800">Closer: {promoCloserName}</span>
+                                            {!customerDataWarning && <span className="text-emerald-600 ml-1">• 3% descuento aplicado</span>}
+                                        </div>
+                                    </div>
+                                )}
+                                {promoError && (
+                                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                                        <XCircle size={14} className="text-red-500 shrink-0" />
+                                        <span className="text-xs font-bold text-red-700">{promoError}</span>
+                                    </div>
+                                )}
+                                {customerDataWarning && (
+                                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                                        <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+                                        <span className="text-xs font-medium text-amber-800">{customerDataWarning}</span>
+                                    </div>
+                                )}
+                                {promoCloserName && promoDiscount === 0 && !customerDataWarning && getMaxManualDiscountPct() > 3 && (
+                                    <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+                                        <Tag size={14} className="text-blue-500 shrink-0" />
+                                        <span className="text-xs font-medium text-blue-800">Descuento manual {'>'}3%. El 3% promo no aplica financieramente (atribución conservada).</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Promo Discount Line */}
+                            {promoDiscount > 0 && (
+                                <div className="flex justify-between items-center text-emerald-600 font-semibold text-sm">
+                                    <span className="flex items-center gap-1"><Tag size={12} /> Promo 3%</span>
+                                    <span>-${promoDiscount.toFixed(2)}</span>
                                 </div>
                             )}
 

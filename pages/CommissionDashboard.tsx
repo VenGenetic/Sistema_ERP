@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { DollarSign, TrendingUp, Users, Calendar } from 'lucide-react';
+import { DollarSign, TrendingUp, Users, Calendar, Tag, Hash, ShoppingBag } from 'lucide-react';
 
 interface CommissionData {
     closer_id: string;
     closer_name: string;
+    referral_code: string;
+    total_orders: number;
     total_sales: number;
-    total_gp: number;
+    total_gross_profit: number;
     earned_commission: number;
+    promo_attributed_orders: number;
+    promo_attributed_sales: number;
 }
 
 const CommissionDashboard: React.FC = () => {
@@ -33,66 +37,21 @@ const CommissionDashboard: React.FC = () => {
                 const userIsAdmin = profile?.role_id === 1;
                 setIsAdmin(userIsAdmin);
 
-                // Fetch raw orders and order items to calculate GP
-                // In a production app, this should be an RPC or a View
-
-                // We only count orders that are verified/completed
-                const validStatuses = ['completed', 'processing_fulfillment', 'shipped', 'ready_for_pickup'];
-
+                // Use the employee_earnings_summary view
                 let query = supabase
-                    .from('orders')
-                    .select(`
-                        id,
-                        total_amount,
-                        closer_id,
-                        status,
-                        profiles!orders_closer_id_fkey ( full_name ),
-                        order_items (
-                            quantity,
-                            unit_price,
-                            unit_cost
-                        )
-                    `)
-                    .in('status', validStatuses)
-                    .not('closer_id', 'is', null);
+                    .from('employee_earnings_summary')
+                    .select('*')
+                    .gt('total_orders', 0);
 
                 if (!userIsAdmin) {
                     query = query.eq('closer_id', session.user.id);
                 }
 
-                const { data: orders, error } = await query;
+                const { data, error } = await query.order('earned_commission', { ascending: false });
 
                 if (error) throw error;
 
-                // Aggregate by closer
-                const aggregated: Record<string, CommissionData> = {};
-
-                orders?.forEach((order: any) => {
-                    const cid = order.closer_id;
-                    if (!aggregated[cid]) {
-                        aggregated[cid] = {
-                            closer_id: cid,
-                            closer_name: order.profiles?.full_name || 'Vendedor Desconocido',
-                            total_sales: 0,
-                            total_gp: 0,
-                            earned_commission: 0
-                        };
-                    }
-
-                    aggregated[cid].total_sales += order.total_amount;
-
-                    // Calculate GP from items
-                    let orderGp = 0;
-                    order.order_items?.forEach((item: any) => {
-                        const gp = (item.unit_price - item.unit_cost) * item.quantity;
-                        orderGp += gp;
-                    });
-
-                    aggregated[cid].total_gp += orderGp;
-                    aggregated[cid].earned_commission += (orderGp * 0.10); // 10% of GP
-                });
-
-                setCommissions(Object.values(aggregated).sort((a, b) => b.earned_commission - a.earned_commission));
+                setCommissions((data || []) as CommissionData[]);
             } catch (err) {
                 console.error("Error fetching commissions", err);
             } finally {
@@ -103,8 +62,11 @@ const CommissionDashboard: React.FC = () => {
         fetchCommissions();
     }, []);
 
-    const totalCompanyGp = commissions.reduce((sum, c) => sum + c.total_gp, 0);
+    const totalCompanySales = commissions.reduce((sum, c) => sum + c.total_sales, 0);
+    const totalCompanyGp = commissions.reduce((sum, c) => sum + c.total_gross_profit, 0);
     const totalCompanyCommissions = commissions.reduce((sum, c) => sum + c.earned_commission, 0);
+    const totalOrders = commissions.reduce((sum, c) => sum + c.total_orders, 0);
+    const totalPromoOrders = commissions.reduce((sum, c) => sum + c.promo_attributed_orders, 0);
 
     return (
         <div className="p-6 md:p-8 max-w-7xl mx-auto bg-slate-50 dark:bg-[#0d1117] min-h-[calc(100vh-64px)]">
@@ -112,13 +74,13 @@ const CommissionDashboard: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
                         <TrendingUp className="text-blue-500" />
-                        Comisiones
+                        Comisiones y Atribución
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">Calculado al 10% sobre la Utilidad Bruta (GP)</p>
+                    <p className="text-slate-500 text-sm mt-1">Calculado al 10% sobre la Utilidad Bruta (GP) • Atribución vía código promo</p>
                 </div>
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-500 bg-white dark:bg-[#161b22] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
                     <Calendar size={16} />
-                    <span>Mes Actual</span>
+                    <span>Histórico</span>
                 </div>
             </div>
 
@@ -130,40 +92,67 @@ const CommissionDashboard: React.FC = () => {
                 <>
                     {/* Admin Summary Cards */}
                     {isAdmin && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                            <div className="bg-white dark:bg-[#161b22] p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-slate-500 font-medium text-sm">Utilidad Bruta Total (Compañía)</h3>
-                                    <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg">
-                                        <TrendingUp size={20} />
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                            <div className="bg-white dark:bg-[#161b22] p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-slate-500 font-medium text-xs uppercase tracking-wider">Ventas Totales</h3>
+                                    <div className="p-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg">
+                                        <DollarSign size={16} />
                                     </div>
                                 </div>
-                                <div className="text-3xl font-black text-slate-900 dark:text-white">
+                                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                                    ${totalCompanySales.toFixed(2)}
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-[#161b22] p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-slate-500 font-medium text-xs uppercase tracking-wider">Utilidad Bruta</h3>
+                                    <div className="p-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg">
+                                        <TrendingUp size={16} />
+                                    </div>
+                                </div>
+                                <div className="text-2xl font-black text-slate-900 dark:text-white">
                                     ${totalCompanyGp.toFixed(2)}
                                 </div>
                             </div>
 
-                            <div className="bg-white dark:bg-[#161b22] p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-slate-500 font-medium text-sm">Comisiones a Pagar (10%)</h3>
-                                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg">
-                                        <DollarSign size={20} />
+                            <div className="bg-white dark:bg-[#161b22] p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-slate-500 font-medium text-xs uppercase tracking-wider">Comisiones (10%)</h3>
+                                    <div className="p-1.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-lg">
+                                        <DollarSign size={16} />
                                     </div>
                                 </div>
-                                <div className="text-3xl font-black text-slate-900 dark:text-white">
+                                <div className="text-2xl font-black text-slate-900 dark:text-white">
                                     ${totalCompanyCommissions.toFixed(2)}
                                 </div>
                             </div>
 
-                            <div className="bg-white dark:bg-[#161b22] p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-slate-500 font-medium text-sm">Closers Activos</h3>
-                                    <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg">
-                                        <Users size={20} />
+                            <div className="bg-white dark:bg-[#161b22] p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-slate-500 font-medium text-xs uppercase tracking-wider">Órdenes</h3>
+                                    <div className="p-1.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg">
+                                        <ShoppingBag size={16} />
                                     </div>
                                 </div>
-                                <div className="text-3xl font-black text-slate-900 dark:text-white">
-                                    {commissions.length}
+                                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                                    {totalOrders}
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-[#161b22] p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-slate-500 font-medium text-xs uppercase tracking-wider">Vía Promo</h3>
+                                    <div className="p-1.5 bg-teal-50 dark:bg-teal-900/20 text-teal-600 rounded-lg">
+                                        <Tag size={16} />
+                                    </div>
+                                </div>
+                                <div className="text-2xl font-black text-slate-900 dark:text-white">
+                                    {totalPromoOrders}
+                                    <span className="text-sm font-medium text-slate-400 ml-1">
+                                        ({totalOrders > 0 ? ((totalPromoOrders / totalOrders) * 100).toFixed(0) : 0}%)
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -176,16 +165,19 @@ const CommissionDashboard: React.FC = () => {
                                 <thead>
                                     <tr className="bg-slate-50/50 dark:bg-[#0c1117] border-b border-slate-200 dark:border-slate-800 text-xs uppercase tracking-wider text-slate-500">
                                         <th className="p-4 font-bold">Vendedor / Closer</th>
-                                        <th className="p-4 font-bold text-right">Ventas Totales</th>
-                                        <th className="p-4 font-bold text-right">Utilidad Bruta (GP)</th>
+                                        <th className="p-4 font-bold text-center">Código</th>
+                                        <th className="p-4 font-bold text-right">Órdenes</th>
+                                        <th className="p-4 font-bold text-right">Ventas</th>
+                                        <th className="p-4 font-bold text-right">GP</th>
                                         <th className="p-4 font-bold text-right text-blue-600 dark:text-blue-400">Comisión (10%)</th>
+                                        <th className="p-4 font-bold text-right">Vía Promo</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                                     {commissions.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="p-8 text-center text-slate-500">
-                                                No hay ventas verificadas registradas en este periodo.
+                                            <td colSpan={7} className="p-8 text-center text-slate-500">
+                                                No hay ventas verificadas registradas.
                                             </td>
                                         </tr>
                                     ) : (
@@ -197,16 +189,35 @@ const CommissionDashboard: React.FC = () => {
                                                         <span className="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded mt-1 inline-block">TÚ</span>
                                                     )}
                                                 </td>
+                                                <td className="p-4 text-center">
+                                                    <span className="inline-flex items-center gap-1 font-mono text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded font-bold tracking-wider">
+                                                        <Hash size={10} />
+                                                        {c.referral_code || '—'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-right font-medium text-slate-600 dark:text-slate-300">
+                                                    {c.total_orders}
+                                                </td>
                                                 <td className="p-4 text-right font-medium text-slate-600 dark:text-slate-300">
                                                     ${c.total_sales.toFixed(2)}
                                                 </td>
                                                 <td className="p-4 text-right font-medium text-slate-600 dark:text-slate-300">
-                                                    ${c.total_gp.toFixed(2)}
+                                                    ${c.total_gross_profit.toFixed(2)}
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <span className="font-bold text-lg text-slate-900 dark:text-white">
                                                         ${c.earned_commission.toFixed(2)}
                                                     </span>
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                        <span className="font-bold text-slate-700 dark:text-slate-200">{c.promo_attributed_orders}</span>
+                                                        {c.promo_attributed_sales > 0 && (
+                                                            <span className="text-[10px] text-teal-600 font-medium">
+                                                                ${c.promo_attributed_sales.toFixed(2)}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))
