@@ -4,13 +4,15 @@ import { useCartStore } from '../../store/cartStore';
 interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onProcess: (paymentAccountId: number) => Promise<void>;
+    onProcess: (paymentAccountId: number, shippingExpenseAccountId?: number | null) => Promise<void>;
     paymentAccounts: { id: number, name: string }[];
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onProcess, paymentAccounts }) => {
-    const { customer, getSubtotal, getTotal } = useCartStore();
+    const { customer, getSubtotal, getTotal, shippingCost } = useCartStore();
     const [selectedAccount, setSelectedAccount] = useState<number>(paymentAccounts[0]?.id || 0);
+    const [useSeparateShippingAccount, setUseSeparateShippingAccount] = useState(false);
+    const [selectedShippingAccount, setSelectedShippingAccount] = useState<number>(paymentAccounts[0]?.id || 0);
     const [isProcessing, setIsProcessing] = useState(false);
 
     if (!isOpen) return null;
@@ -21,7 +23,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
     const handleConfirm = async () => {
         setIsProcessing(true);
         try {
-            await onProcess(selectedAccount);
+            const shippingAccId = (useSeparateShippingAccount && shippingCost > 0) ? selectedShippingAccount : null;
+            await onProcess(selectedAccount, shippingAccId);
             onClose(); // only close on success
         } catch (e) {
             // error handled by parent
@@ -79,6 +82,46 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                                 ))}
                             </div>
                         </label>
+
+                        {shippingCost > 0 && (
+                            <div className="mt-6 border-t border-slate-200 pt-6">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={useSeparateShippingAccount}
+                                        onChange={(e) => setUseSeparateShippingAccount(e.target.checked)}
+                                        className="w-5 h-5 text-blue-600 rounded bg-white border-slate-300 focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm font-bold text-slate-700">Pagar envío (${shippingCost.toFixed(2)}) desde otra cuenta</span>
+                                </label>
+
+                                {useSeparateShippingAccount && (
+                                    <div className="mt-3 grid grid-cols-1 gap-2 pl-8">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                                            Cuenta para Gastos de Envío
+                                        </span>
+                                        {paymentAccounts.map(acc => (
+                                            <div
+                                                key={`ship-${acc.id}`}
+                                                onClick={() => setSelectedShippingAccount(acc.id)}
+                                                className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedShippingAccount === acc.id
+                                                    ? 'border-amber-500 bg-amber-50/50 shadow-sm'
+                                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                                    }`}
+                                            >
+                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedShippingAccount === acc.id ? 'border-amber-500' : 'border-slate-300'
+                                                    }`}>
+                                                    {selectedShippingAccount === acc.id && <div className="w-2 h-2 bg-amber-500 rounded-full"></div>}
+                                                </div>
+                                                <span className={`text-sm font-bold ${selectedShippingAccount === acc.id ? 'text-amber-700' : 'text-slate-700'}`}>
+                                                    {acc.name}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

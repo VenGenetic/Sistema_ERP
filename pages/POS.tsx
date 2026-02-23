@@ -411,7 +411,7 @@ const POS: React.FC = () => {
         updateUnitPrice(itemId, newPrice);
     };
 
-    const processCheckout = async (paymentAccountId: number) => {
+    const processCheckout = async (paymentAccountId: number, shippingExpenseAccountId?: number | null) => {
         if (cartRef.current.length === 0) return;
 
         try {
@@ -429,7 +429,8 @@ const POS: React.FC = () => {
                 p_shipping_cost: shippingCost,
                 p_items: itemsPayload,
                 p_closer_id: promoCloserId || customer.claimed_by || null,
-                p_promo_code: promoCode || null
+                p_promo_code: promoCode || null,
+                p_shipping_expense_account_id: shippingExpenseAccountId || null
             });
 
             if (error) {
