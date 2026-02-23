@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useSearchParams } from 'react-router-dom';
 import HeaderAccount from './HeaderAccount';
-import { supabase } from '../supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard,
   Box,
@@ -17,30 +17,13 @@ import {
 
 const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { isAdmin, permissions } = useAuth();
   const location = useLocation();
 
   // Cerrar menú móvil al cambiar de ruta
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
-
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role_id')
-          .eq('id', session.user.id)
-          .single();
-        if (profile?.role_id === 1) {
-          setIsAdmin(true);
-        }
-      }
-    };
-    fetchUserRole();
-  }, []);
 
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -64,32 +47,42 @@ const Layout: React.FC = () => {
           Centro de Comando
         </Link>
 
-        <Link to="/team" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('team') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">group</span>
-          Equipo
-        </Link>
+        {(isAdmin || permissions?.team?.read) && (
+          <Link to="/team" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('team') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">group</span>
+            Equipo
+          </Link>
+        )}
 
         <p className="px-3 text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2 mt-4">Operaciones</p>
 
-        <Link to="/customers" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('customers') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">group</span>
-          Clientes
-        </Link>
+        {(isAdmin || permissions?.customers?.read) && (
+          <Link to="/customers" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('customers') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">group</span>
+            Clientes
+          </Link>
+        )}
 
-        <Link to="/products" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('products') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">category</span>
-          Catálogo
-        </Link>
+        {(isAdmin || permissions?.products?.read) && (
+          <Link to="/products" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('products') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">category</span>
+            Catálogo
+          </Link>
+        )}
 
-        <Link to="/inventory" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('inventory') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">inventory_2</span>
-          Almacenes
-        </Link>
+        {(isAdmin || permissions?.inventory?.read) && (
+          <Link to="/inventory" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('inventory') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">inventory_2</span>
+            Almacenes
+          </Link>
+        )}
 
-        <Link to="/orders" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('orders') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">local_shipping</span>
-          Órdenes
-        </Link>
+        {(isAdmin || permissions?.orders?.read) && (
+          <Link to="/orders" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('orders') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+            Órdenes
+          </Link>
+        )}
 
         {isAdmin && (
           <Link to="/dispatch" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('dispatch') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
@@ -98,15 +91,19 @@ const Layout: React.FC = () => {
           </Link>
         )}
 
-        <Link to="/commissions" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('commissions') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">payments</span>
-          Comisiones
-        </Link>
+        {(isAdmin || permissions?.commissions?.read) && (
+          <Link to="/commissions" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('commissions') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">payments</span>
+            Comisiones
+          </Link>
+        )}
 
-        <Link to="/finance" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('finance') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
-          Finanzas
-        </Link>
+        {(isAdmin || permissions?.finance?.read) && (
+          <Link to="/finance" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('finance') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+            Finanzas
+          </Link>
+        )}
 
       </nav>
 

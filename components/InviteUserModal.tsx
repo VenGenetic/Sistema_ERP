@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 interface InviteUserModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onInvite?: () => void;
 }
 
-const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose }) => {
+const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onInvite }) => {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState('onsite');
 
@@ -15,6 +16,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose }) =>
         e.preventDefault();
         // TODO: Implement Supabase invite logic
         console.log("Inviting user:", email, role);
+        onInvite?.();
         onClose();
     };
 

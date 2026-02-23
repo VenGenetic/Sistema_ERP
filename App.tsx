@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 // Lazy load pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));

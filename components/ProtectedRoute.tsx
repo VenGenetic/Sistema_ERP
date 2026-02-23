@@ -1,103 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import SessionTimeoutHandler from './SessionTimeoutHandler';
 
-interface UserProfile {
-    role_id: number | null;
-    roles?: {
-        name: string;
-        permissions: any;
-    };
-}
-
 const ProtectedRoute: React.FC = () => {
-    const [loading, setLoading] = useState(true);
-    const [authenticated, setAuthenticated] = useState(false);
-    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const { loading, authenticated, userProfile, isAdmin, permissions } = useAuth();
     const location = useLocation();
-
-    useEffect(() => {
-        let mounted = true;
-
-        const checkUserAndRole = async () => {
-            try {
-                // Log for debugging
-                console.log("ProtectedRoute: Checking session...");
-
-                // Timeout promise to prevent hanging
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("Session check timed out")), 5000)
-                );
-
-                const sessionPromise = supabase.auth.getSession();
-                const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-
-                if (!session) {
-                    if (mounted) {
-                        setAuthenticated(false);
-                        setLoading(false);
-                    }
-                    return;
-                }
-
-                // Obtener el perfil y el rol del usuario
-                const { data: profile, error } = await supabase
-                    .from('profiles')
-                    .select(`
-                        role_id,
-                        roles (
-                            name,
-                            permissions
-                        )
-                    `)
-                    .eq('id', session.user.id)
-                    .single();
-
-                if (error) {
-                    console.error("ProtectedRoute: Error fetching profile", error);
-                }
-
-                if (mounted) {
-                    console.log("ProtectedRoute: Session found:", !!session);
-                    setAuthenticated(true);
-                    setUserProfile(profile as any);
-                    setLoading(false);
-                }
-            } catch (error) {
-                console.error("ProtectedRoute Error:", error);
-                if (mounted) {
-                    setAuthenticated(false);
-                    setLoading(false);
-                }
-            }
-        };
-
-        checkUserAndRole();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log("ProtectedRoute: Auth state change:", event, !!session);
-            if (event === 'SIGNED_OUT') {
-                if (mounted) {
-                    setAuthenticated(false);
-                    setUserProfile(null);
-                    setLoading(false);
-                }
-            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-                checkUserAndRole();
-            } else if (mounted) {
-                setAuthenticated(!!session);
-                if (!session) {
-                    setLoading(false);
-                }
-            }
-        });
-
-        return () => {
-            mounted = false;
-            subscription.unsubscribe();
-        };
-    }, []);
 
     if (loading) {
         return (
@@ -123,15 +31,30 @@ const ProtectedRoute: React.FC = () => {
         if (!isAllowed) {
             return <Navigate to="/rep-dashboard" replace />;
         }
+        return (
+            <>
+                <SessionTimeoutHandler />
+                <Outlet />
+            </>
+        );
     }
 
-    // Lógica de Autorización Específica (RBAC)
-    const isCloser = userProfile?.roles?.name === 'Closer';
-    const isFinanceRoute = location.pathname.startsWith('/finance');
+    // Default Denial Logic based on permissions JSON
+    const pathSegments = location.pathname.split('/').filter(Boolean);
+    const topLevelRoute = pathSegments[0];
 
-    if (isCloser && isFinanceRoute) {
-        console.warn("Acceso denegado: Los Closers no pueden acceder a Finanzas");
-        return <Navigate to="/" replace />; // Redirigir al Dashboard
+    // Módulos que requieren permisos explícitos en el JSON.
+    const protectedModules = ['team', 'customers', 'products', 'inventory', 'orders', 'dispatch', 'commissions', 'finance', 'settings'];
+
+    if (topLevelRoute && protectedModules.includes(topLevelRoute)) {
+        // If not Admin, check permissions object
+        if (!isAdmin) {
+            const hasAccess = permissions?.[topLevelRoute]?.read === true;
+            if (!hasAccess) {
+                console.warn(`[RBAC] Acceso denegado a módulo: ${topLevelRoute}`);
+                return <Navigate to="/" replace />;
+            }
+        }
     }
 
     return (
