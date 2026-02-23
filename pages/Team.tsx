@@ -41,7 +41,7 @@ const Team: React.FC = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, is_active, avatar_url, roles(name)');
+        .select('*, roles(name, permissions)');
 
       if (error) throw error;
 

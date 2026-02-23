@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Lazy load pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -34,37 +35,39 @@ const LoadingFallback = () => (
 
 const App: React.FC = () => {
   return (
-    <HashRouter>
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/setup" element={<AdminSetup />} />
-          <Route path="/test-connection" element={<TestConnection />} />
-          <Route path="/auth/confirm" element={<AuthConfirm />} />
-          <Route path="/auth/reset-password" element={<ResetPassword />} />
+    <AuthProvider>
+      <HashRouter>
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/setup" element={<AdminSetup />} />
+            <Route path="/test-connection" element={<TestConnection />} />
+            <Route path="/auth/confirm" element={<AuthConfirm />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route path="/pos" element={<POS />} />
-            <Route path="/rep-dashboard" element={<RepDashboard />} />
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="team" element={<Team />} />
-              <Route path="customers" element={<Customers />} />
-              <Route path="products" element={<Products />} />
-              <Route path="inventory" element={<Inventory />} />
-              <Route path="orders/*" element={<Orders />} />
-              <Route path="dispatch" element={<DispatchPipeline />} />
-              <Route path="commissions" element={<CommissionDashboard />} />
-              <Route path="finance/*" element={<Finance />} />
-              <Route path="settings" element={<Settings />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/pos" element={<POS />} />
+              <Route path="/rep-dashboard" element={<RepDashboard />} />
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="team" element={<Team />} />
+                <Route path="customers" element={<Customers />} />
+                <Route path="products" element={<Products />} />
+                <Route path="inventory" element={<Inventory />} />
+                <Route path="orders/*" element={<Orders />} />
+                <Route path="dispatch" element={<DispatchPipeline />} />
+                <Route path="commissions" element={<CommissionDashboard />} />
+                <Route path="finance/*" element={<Finance />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Catch-all 404 Not Found page */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
-    </HashRouter>
+            {/* Catch-all 404 Not Found page */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </HashRouter>
+    </AuthProvider>
   );
 };
 
