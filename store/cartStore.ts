@@ -38,7 +38,6 @@ export interface CartItem {
     unitPrice: number;
     unitCost: number;
     subtotal: number;
-    status: 'in_stock' | 'pending_sourcing' | 'sourced' | 'rejected' | 'shipped' | 'cancelled';
 }
 
 interface CartState {
@@ -51,7 +50,7 @@ interface CartState {
     setCustomer: (customer: Customer) => void;
     setShippingCost: (cost: number) => void;
     setPromoDiscount: (amount: number) => void;
-    addToCart: (item: InventoryResult, status?: 'in_stock' | 'pending_sourcing') => void;
+    addToCart: (item: InventoryResult) => void;
     updateQuantity: (itemId: string, quantity: number) => void;
     updateUnitPrice: (itemId: string, newPrice: number) => void;
     removeFromCart: (itemId: string) => void;
@@ -81,7 +80,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     setPromoDiscount: (amount) => set({ promoDiscount: amount }),
 
-    addToCart: (item: InventoryResult, status: 'in_stock' | 'pending_sourcing' = 'in_stock') => {
+    addToCart: (item: InventoryResult) => {
         const newItemId = crypto.randomUUID();
         const unitCost = item.product.final_cost_with_vat || item.product.cost_without_vat || 0;
 
@@ -94,7 +93,6 @@ export const useCartStore = create<CartState>((set, get) => ({
             unitPrice: item.product.price,
             unitCost: unitCost,
             subtotal: item.product.price,
-            status: status
         };
 
         set((state) => ({ cart: [...state.cart, cartItem] }));

@@ -98,18 +98,6 @@ const Layout: React.FC = () => {
           </Link>
         )}
 
-        {isAdmin && (
-          <Link to="/sourcing" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('sourcing') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">shopping_cart_checkout</span>
-            Sourcing (KM)
-          </Link>
-        )}
-
-        <Link to="/my-orders" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('my-orders') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
-          Mis Ventas
-        </Link>
-
         {(isAdmin || permissions?.finance?.read) && (
           <Link to="/finance" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('finance') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
             <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>

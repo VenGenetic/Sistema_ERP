@@ -5,7 +5,6 @@ import { supabase } from '../supabaseClient';
 import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { PaymentModal } from '../components/pos/PaymentModal';
-import { ImpactPreviewModal } from '../components/pos/ImpactPreviewModal';
 
 const POS: React.FC = () => {
     const navigate = useNavigate();
@@ -40,11 +39,6 @@ const POS: React.FC = () => {
     const [promoValidating, setPromoValidating] = useState(false);
     const [customerDataWarning, setCustomerDataWarning] = useState('');
     const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
-    const [isCreatingDraft, setIsCreatingDraft] = useState(false);
-    const [isImpactPreviewOpen, setIsImpactPreviewOpen] = useState(false);
-    const [previewData, setPreviewData] = useState<any>(null);
-    const [pendingPaymentInfo, setPendingPaymentInfo] = useState<{ paymentAccountId: number, shippingExpenseAccountId?: number | null } | null>(null);
-    const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -302,49 +296,10 @@ const POS: React.FC = () => {
         setSearchQuery('');
     };
 
-    const handleAddToCart = (item: InventoryResult, status: 'in_stock' | 'pending_sourcing' = 'in_stock') => {
-        addToCart(item, status);
+    const handleAddToCart = (item: InventoryResult) => {
+        addToCart(item);
         setSearchQuery('');
         setSearchResults([]);
-    };
-
-    const handleCreateSpecialProduct = async () => {
-        if (!searchQuery.trim()) return;
-        setIsCreatingDraft(true);
-        try {
-            // 1. Create product in DB as draft
-            const { data: draftProduct, error } = await supabase.from('products').insert({
-                sku: `REQ-${Date.now()}`,
-                name: searchQuery.trim(),
-                status: 'draft',
-                price: 0
-            }).select().single();
-
-            if (error) throw error;
-
-            // 2. Add to cart with pending_sourcing status
-            const mappedItem: InventoryResult = {
-                product: {
-                    id: draftProduct.id,
-                    sku: draftProduct.sku,
-                    name: draftProduct.name,
-                    price: draftProduct.price,
-                    cost_without_vat: 0,
-                    vat_percentage: 0,
-                    final_cost_with_vat: 0
-                },
-                warehouse_id: 1, // Default warehouse or dynamic?
-                warehouse_name: 'Bodega Central',
-                current_stock: 0
-            };
-
-            handleAddToCart(mappedItem, 'pending_sourcing');
-        } catch (err) {
-            console.error("Error creating special product:", err);
-            alert("Error al crear producto especial.");
-        } finally {
-            setIsCreatingDraft(false);
-        }
     };
 
     const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
@@ -456,108 +411,45 @@ const POS: React.FC = () => {
         updateUnitPrice(itemId, newPrice);
     };
 
-    const processCheckoutWithPreview = async (paymentAccountId: number, shippingExpenseAccountId?: number | null) => {
-        // Prepare data for Impact Preview
-        const sub = getSubtotal();
-        const tot = getTotal();
-        const itemsWithStatus = cart.map(c => ({
-            name: c.product.name,
-            quantity: c.quantity,
-            status: c.status
-        }));
-
-        const paymentAccountName = paymentAccounts.find(a => a.id === paymentAccountId)?.name || 'Cuenta de Pago';
-
-        // Calculation of Advance vs Revenue
-        let advanceAmount = 0;
-        let revenueAmount = 0;
-        cart.forEach(c => {
-            if (c.status === 'pending_sourcing') {
-                advanceAmount += c.subtotal;
-            } else {
-                revenueAmount += c.subtotal;
-            }
-        });
-
-        // Apply global discount proportionally (simplified for preview)
-        const discountPct = (customer.discount_percentage || 0) / 100;
-        const totalDiscount = (sub * discountPct) + promoDiscount;
-        const netTotal = tot;
-
-        const accountingImpact: any[] = [
-            { account: paymentAccountName, type: 'debit', amount: netTotal },
-            { account: 'Ventas (Netas)', type: 'credit', amount: revenueAmount * (1 - discountPct) - (revenueAmount / sub * promoDiscount) },
-        ];
-
-        if (advanceAmount > 0) {
-            accountingImpact.push({ account: 'Anticipos de Clientes', type: 'credit', amount: advanceAmount * (1 - discountPct) - (advanceAmount / sub * promoDiscount) });
-        }
-
-        if (shippingCost > 0) {
-            accountingImpact.push({ account: 'Ingresos por Envío', type: 'credit', amount: shippingCost });
-        }
-
-        setPreviewData({
-            customerName: customer.name,
-            subtotal: sub,
-            total: netTotal,
-            shippingCost: shippingCost,
-            items: itemsWithStatus,
-            accounting: accountingImpact
-        });
-
-        setPendingPaymentInfo({ paymentAccountId, shippingExpenseAccountId });
-        setIsImpactPreviewOpen(true);
-    };
-
-    const handleConfirmCheckout = async () => {
-        if (!pendingPaymentInfo) return;
-        setIsProcessingCheckout(true);
-        try {
-            await processCheckout(pendingPaymentInfo.paymentAccountId, pendingPaymentInfo.shippingExpenseAccountId);
-            setIsImpactPreviewOpen(false);
-        } catch (err) {
-            // Error already logged/alerted
-        } finally {
-            setIsProcessingCheckout(false);
-        }
-    };
-
     const processCheckout = async (paymentAccountId: number, shippingExpenseAccountId?: number | null) => {
         if (cartRef.current.length === 0) return;
 
-        const itemsPayload = cartRef.current.map(c => ({
-            product_id: c.product.id,
-            warehouse_id: c.warehouse_id,
-            quantity: c.quantity,
-            unit_price: c.unitPrice,
-            unit_cost: c.unitCost,
-            status: c.status
-        }));
+        try {
+            const itemsPayload = cartRef.current.map(c => ({
+                product_id: c.product.id,
+                warehouse_id: c.warehouse_id,
+                quantity: c.quantity,
+                unit_price: c.unitPrice,
+                unit_cost: c.unitCost
+            }));
 
-        const { data, error } = await supabase.rpc('process_pos_sale', {
-            p_customer_id: customer.id,
-            p_payment_account_id: paymentAccountId,
-            p_shipping_cost: shippingCost,
-            p_items: itemsPayload,
-            p_closer_id: promoCloserId || customer.claimed_by || null,
-            p_promo_code: promoCode || null,
-            p_shipping_expense_account_id: shippingExpenseAccountId || null
-        });
+            const { data, error } = await supabase.rpc('process_pos_sale', {
+                p_customer_id: customer.id,
+                p_payment_account_id: paymentAccountId,
+                p_shipping_cost: shippingCost,
+                p_items: itemsPayload,
+                p_closer_id: promoCloserId || customer.claimed_by || null,
+                p_promo_code: promoCode || null,
+                p_shipping_expense_account_id: shippingExpenseAccountId || null
+            });
 
-        if (error) {
-            alert(`Error procesando la venta: ${error.message}`);
-            throw error;
+            if (error) {
+                alert(`Error procesando la venta: ${error.message}`);
+                throw error;
+            }
+
+            alert("¡Venta completada con éxito!");
+            clearCart();
+            setSearchQuery('');
+            setPromoCode('');
+            setPromoCloserName('');
+            setPromoCloserId(null);
+            setPromoError('');
+            setCustomerDataWarning('');
+        } catch (err) {
+            console.error("Checkout failed", err);
+            throw err;
         }
-
-        alert("¡Venta completada con éxito!");
-        clearCart();
-        setSearchQuery('');
-        setPromoCode('');
-        setPromoCloserName('');
-        setPromoCloserId(null);
-        setPromoError('');
-        setCustomerDataWarning('');
     };
 
     const handleSaveDraft = async () => {
@@ -614,15 +506,7 @@ const POS: React.FC = () => {
                 isOpen={isPaymentModalOpen}
                 onClose={() => setIsPaymentModalOpen(false)}
                 paymentAccounts={paymentAccounts}
-                onProcess={processCheckoutWithPreview}
-            />
-
-            <ImpactPreviewModal
-                isOpen={isImpactPreviewOpen}
-                onClose={() => setIsImpactPreviewOpen(false)}
-                onConfirm={handleConfirmCheckout}
-                isProcessing={isProcessingCheckout}
-                data={previewData}
+                onProcess={processCheckout}
             />
 
             {/* Header */}
@@ -726,21 +610,7 @@ const POS: React.FC = () => {
                                     <div className="p-6 text-center text-slate-500">
                                         <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2" />
                                         <p>No se encontraron resultados.</p>
-                                        <div className="mt-4">
-                                            <button
-                                                onClick={handleCreateSpecialProduct}
-                                                disabled={isCreatingDraft}
-                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors disabled:opacity-50"
-                                            >
-                                                {isCreatingDraft ? (
-                                                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                                                ) : (
-                                                    <Package size={18} />
-                                                )}
-                                                Añadir Producto Especial / Borrador
-                                            </button>
-                                        </div>
-                                        <p className="text-xs text-slate-400 mt-2">Esto creará un item pendiente de compra.</p>
+                                        <p className="text-xs text-slate-400 mt-1">Se ha registrado esta demanda.</p>
                                     </div>
                                 ) : null}
                             </div>

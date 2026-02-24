@@ -23,8 +23,6 @@ const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
 const DispatchPipeline = React.lazy(() => import('./pages/DispatchPipeline'));
 const CommissionDashboard = React.lazy(() => import('./pages/CommissionDashboard'));
-const SourcingKanban = React.lazy(() => import('./pages/SourcingKanban'));
-const MyOrdersTracking = React.lazy(() => import('./pages/MyOrdersTracking'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -59,8 +57,6 @@ const App: React.FC = () => {
                 <Route path="orders/*" element={<Orders />} />
                 <Route path="dispatch" element={<DispatchPipeline />} />
                 <Route path="commissions" element={<CommissionDashboard />} />
-                <Route path="sourcing" element={<SourcingKanban />} />
-                <Route path="my-orders" element={<MyOrdersTracking />} />
                 <Route path="finance/*" element={<Finance />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
