@@ -270,26 +270,35 @@ export type Database = {
       }
       order_items: {
         Row: {
+          fulfilled_quantity: number
           id: number
           order_id: number | null
           product_id: number | null
           quantity: number
+          rejection_reason: string | null
+          status: 'in_stock' | 'pending_sourcing' | 'sourced' | 'rejected' | 'shipped' | 'cancelled'
           unit_cost: number
           unit_price: number
         }
         Insert: {
+          fulfilled_quantity?: number
           id?: number
           order_id?: number | null
           product_id?: number | null
           quantity: number
+          rejection_reason?: string | null
+          status?: 'in_stock' | 'pending_sourcing' | 'sourced' | 'rejected' | 'shipped' | 'cancelled'
           unit_cost?: number
           unit_price: number
         }
         Update: {
+          fulfilled_quantity?: number
           id?: number
           order_id?: number | null
           product_id?: number | null
           quantity?: number
+          rejection_reason?: string | null
+          status?: 'in_stock' | 'pending_sourcing' | 'sourced' | 'rejected' | 'shipped' | 'cancelled'
           unit_cost?: number
           unit_price?: number
         }
@@ -328,7 +337,16 @@ export type Database = {
           shipping_cost: number | null
           shipping_expense_account_id: number | null
           shipping_notes: string | null
-          status: string | null
+          status:
+            | "draft"
+            | "quote_sent"
+            | "awaiting_deposit"
+            | "processing"
+            | "partially_fulfilled"
+            | "completed"
+            | "cancelled"
+            | "lost"
+            | null
           total_amount: number | null
           warehouse_id: number | null
         }
@@ -349,7 +367,16 @@ export type Database = {
           shipping_cost?: number | null
           shipping_expense_account_id?: number | null
           shipping_notes?: string | null
-          status?: string | null
+          status?:
+            | "draft"
+            | "quote_sent"
+            | "awaiting_deposit"
+            | "processing"
+            | "partially_fulfilled"
+            | "completed"
+            | "cancelled"
+            | "lost"
+            | null
           total_amount?: number | null
           warehouse_id?: number | null
         }
@@ -370,7 +397,16 @@ export type Database = {
           shipping_cost?: number | null
           shipping_expense_account_id?: number | null
           shipping_notes?: string | null
-          status?: string | null
+          status?:
+            | "draft"
+            | "quote_sent"
+            | "awaiting_deposit"
+            | "processing"
+            | "partially_fulfilled"
+            | "completed"
+            | "cancelled"
+            | "lost"
+            | null
           total_amount?: number | null
           warehouse_id?: number | null
         }
@@ -506,6 +542,7 @@ export type Database = {
           price: number | null
           profit_margin: number | null
           sku: string
+          status: 'active' | 'draft' | 'discontinued'
           strike_count: number | null
           strike_price_candidate: number | null
           vat_percentage: number | null
@@ -521,6 +558,7 @@ export type Database = {
           price?: number | null
           profit_margin?: number | null
           sku: string
+          status?: 'active' | 'draft' | 'discontinued'
           strike_count?: number | null
           strike_price_candidate?: number | null
           vat_percentage?: number | null
@@ -536,6 +574,7 @@ export type Database = {
           price?: number | null
           profit_margin?: number | null
           sku?: string
+          status?: 'active' | 'draft' | 'discontinued'
           strike_count?: number | null
           strike_price_candidate?: number | null
           vat_percentage?: number | null
