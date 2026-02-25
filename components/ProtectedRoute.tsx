@@ -43,10 +43,16 @@ const ProtectedRoute: React.FC = () => {
     const pathSegments = location.pathname.split('/').filter(Boolean);
     const topLevelRoute = pathSegments[0];
 
-    // Módulos que requieren permisos explícitos en el JSON.
+    // Módulos que requieren permisos explícitos
     const protectedModules = ['team', 'customers', 'products', 'inventory', 'orders', 'dispatch', 'commissions', 'finance', 'settings'];
 
-    if (topLevelRoute && protectedModules.includes(topLevelRoute)) {
+    if (topLevelRoute === 'data-steward') {
+        // Solo Admin o Compras / Supply Chain (role_id === 6)
+        if (!isAdmin && userProfile?.role_id !== 6) {
+            console.warn(`[RBAC] Acceso denegado a módulo: ${topLevelRoute}`);
+            return <Navigate to="/" replace />;
+        }
+    } else if (topLevelRoute && protectedModules.includes(topLevelRoute)) {
         // If not Admin, check permissions object
         if (!isAdmin) {
             const hasAccess = permissions?.[topLevelRoute]?.read === true;

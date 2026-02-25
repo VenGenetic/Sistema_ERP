@@ -9,7 +9,7 @@ interface Order {
     id: number;
     customerName: string;
     phone: string;
-    status: 'draft' | 'pending_verification' | 'processing_fulfillment' | 'ready_for_pickup' | 'shipped' | 'completed' | 'cancelled';
+    status: 'draft' | 'quote' | 'pending_verification' | 'processing_fulfillment' | 'ready_for_pickup' | 'shipped' | 'completed' | 'cancelled' | 'lost';
     total: number;
     date: string;
     paymentReceiptUrl?: string;
@@ -22,10 +22,11 @@ interface Order {
 // Kanban Column Config based on strict pipeline
 const columns = [
     { id: 'draft', title: 'Borrador', color: 'bg-gray-100', borderColor: 'border-gray-300', icon: <FileText size={18} className="text-gray-500" /> },
-    { id: 'pending_verification', title: 'Por Verificar Pago', color: 'bg-yellow-50', borderColor: 'border-yellow-300', icon: <MessageCircle size={18} className="text-yellow-500" /> },
-    { id: 'processing_fulfillment', title: 'En Preparación', color: 'bg-purple-50', borderColor: 'border-purple-300', icon: <div className="w-4 h-4 rounded-full bg-purple-500"></div> },
-    { id: 'ready_for_pickup', title: 'Bodega / Mostrador', color: 'bg-blue-50', borderColor: 'border-blue-300', icon: <CheckCircle2 size={18} className="text-blue-500" /> },
-    { id: 'shipped', title: 'Completado', color: 'bg-green-50', borderColor: 'border-green-300', icon: <CheckCircle2 size={18} className="text-green-500" /> },
+    { id: 'quote', title: 'Cotización Enviada', color: 'bg-blue-50', borderColor: 'border-blue-300', icon: <MessageCircle size={18} className="text-blue-500" /> },
+    { id: 'pending_verification', title: 'Cliente Aprobó (Verif. Pago)', color: 'bg-yellow-50', borderColor: 'border-yellow-300', icon: <CheckCircle2 size={18} className="text-yellow-500" /> },
+    { id: 'processing_fulfillment', title: 'En Preparación / Parcial', color: 'bg-purple-50', borderColor: 'border-purple-300', icon: <div className="w-4 h-4 rounded-full bg-purple-500"></div> },
+    { id: 'ready_for_pickup', title: 'Bodega / Mostrador', color: 'bg-indigo-50', borderColor: 'border-indigo-300', icon: <CheckCircle2 size={18} className="text-indigo-500" /> },
+    { id: 'completed', title: 'Completado', color: 'bg-green-50', borderColor: 'border-green-300', icon: <CheckCircle2 size={18} className="text-green-500" /> },
 ];
 
 const Orders: React.FC = () => {
@@ -67,6 +68,7 @@ const Orders: React.FC = () => {
                     )
                 `)
                 .neq('status', 'cancelled')
+                .neq('status', 'lost')
                 .order('created_at', { ascending: false });
 
             // If not admin, only fetch their own drafts/orders
@@ -82,7 +84,7 @@ const Orders: React.FC = () => {
                     id: o.id,
                     customerName: o.customers?.name || 'Cliente Desconocido',
                     phone: o.customers?.phone || '',
-                    status: o.status,
+                    status: (o.status === 'shipped' ? 'completed' : o.status) as Order['status'], // Map shipped to completed for view
                     total: o.total_amount,
                     shippingCost: o.shipping_cost || 0,
                     shippingAddress: o.shipping_address || '',
@@ -109,8 +111,26 @@ const Orders: React.FC = () => {
         }
     };
 
-    const isDraft = selectedOrder?.status === 'draft';
-    const canConvert = isDraft; // Only drafts can be modified with shipment/payments
+    const isDraft = selectedOrder?.status === 'draft' || selectedOrder?.status === 'quote';
+    const canConvert = isDraft; // Drafts and Quotes can be modified with shipment/payments
+
+    // Convert Draft to "Quote Sent"
+    const handleSendQuote = async () => {
+        if (!selectedOrder) return;
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({ status: 'quote' })
+                .eq('id', selectedOrder.id);
+            if (error) throw error;
+            alert("Cotización marcada como enviada.");
+            setIsModalOpen(false);
+            fetchOrders();
+        } catch (error: any) {
+            console.error("Error updating quote:", error);
+            alert("Error al actualizar estado: " + error.message);
+        }
+    };
 
     // Load an order into modal
     const handleViewOrder = (order: Order) => {
@@ -233,7 +253,7 @@ const Orders: React.FC = () => {
                                         <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">{order.customerName}</h3>
                                         <div className="flex items-center gap-1 text-slate-500 mb-3">
                                             <MessageCircle size={12} />
-                                            <span className="text-xs font-mono">{order.phone}</span>
+                                            <span className="text-xs font-mono">{order.phone || 'Sin Teléfono'}</span>
                                         </div>
                                         <div className="border-t border-slate-100 dark:border-slate-800 pt-3 flex justify-between items-center">
                                             <span className="text-xs text-slate-500 font-medium">Total:</span>
@@ -389,13 +409,22 @@ const Orders: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-2">
+                                        {selectedOrder?.status === 'draft' && (
+                                            <button
+                                                onClick={handleSendQuote}
+                                                disabled={selectedOrder.items.length === 0}
+                                                className="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg font-bold shadow-md transition-colors text-sm"
+                                            >
+                                                Marcar como Cotización Enviada
+                                            </button>
+                                        )}
                                         {canConvert && (
                                             <button
                                                 onClick={handleProcessSale}
-                                                disabled={selectedOrder.items.length === 0}
+                                                disabled={selectedOrder.items.length === 0 || !bankRef || !receiptPreview}
                                                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white py-3 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors mt-2"
                                             >
-                                                <span>🔒 Convertir a Verificación</span>
+                                                <span>🔒 Cliente Aprobó (Verificar)</span>
                                             </button>
                                         )}
                                         {!canConvert && (

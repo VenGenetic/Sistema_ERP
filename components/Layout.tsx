@@ -17,7 +17,7 @@ import {
 
 const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isAdmin, permissions } = useAuth();
+  const { isAdmin, permissions, userProfile } = useAuth();
   const location = useLocation();
 
   // Cerrar menú móvil al cambiar de ruta
@@ -95,6 +95,13 @@ const Layout: React.FC = () => {
           <Link to="/commissions" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('commissions') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
             <span className="material-symbols-outlined text-[20px]">payments</span>
             Comisiones
+          </Link>
+        )}
+
+        {(isAdmin || userProfile?.role_id === 6) && (
+          <Link to="/data-steward" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('data-steward') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">database</span>
+            Data Steward
           </Link>
         )}
 

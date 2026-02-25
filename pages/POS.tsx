@@ -40,6 +40,12 @@ const POS: React.FC = () => {
     const [customerDataWarning, setCustomerDataWarning] = useState('');
     const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
 
+    // Draft Product State
+    const [isDraftProductModalOpen, setIsDraftProductModalOpen] = useState(false);
+    const [draftProductName, setDraftProductName] = useState('');
+    const [draftProductPrice, setDraftProductPrice] = useState('');
+    const [draftCreating, setDraftCreating] = useState(false);
+
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -296,6 +302,53 @@ const POS: React.FC = () => {
         setSearchQuery('');
     };
 
+    const handleCreateDraftProduct = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setDraftCreating(true);
+
+        try {
+            const newSku = `DRAFT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+            const { data, error } = await supabase.from('products').insert([{
+                name: draftProductName.trim().toUpperCase() || 'PRODUCTO DRAFT',
+                sku: newSku,
+                price: parseFloat(draftProductPrice) || 0,
+                cost_without_vat: 0,
+                status: 'draft',
+                demand_count: 1
+            }]).select().single();
+
+            if (error || !data) throw error;
+
+            const mappedProduct: Product = {
+                id: data.id,
+                sku: data.sku,
+                name: data.name,
+                price: data.price,
+                cost_without_vat: data.cost_without_vat,
+                vat_percentage: 12, // default
+                final_cost_with_vat: 0
+            };
+
+            addToCart({
+                product: mappedProduct,
+                warehouse_id: 0, // 0 for draft / no warehouse
+                warehouse_name: 'Borrador (Sourcing Obj)',
+                current_stock: 0
+            });
+
+            setIsDraftProductModalOpen(false);
+            setSearchQuery('');
+            setSearchResults([]);
+            setDraftProductName('');
+            setDraftProductPrice('');
+        } catch (err: any) {
+            console.error(err);
+            alert("Error creando producto draft.");
+        } finally {
+            setDraftCreating(false);
+        }
+    };
+
     const handleAddToCart = (item: InventoryResult) => {
         addToCart(item);
         setSearchQuery('');
@@ -499,6 +552,7 @@ const POS: React.FC = () => {
     // Derived State from Zustand
     const subtotal = getSubtotal();
     const orderTotal = getTotal();
+    const hasDraftItems = cart.some(item => item.product.sku.startsWith('DRAFT-'));
 
     return (
         <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-slate-800 font-sans">
@@ -610,7 +664,17 @@ const POS: React.FC = () => {
                                     <div className="p-6 text-center text-slate-500">
                                         <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2" />
                                         <p>No se encontraron resultados.</p>
-                                        <p className="text-xs text-slate-400 mt-1">Se ha registrado esta demanda.</p>
+                                        <p className="text-xs text-slate-400 mt-1 mb-4">Se ha registrado esta demanda automáticamente.</p>
+                                        <button
+                                            onClick={() => {
+                                                setDraftProductName(searchQuery);
+                                                setIsDraftProductModalOpen(true);
+                                                setSearchResults([]);
+                                            }}
+                                            className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold py-2 px-4 rounded-lg outline-none transition-colors border border-amber-300"
+                                        >
+                                            Crear Producto Draft (Cotización)
+                                        </button>
                                     </div>
                                 ) : null}
                             </div>
@@ -882,11 +946,17 @@ const POS: React.FC = () => {
                         </button>
                         <button
                             onClick={handleCheckoutClick}
-                            disabled={cart.length === 0 || isSearching}
+                            disabled={cart.length === 0 || isSearching || hasDraftItems}
                             className="w-full h-16 md:h-20 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl md:text-2xl uppercase rounded-xl shadow-lg transition-transform active:scale-95 flex flex-col items-center justify-center gap-0.5"
                         >
                             <span>Facturar</span>
-                            <span className="text-[10px] md:text-xs font-semibold opacity-70 tracking-wider hidden md:inline">(F12)</span>
+                            {hasDraftItems ? (
+                                <span className="text-[10px] md:text-xs font-semibold uppercase tracking-wider bg-red-500 px-2 py-0.5 rounded text-white mt-1">
+                                    No Facturable (Contiene Drafts)
+                                </span>
+                            ) : (
+                                <span className="text-[10px] md:text-xs font-semibold opacity-70 tracking-wider hidden md:inline">(F12)</span>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -1036,6 +1106,59 @@ const POS: React.FC = () => {
                                 className="w-full py-3 px-4 bg-amber-500 text-white font-black uppercase rounded-lg hover:bg-amber-600 shadow-md transition-all active:scale-95"
                             >
                                 Registrar Demanda
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Draft Product Modal */}
+            {isDraftProductModalOpen && (
+                <div className="fixed inset-0 z-[160] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-blue-50">
+                            <h2 className="font-bold text-blue-800 uppercase tracking-tight flex items-center gap-2">
+                                <Package className="w-5 h-5" />
+                                Crear Draft Product
+                            </h2>
+                            <button onClick={() => setIsDraftProductModalOpen(false)} className="text-blue-500 hover:text-blue-800 font-bold px-2 py-1 rounded hover:bg-blue-200 transition-colors">
+                                ✕
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreateDraftProduct} className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre (Obligatorio)</label>
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    required
+                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-blue-500 outline-none uppercase"
+                                    placeholder="Ej: SENSOR ABS DELANTERO"
+                                    value={draftProductName}
+                                    onChange={(e) => setDraftProductName(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Precio Estimado Venta ($) (Opcional)</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-blue-500 outline-none"
+                                    placeholder="Ej: 45.00"
+                                    value={draftProductPrice}
+                                    onChange={(e) => setDraftProductPrice(e.target.value)}
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1">Este producto entrará como 'Draft' para ser validado por el equipo de Compras.</p>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={draftCreating || !draftProductName.trim()}
+                                className="w-full py-3 px-4 bg-blue-600 disabled:bg-blue-300 text-white font-black uppercase rounded-lg hover:bg-blue-700 shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                {draftCreating ? 'Creando...' : 'Agregar a Cotización'}
                             </button>
                         </form>
                     </div>
