@@ -102,9 +102,10 @@ const Inventory: React.FC = () => {
 
     // Data states
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-    const [stockItems, setStockItems] = useState<StockItem[]>([]);
+    const [stockItems, setStockItems] = useState<any[]>([]);
     const [movements, setMovements] = useState<Movement[]>([]);
     const [loading, setLoading] = useState(false);
+    const [exportLoading, setExportLoading] = useState(false);
 
     // ──────────────────────────────────────────────
     // 3. DEBOUNCED SEARCH EFFECT
@@ -192,56 +193,55 @@ const Inventory: React.FC = () => {
                 setStockItems(filtered.slice(from, to));
             } else {
                 // ── Standard server-side paginated query ──
-                // We query inventory_levels and apply filters via the nested products relation
+                // We query products and join inventory_levels to ensure grouping by product
                 let selectStr = `
-                    id, warehouse_id, current_stock, product_id,
-                    products${selectedWarehouseId ? '!inner' : ''} (
-                        id, name, sku, category, min_stock_threshold, brand_id, profit_margin, price,
-                        cost_without_vat, vat_percentage,
-                        brands (name)
-                    ),
-                    warehouses (name)
+                    id, name, sku, category, min_stock_threshold, profit_margin, price,
+                    cost_without_vat, vat_percentage,
+                    brands${filters.brand ? '!inner' : ''} (name),
+                    inventory_levels${selectedWarehouseId ? '!inner' : ''} (
+                        id, current_stock, warehouse_id,
+                        warehouses (name)
+                    )
                 `;
 
                 let query = supabase
-                    .from('inventory_levels')
+                    .from('products')
                     .select(selectStr, { count: 'exact' });
 
-                // Warehouse filter
+                // Warehouse filter (applied to the nested relation via !inner in select)
                 if (selectedWarehouseId) {
-                    query = query.eq('warehouse_id', selectedWarehouseId);
+                    query = query.eq('inventory_levels.warehouse_id', selectedWarehouseId);
                 }
 
-                // Global Search (OR across product name and sku via products relation)
+                // Search (applied to products)
                 if (searchTerm) {
-                    query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`, { referencedTable: 'products' });
+                    query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
                 }
 
-                // Column Filters (AND logic, applied to the products relation)
+                // Column Filters
                 if (filters.product) {
-                    query = query.ilike('products.name', `%${filters.product}%`);
+                    query = query.ilike('name', `%${filters.product}%`);
                 }
                 if (filters.sku) {
-                    query = query.ilike('products.sku', `%${filters.sku}%`);
+                    query = query.ilike('sku', `%${filters.sku}%`);
                 }
                 if (filters.brand) {
-                    // Brand filter is trickier with nested relation – we use textSearch on a computed field
-                    // For now, we'll handle brand filtering client-side after fetch
+                    query = query.ilike('brands.name', `%${filters.brand}%`);
                 }
 
                 // Sorting
                 const isAscending = sortConfig.direction === 'asc';
                 if (sortConfig.key === 'product') {
-                    query = query.order('name', { referencedTable: 'products', ascending: isAscending });
+                    query = query.order('name', { ascending: isAscending });
                 } else if (sortConfig.key === 'sku') {
-                    query = query.order('sku', { referencedTable: 'products', ascending: isAscending });
-                } else if (sortConfig.key === 'stock') {
-                    query = query.order('current_stock', { ascending: isAscending });
+                    query = query.order('sku', { ascending: isAscending });
+                } else if (sortConfig.key === 'brand') {
+                    query = query.order('name', { referencedTable: 'brands', ascending: isAscending });
                 } else {
-                    query = query.order('product_id', { ascending: isAscending });
+                    query = query.order('id', { ascending: isAscending });
                 }
 
-                // Pagination (range is 0-indexed)
+                // Pagination
                 const from = (currentPage - 1) * pagination.pageSize;
                 const to = from + pagination.pageSize - 1;
                 query = query.range(from, to);
@@ -251,17 +251,7 @@ const Inventory: React.FC = () => {
 
                 if (error) throw error;
 
-                // Apply client-side brand filter if needed
-                let items = (data || []) as unknown as StockItem[];
-                if (filters.brand) {
-                    const brandFilter = filters.brand.toLowerCase();
-                    items = items.filter(item =>
-                        (item.products?.brands?.name?.toLowerCase() || '').includes(brandFilter)
-                    );
-                }
-
-                // @ts-ignore
-                setStockItems(items);
+                setStockItems(data || []);
                 if (count !== null) {
                     setPagination(prev => ({ ...prev, totalRecords: count }));
                 }
@@ -364,68 +354,113 @@ const Inventory: React.FC = () => {
     // GROUPING (works on paginated data)
     // ──────────────────────────────────────────────
     const groupedStockItems = useMemo(() => {
-        const groups = new Map<number, any>();
-        stockItems.forEach(item => {
-            if (!groups.has(item.product_id)) {
-                groups.set(item.product_id, {
-                    product_id: item.product_id,
-                    product: item.products,
-                    global_stock: 0,
-                    details: []
-                });
-            }
-            const group = groups.get(item.product_id)!;
-            group.global_stock += item.current_stock;
-            group.details.push(item);
+        return stockItems.map(item => {
+            const levels = (item.inventory_levels || []);
+            const globalStock = levels.reduce((sum: number, il: any) => sum + il.current_stock, 0);
+
+            return {
+                product_id: item.id,
+                product: item,
+                global_stock: globalStock,
+                details: levels
+            };
         });
-        return Array.from(groups.values());
     }, [stockItems]);
 
     // Export current stock view to Excel using the same format as the import template
-    const handleExportToExcel = () => {
-        const ivaMult = 1 + exportIvaPercent / 100;
+    const handleExportToExcel = async () => {
+        setExportLoading(true);
+        try {
+            const ivaMult = 1 + exportIvaPercent / 100;
 
-        const exportData = groupedStockItems.map(group => {
-            const costWithoutVat = group.product?.cost_without_vat ?? null;
-            const storedVat = group.product?.vat_percentage ?? exportIvaPercent;
-            // Costo C/IVA stored in DB = cost_without_vat * (1 + storedVat/100)
-            const costWithVat = costWithoutVat !== null
-                ? parseFloat((costWithoutVat * (1 + storedVat / 100)).toFixed(4))
-                : null;
-            // Back-calculate Costo S/I using the user-supplied IVA %
-            const costoSinIva = costWithVat !== null
-                ? parseFloat((costWithVat / ivaMult).toFixed(4))
-                : '';
+            // 1. Fetch ALL matching products (no pagination)
+            let selectStr = `
+                id, name, sku, category, min_stock_threshold, profit_margin, price,
+                cost_without_vat, vat_percentage,
+                brands!inner (name),
+                inventory_levels (
+                    id, current_stock, warehouse_id,
+                    warehouses (name)
+                )
+            `;
 
-            return {
-                'SKU': group.product?.sku || '',
-                'Nombre': group.product?.name || '',
-                'Cantidad': group.global_stock,
-                'Costo S/I': costoSinIva,
-                'Costo Desc.': '',
-                'Margen': group.product?.profit_margin ?? 0.30,
-                'Costo C/IVA': costWithVat ?? '',
-            };
-        });
+            let query = supabase
+                .from('products')
+                .select(selectStr);
 
-        const ws = utils.json_to_sheet(exportData, {
-            header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen', 'Costo C/IVA']
-        });
+            // Same filters as fetchStockData
+            if (selectedWarehouseId) {
+                query = query.eq('inventory_levels.warehouse_id', selectedWarehouseId);
+            }
+            if (searchTerm) {
+                query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+            }
+            if (filters.product) {
+                query = query.ilike('name', `%${filters.product}%`);
+            }
+            if (filters.sku) {
+                query = query.ilike('sku', `%${filters.sku}%`);
+            }
+            if (filters.brand) {
+                query = query.ilike('brands.name', `%${filters.brand}%`);
+            }
 
-        ws['!cols'] = [
-            { wch: 20 }, // SKU
-            { wch: 40 }, // Nombre
-            { wch: 12 }, // Cantidad
-            { wch: 14 }, // Costo S/I
-            { wch: 14 }, // Costo Desc.
-            { wch: 10 }, // Margen
-            { wch: 14 }, // Costo C/IVA
-        ];
+            // Same sorting
+            const isAscending = sortConfig.direction === 'asc';
+            if (sortConfig.key === 'product') {
+                query = query.order('name', { ascending: isAscending });
+            } else if (sortConfig.key === 'sku') {
+                query = query.order('sku', { ascending: isAscending });
+            } else if (sortConfig.key === 'brand') {
+                query = query.order('name', { referencedTable: 'brands', ascending: isAscending });
+            } else {
+                query = query.order('id', { ascending: isAscending });
+            }
 
-        const wb = utils.book_new();
-        utils.book_append_sheet(wb, ws, 'Inventario');
-        writeFile(wb, `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        setShowExportModal(false);
+            const { data, error } = await query;
+            if (error) throw error;
+
+            // 2. Map to export data
+            const exportData = (data || []).map(product => {
+                const globalStock = (product.inventory_levels || []).reduce((sum: number, il: any) => sum + il.current_stock, 0);
+                const costWithoutVat = product.cost_without_vat ?? null;
+                const storedVat = product.vat_percentage ?? exportIvaPercent;
+                const costWithVat = costWithoutVat !== null
+                    ? parseFloat((costWithoutVat * (1 + storedVat / 100)).toFixed(4))
+                    : null;
+                const costoSinIva = costWithVat !== null
+                    ? parseFloat((costWithVat / ivaMult).toFixed(4))
+                    : '';
+
+                return {
+                    'SKU': product.sku || '',
+                    'Nombre': product.name || '',
+                    'Cantidad': globalStock,
+                    'Costo S/I': costoSinIva,
+                    'Costo Desc.': '',
+                    'Margen': product.profit_margin ?? 0.30,
+                    'Costo C/IVA': costWithVat ?? '',
+                };
+            });
+
+            const ws = utils.json_to_sheet(exportData, {
+                header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen', 'Costo C/IVA']
+            });
+
+            ws['!cols'] = [
+                { wch: 20 }, { wch: 40 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 14 },
+            ];
+
+            const wb = utils.book_new();
+            utils.book_append_sheet(wb, ws, 'Inventario');
+            writeFile(wb, `inventario_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            alert('Error al exportar los datos. Por favor, intente de nuevo.');
+        } finally {
+            setExportLoading(false);
+            setShowExportModal(false);
+        }
     };
 
     const handleWarehouseClick = (warehouseId: number) => {
@@ -510,10 +545,13 @@ const Inventory: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleExportToExcel}
-                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                                disabled={exportLoading}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
                             >
-                                <span className="material-symbols-outlined text-[18px]">download</span>
-                                Descargar
+                                <span className={`material-symbols-outlined text-[18px] ${exportLoading ? 'animate-spin' : ''}`}>
+                                    {exportLoading ? 'progress_activity' : 'download'}
+                                </span>
+                                {exportLoading ? 'Exportando...' : 'Descargar'}
                             </button>
                         </div>
                     </div>
@@ -588,11 +626,14 @@ const Inventory: React.FC = () => {
                             <>
                                 <button
                                     onClick={() => setShowExportModal(true)}
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                                    disabled={exportLoading}
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50"
                                     title="Exportar inventario visible como Excel (mismo formato que importación)"
                                 >
-                                    <span className="material-symbols-outlined text-[18px] text-emerald-600">table_view</span>
-                                    Exportar Excel
+                                    <span className={`material-symbols-outlined text-[18px] text-emerald-600 ${exportLoading ? 'animate-spin' : ''}`}>
+                                        {exportLoading ? 'progress_activity' : 'table_view'}
+                                    </span>
+                                    {exportLoading ? 'Exportando...' : 'Exportar Excel'}
                                 </button>
                                 <button
                                     onClick={handleNewProduct}
