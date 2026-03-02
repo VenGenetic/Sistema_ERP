@@ -76,7 +76,7 @@ erDiagram
         int id PK
         int partner_id FK
         int warehouse_id FK
-        order_status_enum status "Borrador|Pendiente_Pago|Listo_Cumplimiento|Sourcing_Pendiente|Alerta_Margen|En_Transito|Entregado|RMA_Pendiente|Cancelado|Reembolsado"
+        string status
         numeric total_amount
         timestamp created_at
         int customer_id FK
@@ -113,7 +113,7 @@ erDiagram
     }
     products {
         int id PK
-        string sku "NULLABLE - auto DRFT-xxx for drafts"
+        string sku
         string name
         string category
         int min_stock_threshold
@@ -125,7 +125,7 @@ erDiagram
         numeric profit_margin
         bigint brand_id FK
         numeric price
-        string status "draft | official"
+        string status
         string reference_image_url
     }
     profiles {
@@ -182,10 +182,9 @@ erDiagram
         uuid sales_user_id FK
         int order_id FK
         numeric amount
-        commission_type_enum type "credit | clawback"
-        commission_status_enum status "pending | vested | paid"
-        timestamptz vesting_date "DEFAULT now + 30 days"
-        timestamptz created_at
+        string type
+        string status
+        timestamp vesting_date
     }
 
     brands ||--o{ products : owns

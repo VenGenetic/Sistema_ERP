@@ -60,7 +60,7 @@ const DispatchPipeline: React.FC = () => {
                         profiles!orders_closer_id_fkey (full_name),
                         customers (name, phone)
                     `)
-                    .eq('status', 'pending_verification')
+                    .eq('status', 'Pendiente_Pago')
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
@@ -116,7 +116,7 @@ const DispatchPipeline: React.FC = () => {
                         id, status, total_amount, shipping_cost, bank_reference_code, created_at,
                         customers (name, phone)
                     `)
-                    .eq('status', 'processing_fulfillment')
+                    .eq('status', 'Listo_Cumplimiento')
                     .order('created_at', { ascending: true });
 
                 if (error) throw error;
@@ -148,7 +148,7 @@ const DispatchPipeline: React.FC = () => {
             // Update order status, triggering M4 (via future logic or manually handling it)
             const { error } = await supabase
                 .from('orders')
-                .update({ status: 'processing_fulfillment' })
+                .update({ status: 'Listo_Cumplimiento' })
                 .eq('id', selectedAuditOrder.id);
 
             if (error) throw error;
@@ -173,7 +173,7 @@ const DispatchPipeline: React.FC = () => {
         try {
             const { error } = await supabase
                 .from('orders')
-                .update({ status: 'draft', bank_reference_code: null, payment_receipt_url: null })
+                .update({ status: 'Borrador', bank_reference_code: null, payment_receipt_url: null })
                 .eq('id', selectedAuditOrder.id);
 
             if (error) throw error;
@@ -187,7 +187,7 @@ const DispatchPipeline: React.FC = () => {
 
     const handleMarkShipped = async (orderId: number) => {
         try {
-            const { error } = await supabase.from('orders').update({ status: 'shipped' }).eq('id', orderId);
+            const { error } = await supabase.from('orders').update({ status: 'En_Transito' }).eq('id', orderId);
             if (error) throw error;
             alert("Orden marcada como enviada/entregada!");
             fetchData();

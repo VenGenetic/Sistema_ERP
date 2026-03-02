@@ -116,7 +116,7 @@ const Dashboard: React.FC = () => {
                             time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             user: (o.profiles as any)?.full_name || 'Cliente Web',
                             detail: `Pedido ${o.status}`,
-                            status: o.status === 'completed' ? 'Completado' : 'Pendiente',
+                            status: o.status === 'Entregado' ? 'Completado' : 'Pendiente',
                             amount: `$${Number(o.total_amount).toFixed(2)}`,
                             timestamp: date.getTime()
                         });

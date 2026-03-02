@@ -9,7 +9,7 @@ interface Order {
     id: number;
     customerName: string;
     phone: string;
-    status: 'draft' | 'quote' | 'pending_verification' | 'processing_fulfillment' | 'ready_for_pickup' | 'shipped' | 'completed' | 'cancelled' | 'lost';
+    status: 'Borrador' | 'Pendiente_Pago' | 'Listo_Cumplimiento' | 'Sourcing_Pendiente' | 'Alerta_Margen' | 'En_Transito' | 'Entregado' | 'RMA_Pendiente' | 'Cancelado' | 'Reembolsado';
     total: number;
     date: string;
     paymentReceiptUrl?: string;
@@ -21,12 +21,11 @@ interface Order {
 
 // Kanban Column Config based on strict pipeline
 const columns = [
-    { id: 'draft', title: 'Borrador', color: 'bg-gray-100', borderColor: 'border-gray-300', icon: <FileText size={18} className="text-gray-500" /> },
-    { id: 'quote', title: 'Cotización Enviada', color: 'bg-blue-50', borderColor: 'border-blue-300', icon: <MessageCircle size={18} className="text-blue-500" /> },
-    { id: 'pending_verification', title: 'Cliente Aprobó (Verif. Pago)', color: 'bg-yellow-50', borderColor: 'border-yellow-300', icon: <CheckCircle2 size={18} className="text-yellow-500" /> },
-    { id: 'processing_fulfillment', title: 'En Preparación / Parcial', color: 'bg-purple-50', borderColor: 'border-purple-300', icon: <div className="w-4 h-4 rounded-full bg-purple-500"></div> },
-    { id: 'ready_for_pickup', title: 'Bodega / Mostrador', color: 'bg-indigo-50', borderColor: 'border-indigo-300', icon: <CheckCircle2 size={18} className="text-indigo-500" /> },
-    { id: 'completed', title: 'Completado', color: 'bg-green-50', borderColor: 'border-green-300', icon: <CheckCircle2 size={18} className="text-green-500" /> },
+    { id: 'Borrador', title: 'Borrador / Cotización', color: 'bg-gray-100', borderColor: 'border-gray-300', icon: <FileText size={18} className="text-gray-500" /> },
+    { id: 'Pendiente_Pago', title: 'Cliente Aprobó (Verif. Pago)', color: 'bg-yellow-50', borderColor: 'border-yellow-300', icon: <CheckCircle2 size={18} className="text-yellow-500" /> },
+    { id: 'Listo_Cumplimiento', title: 'En Preparación / Parcial', color: 'bg-purple-50', borderColor: 'border-purple-300', icon: <div className="w-4 h-4 rounded-full bg-purple-500"></div> },
+    { id: 'En_Transito', title: 'Bodega / Mostrador', color: 'bg-indigo-50', borderColor: 'border-indigo-300', icon: <CheckCircle2 size={18} className="text-indigo-500" /> },
+    { id: 'Entregado', title: 'Completado', color: 'bg-green-50', borderColor: 'border-green-300', icon: <CheckCircle2 size={18} className="text-green-500" /> },
 ];
 
 const Orders: React.FC = () => {
@@ -67,8 +66,7 @@ const Orders: React.FC = () => {
                         products (name, sku)
                     )
                 `)
-                .neq('status', 'cancelled')
-                .neq('status', 'lost')
+                .neq('status', 'Cancelado')
                 .order('created_at', { ascending: false });
 
             // If not admin, only fetch their own drafts/orders
@@ -84,7 +82,7 @@ const Orders: React.FC = () => {
                     id: o.id,
                     customerName: o.customers?.name || 'Cliente Desconocido',
                     phone: o.customers?.phone || '',
-                    status: (o.status === 'shipped' ? 'completed' : o.status) as Order['status'], // Map shipped to completed for view
+                    status: (o.status === 'En_Transito' ? 'Entregado' : o.status) as Order['status'], // Map in-transit to completed for view if needed, but 'Entregado' is there
                     total: o.total_amount,
                     shippingCost: o.shipping_cost || 0,
                     shippingAddress: o.shipping_address || '',
@@ -111,7 +109,7 @@ const Orders: React.FC = () => {
         }
     };
 
-    const isDraft = selectedOrder?.status === 'draft' || selectedOrder?.status === 'quote';
+    const isDraft = selectedOrder?.status === 'Borrador';
     const canConvert = isDraft; // Drafts and Quotes can be modified with shipment/payments
 
     // Convert Draft to "Quote Sent"
@@ -120,7 +118,7 @@ const Orders: React.FC = () => {
         try {
             const { error } = await supabase
                 .from('orders')
-                .update({ status: 'quote' })
+                .update({ status: 'Borrador' })
                 .eq('id', selectedOrder.id);
             if (error) throw error;
             alert("Cotización marcada como enviada.");
@@ -184,7 +182,7 @@ const Orders: React.FC = () => {
             const { error } = await supabase
                 .from('orders')
                 .update({
-                    status: 'pending_verification',
+                    status: 'Pendiente_Pago',
                     bank_reference_code: bankRef,
                     payment_receipt_url: receiptPreview,
                     shipping_address: shippingAddress,
@@ -244,7 +242,7 @@ const Orders: React.FC = () => {
                                     <div
                                         key={order.id}
                                         onClick={() => handleViewOrder(order)}
-                                        className={`bg-white dark:bg-[#0c1117] p-4 rounded-lg shadow-sm border ${order.status === 'draft' ? 'border-slate-200 hover:border-blue-400' : 'border-slate-200/50 hover:border-slate-400 opacity-90'} dark:border-slate-800 cursor-pointer transition-colors group`}
+                                        className={`bg-white dark:bg-[#0c1117] p-4 rounded-lg shadow-sm border ${order.status === 'Borrador' ? 'border-slate-200 hover:border-blue-400' : 'border-slate-200/50 hover:border-slate-400 opacity-90'} dark:border-slate-800 cursor-pointer transition-colors group`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-xs font-mono text-slate-500 group-hover:text-blue-500 transition-colors">#{order.id}</span>
@@ -409,7 +407,7 @@ const Orders: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-2">
-                                        {selectedOrder?.status === 'draft' && (
+                                        {selectedOrder?.status === 'Borrador' && (
                                             <button
                                                 onClick={handleSendQuote}
                                                 disabled={selectedOrder.items.length === 0}
