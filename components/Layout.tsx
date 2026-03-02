@@ -153,14 +153,15 @@ const Layout: React.FC = () => {
 
           {/* Admin POS Auto-Access Button */}
           {isAdmin && (
-            <Link
-              to="/pos"
+            <a
+              href={`${window.location.pathname}#/pos`}
               target="_blank"
+              rel="noopener noreferrer"
               className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-semibold transition-colors shadow-sm"
             >
               <span className="material-symbols-outlined text-[18px]">point_of_sale</span>
               <span>Abrir Caja (POS)</span>
-            </Link>
+            </a>
           )}
 
           <div className="relative hidden md:block w-64">
