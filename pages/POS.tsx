@@ -97,22 +97,19 @@ const POS: React.FC = () => {
             const { data: order, error: orderError } = await supabase
                 .from('orders')
                 .select(`
-                    id, status, customer_id, shipping_cost,
+                    id, status, customer_id, shipping_cost, warehouse_id,
                     customers (id, identification_number, name, email, phone, is_final_consumer, customer_type, discount_percentage, claimed_by),
                     order_items (
-                        id, quantity, unit_price,
-                        product_id,
-                        products (id, sku, name, price, cost_without_vat, vat_percentage),
-                        warehouse_id
+                        id, quantity, unit_price, unit_cost,
+                        products (id, sku, name, price, cost_without_vat, vat_percentage)
                     )
                 `)
                 .eq('id', draftId)
-                .eq('status', 'Borrador')
                 .single();
 
             if (orderError || !order) {
                 console.error('Error loading draft:', orderError);
-                alert('No se pudo cargar el borrador. Puede que ya no exista o no sea un borrador.');
+                alert('No se pudo cargar el borrador. Puede que ya no exista.');
                 setLoadingDraft(false);
                 return;
             }
@@ -143,6 +140,7 @@ const POS: React.FC = () => {
 
             // Add each item to cart
             const items = order.order_items as any[];
+            const orderWarehouseId = (order as any).warehouse_id || 0;
             if (items) {
                 for (const item of items) {
                     const p = item.products as any;
@@ -162,9 +160,9 @@ const POS: React.FC = () => {
                             vat_percentage: vat,
                             final_cost_with_vat: finalCost,
                         },
-                        warehouse_id: item.warehouse_id || 0,
-                        warehouse_name: '', // Will show as empty but functional
-                        current_stock: 999, // Draft items don't need stock check
+                        warehouse_id: orderWarehouseId,
+                        warehouse_name: 'Borrador',
+                        current_stock: 999,
                     };
 
                     addToCart(inventoryResult);
