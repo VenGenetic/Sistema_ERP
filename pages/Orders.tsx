@@ -306,7 +306,7 @@ const Orders: React.FC = () => {
                                     <div className="bg-slate-50 dark:bg-[#161b22] px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                                         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Productos Seleccionados</h3>
                                         {isDraft && (
-                                            <button onClick={() => alert("Próximamente: Redirección al POS con ?draft_id=" + selectedOrder.id)} className="text-xs font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                                            <button onClick={() => { setIsModalOpen(false); navigate('/pos?draft_id=' + selectedOrder.id); }} className="text-xs font-bold text-blue-600 flex items-center gap-1 hover:underline">
                                                 <Edit size={14} /> Editar en POS
                                             </button>
                                         )}

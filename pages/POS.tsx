@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, DollarSign, AlertTriangle, ArrowLeft, LogOut, Package, Search, Trash2, Tag, CheckCircle, XCircle, Edit3 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
@@ -8,6 +8,7 @@ import { PaymentModal } from '../components/pos/PaymentModal';
 
 const POS: React.FC = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     // Global State
     const {
@@ -45,6 +46,8 @@ const POS: React.FC = () => {
     const [draftProductName, setDraftProductName] = useState('');
     const [draftProductPrice, setDraftProductPrice] = useState('');
     const [draftCreating, setDraftCreating] = useState(false);
+    const [loadingDraft, setLoadingDraft] = useState(false);
+    const [activeDraftId, setActiveDraftId] = useState<number | null>(null);
 
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -77,9 +80,116 @@ const POS: React.FC = () => {
                 setPaymentAccounts(accounts);
                 setSelectedPaymentAccount(accounts[0].id);
             }
+
+            // Load draft if draft_id is in URL
+            const draftIdParam = searchParams.get('draft_id');
+            if (draftIdParam) {
+                await loadDraftOrder(parseInt(draftIdParam, 10));
+            }
         };
         fetchInitialData();
     }, []);
+
+    // Load a draft order into the cart
+    const loadDraftOrder = async (draftId: number) => {
+        setLoadingDraft(true);
+        try {
+            const { data: order, error: orderError } = await supabase
+                .from('orders')
+                .select(`
+                    id, status, customer_id, shipping_cost,
+                    customers (id, identification_number, name, email, phone, is_final_consumer, customer_type, discount_percentage, claimed_by),
+                    order_items (
+                        id, quantity, unit_price,
+                        product_id,
+                        products (id, sku, name, price, cost_without_vat, vat_percentage),
+                        warehouse_id
+                    )
+                `)
+                .eq('id', draftId)
+                .eq('status', 'Borrador')
+                .single();
+
+            if (orderError || !order) {
+                console.error('Error loading draft:', orderError);
+                alert('No se pudo cargar el borrador. Puede que ya no exista o no sea un borrador.');
+                setLoadingDraft(false);
+                return;
+            }
+
+            // Clear existing cart first
+            clearCart();
+
+            // Set customer
+            const cust = order.customers as any;
+            if (cust && !cust.is_final_consumer) {
+                setCustomer({
+                    id: cust.id,
+                    identification_number: cust.identification_number || '',
+                    name: cust.name || 'Cliente',
+                    email: cust.email || undefined,
+                    phone: cust.phone || undefined,
+                    is_final_consumer: cust.is_final_consumer || false,
+                    customer_type: cust.customer_type || undefined,
+                    discount_percentage: cust.discount_percentage || undefined,
+                    claimed_by: cust.claimed_by || undefined,
+                });
+            }
+
+            // Set shipping cost
+            if (order.shipping_cost) {
+                setShippingCost(order.shipping_cost);
+            }
+
+            // Add each item to cart
+            const items = order.order_items as any[];
+            if (items) {
+                for (const item of items) {
+                    const p = item.products as any;
+                    if (!p) continue;
+
+                    const cost = p.cost_without_vat || 0;
+                    const vat = p.vat_percentage || 0;
+                    const finalCost = cost * (1 + vat / 100);
+
+                    const inventoryResult: InventoryResult = {
+                        product: {
+                            id: p.id,
+                            sku: p.sku,
+                            name: p.name,
+                            price: p.price,
+                            cost_without_vat: cost,
+                            vat_percentage: vat,
+                            final_cost_with_vat: finalCost,
+                        },
+                        warehouse_id: item.warehouse_id || 0,
+                        warehouse_name: '', // Will show as empty but functional
+                        current_stock: 999, // Draft items don't need stock check
+                    };
+
+                    addToCart(inventoryResult);
+
+                    // After adding, update quantity and price to match draft values
+                    // We need to get the last added item's ID from the store
+                    const currentCart = useCartStore.getState().cart;
+                    const lastItem = currentCart[currentCart.length - 1];
+                    if (lastItem && item.quantity > 1) {
+                        updateQuantity(lastItem.id, item.quantity);
+                    }
+                    if (lastItem && item.unit_price !== p.price) {
+                        updateUnitPrice(lastItem.id, item.unit_price);
+                    }
+                }
+            }
+
+            setActiveDraftId(draftId);
+        } catch (err) {
+            console.error('Error loading draft:', err);
+            alert('Error al cargar el borrador.');
+        } finally {
+            setLoadingDraft(false);
+        }
+    };
 
     // Global Keyboard Shortcuts
     useEffect(() => {
@@ -527,7 +637,7 @@ const POS: React.FC = () => {
                 p_items: itemsPayload,
                 p_closer_id: promoCloserId || customer.claimed_by || null,
                 p_promo_code: promoCode || null,
-                p_draft_id: null
+                p_draft_id: activeDraftId
             });
 
             if (error) {
