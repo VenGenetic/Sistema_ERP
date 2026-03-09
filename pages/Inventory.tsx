@@ -314,7 +314,7 @@ const Inventory: React.FC = () => {
         setIsProductEntryOpen(true);
     };
 
-    const handleOpenPartProfile = (groupData: void) => {
+    const handleOpenPartProfile = (groupData: any) => {
         setSelectedPartProfileData(groupData);
         setIsPartProfileOpen(true);
     };
@@ -422,7 +422,7 @@ const Inventory: React.FC = () => {
             if (error) throw error;
 
             // 2. Map to export data
-            const exportData = (data || []).map(product => {
+            const exportData = (data || []).map((product: any) => {
                 const globalStock = (product.inventory_levels || []).reduce((sum: number, il: any) => sum + il.current_stock, 0);
                 const costWithoutVat = product.cost_without_vat ?? null;
                 const storedVat = product.vat_percentage ?? exportIvaPercent;
