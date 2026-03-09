@@ -386,7 +386,8 @@ const Inventory: React.FC = () => {
 
             let query = supabase
                 .from('products')
-                .select(selectStr);
+                .select(selectStr)
+                .limit(50000); // Bypass the default 1000 row limit for full catalog export
 
             // Same filters as fetchStockData
             if (selectedWarehouseId) {
@@ -436,19 +437,21 @@ const Inventory: React.FC = () => {
                     'SKU': product.sku || '',
                     'Nombre': product.name || '',
                     'Cantidad': globalStock,
-                    'Costo S/I': costoSinIva,
+                    'Costo S/IVA': costoSinIva, // Changed from Costo S/I to match Catalog Import
                     'Costo Desc.': '',
                     'Margen': product.profit_margin ?? 0.30,
+                    'Categoría': product.category || '', // Added to match Catalog Import
+                    'IVA %': product.vat_percentage ?? exportIvaPercent, // Added to match Catalog Import
                     'Costo C/IVA': costWithVat ?? '',
                 };
             });
 
             const ws = utils.json_to_sheet(exportData, {
-                header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen', 'Costo C/IVA']
+                header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/IVA', 'Costo Desc.', 'Margen', 'Categoría', 'IVA %', 'Costo C/IVA']
             });
 
             ws['!cols'] = [
-                { wch: 20 }, { wch: 40 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 14 },
+                { wch: 20 }, { wch: 40 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 18 }, { wch: 8 }, { wch: 14 },
             ];
 
             const wb = utils.book_new();
@@ -533,7 +536,7 @@ const Inventory: React.FC = () => {
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3 text-xs text-slate-500 space-y-1">
                                 <p>Se exportarán <span className="font-semibold text-slate-700 dark:text-slate-300">{groupedStockItems.length}</span> productos visibles.</p>
-                                <p>Columnas: SKU · Nombre · Cantidad · Costo S/I · Costo Desc. · Margen · Costo C/IVA</p>
+                                <p>Columnas: SKU · Nombre · Cantidad · Costo S/IVA · Costo Desc. · Margen · Categoría · IVA % · Costo C/IVA</p>
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 px-5 pb-5">

@@ -1,218 +1,197 @@
 erDiagram
-    accounts {
-        int id PK
-        string code
-        string name
-        string category
-        boolean is_nominal
-        string currency
-        int position
+    %% ==========================================
+    %% 1. COMMERCE & FULFILLMENT
+    %% ==========================================
+    CUSTOMERS {
+        integer id PK
+        text identification_number
+        text name
+        text customer_type
+        uuid claimed_by FK "refs AUTH_USERS"
     }
-    api_keys {
-        uuid id PK
-        string name
-        string key_hash
-        string provider
-        boolean is_active
-        timestamp last_used_at
-        timestamp created_at
-        timestamp updated_at
-    }
-    brands {
-        bigint id PK
-        string name
-        boolean is_active
-        timestamp created_at
-    }
-    customers {
-        int id PK
-        string identification_number
-        string name
-        string email
-        string phone
-        boolean is_final_consumer
-        timestamp created_at
-        string customer_type
-        numeric discount_percentage
-        uuid claimed_by FK
-        timestamp claimed_at
-    }
-    inventory_levels {
-        int id PK
-        int product_id FK
-        int warehouse_id FK
-        int current_stock
-        timestamp last_updated
-    }
-    inventory_logs {
-        int id PK
-        int product_id FK
-        int warehouse_id FK
-        int quantity_change
-        string reason
-        uuid user_id FK
-        timestamp created_at
-        string reference_type
-        string reference_id
-    }
-    lost_demand {
-        int id PK
-        string search_term
-        int product_id FK
-        string reason
-        string channel
-        timestamp created_at
-        uuid user_id FK
-    }
-    order_items {
-        int id PK
-        int order_id FK
-        int product_id FK
-        int quantity
-        numeric unit_price
-        numeric unit_cost
-    }
-    orders {
-        int id PK
-        int partner_id FK
-        int warehouse_id FK
-        order_status_enum status "Borrador|Pendiente_Pago|Listo_Cumplimiento|Sourcing_Pendiente|Alerta_Margen|En_Transito|Entregado|RMA_Pendiente|Cancelado|Reembolsado"
+
+    ORDERS {
+        integer id PK
+        integer customer_id FK
+        integer warehouse_id FK
+        integer partner_id FK
         numeric total_amount
-        timestamp created_at
-        int customer_id FK
-        string channel
-        string payment_status
-        uuid created_by FK
-        uuid closer_id FK
-        string promo_code
-        string payment_receipt_url
-        string bank_reference_code
-        numeric shipping_cost
-        string shipping_address
-        string shipping_notes
-        int payment_account_id FK
-        int shipping_expense_account_id FK
+        text status
+        uuid created_by FK "refs AUTH_USERS"
+        uuid closer_id FK "refs AUTH_USERS"
     }
-    partners {
-        int id PK
-        string name
-        string type
-        string status
+
+    ORDER_ITEMS {
+        integer id PK
+        integer order_id FK
+        integer product_id FK
+        integer quantity
+        numeric unit_price
+        text status
     }
-    product_entries_history {
+
+    CUSTOMERS ||--o{ ORDERS : "places"
+    ORDERS ||--|{ ORDER_ITEMS : "contains"
+
+    %% ==========================================
+    %% 2. PRODUCT INTELLIGENCE & INVENTORY
+    %% ==========================================
+    BRANDS {
         bigint id PK
-        bigint product_id FK
-        string sku
-        numeric cost_without_vat
-        numeric discounted_cost
-        numeric discount_percentage
-        numeric vat_percentage
-        numeric final_cost_with_vat
-        timestamp created_at
-        uuid user_id FK
+        text name
     }
-    products {
-        int id PK
-        string sku "NULLABLE - auto DRFT-xxx for drafts"
-        string name
-        string category
-        int min_stock_threshold
-        timestamp created_at
-        numeric cost_without_vat
-        numeric vat_percentage
-        numeric strike_price_candidate
-        int strike_count
-        numeric profit_margin
+
+    PRODUCTS {
+        integer id PK
+        text sku
+        text name
         bigint brand_id FK
         numeric price
-        string status "draft | official"
-        string reference_image_url
+        numeric cost_without_vat
     }
-    profiles {
-        uuid id PK
-        string full_name
-        string email
-        boolean is_active
-        int role_id FK
-        string nickname
-        string bio
-        string avatar_url
-        string referral_code
+
+    WAREHOUSES {
+        integer id PK
+        text name
+        text type
+        integer partner_id FK
     }
-    roles {
-        int id PK
-        string name
-        jsonb permissions
+
+    INVENTORY_LEVELS {
+        integer id PK
+        integer product_id FK
+        integer warehouse_id FK
+        integer current_stock
     }
-    system_events {
-        uuid id PK
-        string event_type
-        jsonb payload
-        string status
-        timestamp created_at
-        timestamp processed_at
+
+    INVENTORY_LOGS {
+        integer id PK
+        integer product_id FK
+        integer warehouse_id FK
+        integer quantity_change
+        uuid user_id FK "refs AUTH_USERS"
     }
-    transaction_lines {
-        int id PK
-        int transaction_id FK
-        int account_id FK
+
+    PRODUCT_ENTRIES_HISTORY {
+        bigint id PK
+        bigint product_id FK
+        numeric final_cost_with_vat
+    }
+
+    LOST_DEMAND {
+        integer id PK
+        text search_term
+        integer product_id FK
+    }
+
+    BRANDS ||--o{ PRODUCTS : "categorizes"
+    PRODUCTS ||--o{ ORDER_ITEMS : "sold_in"
+    PRODUCTS ||--o{ INVENTORY_LEVELS : "tracked_in"
+    WAREHOUSES ||--o{ INVENTORY_LEVELS : "stores"
+    PRODUCTS ||--o{ INVENTORY_LOGS : "logs_history"
+    WAREHOUSES ||--o{ INVENTORY_LOGS : "logs_history"
+    PRODUCTS ||--o{ PRODUCT_ENTRIES_HISTORY : "cost_history"
+    PRODUCTS ||--o{ LOST_DEMAND : "missed_sales"
+    WAREHOUSES ||--o{ ORDERS : "fulfills"
+
+    %% ==========================================
+    %% 3. FINANCIAL ENGINE
+    %% ==========================================
+    ACCOUNTS {
+        integer id PK
+        text code
+        text name
+        text category
+    }
+
+    TRANSACTIONS {
+        integer id PK
+        integer order_id FK
+        text reference_type
+        text description
+    }
+
+    TRANSACTION_LINES {
+        integer id PK
+        integer transaction_id FK
+        integer account_id FK
         numeric debit
         numeric credit
     }
-    transactions {
-        int id PK
-        int order_id FK
-        string reference_type
-        string description
-        timestamp created_at
-    }
-    warehouses {
-        int id PK
-        string name
-        string type
-        string location
-        int partner_id FK
-        boolean is_active
-    }
-    auth_users {
+
+    COMMISSION_LEDGER {
         uuid id PK
-    }
-    commission_ledger {
-        uuid id PK
-        uuid sales_user_id FK
-        int order_id FK
+        uuid sales_user_id FK "refs PROFILES"
+        integer order_id FK
         numeric amount
-        commission_type_enum type "credit | clawback"
-        commission_status_enum status "pending | vested | paid"
-        timestamptz vesting_date "DEFAULT now + 30 days"
-        timestamptz created_at
+        text status
     }
 
-    brands ||--o{ products : owns
-    products ||--o{ inventory_levels : has_levels
-    warehouses ||--o{ inventory_levels : stores_levels
-    products ||--o{ inventory_logs : logged_in
-    warehouses ||--o{ inventory_logs : occurs_in
-    products ||--o{ product_entries_history : has_history
-    orders ||--o{ order_items : contains
-    products ||--o{ order_items : included_in
-    partners ||--o{ orders : associated_with
-    warehouses ||--o{ orders : fulfilled_from
-    customers ||--o{ orders : placed_by
-    transactions ||--o{ transaction_lines : contains
-    accounts ||--o{ transaction_lines : records_to
-    orders ||--o{ transactions : generates
-    partners ||--o{ warehouses : operates
-    auth_users ||--|| profiles : has_profile
-    roles ||--o{ profiles : assigned_to
-    auth_users ||--o{ orders : created_by
-    auth_users ||--o{ orders : closes
-    auth_users ||--o{ customers : claims
-    auth_users ||--o{ inventory_logs : performed_by
-    auth_users ||--o{ product_entries_history : recorded_by
-    products |o--o{ lost_demand : causes
-    auth_users ||--o{ lost_demand : recorded_by
-    accounts ||--o{ orders : receives_payment
-    accounts ||--o{ orders : records_shipping_expense
-    profiles ||--o{ commission_ledger : receives
-    orders ||--o{ commission_ledger : generates
+    POINT_LEDGER {
+        uuid id PK
+        uuid user_id FK "refs AUTH_USERS"
+        integer order_item_id FK
+        numeric points
+        text milestone
+    }
+
+    GLOBAL_POOL {
+        uuid id PK
+        date month_year
+        numeric total_pool_amount
+    }
+
+    ORDERS ||--o{ TRANSACTIONS : "generates"
+    TRANSACTIONS ||--|{ TRANSACTION_LINES : "contains"
+    ACCOUNTS ||--o{ TRANSACTION_LINES : "records_in"
+    ACCOUNTS ||--o{ ORDERS : "payment/shipping_acct"
+    ORDERS ||--o{ COMMISSION_LEDGER : "yields"
+    ORDER_ITEMS ||--o{ POINT_LEDGER : "awards"
+
+    %% ==========================================
+    %% 4. ACCESS & SYSTEM CONTROL
+    %% ==========================================
+    AUTH_USERS {
+        uuid id PK "External Auth Schema"
+    }
+
+    PROFILES {
+        uuid id PK, FK "refs AUTH_USERS"
+        text full_name
+        integer role_id FK
+        text referral_code
+    }
+
+    ROLES {
+        integer id PK
+        text name
+        jsonb permissions
+    }
+
+    PARTNERS {
+        integer id PK
+        text name
+        text type
+    }
+
+    API_KEYS {
+        uuid id PK
+        text name
+        text provider
+    }
+
+    SYSTEM_EVENTS {
+        uuid id PK
+        text event_type
+        text status
+        jsonb payload
+    }
+
+    AUTH_USERS ||--|| PROFILES : "has_profile"
+    ROLES ||--o{ PROFILES : "assigned_to"
+    PROFILES ||--o{ COMMISSION_LEDGER : "earns"
+    AUTH_USERS ||--o{ POINT_LEDGER : "earns"
+    AUTH_USERS ||--o{ CUSTOMERS : "claims"
+    AUTH_USERS ||--o{ ORDERS : "creates/closes"
+    PARTNERS ||--o{ WAREHOUSES : "operates"
+    PARTNERS ||--o{ ORDERS : "associated_with"
