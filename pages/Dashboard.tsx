@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ActivityItem {
     type: string;
@@ -13,8 +14,12 @@ interface ActivityItem {
 }
 
 const Dashboard: React.FC = () => {
+    const { session } = useAuth();
+    const currentUserId = session?.user?.id;
+
     // Dynamic State
     const [todaySales, setTodaySales] = useState<number>(0);
+    const [myTodaySales, setMyTodaySales] = useState<number>(0);
     const [lowStockCount, setLowStockCount] = useState<number>(0);
     const [inventoryHealth, setInventoryHealth] = useState<number>(100);
     const [netLiquidity, setNetLiquidity] = useState<number>(0);
@@ -32,11 +37,15 @@ const Dashboard: React.FC = () => {
 
                 const { data: orders } = await supabase
                     .from('orders')
-                    .select('id, total_amount, created_at, status, user:profiles!orders_customer_id_fkey(full_name)')
+                    .select('id, total_amount, created_at, status, user:profiles!orders_customer_id_fkey(full_name), closer_id')
                     .gte('created_at', startOfDay.toISOString());
 
                 const sales = orders?.reduce((acc, order) => acc + Number(order.total_amount), 0) || 0;
                 setTodaySales(sales);
+                
+                const mySales = orders?.filter(o => o.closer_id === currentUserId)
+                                       .reduce((acc, order) => acc + Number(order.total_amount), 0) || 0;
+                setMyTodaySales(mySales);
 
                 // 2. Low Stock Alerts & Inventory Health
                 const { data: inventory } = await supabase
@@ -194,8 +203,10 @@ const Dashboard: React.FC = () => {
             }
         };
 
-        fetchDashboardData();
-    }, []);
+        if (currentUserId) {
+            fetchDashboardData();
+        }
+    }, [currentUserId]);
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
@@ -220,7 +231,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* High Density Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
                 {/* Finance Metric */}
                 <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] flex flex-col justify-between h-32 hover:border-slate-400 dark:hover:border-slate-600 transition-colors group cursor-pointer shadow-sm">
                     <div className="flex justify-between items-start">
@@ -279,10 +290,10 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Ventas Hoy Metric */}
+                {/* Ventas Hoy Totales Metric */}
                 <div className="p-5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-900/10 flex flex-col justify-between h-32 hover:border-emerald-400 dark:hover:border-emerald-600 transition-colors group cursor-pointer shadow-sm">
                     <div className="flex justify-between items-start">
-                        <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Ventas de Hoy</span>
+                        <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Ventas Globales (Hoy)</span>
                         <span className="material-symbols-outlined text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-300 transition-colors">point_of_sale</span>
                     </div>
                     <div>
@@ -291,7 +302,24 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                            Corte de Caja local
+                            Todas las ventas
+                        </div>
+                    </div>
+                </div>
+
+                {/* Mis Ventas Hoy Metric */}
+                <div className="p-5 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-900/10 flex flex-col justify-between h-32 hover:border-blue-400 dark:hover:border-blue-600 transition-colors group cursor-pointer shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-mono text-blue-600 dark:text-blue-400 uppercase tracking-wider">Mis Ventas Hoy</span>
+                        <span className="material-symbols-outlined text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">payments</span>
+                    </div>
+                    <div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                            {isLoading ? '...' : `$${myTodaySales.toFixed(2)}`}
+                        </div>
+                        <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">account_circle</span>
+                            Dinero generado en mi turno
                         </div>
                     </div>
                 </div>
