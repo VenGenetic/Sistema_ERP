@@ -86,7 +86,8 @@ async function run() {
         
         for (const inserted of insertedProducts) {
             const orig = chunk.find(c => c.sku === inserted.sku);
-            const stock = orig ? orig.stock : 0;
+            const rawStock = orig ? orig.stock : 0;
+            const stock = Math.floor(Number(rawStock) || 0);
             
             inventoryPayload.push({
                 product_id: inserted.id,
