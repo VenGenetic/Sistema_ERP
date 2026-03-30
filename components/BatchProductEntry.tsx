@@ -19,9 +19,9 @@ interface ProductRow {
     costWithoutVat: string;
     discountedCost: string;
     profitMargin: string;
+    pvp: string; // Changed to string for input handling
     // Calculated fields for display
     costWithVat: number;
-    pvp: number;
 }
 
 interface BatchProductEntryProps {
@@ -38,10 +38,11 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
     const [skipFinancialTransaction, setSkipFinancialTransaction] = useState(false);
+    const [entryByPrice, setEntryByPrice] = useState(false);
 
     // Initial row
     const [rows, setRows] = useState<ProductRow[]>([
-        { id: '1', sku: '', name: '', quantity: '1', costWithoutVat: '', discountedCost: '', profitMargin: '0.65', costWithVat: 0, pvp: 0 }
+        { id: '1', sku: '', name: '', quantity: '1', costWithoutVat: '', discountedCost: '', profitMargin: '0.65', pvp: '', costWithVat: 0 }
     ]);
 
     // Computed totals
@@ -77,38 +78,62 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     useEffect(() => {
         let totalCostExVat = 0;
         let totalCostIncVat = 0;
-        let totalPvp = 0;
+        let totalPvpValue = 0;
 
         const newRows = rows.map(row => {
-            const cost = parseFloat(row.discountedCost || row.costWithoutVat) || 0;
             const margin = parseFloat(row.profitMargin) || 0;
             const qty = parseFloat(row.quantity) || 0;
+            const vatFactor = 1 + globalVat / 100;
 
-            const costWithVat = cost * (1 + globalVat / 100);
-            const pvp = costWithVat * (1 + margin);
+            let costWithoutVatValue = 0;
+            let costWithVatValue = 0;
+            let pvpValue = 0;
+            let finalPvpStr = row.pvp;
+            let finalCostStr = row.costWithoutVat;
+
+            if (entryByPrice) {
+                // Mode: Price -> Cost
+                pvpValue = parseFloat(row.pvp) || 0;
+                costWithVatValue = pvpValue / (1 + margin);
+                costWithoutVatValue = costWithVatValue / vatFactor;
+                finalCostStr = costWithoutVatValue > 0 ? costWithoutVatValue.toFixed(4) : '';
+            } else {
+                // Mode: Cost -> Price
+                costWithoutVatValue = parseFloat(row.discountedCost || row.costWithoutVat) || 0;
+                costWithVatValue = costWithoutVatValue * vatFactor;
+                pvpValue = costWithVatValue * (1 + margin);
+                finalPvpStr = pvpValue > 0 ? pvpValue.toFixed(2) : '';
+            }
 
             // Accumulate totals
             if (qty > 0) {
-                totalCostExVat += cost * qty;
-                totalCostIncVat += costWithVat * qty;
-                totalPvp += pvp * qty;
+                totalCostExVat += costWithoutVatValue * qty;
+                totalCostIncVat += costWithVatValue * qty;
+                totalPvpValue += pvpValue * qty;
             }
 
-            return { ...row, costWithVat, pvp };
+            return { 
+                ...row, 
+                costWithVat: costWithVatValue, 
+                pvp: finalPvpStr, 
+                costWithoutVat: finalCostStr 
+            };
         });
 
         setTotals({
             totalCostExVat,
             totalCostIncVat,
-            totalPvp,
-            estimatedProfit: totalPvp - totalCostIncVat
+            totalPvp: totalPvpValue,
+            estimatedProfit: totalPvpValue - totalCostIncVat
         });
 
-        if (JSON.stringify(newRows) !== JSON.stringify(rows)) {
+        // Use a more careful check to avoid unnecessary state updates while typing
+        const isDifferent = JSON.stringify(newRows) !== JSON.stringify(rows);
+        if (isDifferent) {
             setRows(newRows);
         }
 
-    }, [rows, globalVat]);
+    }, [rows, globalVat, entryByPrice]);
 
     const handleRowChange = (id: string, field: keyof ProductRow, value: string) => {
         setRows(prev => prev.map(row => {
@@ -128,8 +153,8 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             costWithoutVat: '',
             discountedCost: '',
             profitMargin: '0.65',
-            costWithVat: 0,
-            pvp: 0
+            pvp: '',
+            costWithVat: 0
         }]);
     };
 
@@ -142,11 +167,6 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     const handleSubmit = async () => {
         if (!globalBrandId) {
             alert('Por favor selecciona una marca para el lote.');
-            return;
-        }
-
-        if (!globalWarehouseId) {
-            alert('Por favor selecciona un almacén para el lote.');
             return;
         }
 
@@ -207,8 +227,8 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     // Excel Logic
     const handleDownloadTemplate = () => {
         const ws = utils.json_to_sheet([
-            { SKU: 'EJEMPLO-SKU', Nombre: 'Producto Ejemplo', Cantidad: 10, 'Costo S/I': 15.50, 'Costo Desc.': 0, Margen: 0.30 }
-        ], { header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen'] });
+            { SKU: 'EJEMPLO-SKU', Nombre: 'Producto Ejemplo', Cantidad: 10, 'Costo S/I': 15.50, 'Costo Desc.': 0, Margen: 0.65, 'PVP': 30.00 }
+        ], { header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen', 'PVP'] });
         const wb = utils.book_new();
         utils.book_append_sheet(wb, ws, "Plantilla");
         writeFile(wb, "plantilla_importacion.xlsx");
@@ -234,6 +254,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 const cost = item['Costo S/I'] || item['costo'] || item['Costo'] || '0';
                 const discountCost = item['Costo Desc.'] || item['descuento'] || '';
                 const margin = item['Margen'] || item['margen'] || '0.65';
+                const pvp = item['PVP'] || item['pvp'] || '';
 
                 return {
                     id: `imported-${Date.now()}-${index}`,
@@ -243,8 +264,8 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                     costWithoutVat: String(cost),
                     discountedCost: String(discountCost),
                     profitMargin: String(margin),
-                    costWithVat: 0,
-                    pvp: 0
+                    pvp: String(pvp),
+                    costWithVat: 0
                 };
             }).filter(row => row.sku && row.name); // Basic validation that row has content
 
@@ -310,7 +331,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 </div>
 
                 {/* Global Configuration */}
-                <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 border-b border-slate-200 dark:border-slate-700">
+                <div className="p-6 grid grid-cols-1 md:grid-cols-5 gap-6 border-b border-slate-200 dark:border-slate-700 items-end">
                     <div>
                         <WarehouseSelect
                             value={globalWarehouseId}
@@ -366,6 +387,20 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                             onChange={(e) => setGlobalVat(parseFloat(e.target.value) || 0)}
                         />
                     </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Modo de Ingreso</label>
+                        <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg h-[42px]">
+                            <span className={`text-[10px] font-bold uppercase ${!entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Costo</span>
+                            <label className="flex items-center cursor-pointer relative group">
+                                <input type="checkbox" className="sr-only peer"
+                                    checked={entryByPrice}
+                                    onChange={(e) => setEntryByPrice(e.target.checked)}
+                                />
+                                <div className="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                            <span className={`text-[10px] font-bold uppercase ${entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Precio</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Spreadsheet Table */}
@@ -377,11 +412,15 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">SKU *</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Nombre *</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Cant.</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32 " title="Costo Unitario Sin IVA">Costo S/I *</th>
+                                <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider w-32 ${entryByPrice ? 'text-amber-500 italic' : 'text-slate-500'}`} title="Costo Unitario Sin IVA">
+                                    {entryByPrice ? 'Costo (Calc)' : 'Costo S/I *'}
+                                </th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32" title="Opcional: Si hay descuento">Costo Desc.</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Margen</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 bg-slate-100 dark:bg-slate-800 text-center">Costo + IVA</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 bg-emerald-50 dark:bg-emerald-900/10 text-center">PVP Tentativo</th>
+                                <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider w-28 text-center ${entryByPrice ? 'bg-primary/10 text-primary' : 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600'}`}>
+                                    {entryByPrice ? 'PVP Entry *' : 'PVP Tentativo'}
+                                </th>
                                 <th className="px-4 py-3 w-10"></th>
                             </tr>
                         </thead>
@@ -421,11 +460,12 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                         <input
                                             type="number"
                                             min="0"
-                                            step="0.01"
-                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-primary outline-none"
+                                            step="0.0001"
+                                            className={`w-full px-2 py-1.5 border rounded text-sm outline-none ${entryByPrice ? 'bg-amber-50/30 dark:bg-amber-900/5 border-amber-200/30 text-slate-400 cursor-not-allowed' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-primary'}`}
                                             value={row.costWithoutVat}
-                                            onChange={e => handleRowChange(row.id, 'costWithoutVat', e.target.value)}
-                                            placeholder="0.00"
+                                            onChange={e => !entryByPrice && handleRowChange(row.id, 'costWithoutVat', e.target.value)}
+                                            placeholder={entryByPrice ? 'Calc...' : '0.00'}
+                                            readOnly={entryByPrice}
                                         />
                                     </td>
                                     <td className="px-2 py-2">
@@ -453,8 +493,20 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                     <td className="px-4 py-2 text-center font-mono text-sm text-slate-600 bg-slate-50 dark:bg-slate-800/50">
                                         ${row.costWithVat.toFixed(2)}
                                     </td>
-                                    <td className="px-4 py-2 text-center font-bold text-sm text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10">
-                                        ${row.pvp.toFixed(2)}
+                                    <td className={`px-2 py-2 text-center text-sm ${entryByPrice ? 'bg-primary/5' : 'bg-emerald-50 dark:bg-emerald-900/10'}`}>
+                                        {entryByPrice ? (
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-primary/30 rounded text-sm font-bold text-primary focus:ring-2 focus:ring-primary outline-none text-center"
+                                                value={row.pvp}
+                                                onChange={e => handleRowChange(row.id, 'pvp', e.target.value)}
+                                                placeholder="0.00"
+                                            />
+                                        ) : (
+                                            <span className="font-bold text-emerald-600">${parseFloat(row.pvp || '0').toFixed(2)}</span>
+                                        )}
                                     </td>
                                     <td className="px-2 py-2 text-center">
                                         <button
