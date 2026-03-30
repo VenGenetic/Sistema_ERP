@@ -40,15 +40,16 @@ const calcMargin = (costWithoutVat: number, vatPercentage: number, price: number
 
 export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     const [loading, setLoading] = useState(false);
+    const [entryByPrice, setEntryByPrice] = useState(false);
     const [formData, setFormData] = useState({
         sku: '',
         name: '',
         category: '',
         brandId: null as number | null,
         minStock: 10,
-        profitMargin: 0.30,
+        profitMargin: 0.65,
         costWithoutVat: 0,
-        vatPercentage: 12.0,
+        vatPercentage: 15.0,
         price: 0
     });
 
@@ -97,8 +98,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             fetchAccounts();
             if (productToEdit) {
                 const cwv = productToEdit.cost_without_vat || 0;
-                const vat = productToEdit.vat_percentage || 12.0;
-                const margin = productToEdit.profit_margin || 0.30;
+                const vat = productToEdit.vat_percentage || 15.0;
+                const margin = productToEdit.profit_margin || 0.65;
                 // Derive PVP from cost data if stored price is 0 or missing
                 const storedPrice = productToEdit.price || 0;
                 const derivedPrice = storedPrice > 0 ? storedPrice : calcPrice(cwv, vat, margin);
@@ -121,9 +122,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     category: '',
                     brandId: null,
                     minStock: 10,
-                    profitMargin: 0.30,
+                    profitMargin: 0.65,
                     costWithoutVat: 0,
-                    vatPercentage: 12.0,
+                    vatPercentage: 15.0,
                     price: 0
                 });
             }
@@ -144,23 +145,51 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     // ─── Change handlers that keep everything in sync ───
 
     const handleCostChange = (newCost: number) => {
-        const price = calcPrice(newCost, formData.vatPercentage, formData.profitMargin);
-        setFormData(prev => ({ ...prev, costWithoutVat: newCost, price: Math.round(price * 100) / 100 }));
+        if (entryByPrice) {
+            // Cost changed while in Price Mode? Probably want to update Price
+            const price = calcPrice(newCost, formData.vatPercentage, formData.profitMargin);
+            setFormData(prev => ({ ...prev, costWithoutVat: newCost, price: Math.round(price * 100) / 100 }));
+        } else {
+            const price = calcPrice(newCost, formData.vatPercentage, formData.profitMargin);
+            setFormData(prev => ({ ...prev, costWithoutVat: newCost, price: Math.round(price * 100) / 100 }));
+        }
     };
 
     const handleVatChange = (newVat: number) => {
-        const price = calcPrice(formData.costWithoutVat, newVat, formData.profitMargin);
-        setFormData(prev => ({ ...prev, vatPercentage: newVat, price: Math.round(price * 100) / 100 }));
+        if (entryByPrice) {
+            // Price is fixed, update Cost
+            const costWithVatValue = formData.price / (1 + formData.profitMargin);
+            const costWithoutVatValue = costWithVatValue / (1 + (newVat / 100));
+            setFormData(prev => ({ ...prev, vatPercentage: newVat, costWithoutVat: r(costWithoutVatValue) }));
+        } else {
+            const price = calcPrice(formData.costWithoutVat, newVat, formData.profitMargin);
+            setFormData(prev => ({ ...prev, vatPercentage: newVat, price: Math.round(price * 100) / 100 }));
+        }
     };
 
     const handleMarginChange = (newMargin: number) => {
-        const price = calcPrice(formData.costWithoutVat, formData.vatPercentage, newMargin);
-        setFormData(prev => ({ ...prev, profitMargin: newMargin, price: Math.round(price * 100) / 100 }));
+        if (entryByPrice) {
+            // Price is fixed, update Cost
+            const costWithVatValue = formData.price / (1 + newMargin);
+            const costWithoutVatValue = costWithVatValue / (1 + (formData.vatPercentage / 100));
+            setFormData(prev => ({ ...prev, profitMargin: newMargin, costWithoutVat: r(costWithoutVatValue) }));
+        } else {
+            const price = calcPrice(formData.costWithoutVat, formData.vatPercentage, newMargin);
+            setFormData(prev => ({ ...prev, profitMargin: newMargin, price: Math.round(price * 100) / 100 }));
+        }
     };
 
     const handlePriceChange = (newPrice: number) => {
-        const margin = calcMargin(formData.costWithoutVat, formData.vatPercentage, newPrice);
-        setFormData(prev => ({ ...prev, price: newPrice, profitMargin: Math.round(margin * 100) / 100 }));
+        if (entryByPrice) {
+            // Margin is fixed, update Cost
+            const costWithVatValue = newPrice / (1 + formData.profitMargin);
+            const costWithoutVatValue = costWithVatValue / (1 + (formData.vatPercentage / 100));
+            setFormData(prev => ({ ...prev, price: newPrice, costWithoutVat: r(costWithoutVatValue) }));
+        } else {
+            // Cost is fixed, update Margin
+            const margin = calcMargin(formData.costWithoutVat, formData.vatPercentage, newPrice);
+            setFormData(prev => ({ ...prev, price: newPrice, profitMargin: Math.round(margin * 100) / 100 }));
+        }
     };
 
     // ─── Computed display values ───
@@ -320,14 +349,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             <span className="material-symbols-outlined text-[18px]">payments</span>
                             Precios y Costos
                             <span className="text-xs font-normal normal-case text-slate-400 ml-1">— los campos se auto-calculan</span>
+                            <div className="ml-auto flex items-center gap-2">
+                                <span className={`text-[10px] font-bold uppercase tracking-tight ${!entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Costo</span>
+                                <label className="flex items-center cursor-pointer relative group">
+                                    <input type="checkbox" className="sr-only peer"
+                                        checked={entryByPrice}
+                                        onChange={(e) => setEntryByPrice(e.target.checked)}
+                                    />
+                                    <div className="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                                </label>
+                                <span className={`text-[10px] font-bold uppercase tracking-tight ${entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Precio</span>
+                            </div>
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className={labelClass}>Costo sin IVA ($)</label>
-                                <input type="number" step="0.01" min="0" className={inputClass}
+                                <input type="number" step="0.0001" min="0" className={`${inputClass} ${entryByPrice ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50' : ''}`}
                                     value={formData.costWithoutVat}
-                                    onChange={e => handleCostChange(parseFloat(e.target.value) || 0)} />
+                                    onChange={e => handleCostChange(parseFloat(e.target.value) || 0)}
+                                    readOnly={entryByPrice}
+                                />
+                                {entryByPrice && <p className="text-[10px] text-amber-600 mt-1 italic">Calculado desde el PVP</p>}
                             </div>
 
                             <div>
@@ -343,17 +386,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     value={formData.profitMargin}
                                     onChange={e => handleMarginChange(parseFloat(e.target.value) || 0)} />
                                 <p className="text-xs text-slate-400 mt-1">
-                                    Ej: 0.30 = 30%. Cambia automáticamente al editar PVP.
+                                    Ej: 0.65 = 65%. {entryByPrice ? 'Actualiza el costo automáticamente.' : 'Actualiza el PVP automáticamente.'}
                                 </p>
                             </div>
 
                             <div>
                                 <label className={labelClass}>PVP — Precio de Venta ($)</label>
-                                <input type="number" step="0.01" min="0" className={`${inputClass} font-semibold`}
+                                <input type="number" step="0.01" min="0" className={`${inputClass} font-semibold ${!entryByPrice ? 'bg-emerald-50/30 dark:bg-emerald-900/10 border-emerald-200/50' : 'ring-2 ring-primary border-primary'}`}
                                     value={formData.price}
                                     onChange={e => handlePriceChange(parseFloat(e.target.value) || 0)} />
                                 <p className="text-xs text-slate-400 mt-1">
-                                    Al cambiar, el margen se recalcula automáticamente.
+                                    {entryByPrice ? 'Ingresa el precio final; el costo se ajustará.' : 'Al cambiar, el margen se recalcula automáticamente.'}
                                 </p>
                             </div>
                         </div>

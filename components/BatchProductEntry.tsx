@@ -34,14 +34,14 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     const [loading, setLoading] = useState(false);
     const [globalBrandId, setGlobalBrandId] = useState<number | null>(null);
     const [globalWarehouseId, setGlobalWarehouseId] = useState<number | null>(null);
-    const [globalVat, setGlobalVat] = useState<number>(12); // Default 12%
+    const [globalVat, setGlobalVat] = useState<number>(15); // Default 15%
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
     const [skipFinancialTransaction, setSkipFinancialTransaction] = useState(false);
 
     // Initial row
     const [rows, setRows] = useState<ProductRow[]>([
-        { id: '1', sku: '', name: '', quantity: '1', costWithoutVat: '', discountedCost: '', profitMargin: '0.30', costWithVat: 0, pvp: 0 }
+        { id: '1', sku: '', name: '', quantity: '1', costWithoutVat: '', discountedCost: '', profitMargin: '0.65', costWithVat: 0, pvp: 0 }
     ]);
 
     // Computed totals
@@ -127,7 +127,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             quantity: '1',
             costWithoutVat: '',
             discountedCost: '',
-            profitMargin: '0.30',
+            profitMargin: '0.65',
             costWithVat: 0,
             pvp: 0
         }]);
@@ -233,7 +233,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 const qty = item['Cantidad'] || item['cantidad'] || '1';
                 const cost = item['Costo S/I'] || item['costo'] || item['Costo'] || '0';
                 const discountCost = item['Costo Desc.'] || item['descuento'] || '';
-                const margin = item['Margen'] || item['margen'] || '0.30';
+                const margin = item['Margen'] || item['margen'] || '0.65';
 
                 return {
                     id: `imported-${Date.now()}-${index}`,

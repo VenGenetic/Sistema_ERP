@@ -18,7 +18,7 @@ export const ProductEntryForm = ({ productId, onSave }: { productId: number, onS
     const [form, setForm] = useState<CostFormState>({
         costoSinIva: '',
         costoSinIvaDescontado: '',
-        porcentajeIva: 12 // Default Ecuador/latam, ajustar según país
+        porcentajeIva: 15 // Default Ecuador/latam, ajustar según país
     });
 
     const [calculated, setCalculated] = useState<CalculatedValues>({
