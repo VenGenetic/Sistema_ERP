@@ -354,7 +354,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 </div>
 
                 {/* Global Configuration */}
-                <div className="p-6 grid grid-cols-1 md:grid-cols-5 gap-6 border-b border-slate-200 dark:border-slate-700 items-end">
+                <div className="relative z-20 p-6 grid grid-cols-1 md:grid-cols-5 gap-6 border-b border-slate-200 dark:border-slate-700 items-end">
                     <div>
                         <WarehouseSelect
                             value={globalWarehouseId}
