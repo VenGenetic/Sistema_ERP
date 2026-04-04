@@ -22,6 +22,8 @@ const Dashboard: React.FC = () => {
     const [myTodaySales, setMyTodaySales] = useState<number>(0);
     const [lowStockCount, setLowStockCount] = useState<number>(0);
     const [inventoryHealth, setInventoryHealth] = useState<number>(100);
+    const [inventoryCapitalCost, setInventoryCapitalCost] = useState<number>(0);
+    const [inventoryCapitalPvp, setInventoryCapitalPvp] = useState<number>(0);
     const [netLiquidity, setNetLiquidity] = useState<number>(0);
     const [topLostDemand, setTopLostDemand] = useState<{ term: string, count: number }[]>([]);
     const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
@@ -31,82 +33,30 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // 1. Today's Sales
-                const startOfDay = new Date();
-                startOfDay.setHours(0, 0, 0, 0);
-
-                const { data: orders } = await supabase
-                    .from('orders')
-                    .select('id, total_amount, created_at, status, user:profiles!orders_customer_id_fkey(full_name), closer_id')
-                    .gte('created_at', startOfDay.toISOString());
-
-                const sales = orders?.reduce((acc, order) => acc + Number(order.total_amount), 0) || 0;
-                setTodaySales(sales);
-                
-                const mySales = orders?.filter(o => o.closer_id === currentUserId)
-                                       .reduce((acc, order) => acc + Number(order.total_amount), 0) || 0;
-                setMyTodaySales(mySales);
-
-                // 2. Low Stock Alerts & Inventory Health
-                const { data: inventory } = await supabase
-                    .from('inventory_levels')
-                    .select('current_stock, products(id, min_stock_threshold)');
-
-                if (inventory) {
-                    const stockByProduct: Record<string, { total: number, min: number }> = {};
-                    inventory.forEach((il: any) => {
-                        const pid = il.products?.id;
-                        if (!pid) return;
-                        if (!stockByProduct[pid]) {
-                            stockByProduct[pid] = { total: 0, min: Math.max(il.products.min_stock_threshold || 10, 1) };
-                        }
-                        stockByProduct[pid].total += Number(il.current_stock);
+                // 1. Fetch Aggregated Data via RPC
+                if (currentUserId) {
+                    const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats', {
+                        p_user_id: currentUserId
                     });
 
-                    let lowStock = 0;
-                    let totalSkus = 0;
-                    for (const pid in stockByProduct) {
-                        totalSkus++;
-                        if (stockByProduct[pid].total <= stockByProduct[pid].min) lowStock++;
+                    if (!rpcError && stats) {
+                        setTodaySales(Number(stats.todaySales) || 0);
+                        setMyTodaySales(Number(stats.myTodaySales) || 0);
+                        setLowStockCount(stats.lowStockCount || 0);
+                        
+                        const total = stats.totalSkus || 0;
+                        const low = stats.lowStockCount || 0;
+                        setInventoryHealth(total > 0 ? ((total - low) / total) * 100 : 100);
+                        
+                        setInventoryCapitalCost(Number(stats.capitalCost) || 0);
+                        setInventoryCapitalPvp(Number(stats.capitalPvp) || 0);
+                        
+                        setNetLiquidity(Number(stats.netLiquidity) || 0);
+                        setTopLostDemand(stats.topLostDemand || []);
                     }
-                    setLowStockCount(lowStock);
-                    setInventoryHealth(totalSkus > 0 ? ((totalSkus - lowStock) / totalSkus) * 100 : 100);
                 }
 
-                // 3. Lost Demand Rank
-                const { data: lostDemand } = await supabase
-                    .from('lost_demand')
-                    .select('*');
-
-                if (lostDemand) {
-                    const counts: Record<string, number> = {};
-                    lostDemand.forEach(row => {
-                        if (row.search_term) {
-                            const term = String(row.search_term).toUpperCase();
-                            counts[term] = (counts[term] || 0) + 1;
-                        }
-                    });
-
-                    const top5 = Object.entries(counts)
-                        .map(([term, count]) => ({ term, count: count as number }))
-                        .sort((a, b) => b.count - a.count)
-                        .slice(0, 5);
-
-                    setTopLostDemand(top5);
-                }
-
-                // 4. Net Liquidity (Liquidez Neta)
-                const { data: accountsData } = await supabase
-                    .from('account_balances')
-                    .select('current_balance')
-                    .eq('category', 'asset');
-
-                if (accountsData) {
-                    const totalLiquidity = accountsData.reduce((acc, account) => acc + Number(account.current_balance), 0);
-                    setNetLiquidity(totalLiquidity);
-                }
-
-                // 5. Activity Stream (Orders, Inventory Logs, Transactions)
+                // 2. Activity Stream (Orders, Inventory Logs, Transactions)
                 const activities: ActivityItem[] = [];
 
                 // Fetch recent orders
@@ -231,7 +181,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* High Density Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
                 {/* Finance Metric */}
                 <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] flex flex-col justify-between h-32 hover:border-slate-400 dark:hover:border-slate-600 transition-colors group cursor-pointer shadow-sm">
                     <div className="flex justify-between items-start">
@@ -303,6 +253,22 @@ const Dashboard: React.FC = () => {
                         <div className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                             Todas las ventas
+                        </div>
+                    </div>
+                </div>
+
+                {/* Capitalización de Inventario */}
+                <div className="p-5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/30 dark:bg-purple-900/10 flex flex-col justify-between h-32 hover:border-purple-400 dark:hover:border-purple-600 transition-colors group cursor-pointer shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-mono text-purple-600 dark:text-purple-400 uppercase tracking-wider">Capital Almacenado</span>
+                        <span className="material-symbols-outlined text-purple-400 group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">stacked_bar_chart</span>
+                    </div>
+                    <div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                            {isLoading ? '...' : `$${inventoryCapitalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        </div>
+                        <div className="text-[10px] text-purple-600 dark:text-purple-400 mt-1 flex flex-col">
+                            <span>Espectativa PVP: <strong>${inventoryCapitalPvp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
                         </div>
                     </div>
                 </div>
