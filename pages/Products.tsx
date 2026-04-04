@@ -82,6 +82,13 @@ const Products: React.FC = () => {
             if (filters.category) {
                 query = query.ilike('category', `%${filters.category}%`);
             }
+            
+            // Image Status Filter
+            if (filters.imageStatus === 'con_imagen') {
+                query = query.not('image_url', 'is', null);
+            } else if (filters.imageStatus === 'sin_imagen') {
+                query = query.is('image_url', null);
+            }
 
             // Sorting
             const isAscending = sortConfig.direction === 'asc';
@@ -209,24 +216,35 @@ const Products: React.FC = () => {
                 </div>
             </div>
 
-            {/* ═══════ GLOBAL SEARCH ═══════ */}
-            <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                <input
-                    type="text"
-                    placeholder="Buscar por nombre o SKU..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                />
-                {searchTerm && (
-                    <button
-                        onClick={() => setSearchTerm('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-[18px]">close</span>
-                    </button>
-                )}
+            {/* ═══════ GLOBAL SEARCH & FILTERS ═══════ */}
+            <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre o SKU..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    />
+                    {searchTerm && (
+                        <button
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                    )}
+                </div>
+                <select
+                    value={filters.imageStatus || ''}
+                    onChange={(e) => handleFilterChange('imageStatus', e.target.value)}
+                    className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[220px]"
+                >
+                    <option value="">📸 Todas las Imágenes</option>
+                    <option value="con_imagen">✅ Mostrar Con Imagen</option>
+                    <option value="sin_imagen">❌ Faltantes (Sin Imagen)</option>
+                </select>
             </div>
 
             {/* ═══════ TABLE ═══════ */}

@@ -4,6 +4,7 @@ import InventoryMovementModal from '../components/InventoryMovementModal';
 import { ProductEntryForm } from '../components/ProductEntryForm';
 import { BatchProductEntry } from '../components/BatchProductEntry'; // New Component
 import { PartProfileModal } from '../components/PartProfileModal'; // New Component
+import { ProductModal } from '../components/ProductModal';
 import { FitmentSearch } from '../components/FitmentSearch'; // New Component
 import { utils, writeFile } from 'xlsx';
 
@@ -91,6 +92,10 @@ const Inventory: React.FC = () => {
     // Part Profile 360 Modal
     const [isPartProfileOpen, setIsPartProfileOpen] = useState(false);
     const [selectedPartProfileData, setSelectedPartProfileData] = useState<any>(null);
+
+    // Product Edit Modal (Prices / Image)
+    const [isProductEditOpen, setIsProductEditOpen] = useState(false);
+    const [productToEdit, setProductToEdit] = useState<any>(null);
 
     // Fitment Filter
     const [fitmentFilter, setFitmentFilter] = useState<{ make: string; model: string; year: number | null } | null>(null);
@@ -196,7 +201,7 @@ const Inventory: React.FC = () => {
                 // We query products and join inventory_levels to ensure grouping by product
                 let selectStr = `
                     id, name, sku, category, min_stock_threshold, profit_margin, price,
-                    cost_without_vat, vat_percentage,
+                    cost_without_vat, vat_percentage, image_url, brand_id,
                     brands${filters.brand ? '!inner' : ''} (name),
                     inventory_levels${selectedWarehouseId ? '!inner' : ''} (
                         id, current_stock, warehouse_id,
@@ -376,7 +381,7 @@ const Inventory: React.FC = () => {
             // 1. Fetch ALL matching products (no pagination)
             let selectStr = `
                 id, name, sku, category, min_stock_threshold, profit_margin, price,
-                cost_without_vat, vat_percentage,
+                cost_without_vat, vat_percentage, image_url, brand_id,
                 brands!inner (name),
                 inventory_levels (
                     id, current_stock, warehouse_id,
@@ -605,6 +610,17 @@ const Inventory: React.FC = () => {
                 product={selectedPartProfileData}
             />
 
+            {/* Product Edit Modal */}
+            <ProductModal
+                isOpen={isProductEditOpen}
+                onClose={() => setIsProductEditOpen(false)}
+                onSuccess={() => {
+                    setIsProductEditOpen(false);
+                    fetchStockData(pagination.page);
+                }}
+                productToEdit={productToEdit}
+            />
+
             {/* Header ... */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -797,6 +813,7 @@ const Inventory: React.FC = () => {
                                             { key: 'product', label: 'Producto' },
                                             { key: 'brand', label: 'Marca' },
                                             { key: 'sku', label: 'SKU' },
+                                            { key: 'prices', label: 'Precios', align: 'right' },
                                             { key: 'stock', label: 'Stock Global', align: 'right' }
                                         ].map(col => (
                                             <th key={col.key} className={`px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${col.align === 'right' ? 'text-right' : ''}`} onClick={() => handleSort(col.key)}>
@@ -854,13 +871,31 @@ const Inventory: React.FC = () => {
                                             <React.Fragment key={group.product_id}>
                                                 <tr className={`transition-colors group cursor-pointer ${isContextuallyDimmed ? 'opacity-60 bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`} onClick={() => handleOpenPartProfile(group)}>
                                                     <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-3">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); toggleExpandProduct(group.product_id); }}
                                                                 className={`material-symbols-outlined text-[20px] p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                                                             >
                                                                 chevron_right
                                                             </button>
+                                                            {group.product?.image_url ? (
+                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm">
+                                                                    <img 
+                                                                       src={group.product.image_url} 
+                                                                       alt="" 
+                                                                       className="h-full w-full object-cover" 
+                                                                       onError={(e) => {
+                                                                           e.currentTarget.style.display = 'none';
+                                                                           e.currentTarget.parentElement!.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                                                           e.currentTarget.parentElement!.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                                                       }}
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
+                                                                    <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
+                                                                </div>
+                                                            )}
                                                             <div className="hover:text-primary transition-colors">
                                                                 {group.product?.name}
                                                                 <div className="text-xs text-slate-500 mt-0.5">{group.product?.category}</div>
@@ -870,10 +905,14 @@ const Inventory: React.FC = () => {
                                                     <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
                                                         {group.product?.brands?.name || '-'}
                                                     </td>
-                                                    <td className="px-6 py-4 text-slate-500 font-mono text-sm">
+                                                    <td className="px-6 py-4 text-slate-500 font-mono text-sm inline-flex flex-col">
                                                         {group.product?.sku}
                                                     </td>
-                                                    <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{group.global_stock}</td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="text-sm font-bold text-slate-900 dark:text-white">${(group.product?.price || 0).toFixed(2)}</div>
+                                                        <div className="text-xs text-slate-500">C/I: ${(group.product?.cost_without_vat * (1 + (group.product?.vat_percentage||15)/100)).toFixed(2)}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right font-bold text-[16px] text-slate-900 dark:text-white">{group.global_stock}</td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${group.global_stock < (group.product?.min_stock_threshold || 10) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
                                                             {group.global_stock < (group.product?.min_stock_threshold || 10) ? 'Bajo Stock' : 'En Stock'}
@@ -883,10 +922,21 @@ const Inventory: React.FC = () => {
                                                         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                             <button
                                                                 onClick={() => handleOpenProductEntry(group.product_id)}
-                                                                className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-colors ${isContextuallyDimmed ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/10 dark:text-blue-400' : 'bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50'}`}
+                                                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${isContextuallyDimmed ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/10 dark:text-blue-400' : 'bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50'}`}
                                                             >
                                                                 <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
                                                                 Surtir
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    setProductToEdit(group.product); 
+                                                                    setIsProductEditOpen(true); 
+                                                                }}
+                                                                className="p-1 flex items-center justify-center text-slate-400 hover:text-primary transition-colors hover:bg-primary/10 rounded-lg"
+                                                                title="Editar Valores Maestro / Foto"
+                                                            >
+                                                                <span className="material-symbols-outlined text-[18px]">edit</span>
                                                             </button>
                                                         </div>
                                                     </td>
