@@ -245,6 +245,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         setLoading(true);
 
         try {
+            // Compute implied image URL based on SKU if not manually uploaded
+            const defaultImageUrl = supabase.storage
+                .from('product_images')
+                .getPublicUrl('products/' + formData.sku + '_cut.webp').data.publicUrl;
+
             const payload = {
                 sku: formData.sku,
                 name: formData.name,
@@ -255,7 +260,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 cost_without_vat: formData.costWithoutVat,
                 vat_percentage: formData.vatPercentage,
                 price: formData.price,
-                image_url: formData.imageUrl || null
+                image_url: formData.imageUrl || defaultImageUrl
             };
 
             let productId = productToEdit?.id;

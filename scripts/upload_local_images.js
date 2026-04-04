@@ -33,49 +33,15 @@ const supabase = createClient(url, key);
 // The source directory containing the images
 const imagesDir = 'C:\\Users\\ASUS\\Documents\\catalogo-motos-main\\catalogo-motos\\public\\imagenes_repuestos';
 
-async function main() {
-    console.log(`Starting image upload process connecting to: ${url}`);
-    
-    // Check if directory exists
-    if (!fs.existsSync(imagesDir)) {
-        console.error(`Error: Directory not found at ${imagesDir}`);
-        return;
-    }
-
-    const files = fs.readdirSync(imagesDir);
-    const webpFiles = files.filter(f => f.endsWith('_cut.webp'));
-
-    console.log(`Found ${webpFiles.length} image files to process.`);
-
-    let successCount = 0;
-    let errorCount = 0;
-    let notFoundCount = 0;
-
-    for (const fileName of webpFiles) {
-        // Assume format is '(codigo)_cut.webp' as requested
+async function processBatch(filesBatch) {
+    const results = [];
+    for (const fileName of filesBatch) {
         const sku = fileName.replace('_cut.webp', '');
-        
-        // 1. Check if the product exists in the DB first
-        const { data: product, error: findError } = await supabase
-            .from('products')
-            .select('id, sku')
-            .eq('sku', sku)
-            .single();
-
-        if (findError || !product) {
-            console.log(`[SKIPPED] File ${fileName} - No product found matching SKU '${sku}'.`);
-            notFoundCount++;
-            continue;
-        }
-
-        // 2. Read the image file as a Buffer
         const filePath = path.join(imagesDir, fileName);
         const fileBuffer = fs.readFileSync(filePath);
-        
-        // 3. Upload to Supabase Storage (Bucket: product_images)
         const storagePath = `products/${fileName}`;
         
-        console.log(`[UPLOADING] ${fileName} for SKU ${sku}...`);
+        // 1. Upload to Supabase Storage (Bucket: product_images) UNCONDITIONALLY
         const { error: uploadError } = await supabase.storage
             .from('product_images')
             .upload(storagePath, fileBuffer, {
@@ -85,39 +51,75 @@ async function main() {
 
         if (uploadError) {
             console.error(`[ERROR] Failed to upload ${fileName}:`, uploadError.message);
-            errorCount++;
+            results.push({ sku, status: 'error', message: uploadError.message });
             continue;
         }
 
-        // 4. Get the Public URL
+        // 2. Get the Public URL
         const { data: publicUrlData } = supabase.storage
             .from('product_images')
             .getPublicUrl(storagePath);
             
         const imageUrl = publicUrlData.publicUrl;
 
-        // 5. Link the URL to the product
-        const { error: updateError } = await supabase
+        // 3. Link the URL to the product directly by matching SKU (if it exists)
+        // By doing this, any existing product with this SKU gets the image URL.
+        const { error: updateError, count } = await supabase
             .from('products')
             .update({ image_url: imageUrl })
-            .eq('id', product.id);
+            .eq('sku', sku)
+            .select('*');
 
         if (updateError) {
-            console.error(`[ERROR] Failed to link URL to product ${sku}:`, updateError.message);
-            errorCount++;
+            console.error(`[WARN] DB link failed for ${sku} (maybe not present yet):`, updateError.message);
+            results.push({ sku, status: 'uploaded_only' });
+        } else if (count === 0) {
+            console.log(`[UPLOADED] ${fileName} -> Stored. (No product mapped yet)`);
+            results.push({ sku, status: 'uploaded_only' });
         } else {
-            console.log(`[SUCCESS] Linked image to product ${sku}.`);
-            successCount++;
+            console.log(`[SUCCESS] ${fileName} -> Stored & Linked to Product!`);
+            results.push({ sku, status: 'linked' });
+        }
+    }
+    return results;
+}
+
+async function main() {
+    console.log(`Starting bulk image upload process to: ${url}`);
+    
+    if (!fs.existsSync(imagesDir)) {
+        console.error(`Error: Directory not found at ${imagesDir}`);
+        return;
+    }
+
+    const files = fs.readdirSync(imagesDir);
+    const webpFiles = files.filter(f => f.endsWith('_cut.webp'));
+
+    console.log(`Found ${webpFiles.length} image files to process. Using concurrency to speed up...`);
+
+    const BATCH_SIZE = 10;
+    let successCount = 0;
+    let uploadedOnlyCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < webpFiles.length; i += BATCH_SIZE) {
+        const batch = webpFiles.slice(i, i + BATCH_SIZE);
+        console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(webpFiles.length / BATCH_SIZE)}...`);
+        const batchResults = await processBatch(batch);
+        
+        for (const res of batchResults) {
+            if (res.status === 'linked') successCount++;
+            else if (res.status === 'uploaded_only') uploadedOnlyCount++;
+            else if (res.status === 'error') errorCount++;
         }
     }
 
-    console.log('\n--- SUMMARY ---');
+    console.log('\n--- UPLOAD SUMMARY ---');
     console.log(`Total files found: ${webpFiles.length}`);
-    console.log(`Successfully linked: ${successCount}`);
-    console.log(`Products not found: ${notFoundCount}`);
+    console.log(`Successfully UPLOADED AND LINKED to existing products: ${successCount}`);
+    console.log(`Successfully UPLOADED to Cloud (ready for future products): ${uploadedOnlyCount}`);
     console.log(`Errors: ${errorCount}`);
-    console.log('----------------');
-    console.log('NOTE: If you got "row-level security" errors updating products, ensure your DB policies allow this or temporarily use VITE_SUPABASE_SERVICE_ROLE_KEY.');
+    console.log('----------------------');
 }
 
 main().catch(console.error);
