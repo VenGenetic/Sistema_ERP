@@ -46,7 +46,8 @@ async function processBatch(filesBatch) {
             .from('product_images')
             .upload(storagePath, fileBuffer, {
                 contentType: 'image/webp',
-                upsert: true
+                upsert: true,
+                cacheControl: '31536000'
             });
 
         if (uploadError) {

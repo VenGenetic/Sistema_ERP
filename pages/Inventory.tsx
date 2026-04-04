@@ -6,6 +6,7 @@ import { BatchProductEntry } from '../components/BatchProductEntry'; // New Comp
 import { PartProfileModal } from '../components/PartProfileModal'; // New Component
 import { ProductModal } from '../components/ProductModal';
 import { FitmentSearch } from '../components/FitmentSearch'; // New Component
+import { getThumbnailUrl } from '../utils/image';
 import { utils, writeFile } from 'xlsx';
 
 // Define types based on our join queries
@@ -879,15 +880,24 @@ const Inventory: React.FC = () => {
                                                                 chevron_right
                                                             </button>
                                                             {group.product?.image_url ? (
-                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm">
+                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative">
                                                                     <img 
-                                                                       src={group.product.image_url} 
+                                                                       src={getThumbnailUrl(group.product.image_url, 80, 80)} 
                                                                        alt="" 
+                                                                       loading="lazy"
+                                                                       decoding="async"
                                                                        className="h-full w-full object-cover" 
                                                                        onError={(e) => {
-                                                                           e.currentTarget.style.display = 'none';
-                                                                           e.currentTarget.parentElement!.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
-                                                                           e.currentTarget.parentElement!.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                                                           const target = e.currentTarget;
+                                                                           if (target.src.includes('render/image')) {
+                                                                               target.src = group.product.image_url || '';
+                                                                           } else {
+                                                                               target.style.display = 'none';
+                                                                               if (target.parentElement) {
+                                                                                   target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                                                                   target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                                                               }
+                                                                           }
                                                                        }}
                                                                     />
                                                                 </div>

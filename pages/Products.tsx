@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
 import { CatalogImportWizard } from '../components/CatalogImportWizard';
 import { BulkEditModal } from '../components/BulkEditModal';
+import { getThumbnailUrl } from '../utils/image';
 
 const Products: React.FC = () => {
     // ──────────────────────────────────────────────
@@ -307,16 +308,25 @@ const Products: React.FC = () => {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             {prod.image_url ? (
-                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm">
+                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative">
                                                     <img 
-                                                       src={prod.image_url} 
+                                                       src={getThumbnailUrl(prod.image_url, 80, 80)} 
                                                        alt="" 
+                                                       loading="lazy"
+                                                       decoding="async"
                                                        className="h-full w-full object-cover" 
                                                        onError={(e) => {
-                                                           // Hide broken image link and replace with placeholder if file wasn't found in storage
-                                                           e.currentTarget.style.display = 'none';
-                                                           e.currentTarget.parentElement!.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
-                                                           e.currentTarget.parentElement!.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                                           // Fallback to original if thumbnail fails, or placeholder if both fail
+                                                           const target = e.currentTarget;
+                                                           if (target.src.includes('render/image')) {
+                                                               target.src = prod.image_url || '';
+                                                           } else {
+                                                               target.style.display = 'none';
+                                                               if (target.parentElement) {
+                                                                   target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                                                   target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                                               }
+                                                           }
                                                        }}
                                                     />
                                                 </div>
