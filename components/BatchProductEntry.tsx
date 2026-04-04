@@ -164,6 +164,22 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
         }
     };
 
+    const clearAllRows = () => {
+        if (window.confirm('¿Estás seguro de que deseas eliminar todos los productos de este lote? Esta acción no se puede deshacer.')) {
+            setRows([{
+                id: Date.now().toString(),
+                sku: '',
+                name: '',
+                quantity: '1',
+                costWithoutVat: '',
+                discountedCost: '',
+                profitMargin: '0.65',
+                pvp: '',
+                costWithVat: 0
+            }]);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!globalBrandId) {
             alert('Por favor selecciona una marca para el lote.');
@@ -180,10 +196,17 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
             return;
         }
 
-        // Validate rows
-        const validRows = rows.filter(r => r.sku && r.name && r.costWithoutVat);
+        // Validate rows: Must have SKU, Name, and either Cost or Price (depending on mode)
+        const validRows = rows.filter(r => {
+            const hasSkuAndName = r.sku.trim() && r.name.trim();
+            const hasValue = entryByPrice ? (parseFloat(r.pvp) > 0) : (parseFloat(r.costWithoutVat) > 0);
+            return hasSkuAndName && hasValue;
+        });
+
         if (validRows.length === 0) {
-            alert('Debe haber al menos un producto con SKU, Nombre y Costo.');
+            alert(entryByPrice 
+                ? 'Debe haber al menos un producto con SKU, Nombre y PVP.' 
+                : 'Debe haber al menos un producto con SKU, Nombre y Costo.');
             return;
         }
 
@@ -521,7 +544,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                             ))}
                         </tbody>
                     </table>
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
                         <button
                             onClick={addRow}
                             className="flex items-center gap-2 text-primary hover:text-primary/80 font-medium text-sm transition-colors"
@@ -529,6 +552,16 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                             <span className="material-symbols-outlined text-[18px]">add_circle</span>
                             Agregar Fila
                         </button>
+
+                        {rows.length > 0 && (rows[0].sku || rows.length > 1) && (
+                            <button
+                                onClick={clearAllRows}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg text-xs font-semibold transition-all border border-transparent hover:border-red-200"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                                Limpiar Todo el Lote
+                            </button>
+                        )}
                     </div>
                 </div>
 

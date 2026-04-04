@@ -286,7 +286,20 @@ const Products: React.FC = () => {
                                         />
                                     </td>
                                     <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400">{prod.sku}</td>
-                                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{prod.name}</td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            {prod.image_url ? (
+                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm">
+                                                    <img src={prod.image_url} alt="" className="h-full w-full object-cover" />
+                                                </div>
+                                            ) : (
+                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
+                                                </div>
+                                            )}
+                                            <span className="font-bold text-slate-900 dark:text-white">{prod.name}</span>
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.category || '—'}</td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.brands?.name || '—'}</td>
                                     <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white">

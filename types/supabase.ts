@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -501,6 +501,7 @@ export type Database = {
           cost_without_vat: number | null
           created_at: string | null
           id: number
+          image_url: string | null
           min_stock_threshold: number | null
           name: string
           price: number | null
@@ -516,6 +517,7 @@ export type Database = {
           cost_without_vat?: number | null
           created_at?: string | null
           id?: number
+          image_url?: string | null
           min_stock_threshold?: number | null
           name: string
           price?: number | null
@@ -531,6 +533,7 @@ export type Database = {
           cost_without_vat?: number | null
           created_at?: string | null
           id?: number
+          image_url?: string | null
           min_stock_threshold?: number | null
           name?: string
           price?: number | null

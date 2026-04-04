@@ -215,7 +215,7 @@
             "codigo_referencia": "CB250-267",
             "nombre": "DISCO FRENO POST TEKKEN",
             "marca": "DAYTONA",
-            "precio": 31,
+            "precio": 18,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -385,7 +385,7 @@
             "codigo_referencia": "CB200WF-09JRXN",
             "nombre": "PLACA TANQUE (I-D) WOLF 200CC ROJO",
             "marca": "DAYTONA",
-            "precio": 117,
+            "precio": 150,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -405,7 +405,7 @@
             "codigo_referencia": "CB250-165R",
             "nombre": "PLACA TANQUE (I-D) SHARK II 19-22 ROJO",
             "marca": "DAYTONA",
-            "precio": 23,
+            "precio": 48,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -1071,6 +1071,36 @@
             "stock": true
         },
         {
+            "id": "JG4VTEK-C418",
+            "codigo_referencia": "JG4VTEK-C418",
+            "nombre": "Juegos de valvulas",
+            "marca": "DAYTONA",
+            "precio": 41,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CG200WEV2-026",
+            "codigo_referencia": "CG200WEV2-026",
+            "nombre": "faros y mascarilla win evo 2026",
+            "marca": "DAYTONA",
+            "precio": 161,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CB200FC-047",
+            "codigo_referencia": "CB200FC-047",
+            "nombre": "TELESCOPICAS (I-D) FORCE 200/DK XTZ 250CC",
+            "marca": "DAYTONA",
+            "precio": 202,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
             "id": "CB200WF-006",
             "codigo_referencia": "CB200WF-006",
             "nombre": "KIT RUN Y LUCES WOLF/ADV200/RANGER CFZ 250/HONDA CB190",
@@ -1296,16 +1326,6 @@
             "nombre": "DISCO FRENO POST. EAGLE 150CC III/DK FALCON",
             "marca": "DAYTONA",
             "precio": 15,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
-            "id": "CB250CRF-047",
-            "codigo_referencia": "CB250CRF-047",
-            "nombre": "DISCO FRENO POST CROSSFIRE/XTREEM/THUNDER F16/DK HORNET/IGM WIND250/Z1 V8200",
-            "marca": "DAYTONA",
-            "precio": 29,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -1706,6 +1726,36 @@
             "nombre": "ESTRIBO DEL CON BASE (I-D) CROSSFIRE/XTREEM/THUNDER F16/DK HORNET/IGM WIND250/Z1 V8200",
             "marca": "DAYTONA",
             "precio": 115,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CB250CRF-002",
+            "codigo_referencia": "CB250CRF-002",
+            "nombre": "MONOSHOCK 260MM CROSSFIRE/XTREEM/TH F16/DK HORNET/IGM WIND250/Z1 V8200 ROJO",
+            "marca": "DAYTONA",
+            "precio": 86,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CB300SW-022N",
+            "codigo_referencia": "CB300SW-022N",
+            "nombre": "GUARDAFANGO DEL SUPER WOLF 300 NEGRO",
+            "marca": "DAYTONA",
+            "precio": 0,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CG150SPF-023",
+            "codigo_referencia": "CG150SPF-023",
+            "nombre": "MANIGUETA EMBRAGUE CON BASE UNIVERSAL SPITFIRE/DELTA/PANTHER/WORKFORCE/SKR/THOR/GP200/XY250GY6/EVEREST 250CC/WIN EVO II/EVEREST 300CC",
+            "marca": "DAYTONA",
+            "precio": 8,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -2331,11 +2381,11 @@
             "stock": true
         },
         {
-            "id": "FE250GP1R-007",
-            "codigo_referencia": "FE250GP1R-007",
-            "nombre": "ESPEJOS (I-D) GP1-R 250/FACTORY F370/SHM CHIEF II/CHIEF 2.5/CHIEF II PRO/THUNDER F22 250CC",
+            "id": "CB150-028T",
+            "codigo_referencia": "CB150-028T",
+            "nombre": "GUARDAFANGO DEL MONTANA 150CC NARANJA",
             "marca": "DAYTONA",
-            "precio": 19,
+            "precio": 35,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -2386,16 +2436,6 @@
             "nombre": "GUARDAFANGO DEL S1 150/180CC NEGRO",
             "marca": "DAYTONA",
             "precio": 22,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
-            "id": "CB150-028T",
-            "codigo_referencia": "CB150-028T",
-            "nombre": "GUARDAFANGO DEL MONTANA 150CC NARANJA",
-            "marca": "DAYTONA",
-            "precio": 35,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -2501,16 +2541,6 @@
             "stock": true
         },
         {
-            "id": "FE250ART-051",
-            "codigo_referencia": "FE250ART-051",
-            "nombre": "KIT FRENO DEL. ARMADO ARTIC/TEKKEN EVO/SCRAMBLER 250CC B/I",
-            "marca": "DAYTONA",
-            "precio": 54,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "CB250SC-115",
             "codigo_referencia": "CB250SC-115",
             "nombre": "TELESCOPICAS (I-D) SCORPION/BULL/SHARK II PLOMO B/N",
@@ -2536,6 +2566,16 @@
             "nombre": "TELESCOPICAS (I-D) EAGLE 150CC I-II-III-V/DK FALCON",
             "marca": "DAYTONA",
             "precio": 143,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "FE250GP1R-007",
+            "codigo_referencia": "FE250GP1R-007",
+            "nombre": "ESPEJOS (I-D) GP1-R 250/FACTORY F370/SHM CHIEF II/CHIEF 2.5/CHIEF II PRO/THUNDER F22 250CC",
+            "marca": "DAYTONA",
+            "precio": 19,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -2625,7 +2665,7 @@
             "codigo_referencia": "VEL-1620",
             "nombre": "VELOCIMETRO DAYTONA DY200WINGEVO BOST",
             "marca": "DAYTONA",
-            "precio": 42,
+            "precio": 55,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -3161,16 +3201,6 @@
             "stock": true
         },
         {
-            "id": "CG150IND-005",
-            "codigo_referencia": "CG150IND-005",
-            "nombre": "PEDAL FRENO DELTA/PANTHER/INDY 150",
-            "marca": "DAYTONA",
-            "precio": 7,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "CGEA150-041",
             "codigo_referencia": "CGEA150-041",
             "nombre": "MONOSHOCK 280MM (TIPO U) EAGLE 150CC I-II-III/MOTORNTANA150/DK FALCON NEGRO",
@@ -3406,6 +3436,16 @@
             "nombre": "DIRECCIONALES (SET4) GP1 250/TUNDRA VELOCE 250CC",
             "marca": "DAYTONA",
             "precio": 32,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CG150IND-005",
+            "codigo_referencia": "CG150IND-005",
+            "nombre": "PEDAL FRENO DELTA/PANTHER/INDY 150",
+            "marca": "DAYTONA",
+            "precio": 7,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true

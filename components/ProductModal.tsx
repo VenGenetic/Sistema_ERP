@@ -18,6 +18,7 @@ interface ProductModalProps {
         cost_without_vat: number;
         vat_percentage: number;
         price: number;
+        image_url?: string | null;
     } | null;
 }
 
@@ -40,6 +41,7 @@ const calcMargin = (costWithoutVat: number, vatPercentage: number, price: number
 
 export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     const [loading, setLoading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [entryByPrice, setEntryByPrice] = useState(false);
     const [formData, setFormData] = useState({
         sku: '',
@@ -50,7 +52,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         profitMargin: 0.65,
         costWithoutVat: 0,
         vatPercentage: 15.0,
-        price: 0
+        price: 0,
+        imageUrl: ''
     });
 
     // Stock Adjustment State
@@ -113,7 +116,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     profitMargin: Math.round(margin * 100) / 100,
                     costWithoutVat: cwv,
                     vatPercentage: vat,
-                    price: Math.round(derivedPrice * 100) / 100
+                    price: Math.round(derivedPrice * 100) / 100,
+                    imageUrl: productToEdit.image_url || ''
                 });
             } else {
                 setFormData({
@@ -125,7 +129,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     profitMargin: 0.65,
                     costWithoutVat: 0,
                     vatPercentage: 15.0,
-                    price: 0
+                    price: 0,
+                    imageUrl: ''
                 });
             }
             // Reset stock adjustment
@@ -196,6 +201,39 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const costoConIva = costWithVat(formData.costWithoutVat, formData.vatPercentage);
     const gananciaAbsoluta = r(formData.price - costoConIva);
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `products/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('product_images')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage
+                .from('product_images')
+                .getPublicUrl(filePath);
+
+            setFormData(prev => ({ ...prev, imageUrl: data.publicUrl }));
+        } catch (error: any) {
+            console.error('Error uploading image:', error);
+            alert('Error al subir imagen: ' + error.message);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleRemoveImage = () => {
+        setFormData(prev => ({ ...prev, imageUrl: '' }));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -216,7 +254,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 profit_margin: formData.profitMargin,
                 cost_without_vat: formData.costWithoutVat,
                 vat_percentage: formData.vatPercentage,
-                price: formData.price
+                price: formData.price,
+                image_url: formData.imageUrl || null
             };
 
             let productId = productToEdit?.id;
@@ -312,6 +351,37 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5">
+                    {/* ═══ Image Upload ═══ */}
+                    <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group">
+                        {formData.imageUrl ? (
+                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <img src={formData.imageUrl} alt="Product" className="w-full h-full object-cover" />
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveImage}
+                                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500 backdrop-blur-sm"
+                                >
+                                    <span className="material-symbols-outlined text-[16px] leading-none">close</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <label className="flex flex-col items-center justify-center w-full h-full min-h-[128px] cursor-pointer">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    {isUploading ? (
+                                        <span className="material-symbols-outlined text-[32px] text-primary animate-spin">progress_activity</span>
+                                    ) : (
+                                        <>
+                                            <span className="material-symbols-outlined text-[32px] text-slate-400 mb-2 group-hover:text-primary transition-colors">add_photo_alternate</span>
+                                            <p className="mb-1 text-sm text-slate-600 dark:text-slate-400 font-medium">Click para subir foto central</p>
+                                            <p className="text-xs text-slate-400 dark:text-slate-500">JPG, PNG o WEBP</p>
+                                        </>
+                                    )}
+                                </div>
+                                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
+                            </label>
+                        )}
+                    </div>
+
                     {/* ═══ Core Fields ═══ */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="col-span-1 md:col-span-2">
