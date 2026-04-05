@@ -87,9 +87,6 @@ const Inventory: React.FC = () => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportIvaPercent, setExportIvaPercent] = useState<number>(12);
 
-    // Expanded products state for grouped view
-    const [expandedProductIds, setExpandedProductIds] = useState<number[]>([]);
-
     // Part Profile 360 Modal
     const [isPartProfileOpen, setIsPartProfileOpen] = useState(false);
     const [selectedPartProfileData, setSelectedPartProfileData] = useState<any>(null);
@@ -495,12 +492,6 @@ const Inventory: React.FC = () => {
         setFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    const toggleExpandProduct = (productId: number) => {
-        setExpandedProductIds(prev =>
-            prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
-        );
-    };
-
     // ──────────────────────────────────────────────
     // PAGINATION HELPERS
     // ──────────────────────────────────────────────
@@ -866,19 +857,12 @@ const Inventory: React.FC = () => {
                                     )}
                                     {groupedStockItems.map(group => {
                                         const isContextuallyDimmed = selectedWarehouseId !== null;
-                                        const isExpanded = selectedWarehouseId !== null || expandedProductIds.includes(group.product_id);
 
                                         return (
                                             <React.Fragment key={group.product_id}>
                                                 <tr className={`transition-colors group cursor-pointer ${isContextuallyDimmed ? 'opacity-60 bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`} onClick={() => handleOpenPartProfile(group)}>
                                                     <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                                                         <div className="flex items-center gap-3">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); toggleExpandProduct(group.product_id); }}
-                                                                className={`material-symbols-outlined text-[20px] p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                                                            >
-                                                                chevron_right
-                                                            </button>
                                                             {group.product?.image_url ? (
                                                                 <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative">
                                                                     <img 
@@ -951,28 +935,6 @@ const Inventory: React.FC = () => {
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                {isExpanded && group.details.map((detail: StockItem) => {
-                                                    if (selectedWarehouseId && detail.warehouse_id !== selectedWarehouseId) {
-                                                        return null;
-                                                    }
-
-                                                    const isHighlighted = selectedWarehouseId === detail.warehouse_id;
-
-                                                    return (
-                                                        <tr key={detail.id} className={`${isHighlighted ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-l-primary' : 'bg-slate-50/50 dark:bg-slate-800/50'} border-t-0`}>
-                                                            <td className={`px-6 py-3 pl-14 text-sm ${isHighlighted ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`} colSpan={3}>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="material-symbols-outlined text-[16px] opacity-70">subdirectory_arrow_right</span>
-                                                                    Almacén: <span className={`font-medium ${isHighlighted ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>{detail.warehouses?.name}</span>
-                                                                </div>
-                                                            </td>
-                                                            <td className={`px-6 py-3 text-right font-semibold ${isHighlighted ? 'text-primary text-base' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                                {detail.current_stock}
-                                                            </td>
-                                                            <td colSpan={2}></td>
-                                                        </tr>
-                                                    );
-                                                })}
                                             </React.Fragment>
                                         );
                                     })}
