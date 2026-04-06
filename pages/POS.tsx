@@ -49,6 +49,14 @@ const POS: React.FC = () => {
     const [loadingDraft, setLoadingDraft] = useState(false);
     const [activeDraftId, setActiveDraftId] = useState<number | null>(null);
 
+    // Manual Sales State
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [manualProductName, setManualProductName] = useState('');
+    const [manualProductCost, setManualProductCost] = useState('');
+    const [manualProductPrice, setManualProductPrice] = useState('');
+    const [manualProductQty, setManualProductQty] = useState(1);
+    const [isAddingManual, setIsAddingManual] = useState(false);
+
     // Refs
     const searchInputRef = useRef<HTMLInputElement>(null);
     const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -457,6 +465,70 @@ const POS: React.FC = () => {
         }
     };
 
+    const handleAddManualProduct = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsAddingManual(true);
+        try {
+            const cost = parseFloat(manualProductCost);
+            const price = parseFloat(manualProductPrice);
+            if (isNaN(cost) || isNaN(price)) {
+                throw new Error("El costo y precio deben ser números válidos");
+            }
+            if (price < cost) {
+                alert("Advertencia: El precio de venta no debería ser menor al costo de compra.");
+            }
+
+            const newSku = `MANUAL-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+            const { data, error } = await supabase.from('products').insert([{
+                name: manualProductName.trim().toUpperCase() || 'PRODUCTO MANUAL',
+                sku: newSku,
+                price: price,
+                cost_without_vat: cost,
+                vat_percentage: 12,
+                status: 'draft',
+                demand_count: 1
+            }]).select().single();
+
+            if (error || !data) throw error;
+
+            const mappedProduct: Product = {
+                id: data.id,
+                sku: data.sku,
+                name: data.name,
+                price: data.price,
+                cost_without_vat: data.cost_without_vat,
+                vat_percentage: data.vat_percentage || 0,
+                final_cost_with_vat: data.cost_without_vat * (1 + (data.vat_percentage || 0) / 100)
+            };
+
+            const item: InventoryResult = {
+                product: mappedProduct,
+                warehouse_id: 0, // Code 0 = non physical inventory logic
+                warehouse_name: 'Venta Libre',
+                current_stock: 9999
+            };
+
+            addToCart(item);
+
+            const currentStore = useCartStore.getState();
+            const addedItem = currentStore.cart.find(c => c.product.id === data.id);
+            if (addedItem && manualProductQty > 1) {
+                updateQuantity(addedItem.id, manualProductQty);
+            }
+
+            setManualProductName('');
+            setManualProductCost('');
+            setManualProductPrice('');
+            setManualProductQty(1);
+            alert("Producto manual agregado a la venta correctamente.");
+        } catch (err: any) {
+            console.error(err);
+            alert("Error agregando producto manual.");
+        } finally {
+            setIsAddingManual(false);
+        }
+    };
+
     const handleAddToCart = (item: InventoryResult) => {
         addToCart(item);
         setSearchQuery('');
@@ -715,29 +787,75 @@ const POS: React.FC = () => {
                 {/* Left Side: Product Search & Cart */}
                 <div className="flex-1 flex flex-col p-4 md:p-6 pb-2 md:pb-4 overflow-y-auto">
 
-                    {/* Search Bar */}
+                    {/* Search Bar / Manual Toggle */}
+                    <div className="mb-4 z-10 bg-white p-1 rounded-lg border border-slate-200 inline-flex shadow-sm">
+                        <button 
+                            className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${!isManualMode ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            onClick={() => setIsManualMode(false)}
+                        >
+                            Catálogo
+                        </button>
+                        <button 
+                            className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${isManualMode ? 'bg-amber-50 text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            onClick={() => setIsManualMode(true)}
+                        >
+                            Venta Manual
+                        </button>
+                    </div>
+
                     <div className="mb-4 relative z-10">
-                        <div className="relative flex-1">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                {isSearching ? (
-                                    <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                ) : (
-                                    <Search className="h-5 w-5 text-slate-400" />
-                                )}
+                        {isManualMode ? (
+                            <form onSubmit={handleAddManualProduct} className="bg-white p-4 border border-amber-200 rounded-xl shadow-sm text-left">
+                                <h3 className="font-bold text-amber-800 mb-3 text-sm flex items-center gap-2">
+                                    <AlertTriangle size={16} /> Agregar Producto No Registrado
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Nombre / Descripción</label>
+                                        <input type="text" required autoFocus value={manualProductName} onChange={e => setManualProductName(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 uppercase" placeholder="Ej: ESPEJO GRANDE" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Costo S/I ($)</label>
+                                        <input type="number" step="0.01" min="0" required value={manualProductCost} onChange={e => setManualProductCost(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 font-mono" placeholder="0.00" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Precio Final ($)</label>
+                                        <input type="number" step="0.01" min="0" required value={manualProductPrice} onChange={e => setManualProductPrice(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 font-mono" placeholder="0.00" />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-end gap-3 mt-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Cantidad</label>
+                                        <input type="number" min="1" required value={manualProductQty} onChange={e => setManualProductQty(parseInt(e.target.value) || 1)} className="w-20 border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 font-mono text-center" />
+                                    </div>
+                                    <button disabled={isAddingManual || !manualProductName.trim()} type="submit" className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-6 rounded-lg text-sm transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center">
+                                        {isAddingManual ? 'Agregando...' : 'Agregar a la Venta'}
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div className="relative flex-1">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    {isSearching ? (
+                                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                    ) : (
+                                        <Search className="h-5 w-5 text-slate-400" />
+                                    )}
+                                </div>
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Buscar producto (F2)"
+                                    className="block w-full pl-10 pr-3 py-3 md:py-4 border border-slate-300 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-lg shadow-sm"
+                                    autoFocus
+                                />
                             </div>
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Buscar producto (F2)"
-                                className="block w-full pl-10 pr-3 py-3 md:py-4 border border-slate-300 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-lg shadow-sm"
-                                autoFocus
-                            />
-                        </div>
+                        )}
 
                         {/* Search Results Dropdown */}
-                        {searchQuery.trim().length > 0 && (
+                        {!isManualMode && searchQuery.trim().length > 0 && (
                             <div className="absolute top-full mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-96 overflow-y-auto">
                                 {searchResults.length > 0 ? (
                                     <ul className="divide-y divide-slate-100">
