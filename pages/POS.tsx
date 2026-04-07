@@ -8,7 +8,7 @@ import { PaymentModal } from '../components/pos/PaymentModal';
 
 const POS: React.FC = () => {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     // Global State
     const {
@@ -663,7 +663,8 @@ const POS: React.FC = () => {
                 p_items: itemsPayload,
                 p_closer_id: promoCloserId || customer.claimed_by || null,
                 p_promo_code: promoCode || null,
-                p_shipping_expense_account_id: shippingExpenseAccountId || null
+                p_shipping_expense_account_id: shippingExpenseAccountId || null,
+                p_draft_id: activeDraftId || null
             });
 
             if (error) {
@@ -675,6 +676,12 @@ const POS: React.FC = () => {
             clearCart();
             setSearchQuery('');
             setPromoCode('');
+            
+            // Si la venta provenía de un borrador, limpiamos la URL para no volver a cargarlo
+            if (activeDraftId) {
+                setSearchParams({});
+                setActiveDraftId(null);
+            }
             setPromoCloserName('');
             setPromoCloserId(null);
             setPromoError('');

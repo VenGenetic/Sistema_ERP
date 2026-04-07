@@ -9,7 +9,8 @@ CREATE OR REPLACE FUNCTION process_pos_sale(
     p_closer_id UUID DEFAULT NULL,
     p_promo_code TEXT DEFAULT NULL,
     p_shipping_address TEXT DEFAULT 'POS Walk-in',
-    p_shipping_expense_account_id INTEGER DEFAULT NULL
+    p_shipping_expense_account_id INTEGER DEFAULT NULL,
+    p_draft_id INTEGER DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -34,6 +35,10 @@ DECLARE
     v_max_manual_discount_pct NUMERIC := 0;
     v_item_discount_pct NUMERIC;
 BEGIN
+    -- STEP 0: Sanity checks
+    IF p_items IS NULL OR array_length(p_items, 1) IS NULL THEN
+        RAISE EXCEPTION 'No se puede procesar una venta sin productos.';
+    END IF;
     -- STEP 0: Resolve promo code → closer_id
     v_resolved_closer_id := p_closer_id;
     
@@ -59,6 +64,17 @@ BEGIN
     -- STEP 1: Calculate totals, verify stock, enforce price guardrails
     FOREACH v_item IN ARRAY p_items
     LOOP
+        IF v_item.quantity <= 0 THEN
+            RAISE EXCEPTION 'La cantidad debe ser mayor a 0 para el producto ID %', v_item.product_id;
+        END IF;
+
+        IF v_item.unit_price < 0 THEN
+            RAISE EXCEPTION 'El precio unitario no puede ser negativo para el producto ID %', v_item.product_id;
+        END IF;
+
+        IF v_item.unit_cost IS NULL OR v_item.unit_cost < 0 THEN
+            v_item.unit_cost := 0;
+        END IF;
         SELECT cost_without_vat, COALESCE(vat_percentage, 0), price
         INTO v_product_cost, v_vat_percent, v_product_price
         FROM products
@@ -111,30 +127,52 @@ BEGIN
 
     v_total_amount := v_total_amount + p_shipping_cost;
 
-    -- STEP 3: Create the Order AS DRAFT (Borrador)
-    INSERT INTO orders (
-        customer_id, 
-        closer_id, 
-        promo_code, 
-        status, 
-        total_amount, 
-        shipping_cost, 
-        shipping_address,
-        payment_account_id,
-        shipping_expense_account_id
-    )
-    VALUES (
-        p_customer_id, 
-        v_resolved_closer_id, 
-        p_promo_code, 
-        'Borrador',
-        v_total_amount, 
-        p_shipping_cost,
-        p_shipping_address,
-        p_payment_account_id,
-        p_shipping_expense_account_id
-    )
-    RETURNING id INTO v_order_id;
+    -- STEP 3: Create or Update the Order AS DRAFT (Borrador)
+    IF p_draft_id IS NOT NULL THEN
+        -- Verify it is still a draft to prevent overriding completed orders
+        IF NOT EXISTS (SELECT 1 FROM orders WHERE id = p_draft_id AND status = 'Borrador'::order_status_enum) THEN
+            RAISE EXCEPTION 'Esta orden ya fue procesada o cancelada y no puede modificarse.';
+        END IF;
+
+        UPDATE orders SET
+            customer_id = p_customer_id,
+            closer_id = v_resolved_closer_id,
+            promo_code = p_promo_code,
+            total_amount = v_total_amount,
+            shipping_cost = p_shipping_cost,
+            shipping_address = p_shipping_address,
+            payment_account_id = p_payment_account_id,
+            shipping_expense_account_id = p_shipping_expense_account_id
+        WHERE id = p_draft_id
+        RETURNING id INTO v_order_id;
+
+        -- Clean up old items before replacing
+        DELETE FROM order_items WHERE order_id = v_order_id;
+    ELSE
+        INSERT INTO orders (
+            customer_id, 
+            closer_id, 
+            promo_code, 
+            status, 
+            total_amount, 
+            shipping_cost, 
+            shipping_address,
+            payment_account_id,
+            shipping_expense_account_id
+        )
+        VALUES (
+            p_customer_id, 
+            v_resolved_closer_id, 
+            p_promo_code, 
+            'Borrador'::order_status_enum,
+            v_total_amount, 
+            p_shipping_cost,
+            p_shipping_address,
+            p_payment_account_id,
+            p_shipping_expense_account_id
+        )
+        RETURNING id INTO v_order_id;
+    END IF;
 
     -- STEP 4: Process each item
     FOREACH v_item IN ARRAY p_items
@@ -169,8 +207,8 @@ BEGIN
         VALUES (v_order_id, v_item.product_id, v_item.quantity, v_item.unit_price, v_item.unit_cost);
     END LOOP;
 
-    -- STEP 5: Mark as Entregado (triggers financial accounting)
-    UPDATE orders SET status = 'Entregado' WHERE id = v_order_id;
+    -- STEP 5: Mark as completed (triggers financial accounting)
+    UPDATE orders SET status = 'Entregado'::order_status_enum WHERE id = v_order_id;
 
     -- STEP 6: Return Success
     RETURN jsonb_build_object(
