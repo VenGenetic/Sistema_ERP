@@ -334,10 +334,6 @@ const POS: React.FC = () => {
             setSearchResults(results);
             setIsSearching(false);
 
-            // Lost demand tracking
-            if (results.length === 0) {
-                await handleRegistrarDemanda(query, 'out_of_stock');
-            }
 
         }, 300);
 

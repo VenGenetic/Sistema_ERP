@@ -24,6 +24,7 @@ const NotFound = React.lazy(() => import('./pages/NotFound'));
 const DispatchPipeline = React.lazy(() => import('./pages/DispatchPipeline'));
 const CommissionDashboard = React.lazy(() => import('./pages/CommissionDashboard'));
 const DataSteward = React.lazy(() => import('./pages/DataSteward'));
+const DailyRegistry = React.lazy(() => import('./pages/DailyRegistry'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -60,6 +61,7 @@ const App: React.FC = () => {
                 <Route path="data-steward" element={<DataSteward />} />
                 <Route path="commissions" element={<CommissionDashboard />} />
                 <Route path="finance/*" element={<Finance />} />
+                <Route path="daily-registry" element={<DailyRegistry />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Route>

@@ -106,10 +106,16 @@ const Layout: React.FC = () => {
         )}
 
         {(isAdmin || permissions?.finance?.read) && (
-          <Link to="/finance" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('finance') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
-            Finanzas
-          </Link>
+          <>
+            <Link to="/finance" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('finance') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+              <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+              Finanzas
+            </Link>
+            <Link to="/daily-registry" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('daily-registry') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+              <span className="material-symbols-outlined text-[20px]">point_of_sale</span>
+              Cierre Diario
+            </Link>
+          </>
         )}
 
       </nav>
