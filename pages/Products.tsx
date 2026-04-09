@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
 import { CatalogImportWizard } from '../components/CatalogImportWizard';
@@ -20,6 +21,10 @@ const Products: React.FC = () => {
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
     const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
+
+    // Export ZIP
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportProgress, setExportProgress] = useState({ current: 0, total: 0 });
 
     // ──────────────────────────────────────────────
     // 2. FILTER, SORT, PAGINATION STATES
@@ -143,6 +148,75 @@ const Products: React.FC = () => {
         fetchCatalogData(pagination.page);
     };
 
+    // ── Export ZIP handler ──
+    const handleExportZip = async () => {
+        setIsExporting(true);
+        setExportProgress({ current: 0, total: 0 });
+        try {
+            // 1. Obtener TODOS los productos con imagen enlazada (sin límite de página)
+            let allProducts: any[] = [];
+            let from = 0;
+            const batchSize = 1000;
+            while (true) {
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('sku, image_url')
+                    .not('image_url', 'is', null)
+                    .range(from, from + batchSize - 1);
+                if (error) throw error;
+                if (!data || data.length === 0) break;
+                allProducts = allProducts.concat(data);
+                if (data.length < batchSize) break;
+                from += batchSize;
+            }
+
+            if (allProducts.length === 0) {
+                alert('No se encontraron productos con imágenes enlazadas.');
+                return;
+            }
+
+            setExportProgress({ current: 0, total: allProducts.length });
+
+            // 2. Crear el ZIP
+            const zip = new JSZip();
+            let success = 0;
+            let failed = 0;
+
+            for (let i = 0; i < allProducts.length; i++) {
+                const { sku, image_url } = allProducts[i];
+                setExportProgress({ current: i + 1, total: allProducts.length });
+                try {
+                    const response = await fetch(image_url);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const blob = await response.blob();
+                    const arrayBuffer = await blob.arrayBuffer();
+                    zip.file(`${sku}.webp`, arrayBuffer);
+                    success++;
+                } catch {
+                    failed++;
+                }
+            }
+
+            // 3. Generar y descargar el ZIP
+            const content = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `imagenes_productos_${new Date().toISOString().slice(0, 10)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            alert(`✅ Exportación completa\n\n📦 ${success} imágenes exportadas\n❌ ${failed} fallidas`);
+        } catch (err: any) {
+            alert(`Error durante la exportación: ${err.message}`);
+        } finally {
+            setIsExporting(false);
+            setExportProgress({ current: 0, total: 0 });
+        }
+    };
+
     // ── Selection handlers ──
     const toggleSelectAll = () => {
         if (selectedIds.size === products.length) {
@@ -206,6 +280,26 @@ const Products: React.FC = () => {
                     >
                         <span className="material-symbols-outlined text-[20px]">magic_button</span>
                         Importar Catálogo
+                    </button>
+                    <button
+                        onClick={handleExportZip}
+                        disabled={isExporting}
+                        className="px-4 py-2 bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400 border border-violet-200 dark:border-violet-800 rounded-lg flex items-center gap-2 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        title="Descargar todas las imágenes enlazadas como ZIP"
+                    >
+                        {isExporting ? (
+                            <>
+                                <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                                {exportProgress.total > 0
+                                    ? `${exportProgress.current}/${exportProgress.total}...`
+                                    : 'Preparando...'}
+                            </>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined text-[20px]">folder_zip</span>
+                                Exportar ZIP
+                            </>
+                        )}
                     </button>
                     <button
                         onClick={() => handleOpenModal()}

@@ -951,16 +951,6 @@
             "stock": true
         },
         {
-            "id": "CB250GP1-023",
-            "codigo_referencia": "CB250GP1-023",
-            "nombre": "ESTRIBOS ARMADOS CON BASE (I-D) GP1 250/TUNDRA VELOCE 250CC",
-            "marca": "DAYTONA",
-            "precio": 124,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "CBB250XP-036",
             "codigo_referencia": "CBB250XP-036",
             "nombre": "ESTRIBO DEL. CON BASE (I-D) XPOWER/GP1-R 250/FK370/FK 400/F 370/CHEF II/CHIEF II PRO/THD SR71/PEGASSO DUKK 250CC/FACTORY FZ 300CC",
@@ -1141,6 +1131,16 @@
             "stock": true
         },
         {
+            "id": "CB200WF-080",
+            "codigo_referencia": "CB200WF-080",
+            "nombre": "KIT EMBRAGUE ARMADO 6H/6D 73T (6V/BOCIN) WOLF/AXXO ASFALT/AXXO F51 200cc",
+            "marca": "DAYTONA",
+            "precio": 54,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
             "id": "CB250GP1-029",
             "codigo_referencia": "CB250GP1-029",
             "nombre": "PORTA PLACAS GP1 250/TUNDRA VELOCE 250CC",
@@ -1176,16 +1176,6 @@
             "nombre": "TELESCOPICAS (I-D) ARTIC 250 B/N",
             "marca": "DAYTONA",
             "precio": 228,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
-            "id": "CB200WF-080",
-            "codigo_referencia": "CB200WF-080",
-            "nombre": "KIT EMBRAGUE ARMADO 6H/6D 73T (6V/BOCIN) WOLF/AXXO ASFALT/AXXO F51 200cc",
-            "marca": "DAYTONA",
-            "precio": 54,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -1306,6 +1296,16 @@
             "nombre": "PORTA PLACAS EAGLE 150CC III/DK FALCON",
             "marca": "DAYTONA",
             "precio": 20,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CB250GP1-023",
+            "codigo_referencia": "CB250GP1-023",
+            "nombre": "ESTRIBOS ARMADOS CON BASE (I-D) GP1 250/TUNDRA VELOCE 250CC",
+            "marca": "DAYTONA",
+            "precio": 124,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -1821,16 +1821,6 @@
             "stock": true
         },
         {
-            "id": "CB200WF-021 ",
-            "codigo_referencia": "CB200WF-021 ",
-            "nombre": "INSTALACION ELECTRICA WOLF/RANGER CFZ 250/HONDA CB190 ",
-            "marca": "DAYTONA",
-            "precio": 27,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "INS2407-ELEC1",
             "codigo_referencia": "INS2407-ELEC1",
             "nombre": "INSTALACION ELECTRICA SPITFIRE 150",
@@ -2001,6 +1991,16 @@
             "stock": true
         },
         {
+            "id": "CB300SW-046",
+            "codigo_referencia": "CB300SW-046",
+            "nombre": "ESTRIBO DEL CON BASE (I-D) SUPER WOLF 300",
+            "marca": "DAYTONA",
+            "precio": 86,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
             "id": "CB200PDT-020A",
             "codigo_referencia": "CB200PDT-020A",
             "nombre": "PLACA TANQUE (I-D) PREDATOR 200 AZUL",
@@ -2111,11 +2111,11 @@
             "stock": true
         },
         {
-            "id": "CB300SW-046",
-            "codigo_referencia": "CB300SW-046",
-            "nombre": "ESTRIBO DEL CON BASE (I-D) SUPER WOLF 300",
+            "id": "CB200WF-021 ",
+            "codigo_referencia": "CB200WF-021 ",
+            "nombre": "INSTALACION ELECTRICA WOLF/RANGER CFZ 250/HONDA CB190 ",
             "marca": "DAYTONA",
-            "precio": 86,
+            "precio": 27,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -3081,16 +3081,6 @@
             "stock": true
         },
         {
-            "id": "CB250GP1-006",
-            "codigo_referencia": "CB250GP1-006",
-            "nombre": "KIT SWITCH,TAPA,LLAVES GP1 250/TUNDRA VELOCE 250CC",
-            "marca": "DAYTONA",
-            "precio": 43,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "CG200WEV-052K",
             "codigo_referencia": "CG200WEV-052K",
             "nombre": "CILINDRO Y PISTON CRUCERO 200/WING EVO I/II/SL-KM PIN 15 NEGRO",
@@ -3164,16 +3154,6 @@
             "id": "TY300-011",
             "codigo_referencia": "TY300-011",
             "nombre": "GUIA CADENILLA (1-2) ADV 300/CHIEF 30/TK CR300/RACER 300/RANGER DR300CC TY",
-            "marca": "DAYTONA",
-            "precio": 15,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
-            "id": "CB200WF-060",
-            "codigo_referencia": "CB200WF-060",
-            "nombre": "BALANCIN SET2 WOLF/AXXO ASFALT/AXXO F51 200cc",
             "marca": "DAYTONA",
             "precio": 15,
             "categoria": "General",
@@ -3511,6 +3491,16 @@
             "stock": true
         },
         {
+            "id": "CB200WF-060",
+            "codigo_referencia": "CB200WF-060",
+            "nombre": "BALANCIN SET2 WOLF/AXXO ASFALT/AXXO F51 200cc",
+            "marca": "DAYTONA",
+            "precio": 15,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
             "id": "CB200WF-102",
             "codigo_referencia": "CB200WF-102",
             "nombre": "MANIGUETA EMBRAGUE CON BASE WOLF/ADV200/RANGER CFZ 250/HONDA CB190/GY200/CG200 UNIVERSAL",
@@ -3751,16 +3741,6 @@
             "stock": true
         },
         {
-            "id": "CG150-115",
-            "codigo_referencia": "CG150-115",
-            "nombre": "ESPEJOS (I-D) CRUCERO 150/200",
-            "marca": "DAYTONA",
-            "precio": 5,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "CB150-027R",
             "codigo_referencia": "CB150-027R",
             "nombre": "GUARDAFANGO POST MONTANA 150CC N-ROJO",
@@ -3926,16 +3906,6 @@
             "nombre": "MESA DIRECCION ARMADA SUPER WOLF 300 B/I",
             "marca": "DAYTONA",
             "precio": 87,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
-            "id": "FE250FRC-036",
-            "codigo_referencia": "FE250FRC-036",
-            "nombre": "VELOCIMETRO DIGITAL FEROCE 250CC",
-            "marca": "DAYTONA",
-            "precio": 105,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -4451,16 +4421,6 @@
             "stock": true
         },
         {
-            "id": "CB200WF-088",
-            "codigo_referencia": "CB200WF-088",
-            "nombre": "VALVULA (AD315mm-ES26mm) PICO LARGO WOLF/FORCE/SHARK 200CC/AXXO ASFALT/AXXO F51 CB200CC",
-            "marca": "DAYTONA",
-            "precio": 10,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "CB250-309",
             "codigo_referencia": "CB250-309",
             "nombre": "VALVULA (AD315mm-ES27mm) PICO CORTO RE-250 TEKKEN/SCRAMBLER/ADV250/CROSSFIRE",
@@ -4661,31 +4621,11 @@
             "stock": true
         },
         {
-            "id": "CBB250XP-073",
-            "codigo_referencia": "CBB250XP-073",
-            "nombre": "FILTRO AIRE CON BASE XPOWER/THD SR71/PEGASSO DUKK 250CC/FACTORY FZ 300CC ",
-            "marca": "DAYTONA",
-            "precio": 8,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
             "id": "CB200HTR-024 ",
             "codigo_referencia": "CB200HTR-024 ",
             "nombre": "BANDA TRANSMISION BANDO 743X20X30 HUNTER 200/ATV 150/200CC/DYNAMIC PRO/SHM JEDI 150CC",
             "marca": "DAYTONA",
             "precio": 35,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true
-        },
-        {
-            "id": "CB150S1-007 ",
-            "codigo_referencia": "CB150S1-007 ",
-            "nombre": "BANDA TRANSMISION QINJIANG 842x20x30 S1 150CC 2024 ",
-            "marca": "DAYTONA",
-            "precio": 23,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true
@@ -4794,6 +4734,46 @@
             "id": "CB250TKN-029",
             "codigo_referencia": "CB250TKN-029",
             "nombre": "PEDAL CAMBIOS TEKKEN EVO/AXXO TRACKER 250cc",
+            "marca": "DAYTONA",
+            "precio": 12,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CB150S1-007 ",
+            "codigo_referencia": "CB150S1-007 ",
+            "nombre": "BANDA TRANSMISION QINJIANG 842x20x30 S1 150CC 2024 ",
+            "marca": "DAYTONA",
+            "precio": 23,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "CB200WF-088",
+            "codigo_referencia": "CB200WF-088",
+            "nombre": "VALVULA (AD315mm-ES26mm) PICO LARGO WOLF/FORCE/SHARK 200CC/AXXO ASFALT/AXXO F51 CB200CC",
+            "marca": "DAYTONA",
+            "precio": 10,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "MAN-B1623-NE",
+            "codigo_referencia": "MAN-B1623-NE",
+            "nombre": "MANIJA CON BOMBA DAYTONA DY200WOLF /IGM WIND200 /Z1 AK200 NEGRO BOST",
+            "marca": "DAYTONA",
+            "precio": 13,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true
+        },
+        {
+            "id": "MAN-B1917-NE",
+            "codigo_referencia": "MAN-B1917-NE",
+            "nombre": "MANIJA CON BOMBA DAYTONA DY250 RX /SHARKII NEGRO",
             "marca": "DAYTONA",
             "precio": 12,
             "categoria": "General",
