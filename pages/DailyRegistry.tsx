@@ -177,20 +177,26 @@ const DailyRegistry: React.FC = () => {
         const newTimestamp = `${editingDate}T17:00:00.000Z`;
         
         try {
-            const { error } = await supabase
+            const { error: updateError } = await supabase
                 .from('orders')
                 .update({ created_at: newTimestamp })
                 .eq('id', orderId);
 
-            if (error) {
-                alert(`Error al actualizar la fecha: ${error.message}`);
+            if (updateError) {
+                alert(`Error al actualizar la fecha: ${updateError.message}`);
+                setLoading(false);
                 return;
             }
+
+            // Actualización INMEDIATA del estado local para que el usuario vea el cambio
+            setOrders(prev => prev.map(o => 
+                o.id === orderId ? { ...o, created_at: newTimestamp } : o
+            ));
 
             setEditingOrderId(null);
             setEditingDate('');
             
-            // Refrescar los datos para que se mueva de día si es necesario
+            // Refrescar los datos del servidor en segundo plano para asegurar consistencia
             await fetchDailyData();
         } catch (err: any) {
             alert(`Error inesperado: ${err.message}`);
@@ -456,19 +462,22 @@ const DailyRegistry: React.FC = () => {
                                                                                             type="date"
                                                                                             value={editingDate}
                                                                                             max={todayLocal()}
+                                                                                            disabled={loading}
                                                                                             onChange={(e) => setEditingDate(e.target.value)}
-                                                                                            className="text-xs border border-primary rounded px-1.5 py-0.5 outline-none bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-mono"
+                                                                                            className="text-xs border border-primary rounded px-1.5 py-0.5 outline-none bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-mono disabled:opacity-50"
                                                                                             autoFocus
                                                                                         />
                                                                                         <button
                                                                                             onClick={() => handleUpdateOrderDate(order.id)}
-                                                                                            className="text-[10px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded hover:bg-emerald-600 transition-colors"
+                                                                                            disabled={loading}
+                                                                                            className="text-[10px] min-w-[60px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded hover:bg-emerald-600 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
                                                                                         >
-                                                                                            Guardar
+                                                                                            {loading ? '...' : 'Guardar'}
                                                                                         </button>
                                                                                         <button
                                                                                             onClick={() => { setEditingOrderId(null); setEditingDate(''); }}
-                                                                                            className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-300 transition-colors"
+                                                                                            disabled={loading}
+                                                                                            className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-300 transition-colors disabled:opacity-50"
                                                                                         >
                                                                                             ✕
                                                                                         </button>
