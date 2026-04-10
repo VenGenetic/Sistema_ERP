@@ -50,50 +50,49 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                     <p className="text-slate-500 text-sm mt-1">{customer.name}</p>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 space-y-6">
-                    {/* Amount */}
-                    <div className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-xl border border-blue-100">
-                        <span className="text-blue-500 font-bold uppercase text-sm mb-1">Monto a Pagar</span>
-                        <span className="text-5xl font-black text-blue-700 tracking-tighter">
+                {/* Body — scrollable */}
+                <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+
+                    {/* Amount + Date picker (always visible at top) */}
+                    <div className={`flex flex-col items-center justify-center p-5 rounded-xl border-2 transition-all ${
+                        saleDate !== todayEcuador() ? 'bg-amber-50 border-amber-300' : 'bg-blue-50 border-blue-100'
+                    }`}>
+                        <span className={`font-bold uppercase text-sm mb-1 ${saleDate !== todayEcuador() ? 'text-amber-600' : 'text-blue-500'}`}>
+                            Monto a Pagar
+                        </span>
+                        <span className={`text-5xl font-black tracking-tighter ${saleDate !== todayEcuador() ? 'text-amber-700' : 'text-blue-700'}`}>
                             ${total.toFixed(2)}
                         </span>
-                        <div className="mt-2 text-xs text-blue-400 font-medium">
+                        <div className={`mt-1 text-xs font-medium ${saleDate !== todayEcuador() ? 'text-amber-400' : 'text-blue-400'}`}>
                             Subtotal: ${subtotal.toFixed(2)}
+                        </div>
+
+                        {/* Fecha inline — siempre visible */}
+                        <div className="mt-4 w-full border-t border-white/60 pt-4">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block text-center">
+                                Fecha del Registro
+                            </span>
+                            <div className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
+                                saleDate !== todayEcuador() ? 'border-amber-400 bg-white' : 'border-slate-200 bg-white'
+                            }`}>
+                                <span className="material-symbols-outlined text-slate-400 text-[18px]">calendar_today</span>
+                                <input
+                                    type="date"
+                                    value={saleDate}
+                                    max={todayEcuador()}
+                                    onChange={(e) => setSaleDate(e.target.value)}
+                                    className="bg-transparent text-sm font-bold text-slate-700 outline-none"
+                                />
+                                {saleDate !== todayEcuador() && (
+                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                        Día anterior
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Date Picker */}
-                <div className="py-4 border-b border-slate-100">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
-                        Fecha del Registro
-                    </span>
-                    <div className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                        saleDate !== todayEcuador() ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-slate-50'
-                    }`}>
-                        <span className="material-symbols-outlined text-slate-400 text-[20px]">calendar_today</span>
-                        <input
-                            type="date"
-                            value={saleDate}
-                            max={todayEcuador()}
-                            onChange={(e) => setSaleDate(e.target.value)}
-                            className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none"
-                        />
-                        {saleDate !== todayEcuador() && (
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full whitespace-nowrap">
-                                Día anterior
-                            </span>
-                        )}
-                    </div>
-                    {saleDate !== todayEcuador() && (
-                        <p className="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px]">info</span>
-                            La venta se registrará con fecha {new Date(saleDate + 'T12:00:00').toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' })}.
-                        </p>
-                    )}
-                </div>
-
-                {/* Payment Form */}
+                    {/* Payment Form */}
                     <div className="space-y-4">
                         <label className="block">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
@@ -122,7 +121,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                         </label>
 
                         {shippingCost > 0 && (
-                            <div className="mt-6 border-t border-slate-200 pt-6">
+                            <div className="mt-4 border-t border-slate-200 pt-4">
                                 <label className="flex items-center gap-3 cursor-pointer">
                                     <input
                                         type="checkbox"
