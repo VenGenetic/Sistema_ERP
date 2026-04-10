@@ -164,10 +164,12 @@ const Products: React.FC = () => {
         setLoading(true);
         try {
             // Intento 1: Hard Delete (Borrado físico)
-            const { error: deleteError } = await supabase
+            // Usamos .select() para recibir las filas borradas y confirmar que realmente se borró algo
+            const { data: deletedData, error: deleteError } = await supabase
                 .from('products')
                 .delete()
-                .eq('id', product.id);
+                .eq('id', product.id)
+                .select();
 
             if (deleteError) {
                 // Si falla por Foreign Key (historial), ofrecemos Soft Delete
@@ -178,18 +180,29 @@ const Products: React.FC = () => {
                     );
                     
                     if (softConfirm) {
-                        const { error: updateError } = await supabase
+                        const { data: updatedData, error: updateError } = await supabase
                             .from('products')
                             .update({ is_active: false })
-                            .eq('id', product.id);
+                            .eq('id', product.id)
+                            .select();
                         
                         if (updateError) throw updateError;
+                        
+                        // Verificar si el update realmente afectó filas
+                        if (!updatedData || updatedData.length === 0) {
+                            throw new Error("No se pudo ocultar el producto. Verifica tus permisos en la base de datos.");
+                        }
+                        
                         alert("Producto ocultado correctamente.");
                     }
                 } else {
                     throw deleteError;
                 }
             } else {
+                // Verificar si el delete realmente afectó filas
+                if (!deletedData || deletedData.length === 0) {
+                    throw new Error("La base de datos rechazó la eliminación (es posible que falten permisos DELETE en RLS).");
+                }
                 alert("Producto eliminado permanentemente.");
             }
             
