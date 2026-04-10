@@ -8,6 +8,7 @@ interface OrderItem {
     quantity: number;
     unit_price: number;
     unit_cost: number;
+    products: { name: string } | null;
 }
 
 interface Order {
@@ -88,7 +89,12 @@ const DailyRegistry: React.FC = () => {
                     shipping_cost,
                     status,
                     customers(name),
-                    order_items(quantity, unit_price, unit_cost)
+                    order_items(
+                        quantity, 
+                        unit_price, 
+                        unit_cost,
+                        products(name)
+                    )
                 `)
                 .eq('status', 'Entregado')
                 .gte('created_at', startUTC)
@@ -452,85 +458,123 @@ const DailyRegistry: React.FC = () => {
                                                                 const orderProfit = Number(order.total_amount || 0) - orderCost;
 
                                                                 return (
-                                                                    <div
-                                                                        key={order.id}
-                                                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm"
-                                                                    >
-                                                                        <div className="flex items-center gap-4">
-                                                                            <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold font-mono text-xs px-2 py-1 rounded">
-                                                                                #{order.id}
-                                                                            </div>
-                                                                            <div className="flex flex-col">
-                                                                                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                                                                                    {order.customers?.name || 'Mostrador / POS'}
-                                                                                    {justUpdatedId === order.id && (
-                                                                                        <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded animate-bounce">
-                                                                                            ✓ ¡Actualizado!
-                                                                                        </span>
-                                                                                    )}
-                                                                                </span>
-
-                                                                                {/* Fecha editable inline */}
-                                                                                {editingOrderId === order.id ? (
-                                                                                    <div className="flex items-center gap-1 mt-1">
-                                                                                        <input
-                                                                                            type="date"
-                                                                                            value={editingDate}
-                                                                                            max={todayLocal()}
-                                                                                            disabled={loading}
-                                                                                            onChange={(e) => setEditingDate(e.target.value)}
-                                                                                            className="text-xs border border-primary rounded px-1.5 py-0.5 outline-none bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-mono disabled:opacity-50"
-                                                                                            autoFocus
-                                                                                        />
-                                                                                        <button
-                                                                                            onClick={() => handleUpdateOrderDate(order.id)}
-                                                                                            disabled={loading}
-                                                                                            className="text-[10px] min-w-[60px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded hover:bg-emerald-600 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
-                                                                                        >
-                                                                                            {loading ? '...' : 'Guardar'}
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={() => { setEditingOrderId(null); setEditingDate(''); }}
-                                                                                            disabled={loading}
-                                                                                            className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-300 transition-colors disabled:opacity-50"
-                                                                                        >
-                                                                                            ✕
-                                                                                        </button>
+                                                                        <div className="flex flex-col gap-3">
+                                                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+                                                                                <div className="flex items-center gap-4">
+                                                                                    <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold font-mono text-xs px-2 py-1 rounded">
+                                                                                        #{order.id}
                                                                                     </div>
-                                                                                ) : (
-                                                                                    <button
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            setEditingOrderId(order.id);
-                                                                                            setEditingDate(toLocalDate(order.created_at));
-                                                                                        }}
-                                                                                        className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 hover:text-primary transition-colors group"
-                                                                                        title="Cambiar fecha del registro"
-                                                                                    >
-                                                                                        <span className="material-symbols-outlined text-[12px] group-hover:text-primary">calendar_today</span>
-                                                                                        {toLocalDate(order.created_at)} · {new Date(order.created_at).toLocaleTimeString('es-EC', {
-                                                                                            hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil'
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                                                                            {order.customers?.name || 'Mostrador / POS'}
+                                                                                            {justUpdatedId === order.id && (
+                                                                                                <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded animate-bounce">
+                                                                                                    ✓ ¡Actualizado!
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </span>
+
+                                                                                        {/* Fecha editable inline */}
+                                                                                        {editingOrderId === order.id ? (
+                                                                                            <div className="flex items-center gap-1 mt-1">
+                                                                                                <input
+                                                                                                    type="date"
+                                                                                                    value={editingDate}
+                                                                                                    max={todayLocal()}
+                                                                                                    disabled={loading}
+                                                                                                    onChange={(e) => setEditingDate(e.target.value)}
+                                                                                                    className="text-xs border border-primary rounded px-1.5 py-0.5 outline-none bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-mono disabled:opacity-50"
+                                                                                                    autoFocus
+                                                                                                />
+                                                                                                <button
+                                                                                                    onClick={() => handleUpdateOrderDate(order.id)}
+                                                                                                    disabled={loading}
+                                                                                                    className="text-[10px] min-w-[60px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded hover:bg-emerald-600 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
+                                                                                                >
+                                                                                                    {loading ? '...' : 'Guardar'}
+                                                                                                </button>
+                                                                                                <button
+                                                                                                    onClick={() => { setEditingOrderId(null); setEditingDate(''); }}
+                                                                                                    disabled={loading}
+                                                                                                    className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-300 transition-colors disabled:opacity-50"
+                                                                                                >
+                                                                                                    ✕
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setEditingOrderId(order.id);
+                                                                                                    setEditingDate(toLocalDate(order.created_at));
+                                                                                                }}
+                                                                                                className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 hover:text-primary transition-colors group"
+                                                                                                title="Cambiar fecha del registro"
+                                                                                            >
+                                                                                                <span className="material-symbols-outlined text-[12px] group-hover:text-primary">calendar_today</span>
+                                                                                                {toLocalDate(order.created_at)} · {new Date(order.created_at).toLocaleTimeString('es-EC', {
+                                                                                                    hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil'
+                                                                                                })}
+                                                                                                <span className="material-symbols-outlined text-[11px] opacity-0 group-hover:opacity-60">edit</span>
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="mt-2 sm:mt-0 flex items-center gap-4 text-right">
+                                                                                    <div>
+                                                                                        <div className="text-xs text-slate-400 uppercase font-bold">Ganancia</div>
+                                                                                        <div className={`text-sm font-bold font-mono ${orderProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                                                                                            {formatCurrency(orderProfit)}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <div className="text-xs text-slate-400 uppercase font-bold">Total</div>
+                                                                                        <div className="text-sm font-bold text-slate-900 dark:text-white font-mono">
+                                                                                            {formatCurrency(Number(order.total_amount))}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Desglose de Repuestos */}
+                                                                            <div className="bg-slate-50 dark:bg-slate-900/40 rounded-md p-2 border border-slate-100 dark:border-slate-800/50">
+                                                                                <table className="w-full text-left">
+                                                                                    <thead>
+                                                                                        <tr className="text-[10px] uppercase tracking-tighter text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800">
+                                                                                            <th className="pb-1">Cant.</th>
+                                                                                            <th className="pb-1">Repuesto / Descripción</th>
+                                                                                            <th className="pb-1 text-right">Unit.</th>
+                                                                                            <th className="pb-1 text-right">Subtotal</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                                                        {order.order_items?.map((item, idx) => {
+                                                                                            const subtotal = Number(item.unit_price) * Number(item.quantity);
+                                                                                            return (
+                                                                                                <tr key={idx} className="text-[11px] text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-white/5 transition-colors">
+                                                                                                    <td className="py-1.5 font-mono font-bold">{item.quantity}</td>
+                                                                                                    <td className="py-1.5 pr-4 truncate max-w-[200px] md:max-w-none">
+                                                                                                        {item.products?.name || 'Producto desconocido'}
+                                                                                                    </td>
+                                                                                                    <td className="py-1.5 text-right font-mono">{formatCurrency(Number(item.unit_price))}</td>
+                                                                                                    <td className="py-1.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                                                                                        {formatCurrency(subtotal)}
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            );
                                                                                         })}
-                                                                                        <span className="material-symbols-outlined text-[11px] opacity-0 group-hover:opacity-60">edit</span>
-                                                                                    </button>
-                                                                                )}
+                                                                                        {Number(order.shipping_cost) > 0 && (
+                                                                                            <tr className="text-[11px] text-slate-500 italic">
+                                                                                                <td className="py-1.5">1</td>
+                                                                                                <td className="py-1.5">Cargo por Envío</td>
+                                                                                                <td className="py-1.5 text-right font-mono">{formatCurrency(Number(order.shipping_cost))}</td>
+                                                                                                <td className="py-1.5 text-right font-mono">{formatCurrency(Number(order.shipping_cost))}</td>
+                                                                                            </tr>
+                                                                                        )}
+                                                                                    </tbody>
+                                                                                </table>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="mt-2 sm:mt-0 flex items-center gap-4 text-right">
-                                                                            <div>
-                                                                                <div className="text-xs text-slate-400 uppercase font-bold">Ganancia</div>
-                                                                                <div className={`text-sm font-bold font-mono ${orderProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                                                                                    {formatCurrency(orderProfit)}
-                                                                                </div>
-                                                                            </div>
-                                                                            <div>
-                                                                                <div className="text-xs text-slate-400 uppercase font-bold">Total</div>
-                                                                                <div className="text-sm font-bold text-slate-900 dark:text-white font-mono">
-                                                                                    {formatCurrency(Number(order.total_amount))}
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
                                                                 );
                                                             })}
                                                         </div>
