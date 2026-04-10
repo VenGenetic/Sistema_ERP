@@ -178,13 +178,19 @@ const DailyRegistry: React.FC = () => {
         const newTimestamp = `${editingDate}T17:00:00.000Z`;
         
         try {
-            const { error: updateError } = await supabase
-                .from('orders')
-                .update({ created_at: newTimestamp })
-                .eq('id', orderId);
+            const { data: res, error: rpcError } = await supabase.rpc('update_order_date', {
+                p_order_id: orderId,
+                p_new_date: newTimestamp
+            });
 
-            if (updateError) {
-                alert(`Error al actualizar la fecha: ${updateError.message}`);
+            if (rpcError) {
+                alert(`Error al actualizar la fecha: ${rpcError.message}`);
+                setLoading(false);
+                return;
+            }
+
+            if (res && res.success === false) {
+                alert(`Error: ${res.message}`);
                 setLoading(false);
                 return;
             }
