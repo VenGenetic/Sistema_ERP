@@ -57,6 +57,8 @@ const DailyRegistry: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [expandedDate, setExpandedDate] = useState<string | null>(null);
+    const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
+    const [editingDate, setEditingDate] = useState<string>('');
 
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
         start: nDaysAgoLocal(7),
@@ -166,6 +168,23 @@ const DailyRegistry: React.FC = () => {
     const activeBtn = (days: number): boolean => {
         const expectedStart = days === 0 ? todayLocal() : nDaysAgoLocal(days);
         return dateRange.start === expectedStart && dateRange.end === todayLocal();
+    };
+
+    const handleUpdateOrderDate = async (orderId: number) => {
+        if (!editingDate) return;
+        // Guardar como mediodía Ecuador (17:00 UTC) para evitar drift de zona horaria
+        const newTimestamp = `${editingDate}T17:00:00.000Z`;
+        const { error } = await supabase
+            .from('orders')
+            .update({ created_at: newTimestamp })
+            .eq('id', orderId);
+        if (error) {
+            alert(`Error al actualizar la fecha: ${error.message}`);
+            return;
+        }
+        setEditingOrderId(null);
+        setEditingDate('');
+        fetchDailyData(); // refrescar tabla
     };
 
     return (
@@ -417,12 +436,48 @@ const DailyRegistry: React.FC = () => {
                                                                                 <span className="text-sm font-bold text-slate-900 dark:text-white">
                                                                                     {order.customers?.name || 'Mostrador / POS'}
                                                                                 </span>
-                                                                                <span className="text-xs text-slate-500 flex items-center gap-1">
-                                                                                    <span className="material-symbols-outlined text-[12px]">schedule</span>
-                                                                                    {new Date(order.created_at).toLocaleTimeString('es-EC', {
-                                                                                        hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil'
-                                                                                    })}
-                                                                                </span>
+
+                                                                                {/* Fecha editable inline */}
+                                                                                {editingOrderId === order.id ? (
+                                                                                    <div className="flex items-center gap-1 mt-1">
+                                                                                        <input
+                                                                                            type="date"
+                                                                                            value={editingDate}
+                                                                                            max={todayLocal()}
+                                                                                            onChange={(e) => setEditingDate(e.target.value)}
+                                                                                            className="text-xs border border-primary rounded px-1.5 py-0.5 outline-none bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-mono"
+                                                                                            autoFocus
+                                                                                        />
+                                                                                        <button
+                                                                                            onClick={() => handleUpdateOrderDate(order.id)}
+                                                                                            className="text-[10px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded hover:bg-emerald-600 transition-colors"
+                                                                                        >
+                                                                                            Guardar
+                                                                                        </button>
+                                                                                        <button
+                                                                                            onClick={() => { setEditingOrderId(null); setEditingDate(''); }}
+                                                                                            className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded hover:bg-slate-300 transition-colors"
+                                                                                        >
+                                                                                            ✕
+                                                                                        </button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setEditingOrderId(order.id);
+                                                                                            setEditingDate(toLocalDate(order.created_at));
+                                                                                        }}
+                                                                                        className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 hover:text-primary transition-colors group"
+                                                                                        title="Cambiar fecha del registro"
+                                                                                    >
+                                                                                        <span className="material-symbols-outlined text-[12px] group-hover:text-primary">calendar_today</span>
+                                                                                        {toLocalDate(order.created_at)} · {new Date(order.created_at).toLocaleTimeString('es-EC', {
+                                                                                            hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil'
+                                                                                        })}
+                                                                                        <span className="material-symbols-outlined text-[11px] opacity-0 group-hover:opacity-60">edit</span>
+                                                                                    </button>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                         <div className="mt-2 sm:mt-0 flex items-center gap-4 text-right">
