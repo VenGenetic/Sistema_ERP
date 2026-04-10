@@ -59,6 +59,7 @@ const DailyRegistry: React.FC = () => {
     const [expandedDate, setExpandedDate] = useState<string | null>(null);
     const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
     const [editingDate, setEditingDate] = useState<string>('');
+    const [justUpdatedId, setJustUpdatedId] = useState<number | null>(null);
 
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
         start: nDaysAgoLocal(7),
@@ -195,8 +196,11 @@ const DailyRegistry: React.FC = () => {
 
             setEditingOrderId(null);
             setEditingDate('');
+            setJustUpdatedId(orderId);
+            setTimeout(() => setJustUpdatedId(null), 3000); // Quitar mensaje de éxito tras 3s
             
-            // Refrescar los datos del servidor en segundo plano para asegurar consistencia
+            // Pequeña espera para que Supabase actualice sus índices antes de re-consultar
+            await new Promise(resolve => setTimeout(resolve, 800));
             await fetchDailyData();
         } catch (err: any) {
             alert(`Error inesperado: ${err.message}`);
@@ -453,6 +457,11 @@ const DailyRegistry: React.FC = () => {
                                                                             <div className="flex flex-col">
                                                                                 <span className="text-sm font-bold text-slate-900 dark:text-white">
                                                                                     {order.customers?.name || 'Mostrador / POS'}
+                                                                                    {justUpdatedId === order.id && (
+                                                                                        <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded animate-bounce">
+                                                                                            ✓ ¡Actualizado!
+                                                                                        </span>
+                                                                                    )}
                                                                                 </span>
 
                                                                                 {/* Fecha editable inline */}
