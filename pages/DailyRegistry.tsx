@@ -61,6 +61,7 @@ const DailyRegistry: React.FC = () => {
     const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
     const [editingDate, setEditingDate] = useState<string>('');
     const [justUpdatedId, setJustUpdatedId] = useState<number | null>(null);
+    const [expandedOrderIds, setExpandedOrderIds] = useState<number[]>([]);
 
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
         start: nDaysAgoLocal(7),
@@ -219,6 +220,14 @@ const DailyRegistry: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const toggleOrderExpansion = (orderId: number) => {
+        setExpandedOrderIds(prev =>
+            prev.includes(orderId)
+                ? prev.filter(id => id !== orderId)
+                : [...prev, orderId]
+        );
     };
 
     return (
@@ -452,17 +461,27 @@ const DailyRegistry: React.FC = () => {
                                                         </h4>
                                                         <div className="grid gap-2">
                                                             {day.orders.map(order => {
-                                                                const orderCost = order.order_items?.reduce(
-                                                                    (s, i) => s + Number(i.unit_cost || 0) * Number(i.quantity || 0), 0
-                                                                ) ?? 0;
-                                                                const orderProfit = Number(order.total_amount || 0) - orderCost;
+                                                                 const orderCost = order.order_items?.reduce(
+                                                                     (s, i) => s + Number(i.unit_cost || 0) * Number(i.quantity || 0), 0
+                                                                 ) ?? 0;
+                                                                 const orderProfit = Number(order.total_amount || 0) - orderCost;
+                                                                 const isOrderExpanded = expandedOrderIds.includes(order.id);
 
-                                                                return (
-                                                                        <div className="flex flex-col gap-3">
+                                                                 return (
+                                                                        <div 
+                                                                            key={order.id}
+                                                                            onClick={() => toggleOrderExpansion(order.id)}
+                                                                            className="flex flex-col gap-3 p-3 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg shadow-sm cursor-pointer hover:border-primary/50 transition-all group/card"
+                                                                        >
                                                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between">
                                                                                 <div className="flex items-center gap-4">
-                                                                                    <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold font-mono text-xs px-2 py-1 rounded">
-                                                                                        #{order.id}
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className={`material-symbols-outlined text-slate-400 text-sm transition-transform duration-200 ${isOrderExpanded ? 'rotate-180' : ''}`}>
+                                                                                            expand_more
+                                                                                        </span>
+                                                                                        <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold font-mono text-xs px-2 py-1 rounded">
+                                                                                            #{order.id}
+                                                                                        </div>
                                                                                     </div>
                                                                                     <div className="flex flex-col">
                                                                                         <span className="text-sm font-bold text-slate-900 dark:text-white">
@@ -476,7 +495,7 @@ const DailyRegistry: React.FC = () => {
 
                                                                                         {/* Fecha editable inline */}
                                                                                         {editingOrderId === order.id ? (
-                                                                                            <div className="flex items-center gap-1 mt-1">
+                                                                                            <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
                                                                                                 <input
                                                                                                     type="date"
                                                                                                     value={editingDate}
@@ -508,14 +527,14 @@ const DailyRegistry: React.FC = () => {
                                                                                                     setEditingOrderId(order.id);
                                                                                                     setEditingDate(toLocalDate(order.created_at));
                                                                                                 }}
-                                                                                                className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 hover:text-primary transition-colors group"
+                                                                                                className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 hover:text-primary transition-colors group/edit"
                                                                                                 title="Cambiar fecha del registro"
                                                                                             >
-                                                                                                <span className="material-symbols-outlined text-[12px] group-hover:text-primary">calendar_today</span>
+                                                                                                <span className="material-symbols-outlined text-[12px] group-hover/edit:text-primary">calendar_today</span>
                                                                                                 {toLocalDate(order.created_at)} · {new Date(order.created_at).toLocaleTimeString('es-EC', {
                                                                                                     hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil'
                                                                                                 })}
-                                                                                                <span className="material-symbols-outlined text-[11px] opacity-0 group-hover:opacity-60">edit</span>
+                                                                                                <span className="material-symbols-outlined text-[11px] opacity-0 group-hover/edit:opacity-60">edit</span>
                                                                                             </button>
                                                                                         )}
                                                                                     </div>
@@ -536,44 +555,49 @@ const DailyRegistry: React.FC = () => {
                                                                                 </div>
                                                                             </div>
 
-                                                                            {/* Desglose de Repuestos */}
-                                                                            <div className="bg-slate-50 dark:bg-slate-900/40 rounded-md p-2 border border-slate-100 dark:border-slate-800/50">
-                                                                                <table className="w-full text-left">
-                                                                                    <thead>
-                                                                                        <tr className="text-[10px] uppercase tracking-tighter text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800">
-                                                                                            <th className="pb-1">Cant.</th>
-                                                                                            <th className="pb-1">Repuesto / Descripción</th>
-                                                                                            <th className="pb-1 text-right">Unit.</th>
-                                                                                            <th className="pb-1 text-right">Subtotal</th>
-                                                                                        </tr>
-                                                                                    </thead>
-                                                                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                                                                        {order.order_items?.map((item, idx) => {
-                                                                                            const subtotal = Number(item.unit_price) * Number(item.quantity);
-                                                                                            return (
-                                                                                                <tr key={idx} className="text-[11px] text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-white/5 transition-colors">
-                                                                                                    <td className="py-1.5 font-mono font-bold">{item.quantity}</td>
-                                                                                                    <td className="py-1.5 pr-4 truncate max-w-[200px] md:max-w-none">
-                                                                                                        {item.products?.name || 'Producto desconocido'}
-                                                                                                    </td>
-                                                                                                    <td className="py-1.5 text-right font-mono">{formatCurrency(Number(item.unit_price))}</td>
-                                                                                                    <td className="py-1.5 text-right font-mono font-bold text-slate-900 dark:text-white">
-                                                                                                        {formatCurrency(subtotal)}
-                                                                                                    </td>
-                                                                                                </tr>
-                                                                                            );
-                                                                                        })}
-                                                                                        {Number(order.shipping_cost) > 0 && (
-                                                                                            <tr className="text-[11px] text-slate-500 italic">
-                                                                                                <td className="py-1.5">1</td>
-                                                                                                <td className="py-1.5">Cargo por Envío</td>
-                                                                                                <td className="py-1.5 text-right font-mono">{formatCurrency(Number(order.shipping_cost))}</td>
-                                                                                                <td className="py-1.5 text-right font-mono">{formatCurrency(Number(order.shipping_cost))}</td>
+                                                                            {/* Desglose de Repuestos (Colapsable) */}
+                                                                            {isOrderExpanded && (
+                                                                                <div 
+                                                                                    className="bg-slate-50 dark:bg-slate-900/40 rounded-md p-2 border border-slate-100 dark:border-slate-800/50 animate-in fade-in slide-in-from-top-1 duration-200"
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                >
+                                                                                    <table className="w-full text-left">
+                                                                                        <thead>
+                                                                                            <tr className="text-[10px] uppercase tracking-tighter text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800">
+                                                                                                <th className="pb-1">Cant.</th>
+                                                                                                <th className="pb-1">Repuesto / Descripción</th>
+                                                                                                <th className="pb-1 text-right">Unit.</th>
+                                                                                                <th className="pb-1 text-right">Subtotal</th>
                                                                                             </tr>
-                                                                                        )}
-                                                                                    </tbody>
-                                                                                </table>
-                                                                            </div>
+                                                                                        </thead>
+                                                                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                                                            {order.order_items?.map((item, idx) => {
+                                                                                                const subtotal = Number(item.unit_price) * Number(item.quantity);
+                                                                                                return (
+                                                                                                    <tr key={idx} className="text-[11px] text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-white/5 transition-colors">
+                                                                                                        <td className="py-1.5 font-mono font-bold">{item.quantity}</td>
+                                                                                                        <td className="py-1.5 pr-4 truncate max-w-[200px] md:max-w-none">
+                                                                                                            {item.products?.name || 'Producto desconocido'}
+                                                                                                        </td>
+                                                                                                        <td className="py-1.5 text-right font-mono">{formatCurrency(Number(item.unit_price))}</td>
+                                                                                                        <td className="py-1.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                                                                                                            {formatCurrency(subtotal)}
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                );
+                                                                                            })}
+                                                                                            {Number(order.shipping_cost) > 0 && (
+                                                                                                <tr className="text-[11px] text-slate-500 italic">
+                                                                                                    <td className="py-1.5">1</td>
+                                                                                                    <td className="py-1.5">Cargo por Envío</td>
+                                                                                                    <td className="py-1.5 text-right font-mono">{formatCurrency(Number(order.shipping_cost))}</td>
+                                                                                                    <td className="py-1.5 text-right font-mono">{formatCurrency(Number(order.shipping_cost))}</td>
+                                                                                                </tr>
+                                                                                            )}
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                 );
                                                             })}
