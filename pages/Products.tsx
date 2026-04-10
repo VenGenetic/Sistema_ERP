@@ -71,7 +71,8 @@ const Products: React.FC = () => {
                     *,
                     brands (name),
                     inventory_levels (current_stock)
-                `, { count: 'exact' });
+                `, { count: 'exact' })
+                .eq('is_active', true);
 
             // Global Search (OR across name and sku)
             if (searchTerm) {
@@ -146,6 +147,59 @@ const Products: React.FC = () => {
 
     const handleRefresh = () => {
         fetchCatalogData(pagination.page);
+    };
+
+    const handleDeleteProduct = async (product: any) => {
+        const globalStock = product.inventory_levels?.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) || 0;
+        
+        if (globalStock > 0) {
+            alert(`No se puede eliminar el producto "${product.name}" porque tiene stock disponible (${globalStock} unidades). Debe vaciar el inventario primero.`);
+            return;
+        }
+
+        const confirmed = window.confirm(`¿Estás seguro de que deseas eliminar permanentemente el producto "${product.sku} - ${product.name}"? Esta acción no se puede deshacer.`);
+        
+        if (!confirmed) return;
+
+        setLoading(true);
+        try {
+            // Intento 1: Hard Delete (Borrado físico)
+            const { error: deleteError } = await supabase
+                .from('products')
+                .delete()
+                .eq('id', product.id);
+
+            if (deleteError) {
+                // Si falla por Foreign Key (historial), ofrecemos Soft Delete
+                if (deleteError.code === '23503') {
+                    const softConfirm = window.confirm(
+                        "Este producto tiene historial comercial (ventas o movimientos) y no puede ser borrado permanentemente.\n\n" +
+                        "¿Deseas ocultarlo definitivamente del catálogo?"
+                    );
+                    
+                    if (softConfirm) {
+                        const { error: updateError } = await supabase
+                            .from('products')
+                            .update({ is_active: false })
+                            .eq('id', product.id);
+                        
+                        if (updateError) throw updateError;
+                        alert("Producto ocultado correctamente.");
+                    }
+                } else {
+                    throw deleteError;
+                }
+            } else {
+                alert("Producto eliminado permanentemente.");
+            }
+            
+            fetchCatalogData(pagination.page);
+        } catch (error: any) {
+            console.error('Error deleting product:', error);
+            alert('Error al intentar eliminar el producto: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // ── Export ZIP handler ──
@@ -438,13 +492,22 @@ const Products: React.FC = () => {
                                         {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <button
-                                            onClick={() => handleOpenModal(prod)}
-                                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                            title="Editar Producto"
-                                        >
-                                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                                        </button>
+                                        <div className="flex items-center justify-center gap-1">
+                                            <button
+                                                onClick={() => handleOpenModal(prod)}
+                                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                title="Editar Producto"
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteProduct(prod)}
+                                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                                title="Eliminar Producto"
+                                            >
+                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
