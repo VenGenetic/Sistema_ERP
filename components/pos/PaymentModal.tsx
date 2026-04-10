@@ -43,7 +43,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="p-6 bg-slate-50 border-b border-slate-200 text-center">
                     <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Cobrar Venta</h2>
@@ -51,7 +51,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                 </div>
 
                 {/* Body — scrollable */}
-                <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+                <div className="p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
 
                     {/* Amount + Date picker (always visible at top) */}
                     <div className={`flex flex-col items-center justify-center p-5 rounded-xl border-2 transition-all ${
