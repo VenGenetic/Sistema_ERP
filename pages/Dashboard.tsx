@@ -29,6 +29,10 @@ const Dashboard: React.FC = () => {
     const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
     const [counts, setCounts] = useState({ warehouses: 0, accounts: 0, users: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    const [buildTime] = useState<string>(() => {
+        // Tiempo aproximado del build actual (cuando se cargó la página)
+        return new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' });
+    });
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -62,7 +66,7 @@ const Dashboard: React.FC = () => {
                 // Fetch recent orders
                 const { data: recentOrders } = await supabase
                     .from('orders')
-                    .select('id, created_at, total_amount, status, profiles:customer_id(full_name)')
+                    .select('id, created_at, total_amount, status, customers(name)')
                     .order('created_at', { ascending: false })
                     .limit(5);
 
@@ -72,8 +76,8 @@ const Dashboard: React.FC = () => {
                         activities.push({
                             type: 'PEDIDO',
                             id: `ORD-${o.id}`,
-                            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            user: (o.profiles as any)?.full_name || 'Cliente Web',
+                            time: date.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' }),
+                            user: (o.customers as any)?.name || 'Consumidor Final',
                             detail: `Pedido ${o.status}`,
                             status: o.status === 'Entregado' ? 'Completado' : 'Pendiente',
                             amount: `$${Number(o.total_amount).toFixed(2)}`,
@@ -314,34 +318,53 @@ const Dashboard: React.FC = () => {
                                     <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-right">Estado</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                                {activityStream.map((item, idx) => (
-                                    <tr key={idx} className="group hover:bg-slate-50 dark:hover:bg-[#1c2128] transition-colors cursor-pointer">
-                                        <td className="px-6 py-4 text-xs font-mono text-slate-500">{item.time}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold border
-                                                ${item.type === 'PEDIDO' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : ''}
-                                                ${item.type === 'STOCK' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : ''}
-                                                ${item.type === 'FINANZAS' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : ''}
-                                                ${item.type === 'ALERTA' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : ''}
-                                            `}>
-                                                {item.type}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm text-slate-900 dark:text-slate-200 font-medium">{item.detail}</span>
-                                                <span className="text-xs text-slate-400 font-mono mt-0.5">{item.id} {item.amount && `• ${item.amount}`}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-xs text-slate-500">{item.user}</td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className={`text-xs font-medium 
-                                                ${item.status === 'Advertencia' ? 'text-rose-500' : 'text-slate-900 dark:text-white'}
-                                            `}>{item.status}</span>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                {isLoading ? (
+                                    [...Array(4)].map((_, i) => (
+                                        <tr key={i} className="animate-pulse">
+                                            <td className="px-6 py-4"><div className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                                            <td className="px-6 py-4"><div className="h-5 w-16 bg-slate-200 dark:bg-slate-700 rounded-md"></div></td>
+                                            <td className="px-6 py-4"><div className="h-3 w-40 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                                            <td className="px-6 py-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
+                                            <td className="px-6 py-4 text-right"><div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></td>
+                                        </tr>
+                                    ))
+                                ) : activityStream.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-10 text-center text-slate-400">
+                                            <span className="material-symbols-outlined text-3xl text-slate-300 block mb-2">inbox</span>
+                                            <p className="text-sm">No hay actividad reciente registrada.</p>
                                         </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    activityStream.map((item, idx) => (
+                                        <tr key={idx} className="group hover:bg-slate-50 dark:hover:bg-[#1c2128] transition-colors cursor-pointer">
+                                            <td className="px-6 py-4 text-xs font-mono text-slate-500">{item.time}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold border
+                                                    ${item.type === 'PEDIDO' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : ''}
+                                                    ${item.type === 'STOCK' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : ''}
+                                                    ${item.type === 'FINANZAS' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : ''}
+                                                    ${item.type === 'ALERTA' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : ''}
+                                                `}>
+                                                    {item.type}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm text-slate-900 dark:text-slate-200 font-medium">{item.detail}</span>
+                                                    <span className="text-xs text-slate-400 font-mono mt-0.5">{item.id} {item.amount && `• ${item.amount}`}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-xs text-slate-500">{item.user}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className={`text-xs font-medium 
+                                                    ${item.status === 'Advertencia' ? 'text-rose-500' : item.status === 'Pendiente' ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}
+                                                `}>{item.status}</span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                         <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0d1117] text-center">
@@ -390,7 +413,7 @@ const Dashboard: React.FC = () => {
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-sm font-medium text-slate-900 dark:text-white">Vercel Edge</span>
-                                        <span className="text-[10px] text-slate-500 font-mono">Última build: 4m atrás</span>
+                                        <span className="text-[10px] text-slate-500 font-mono">Cargado a las {buildTime}</span>
                                     </div>
                                 </div>
                                 <span className="text-xs text-slate-500">Listo</span>

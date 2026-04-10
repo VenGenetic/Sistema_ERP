@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 
 // Ecuador is UTC-5
@@ -69,7 +69,7 @@ const DailyRegistry: React.FC = () => {
         fetchDailyData();
     }, [dateRange]);
 
-    const fetchDailyData = async () => {
+    const fetchDailyData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -102,7 +102,7 @@ const DailyRegistry: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [dateRange]);
 
     const dailySummaries: DailySummary[] = useMemo(() => {
         const summaryMap: Record<string, DailySummary> = {};
@@ -172,19 +172,31 @@ const DailyRegistry: React.FC = () => {
 
     const handleUpdateOrderDate = async (orderId: number) => {
         if (!editingDate) return;
+        setLoading(true);
         // Guardar como mediodía Ecuador (17:00 UTC) para evitar drift de zona horaria
         const newTimestamp = `${editingDate}T17:00:00.000Z`;
-        const { error } = await supabase
-            .from('orders')
-            .update({ created_at: newTimestamp })
-            .eq('id', orderId);
-        if (error) {
-            alert(`Error al actualizar la fecha: ${error.message}`);
-            return;
+        
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({ created_at: newTimestamp })
+                .eq('id', orderId);
+
+            if (error) {
+                alert(`Error al actualizar la fecha: ${error.message}`);
+                return;
+            }
+
+            setEditingOrderId(null);
+            setEditingDate('');
+            
+            // Refrescar los datos para que se mueva de día si es necesario
+            await fetchDailyData();
+        } catch (err: any) {
+            alert(`Error inesperado: ${err.message}`);
+        } finally {
+            setLoading(false);
         }
-        setEditingOrderId(null);
-        setEditingDate('');
-        fetchDailyData(); // refrescar tabla
     };
 
     return (
