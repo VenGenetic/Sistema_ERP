@@ -565,7 +565,7 @@ const POS: React.FC = () => {
         updateUnitPrice(itemId, newPrice);
     };
 
-    const processCheckout = async (paymentAccountId: number, shippingExpenseAccountId?: number | null) => {
+    const processCheckout = async (paymentAccountId: number, shippingExpenseAccountId?: number | null, saleDate?: string) => {
         if (cartRef.current.length === 0) return;
 
         try {
@@ -590,6 +590,26 @@ const POS: React.FC = () => {
             if (error) {
                 alert(`Error procesando la venta: ${error.message}`);
                 throw error;
+            }
+
+            // Si se especificó una fecha diferente a hoy, actualizar created_at de la orden
+            const todayLocal = new Date();
+            const todayStr = new Date(todayLocal.getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+            if (saleDate && saleDate !== todayStr && data) {
+                // data contiene el order_id devuelto por el RPC
+                const orderId = typeof data === 'number' ? data : (data as any)?.order_id || data;
+                if (orderId) {
+                    // Usar mediodia Ecuador (UTC-5 = 17:00 UTC) para evitar problemas de zona horaria
+                    const backdatedTimestamp = `${saleDate}T17:00:00.000Z`;
+                    const { error: updateErr } = await supabase
+                        .from('orders')
+                        .update({ created_at: backdatedTimestamp })
+                        .eq('id', orderId);
+                    if (updateErr) {
+                        console.warn('No se pudo actualizar la fecha del registro:', updateErr.message);
+                    }
+                }
             }
 
             alert("¡Venta completada con éxito!");

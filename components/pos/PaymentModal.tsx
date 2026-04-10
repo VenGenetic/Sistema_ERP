@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
 import { useCartStore } from '../../store/cartStore';
 
+// Ecuador is UTC-5; get today's local date
+const todayEcuador = () => {
+    const now = new Date();
+    const localMs = now.getTime() - 5 * 60 * 60 * 1000;
+    return new Date(localMs).toISOString().split('T')[0];
+};
+
 interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onProcess: (paymentAccountId: number, shippingExpenseAccountId?: number | null) => Promise<void>;
+    onProcess: (paymentAccountId: number, shippingExpenseAccountId?: number | null, saleDate?: string) => Promise<void>;
     paymentAccounts: { id: number, name: string }[];
 }
 
@@ -14,6 +21,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
     const [useSeparateShippingAccount, setUseSeparateShippingAccount] = useState(false);
     const [selectedShippingAccount, setSelectedShippingAccount] = useState<number>(paymentAccounts[0]?.id || 0);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [saleDate, setSaleDate] = useState<string>(todayEcuador());
 
     if (!isOpen) return null;
 
@@ -24,7 +32,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
         setIsProcessing(true);
         try {
             const shippingAccId = (useSeparateShippingAccount && shippingCost > 0) ? selectedShippingAccount : null;
-            await onProcess(selectedAccount, shippingAccId);
+            await onProcess(selectedAccount, shippingAccId, saleDate);
             onClose(); // only close on success
         } catch (e) {
             // error handled by parent
@@ -55,7 +63,37 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                         </div>
                     </div>
 
-                    {/* Payment Form */}
+                    {/* Date Picker */}
+                <div className="py-4 border-b border-slate-100">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                        Fecha del Registro
+                    </span>
+                    <div className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                        saleDate !== todayEcuador() ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-slate-50'
+                    }`}>
+                        <span className="material-symbols-outlined text-slate-400 text-[20px]">calendar_today</span>
+                        <input
+                            type="date"
+                            value={saleDate}
+                            max={todayEcuador()}
+                            onChange={(e) => setSaleDate(e.target.value)}
+                            className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none"
+                        />
+                        {saleDate !== todayEcuador() && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                Día anterior
+                            </span>
+                        )}
+                    </div>
+                    {saleDate !== todayEcuador() && (
+                        <p className="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px]">info</span>
+                            La venta se registrará con fecha {new Date(saleDate + 'T12:00:00').toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' })}.
+                        </p>
+                    )}
+                </div>
+
+                {/* Payment Form */}
                     <div className="space-y-4">
                         <label className="block">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
