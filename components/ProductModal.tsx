@@ -329,7 +329,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
         } catch (error: any) {
             console.error('Error saving product:', error);
-            alert('Error al guardar producto: ' + error.message);
+            if (error.code === '23505' || (error.message && error.message.includes('duplicate key'))) {
+                alert('Ocurrió un error: El código SKU "' + formData.sku + '" ya está siendo utilizado por otro producto. Por favor, asigne un SKU único.');
+            } else {
+                alert('Error al guardar producto: ' + error.message);
+            }
         } finally {
             setLoading(false);
         }
