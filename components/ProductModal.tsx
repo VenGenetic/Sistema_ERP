@@ -345,7 +345,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1";
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700 my-8">
                 {/* Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
