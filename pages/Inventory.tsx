@@ -109,6 +109,7 @@ const Inventory: React.FC = () => {
     const [movements, setMovements] = useState<Movement[]>([]);
     const [loading, setLoading] = useState(false);
     const [exportLoading, setExportLoading] = useState(false);
+    const [backupLoading, setBackupLoading] = useState(false);
 
     // ──────────────────────────────────────────────
     // 3. DEBOUNCED SEARCH EFFECT
@@ -469,6 +470,48 @@ const Inventory: React.FC = () => {
         }
     };
 
+    const handleCloudBackup = async () => {
+        setBackupLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('products')
+                .select(`
+                    id, name, sku, category, min_stock_threshold, profit_margin, price,
+                    cost_without_vat, vat_percentage, image_url, brand_id,
+                    brands (name),
+                    inventory_levels (
+                        id, current_stock, warehouse_id,
+                        warehouses (name)
+                    )
+                `)
+                .limit(50000);
+
+            if (error) throw error;
+
+            const jsonData = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const fileName = `inventory_backup_${timestamp}.json`;
+            
+            const { error: uploadError } = await supabase.storage
+                .from('inventory_backups')
+                .upload(fileName, blob, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (uploadError) throw uploadError;
+
+            alert(`Respaldo creado con éxito en la nube como:\n${fileName}`);
+        } catch (error: any) {
+            console.error('Error creating cloud backup:', error);
+            alert('Error al crear el respaldo en la nube: ' + error.message);
+        } finally {
+            setBackupLoading(false);
+        }
+    };
+
     const handleWarehouseClick = (warehouseId: number) => {
         setSelectedWarehouseId(warehouseId);
         setPagination(prev => ({ ...prev, page: 1 }));
@@ -637,7 +680,7 @@ const Inventory: React.FC = () => {
                             <>
                                 <button
                                     onClick={() => setShowExportModal(true)}
-                                    disabled={exportLoading}
+                                    disabled={exportLoading || backupLoading}
                                     className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50"
                                     title="Exportar inventario visible como Excel (mismo formato que importación)"
                                 >
@@ -645,6 +688,17 @@ const Inventory: React.FC = () => {
                                         {exportLoading ? 'progress_activity' : 'table_view'}
                                     </span>
                                     {exportLoading ? 'Exportando...' : 'Exportar Excel'}
+                                </button>
+                                <button
+                                    onClick={handleCloudBackup}
+                                    disabled={backupLoading || exportLoading}
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-blue-600/30 disabled:opacity-50"
+                                    title="Guardar copia de seguridad en la nube (formato JSON)"
+                                >
+                                    <span className={`material-symbols-outlined text-[18px] ${backupLoading ? 'animate-spin' : ''}`}>
+                                        {backupLoading ? 'progress_activity' : 'cloud_upload'}
+                                    </span>
+                                    {backupLoading ? 'Respaldando...' : 'Respaldo Nube'}
                                 </button>
                                 <button
                                     onClick={handleNewProduct}
