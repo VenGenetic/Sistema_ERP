@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
@@ -100,14 +101,20 @@ const Login: React.FC = () => {
                                         id="password"
                                         name="password"
                                         placeholder="••••••••"
-                                        type="password"
+                                        type={showPassword ? "text" : "password"}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
                                     />
                                     <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                                        <button className="text-gray-500 hover:text-gray-300 focus:outline-none transition-colors" type="button">
-                                            <span className="material-symbols-outlined text-[20px]">visibility_off</span>
+                                        <button 
+                                            className="text-gray-500 hover:text-gray-300 focus:outline-none transition-colors" 
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">
+                                                {showPassword ? "visibility" : "visibility_off"}
+                                            </span>
                                         </button>
                                     </div>
                                 </div>
