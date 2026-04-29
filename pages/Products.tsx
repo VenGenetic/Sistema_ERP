@@ -468,6 +468,22 @@ const Products: React.FC = () => {
                                     <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400">{prod.sku}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
+                                            {prod.video_url ? (
+                                                <a 
+                                                    href={prod.video_url} 
+                                                    download 
+                                                    target="_blank" 
+                                                    rel="noreferrer" 
+                                                    title="Descargar Video" 
+                                                    onClick={(e) => e.stopPropagation()} 
+                                                    className="w-2.5 h-2.5 flex-shrink-0 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] hover:scale-150 transition-transform cursor-pointer block"
+                                                ></a>
+                                            ) : (
+                                                <div 
+                                                    title="Sin Video" 
+                                                    className="w-2.5 h-2.5 flex-shrink-0 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)] block"
+                                                ></div>
+                                            )}
                                             {prod.image_url ? (
                                                 <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative">
                                                     <img 
@@ -496,25 +512,7 @@ const Products: React.FC = () => {
                                                     <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
                                                 </div>
                                             )}
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-slate-900 dark:text-white">{prod.name}</span>
-                                                {prod.video_url ? (
-                                                    <a 
-                                                        href={prod.video_url} 
-                                                        download 
-                                                        target="_blank" 
-                                                        rel="noreferrer" 
-                                                        title="Descargar Video" 
-                                                        onClick={(e) => e.stopPropagation()} 
-                                                        className="w-2.5 h-2.5 flex-shrink-0 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] hover:scale-150 transition-transform cursor-pointer block"
-                                                    ></a>
-                                                ) : (
-                                                    <div 
-                                                        title="Sin Video" 
-                                                        className="w-2.5 h-2.5 flex-shrink-0 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)] block"
-                                                    ></div>
-                                                )}
-                                            </div>
+                                            <span className="font-bold text-slate-900 dark:text-white">{prod.name}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.category || '—'}</td>
