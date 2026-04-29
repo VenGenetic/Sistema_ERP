@@ -19,6 +19,7 @@ interface ProductModalProps {
         vat_percentage: number;
         price: number;
         image_url?: string | null;
+        video_url?: string | null;
     } | null;
 }
 
@@ -42,6 +43,7 @@ const calcMargin = (costWithoutVat: number, vatPercentage: number, price: number
 export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSuccess, productToEdit }) => {
     const [loading, setLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isVideoUploading, setIsVideoUploading] = useState(false);
     const [entryByPrice, setEntryByPrice] = useState(false);
     const [formData, setFormData] = useState({
         sku: '',
@@ -53,7 +55,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         costWithoutVat: 0,
         vatPercentage: 15.0,
         price: 0,
-        imageUrl: ''
+        imageUrl: '',
+        videoUrl: ''
     });
 
     // Stock Adjustment State
@@ -117,7 +120,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     costWithoutVat: cwv,
                     vatPercentage: vat,
                     price: Math.round(derivedPrice * 100) / 100,
-                    imageUrl: productToEdit.image_url || ''
+                    imageUrl: productToEdit.image_url || '',
+                    videoUrl: productToEdit.video_url || ''
                 });
             } else {
                 setFormData({
@@ -130,7 +134,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     costWithoutVat: 0,
                     vatPercentage: 15.0,
                     price: 0,
-                    imageUrl: ''
+                    imageUrl: '',
+                    videoUrl: ''
                 });
             }
             // Reset stock adjustment
@@ -237,6 +242,42 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         setFormData(prev => ({ ...prev, imageUrl: '' }));
     };
 
+    const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        
+        setIsVideoUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('product_videos')
+                .upload(filePath, file, {
+                    cacheControl: '31536000',
+                    upsert: true
+                });
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage
+                .from('product_videos')
+                .getPublicUrl(filePath);
+
+            setFormData(prev => ({ ...prev, videoUrl: data.publicUrl }));
+        } catch (error: any) {
+            console.error('Error uploading video:', error);
+            alert('Error al subir video: ' + error.message);
+        } finally {
+            setIsVideoUploading(false);
+        }
+    };
+
+    const handleRemoveVideo = () => {
+        setFormData(prev => ({ ...prev, videoUrl: '' }));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -263,7 +304,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 cost_without_vat: formData.costWithoutVat,
                 vat_percentage: formData.vatPercentage,
                 price: formData.price,
-                image_url: formData.imageUrl || defaultImageUrl
+                image_url: formData.imageUrl || defaultImageUrl,
+                video_url: formData.videoUrl || null
             };
 
             let productId = productToEdit?.id;
@@ -390,6 +432,40 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     )}
                                 </div>
                                 <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
+                            </label>
+                        )}
+                    </div>
+
+                    {/* ═══ Video Upload ═══ */}
+                    <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group">
+                        {formData.videoUrl ? (
+                            <div className="relative w-full max-w-[200px] aspect-video rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm bg-black flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[32px] text-emerald-500">play_circle</span>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveVideo}
+                                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500 backdrop-blur-sm z-10"
+                                >
+                                    <span className="material-symbols-outlined text-[16px] leading-none">close</span>
+                                </button>
+                                <div className="absolute bottom-2 left-2 right-2 text-center text-xs text-white bg-black/60 px-2 py-1 rounded backdrop-blur-sm truncate">
+                                    Video Cargado Exitosamente
+                                </div>
+                            </div>
+                        ) : (
+                            <label className="flex flex-col items-center justify-center w-full h-full min-h-[128px] cursor-pointer">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    {isVideoUploading ? (
+                                        <span className="material-symbols-outlined text-[32px] text-emerald-500 animate-spin">progress_activity</span>
+                                    ) : (
+                                        <>
+                                            <span className="material-symbols-outlined text-[32px] text-slate-400 mb-2 group-hover:text-emerald-500 transition-colors">movie</span>
+                                            <p className="mb-1 text-sm text-slate-600 dark:text-slate-400 font-medium">Click para subir video demostrativo</p>
+                                            <p className="text-xs text-slate-400 dark:text-slate-500">MP4, WEBM o MOV (Max 50MB)</p>
+                                        </>
+                                    )}
+                                </div>
+                                <input type="file" className="hidden" accept="video/*" onChange={handleVideoUpload} disabled={isVideoUploading} />
                             </label>
                         )}
                     </div>
