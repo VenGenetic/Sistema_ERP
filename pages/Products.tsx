@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
 import { CatalogImportWizard } from '../components/CatalogImportWizard';
+import { BulkEditModal } from '../components/BulkEditModal';
 import { BulkMediaUploadModal } from '../components/BulkMediaUploadModal';
 import { VideoThumbnail } from '../components/VideoThumbnail';
 import { MediaLightbox } from '../components/MediaLightbox';
