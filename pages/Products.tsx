@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
 import { CatalogImportWizard } from '../components/CatalogImportWizard';
 import { BulkEditModal } from '../components/BulkEditModal';
+import { BulkMediaUploadModal } from '../components/BulkMediaUploadModal';
 import { getThumbnailUrl } from '../utils/image';
 
 const Products: React.FC = () => {
@@ -17,10 +18,10 @@ const Products: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<any>(null);
 
-    // Selection & Bulk Edit
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
     const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
+    const [isBulkMediaOpen, setIsBulkMediaOpen] = useState(false);
 
     // Export ZIP
     const [isExporting, setIsExporting] = useState(false);
@@ -349,6 +350,14 @@ const Products: React.FC = () => {
                         Importar Catálogo
                     </button>
                     <button
+                        onClick={() => setIsBulkMediaOpen(true)}
+                        className="px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors shadow-sm"
+                        title="Subir fotos y videos masivamente"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">drive_folder_upload</span>
+                        Subir Multimedia
+                    </button>
+                    <button
                         onClick={handleExportZip}
                         disabled={isExporting}
                         className="px-4 py-2 bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400 border border-violet-200 dark:border-violet-800 rounded-lg flex items-center gap-2 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
@@ -631,6 +640,12 @@ const Products: React.FC = () => {
                 onClose={() => setIsBulkEditOpen(false)}
                 onSuccess={handleBulkEditSuccess}
                 selectedProducts={selectedProducts}
+            />
+
+            <BulkMediaUploadModal
+                isOpen={isBulkMediaOpen}
+                onClose={() => setIsBulkMediaOpen(false)}
+                onSuccess={() => fetchCatalogData(pagination.page)}
             />
 
             {/* ═══════ FLOATING ACTION BAR ═══════ */}
