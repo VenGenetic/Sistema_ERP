@@ -3,8 +3,9 @@ import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
 import { CatalogImportWizard } from '../components/CatalogImportWizard';
-import { BulkEditModal } from '../components/BulkEditModal';
 import { BulkMediaUploadModal } from '../components/BulkMediaUploadModal';
+import { VideoThumbnail } from '../components/VideoThumbnail';
+import { MediaLightbox } from '../components/MediaLightbox';
 import { getThumbnailUrl } from '../utils/image';
 
 const Products: React.FC = () => {
@@ -26,6 +27,9 @@ const Products: React.FC = () => {
     // Export ZIP
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState({ current: 0, total: 0 });
+
+    // Lightbox State
+    const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
 
     // ──────────────────────────────────────────────
     // 2. FILTER, SORT, PAGINATION STATES
@@ -98,6 +102,13 @@ const Products: React.FC = () => {
                 query = query.is('image_url', null);
             }
 
+            // Video Status Filter
+            if (filters.videoStatus === 'con_video') {
+                query = query.not('video_url', 'is', null);
+            } else if (filters.videoStatus === 'sin_video') {
+                query = query.is('video_url', null);
+            }
+
             // Sorting
             const isAscending = sortConfig.direction === 'asc';
             if (sortConfig.key === 'brand') {
@@ -133,6 +144,23 @@ const Products: React.FC = () => {
     const handleOpenModal = (product: any = null) => {
         setProductToEdit(product);
         setIsModalOpen(true);
+    };
+
+    const handleOpenLightbox = (prod: any, clickedType: 'video' | 'image') => {
+        const mediaArray: any[] = [];
+        if (prod.video_url) mediaArray.push({ type: 'video', url: prod.video_url, title: prod.sku + ' - ' + prod.name });
+        if (prod.image_url) mediaArray.push({ type: 'image', url: prod.image_url, title: prod.sku + ' - ' + prod.name });
+        
+        let startIndex = 0;
+        if (clickedType === 'image' && prod.video_url) {
+            startIndex = 1;
+        }
+
+        setLightbox({
+            isOpen: true,
+            media: mediaArray,
+            initialIndex: startIndex
+        });
     };
 
     const handleSort = (key: string) => {
@@ -407,15 +435,26 @@ const Products: React.FC = () => {
                         </button>
                     )}
                 </div>
-                <select
-                    value={filters.imageStatus || ''}
-                    onChange={(e) => handleFilterChange('imageStatus', e.target.value)}
-                    className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[220px]"
-                >
-                    <option value="">📸 Todas las Imágenes</option>
-                    <option value="con_imagen">✅ Mostrar Con Imagen</option>
-                    <option value="sin_imagen">❌ Faltantes (Sin Imagen)</option>
-                </select>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                        value={filters.imageStatus || ''}
+                        onChange={(e) => handleFilterChange('imageStatus', e.target.value)}
+                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                    >
+                        <option value="">📸 Todas las Imágenes</option>
+                        <option value="con_imagen">✅ Mostrar Con Imagen</option>
+                        <option value="sin_imagen">❌ Falta Imagen</option>
+                    </select>
+                    <select
+                        value={filters.videoStatus || ''}
+                        onChange={(e) => handleFilterChange('videoStatus', e.target.value)}
+                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                    >
+                        <option value="">🎬 Todos los Videos</option>
+                        <option value="con_video">✅ Mostrar Con Video</option>
+                        <option value="sin_video">❌ Falta Video</option>
+                    </select>
+                </div>
             </div>
 
             {/* ═══════ TABLE ═══════ */}
@@ -477,32 +516,31 @@ const Products: React.FC = () => {
                                     <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400">{prod.sku}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
+                                            {/* Video Thumbnail */}
                                             {prod.video_url ? (
-                                                <a 
-                                                    href={prod.video_url} 
-                                                    download 
-                                                    target="_blank" 
-                                                    rel="noreferrer" 
-                                                    title="Descargar Video" 
-                                                    onClick={(e) => e.stopPropagation()} 
-                                                    className="w-2.5 h-2.5 flex-shrink-0 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] hover:scale-150 transition-transform cursor-pointer block"
-                                                ></a>
+                                                <VideoThumbnail src={prod.video_url} onClick={() => handleOpenLightbox(prod, 'video')} />
                                             ) : (
                                                 <div 
                                                     title="Sin Video" 
-                                                    className="w-2.5 h-2.5 flex-shrink-0 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)] block"
-                                                ></div>
+                                                    className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-900/10 flex items-center justify-center relative"
+                                                >
+                                                    <span className="material-symbols-outlined text-[16px] text-rose-400">videocam_off</span>
+                                                </div>
                                             )}
+
+                                            {/* Image Thumbnail */}
                                             {prod.image_url ? (
-                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative">
+                                                <div 
+                                                    onClick={() => handleOpenLightbox(prod, 'image')}
+                                                    className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-pointer group"
+                                                >
                                                     <img 
                                                        src={getThumbnailUrl(prod.image_url, 80, 80)} 
                                                        alt="" 
                                                        loading="lazy"
                                                        decoding="async"
-                                                       className="h-full w-full object-cover" 
+                                                       className="h-full w-full object-cover group-hover:scale-110 transition-transform" 
                                                        onError={(e) => {
-                                                           // Fallback to original if thumbnail fails, or placeholder if both fail
                                                            const target = e.currentTarget;
                                                            if (target.src.includes('render/image')) {
                                                                target.src = prod.image_url || '';
@@ -515,13 +553,18 @@ const Products: React.FC = () => {
                                                            }
                                                        }}
                                                     />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                                                 </div>
                                             ) : (
-                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
+                                                <div 
+                                                    title="Sin Imagen"
+                                                    className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center"
+                                                >
                                                     <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
                                                 </div>
                                             )}
-                                            <span className="font-bold text-slate-900 dark:text-white">{prod.name}</span>
+                                            
+                                            <span className="font-bold text-slate-900 dark:text-white truncate max-w-[250px]" title={prod.name}>{prod.name}</span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.category || '—'}</td>
@@ -646,6 +689,13 @@ const Products: React.FC = () => {
                 isOpen={isBulkMediaOpen}
                 onClose={() => setIsBulkMediaOpen(false)}
                 onSuccess={() => fetchCatalogData(pagination.page)}
+            />
+
+            <MediaLightbox
+                isOpen={lightbox.isOpen}
+                media={lightbox.media}
+                initialIndex={lightbox.initialIndex}
+                onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))}
             />
 
             {/* ═══════ FLOATING ACTION BAR ═══════ */}

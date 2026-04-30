@@ -101,6 +101,16 @@ export const BulkMediaUploadModal: React.FC<BulkMediaUploadModalProps> = ({ isOp
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    const handleSkuChange = (index: number, newSku: string) => {
+        setFiles(prev => {
+            const copy = [...prev];
+            copy[index].sku = newSku;
+            const foundId = dbProducts.get(newSku) || null;
+            copy[index].productId = foundId;
+            return copy;
+        });
+    };
+
     const handleUploadAll = async () => {
         const validFiles = files.filter(f => f.productId !== null && f.status !== 'success');
         if (validFiles.length === 0) return;
@@ -277,8 +287,21 @@ export const BulkMediaUploadModal: React.FC<BulkMediaUploadModalProps> = ({ isOp
                                                             <span className="flex items-center gap-1 text-blue-600"><span className="material-symbols-outlined text-[16px]">image</span> Imagen</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-4 py-3 font-bold text-slate-800 dark:text-white">
-                                                        {f.sku}
+                                                    <td className="px-4 py-3">
+                                                        {f.productId === null && f.status !== 'success' ? (
+                                                            <div className="flex flex-col gap-1">
+                                                                <input 
+                                                                    type="text"
+                                                                    value={f.sku}
+                                                                    onChange={(e) => handleSkuChange(i, e.target.value.toUpperCase())}
+                                                                    className="w-full min-w-[120px] px-2 py-1.5 text-xs border border-rose-300 dark:border-rose-700 bg-white dark:bg-slate-900 rounded shadow-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 font-mono uppercase transition-all"
+                                                                    placeholder="Escribe el SKU correcto..."
+                                                                />
+                                                                <span className="text-[10px] text-rose-500 font-medium">Corrige el SKU para enlazar</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="font-bold text-slate-800 dark:text-white font-mono">{f.sku}</span>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         {f.productId === null ? (
