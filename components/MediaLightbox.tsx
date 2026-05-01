@@ -53,8 +53,55 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
         setCurrentIndex((prev) => (prev === media.length - 1 ? 0 : prev + 1));
     };
 
+    const handleDownload = async (item: MediaItem) => {
+        try {
+            // Se usa fetch para forzar la descarga en lugar de abrir en otra pestaña (problema de CORS)
+            const response = await fetch(item.url);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            
+            // Extraer el SKU del título (formato: "SKU - Nombre")
+            const sku = item.title ? item.title.split(' - ')[0].trim() : 'archivo';
+            
+            // Intentar extraer extensión de la URL, si no, usar fallback
+            let ext = item.type === 'video' ? 'mp4' : 'jpg';
+            try {
+                const parts = item.url.split('?')[0].split('.');
+                const parsedExt = parts[parts.length - 1].toLowerCase();
+                if (parsedExt && parsedExt.length <= 4 && /^[a-z0-9]+$/.test(parsedExt)) {
+                    ext = parsedExt;
+                }
+            } catch (e) {}
+
+            a.download = `${sku}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            
+            window.URL.revokeObjectURL(blobUrl);
+            a.remove();
+        } catch (error) {
+            console.error('Error descargando archivo:', error);
+            // Fallback si falla el fetch (ej. bloqueos estrictos)
+            window.open(item.url, '_blank');
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm transition-opacity" onClick={onClose}>
+            {/* Download Button */}
+            <button 
+                onClick={(e) => { e.stopPropagation(); handleDownload(currentMedia); }}
+                title="Descargar archivo"
+                className="absolute top-6 right-20 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md z-10"
+            >
+                <span className="material-symbols-outlined">download</span>
+            </button>
+
             {/* Close Button */}
             <button 
                 onClick={onClose}

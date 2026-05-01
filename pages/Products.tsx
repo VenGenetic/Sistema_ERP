@@ -350,7 +350,6 @@ const Products: React.FC = () => {
     const columns = [
         { key: 'sku', label: 'SKU', align: '' },
         { key: 'name', label: 'Nombre', align: '' },
-        { key: 'category', label: 'Categoría', align: '' },
         { key: 'brand', label: 'Marca', align: '' },
     ];
 
@@ -568,7 +567,6 @@ const Products: React.FC = () => {
                                             <span className="font-bold text-slate-900 dark:text-white truncate max-w-[250px]" title={prod.name}>{prod.name}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.category || '—'}</td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.brands?.name || '—'}</td>
                                     <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white">
                                         {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
