@@ -7,6 +7,8 @@ import { WarehouseSelect } from './WarehouseSelect';
 const BULK_FIELDS = [
     { key: 'category', label: 'Categoría', type: 'text', icon: 'category' },
     { key: 'brand_id', label: 'Marca', type: 'brand', icon: 'sell' },
+    { key: 'add_tag', label: 'Añadir Etiqueta', type: 'tag', icon: 'label' },
+    { key: 'remove_tag', label: 'Quitar Etiqueta', type: 'tag', icon: 'label_off' },
     { key: 'min_stock_threshold', label: 'Stock Mínimo', type: 'number', icon: 'inventory' },
     { key: 'cost_without_vat', label: 'Costo sin IVA ($)', type: 'currency', icon: 'payments' },
     { key: 'vat_percentage', label: 'IVA (%)', type: 'percent', icon: 'percent' },
@@ -44,6 +46,9 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
     const [previewStock, setPreviewStock] = useState<Record<number, number>>({});
     // New toggle to apply changes to all products
     const [applyToAll, setApplyToAll] = useState(false);
+    
+    // Tags
+    const [availableTags, setAvailableTags] = useState<any[]>([]);
 
 
     // Reset state when opened
@@ -54,6 +59,9 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
             setResult(null);
             setStockAdjustment({ warehouse_id: null, isPurchase: false, account_id: null });
             fetchAccounts();
+            supabase.from('tags').select('*').order('order_index').then(({data}) => {
+                if (data) setAvailableTags(data);
+            });
         }
     }, [isOpen]);
 
@@ -199,6 +207,28 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                     alert(data.message);
                 } else {
                     success = selectedProducts.length;
+                }
+            } else if (selectedField === 'add_tag' || selectedField === 'remove_tag') {
+                if (!value) throw new Error('Debe seleccionar una etiqueta.');
+                const ids = targetProducts.map(p => p.id);
+                
+                if (selectedField === 'add_tag') {
+                    const tagInserts = ids.map(id => ({ product_id: id, tag_id: value }));
+                    const CHUNK_SIZE = 500;
+                    for (let i = 0; i < tagInserts.length; i += CHUNK_SIZE) {
+                        const chunk = tagInserts.slice(i, i + CHUNK_SIZE);
+                        const { error } = await supabase.from('product_tags').upsert(chunk, { onConflict: 'product_id,tag_id' });
+                        if (error) { failed += chunk.length; console.error(error); }
+                        else success += chunk.length;
+                    }
+                } else if (selectedField === 'remove_tag') {
+                    const CHUNK_SIZE = 500;
+                    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+                        const chunk = ids.slice(i, i + CHUNK_SIZE);
+                        const { error } = await supabase.from('product_tags').delete().eq('tag_id', value).in('product_id', chunk);
+                        if (error) { failed += chunk.length; console.error(error); }
+                        else success += chunk.length;
+                    }
                 }
             } else {
                 // Non-financial: batch update with a single value
@@ -390,6 +420,19 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
 
                             {fieldConfig?.type === 'brand' && (
                                 <BrandSelect value={value || null} onChange={(val) => setValue(val)} />
+                            )}
+
+                            {fieldConfig?.type === 'tag' && (
+                                <select 
+                                    className={inputClass} 
+                                    value={value || ''} 
+                                    onChange={e => setValue(e.target.value)}
+                                >
+                                    <option value="">Seleccionar etiqueta...</option>
+                                    {availableTags.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </select>
                             )}
 
                             {fieldConfig?.type === 'stock' && (

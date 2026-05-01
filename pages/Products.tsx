@@ -7,6 +7,7 @@ import { BulkEditModal } from '../components/BulkEditModal';
 import { BulkMediaUploadModal } from '../components/BulkMediaUploadModal';
 import { VideoThumbnail } from '../components/VideoThumbnail';
 import { MediaLightbox } from '../components/MediaLightbox';
+import { TagManager } from '../components/TagManager';
 import { getThumbnailUrl } from '../utils/image';
 
 const Products: React.FC = () => {
@@ -31,6 +32,7 @@ const Products: React.FC = () => {
 
     // Lightbox State
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
+    const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
 
     // ──────────────────────────────────────────────
     // 2. FILTER, SORT, PAGINATION STATES
@@ -76,7 +78,9 @@ const Products: React.FC = () => {
                 .select(`
                     *,
                     brands (name),
-                    inventory_levels (current_stock)
+                    inventory_levels (current_stock),
+                    profiles (full_name),
+                    product_tags ( tags (*) )
                 `, { count: 'exact' })
                 .eq('is_active', true);
 
@@ -245,6 +249,55 @@ const Products: React.FC = () => {
         }
     };
 
+    const handleBulkDelete = async () => {
+        // Verificar stock de todos los seleccionados
+        const hasStock = selectedProducts.some(p => {
+            const stock = p.inventory_levels?.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) || 0;
+            return stock > 0;
+        });
+
+        if (hasStock) {
+            alert('No se puede eliminar el lote: Al menos uno de los productos seleccionados tiene stock. Debes vaciar sus inventarios primero.');
+            return;
+        }
+
+        const confirmed = window.confirm(`¿Estás súper seguro de que deseas ELIMINAR PERMANENTEMENTE los ${selectedProducts.length} productos seleccionados?\nEsta acción no se puede deshacer.`);
+        if (!confirmed) return;
+
+        setLoading(true);
+        let deleted = 0;
+        let hidden = 0;
+        let failed = 0;
+
+        for (const prod of selectedProducts) {
+            try {
+                const { data, error } = await supabase.from('products').delete().eq('id', prod.id).select();
+                
+                if (error) {
+                    if (error.code === '23503') { // Foreign Key constraint (historial)
+                        const { error: softError } = await supabase.from('products').update({ is_active: false }).eq('id', prod.id);
+                        if (softError) failed++;
+                        else hidden++;
+                    } else {
+                        failed++;
+                    }
+                } else if (data && data.length > 0) {
+                    deleted++;
+                } else {
+                    failed++;
+                }
+            } catch (err) {
+                failed++;
+            }
+        }
+
+        setLoading(false);
+        setSelectedIds(new Set());
+        fetchCatalogData(pagination.page);
+        
+        alert(`Resultado del Lote:\n✅ ${deleted} eliminados permanentemente\n👀 ${hidden} ocultados (tenían historial comercial)\n❌ ${failed} fallidos`);
+    };
+
     // ── Export ZIP handler ──
     const handleExportZip = async () => {
         setIsExporting(true);
@@ -349,8 +402,9 @@ const Products: React.FC = () => {
     // Column definitions for the sortable/filterable headers
     const columns = [
         { key: 'sku', label: 'SKU', align: '' },
-        { key: 'name', label: 'Nombre', align: '' },
+        { key: 'name', label: 'Nombre y Etiquetas', align: '' },
         { key: 'brand', label: 'Marca', align: '' },
+        { key: 'last_edited_at', label: 'Última Edición', align: '' },
     ];
 
     return (
@@ -505,17 +559,18 @@ const Products: React.FC = () => {
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                             {products.map(prod => (
                                 <tr key={prod.id} className={`transition-colors group ${selectedIds.has(prod.id) ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
-                                    <td className="px-3 py-4">
+                                    <td className="px-3 py-4 align-top">
                                         <input
                                             type="checkbox"
                                             checked={selectedIds.has(prod.id)}
                                             onChange={() => toggleSelectRow(prod.id)}
-                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer mt-1"
                                         />
                                     </td>
-                                    <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400">{prod.sku}</td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
+                                    <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">{prod.sku}</td>
+                                    <td className="px-6 py-4 align-top">
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-start gap-3">
                                             {/* Video Thumbnail */}
                                             {prod.video_url ? (
                                                 <VideoThumbnail src={prod.video_url} onClick={() => handleOpenLightbox(prod, 'video')} />
@@ -564,14 +619,45 @@ const Products: React.FC = () => {
                                                 </div>
                                             )}
                                             
-                                            <span className="font-bold text-slate-900 dark:text-white truncate max-w-[250px]" title={prod.name}>{prod.name}</span>
+                                            <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
+                                        </div>
+                                        {/* Tags Rendering */}
+                                        {prod.product_tags && prod.product_tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                {prod.product_tags.map((pt: any) => {
+                                                    const tag = pt.tags;
+                                                    if (!tag) return null;
+                                                    return (
+                                                        <span 
+                                                            key={tag.id} 
+                                                            className="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                                            style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
+                                                            onClick={(e) => { e.stopPropagation(); setIsTagManagerOpen(true); }}
+                                                            title="Clic para editar etiqueta"
+                                                        >
+                                                            {tag.name}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{prod.brands?.name || '—'}</td>
-                                    <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white">
+                                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 align-top">{prod.brands?.name || '—'}</td>
+                                    <td className="px-6 py-4 text-xs text-slate-500 align-top">
+                                        {prod.last_edited_at ? (
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-slate-700 dark:text-slate-300">{prod.profiles?.full_name || 'Desconocido'}</span>
+                                                <span>{new Date(prod.last_edited_at).toLocaleDateString()} {new Date(prod.last_edited_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                            </div>
+                                        ) : (
+                                            '—'
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white align-top">
                                         {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
                                     </td>
-                                    <td className="px-6 py-4 text-center">
+                                    <td className="px-6 py-4 text-center align-top">
                                         <div className="flex items-center justify-center gap-1">
                                             <button
                                                 onClick={() => handleOpenModal(prod)}
@@ -697,6 +783,13 @@ const Products: React.FC = () => {
                 onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))}
             />
 
+            {isTagManagerOpen && (
+                <TagManager onClose={() => {
+                    setIsTagManagerOpen(false);
+                    fetchCatalogData(pagination.page); // Refresh products to show updated tags
+                }} />
+            )}
+
             {/* ═══════ FLOATING ACTION BAR ═══════ */}
             {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 dark:bg-slate-700 text-white rounded-2xl shadow-2xl shadow-slate-900/50 px-6 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4">
@@ -711,6 +804,13 @@ const Products: React.FC = () => {
                     >
                         <span className="material-symbols-outlined text-[18px]">edit_note</span>
                         Edición Rápida
+                    </button>
+                    <button
+                        onClick={handleBulkDelete}
+                        className="flex items-center gap-2 px-4 py-2 bg-rose-500 hover:bg-rose-400 text-white rounded-xl text-sm font-semibold transition-colors ml-2"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                        Eliminar Lote
                     </button>
                     <button
                         onClick={() => setSelectedIds(new Set())}

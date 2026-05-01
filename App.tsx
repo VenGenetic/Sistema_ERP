@@ -26,6 +26,7 @@ const CommissionDashboard = React.lazy(() => import('./pages/CommissionDashboard
 const DataSteward = React.lazy(() => import('./pages/DataSteward'));
 const DailyRegistry = React.lazy(() => import('./pages/DailyRegistry'));
 const CapitalStats = React.lazy(() => import('./pages/CapitalStats'));
+const Tags = React.lazy(() => import('./pages/Tags'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -56,6 +57,7 @@ const App: React.FC = () => {
                 <Route path="team" element={<Team />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="products" element={<Products />} />
+                <Route path="tags" element={<Tags />} />
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="orders/*" element={<Orders />} />
                 <Route path="dispatch" element={<DispatchPipeline />} />

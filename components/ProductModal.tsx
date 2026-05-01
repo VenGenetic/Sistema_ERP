@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
+import { TagManager, Tag } from './TagManager';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -45,6 +46,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const [isUploading, setIsUploading] = useState(false);
     const [isVideoUploading, setIsVideoUploading] = useState(false);
     const [entryByPrice, setEntryByPrice] = useState(false);
+    
+    // Tags state
+    const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+
     const [formData, setFormData] = useState({
         sku: '',
         name: '',
@@ -139,8 +146,25 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             }
             setImageRemoved(false);
             setVideoRemoved(false);
+            const defaultWh = localStorage.getItem('erp_default_warehouse_id');
+            const defaultWarehouseId = defaultWh ? parseInt(defaultWh) : null;
             // Reset stock adjustment
-            setStockAdjustment({ warehouse_id: null, quantity: '', isPurchase: false, account_id: null, isMerma: false, merma_account_id: null });
+            setStockAdjustment({ warehouse_id: defaultWarehouseId, quantity: '', isPurchase: false, account_id: null, isMerma: false, merma_account_id: null });
+
+            // Fetch Tags
+            supabase.from('tags').select('*').order('order_index').then(({ data }) => {
+                if (data) setAvailableTags(data);
+            });
+
+            // Fetch Product Tags
+            if (productToEdit && productToEdit.id) {
+                supabase.from('product_tags').select('tag_id').eq('product_id', productToEdit.id)
+                    .then(({ data }) => {
+                        if (data) setSelectedTags(data.map(d => d.tag_id));
+                    });
+            } else {
+                setSelectedTags([]);
+            }
         }
     }, [isOpen, productToEdit]);
 
@@ -238,8 +262,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     };
 
     const handleRemoveImage = () => {
-        setFormData(prev => ({ ...prev, imageUrl: '' }));
-        setImageRemoved(true);
+        if (window.confirm('¿Estás seguro de que deseas eliminar permanentemente la foto central de este repuesto?')) {
+            setFormData(prev => ({ ...prev, imageUrl: '' }));
+            setImageRemoved(true);
+        }
     };
 
     const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,8 +299,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     };
 
     const handleRemoveVideo = () => {
-        setFormData(prev => ({ ...prev, videoUrl: '' }));
-        setVideoRemoved(true);
+        if (window.confirm('¿Estás seguro de que deseas eliminar permanentemente el video demostrativo de este repuesto?')) {
+            setFormData(prev => ({ ...prev, videoUrl: '' }));
+            setVideoRemoved(true);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -306,6 +334,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 video_url: videoRemoved ? null : (formData.videoUrl || null)
             };
 
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                payload.last_edited_by = user.id;
+                payload.last_edited_at = new Date().toISOString();
+            }
+
             let productId = productToEdit?.id;
 
             if (productToEdit && productToEdit.id) {
@@ -324,6 +358,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     .single();
                 if (insertError) throw insertError;
                 productId = newProd.id;
+            }
+
+            // Sync Tags
+            if (productId) {
+                await supabase.from('product_tags').delete().eq('product_id', productId);
+                if (selectedTags.length > 0) {
+                    const tagInserts = selectedTags.map(tagId => ({ product_id: productId, tag_id: tagId }));
+                    await supabase.from('product_tags').insert(tagInserts);
+                }
             }
 
             // Handle Stock Adjustment
@@ -476,6 +519,40 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                         </div>
 
+                        {/* Etiquetas */}
+                        <div className="col-span-1 md:col-span-2">
+                            <div className="flex justify-between items-end mb-1">
+                                <label className={labelClass} style={{marginBottom: 0}}>Etiquetas</label>
+                                <button type="button" onClick={() => setIsTagManagerOpen(true)} className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
+                                    <span className="material-symbols-outlined text-[14px]">settings</span> Gestionar Etiquetas
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 p-2 border border-slate-300 dark:border-slate-700 rounded-lg min-h-[42px] bg-slate-50 dark:bg-slate-900">
+                                {availableTags.map(tag => {
+                                    const isSelected = selectedTags.includes(tag.id);
+                                    return (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            onClick={() => {
+                                                if (isSelected) setSelectedTags(prev => prev.filter(id => id !== tag.id));
+                                                else setSelectedTags(prev => [...prev, tag.id]);
+                                            }}
+                                            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${isSelected ? 'shadow-sm' : 'opacity-50 hover:opacity-80 grayscale hover:grayscale-0'}`}
+                                            style={{ 
+                                                backgroundColor: isSelected ? tag.color + '30' : 'transparent', 
+                                                color: isSelected ? tag.color : '#64748B', 
+                                                border: `1px solid ${isSelected ? tag.color : '#cbd5e1'}` 
+                                            }}
+                                        >
+                                            {tag.name}
+                                        </button>
+                                    );
+                                })}
+                                {availableTags.length === 0 && <span className="text-xs text-slate-400 my-auto ml-1">No hay etiquetas creadas. Usa "Gestionar Etiquetas" para crear una.</span>}
+                            </div>
+                        </div>
+
                         <div>
                             <label className={labelClass}>SKU *</label>
                             <input required type="text" className={`${inputClass} font-mono uppercase`}
@@ -583,7 +660,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 <div>
                                     <WarehouseSelect
                                         value={stockAdjustment.warehouse_id}
-                                        onChange={(val) => setStockAdjustment(prev => ({ ...prev, warehouse_id: val }))}
+                                        onChange={(val) => {
+                                            setStockAdjustment(prev => ({ ...prev, warehouse_id: val }));
+                                            if (val) {
+                                                localStorage.setItem('erp_default_warehouse_id', val.toString());
+                                            } else {
+                                                localStorage.removeItem('erp_default_warehouse_id');
+                                            }
+                                        }}
                                         label="Almacén:"
                                         required={stockAdjustment.quantity.toString().trim() !== ''}
                                     />
@@ -706,6 +790,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     </div>
                 </form>
             </div>
+            
+            {isTagManagerOpen && (
+                <TagManager onClose={() => { 
+                    setIsTagManagerOpen(false); 
+                    supabase.from('tags').select('*').order('order_index').then(({ data }) => {
+                        if (data) setAvailableTags(data);
+                    });
+                }} />
+            )}
         </div>
     );
 };
