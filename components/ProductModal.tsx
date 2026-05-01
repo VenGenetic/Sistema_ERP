@@ -57,6 +57,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         imageUrl: '',
         videoUrl: ''
     });
+    const [imageRemoved, setImageRemoved] = useState(false);
+    const [videoRemoved, setVideoRemoved] = useState(false);
 
     // Stock Adjustment State
     const [stockAdjustment, setStockAdjustment] = useState({
@@ -135,6 +137,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     videoUrl: ''
                 });
             }
+            setImageRemoved(false);
+            setVideoRemoved(false);
             // Reset stock adjustment
             setStockAdjustment({ warehouse_id: null, quantity: '', isPurchase: false, account_id: null, isMerma: false, merma_account_id: null });
         }
@@ -222,11 +226,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             if (uploadError) throw uploadError;
 
-            const { data } = supabase.storage
-                .from('product_images')
-                .getPublicUrl(filePath);
-
+            const { data } = supabase.storage.from('product_images').getPublicUrl(filePath);
             setFormData(prev => ({ ...prev, imageUrl: data.publicUrl }));
+            setImageRemoved(false);
         } catch (error: any) {
             console.error('Error uploading image:', error);
             alert('Error al subir imagen: ' + error.message);
@@ -237,6 +239,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     const handleRemoveImage = () => {
         setFormData(prev => ({ ...prev, imageUrl: '' }));
+        setImageRemoved(true);
     };
 
     const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,11 +261,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             if (uploadError) throw uploadError;
 
-            const { data } = supabase.storage
-                .from('product_videos')
-                .getPublicUrl(filePath);
-
+            const { data } = supabase.storage.from('product_videos').getPublicUrl(filePath);
             setFormData(prev => ({ ...prev, videoUrl: data.publicUrl }));
+            setVideoRemoved(false);
         } catch (error: any) {
             console.error('Error uploading video:', error);
             alert('Error al subir video: ' + error.message);
@@ -273,6 +274,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     const handleRemoveVideo = () => {
         setFormData(prev => ({ ...prev, videoUrl: '' }));
+        setVideoRemoved(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -300,8 +302,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 cost_without_vat: formData.costWithoutVat,
                 vat_percentage: formData.vatPercentage,
                 price: formData.price,
-                image_url: formData.imageUrl || defaultImageUrl,
-                video_url: formData.videoUrl || null
+                image_url: imageRemoved ? null : (formData.imageUrl || defaultImageUrl),
+                video_url: videoRemoved ? null : (formData.videoUrl || null)
             };
 
             let productId = productToEdit?.id;
