@@ -7,7 +7,7 @@ import { BulkEditModal } from '../components/BulkEditModal';
 import { BulkMediaUploadModal } from '../components/BulkMediaUploadModal';
 import { VideoThumbnail } from '../components/VideoThumbnail';
 import { MediaLightbox } from '../components/MediaLightbox';
-import { TagManager } from '../components/TagManager';
+import { QuickTagAssignModal } from '../components/QuickTagAssignModal';
 import { getThumbnailUrl } from '../utils/image';
 
 const Products: React.FC = () => {
@@ -32,7 +32,7 @@ const Products: React.FC = () => {
 
     // Lightbox State
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
-    const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+    const [selectedProductForTags, setSelectedProductForTags] = useState<any | null>(null);
 
     // ──────────────────────────────────────────────
     // 2. FILTER, SORT, PAGINATION STATES
@@ -404,7 +404,6 @@ const Products: React.FC = () => {
         { key: 'sku', label: 'SKU', align: '' },
         { key: 'name', label: 'Nombre y Etiquetas', align: '' },
         { key: 'brand', label: 'Marca', align: '' },
-        { key: 'last_edited_at', label: 'Última Edición', align: '' },
     ];
 
     return (
@@ -622,38 +621,34 @@ const Products: React.FC = () => {
                                             <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
                                         </div>
                                         {/* Tags Rendering */}
-                                        {prod.product_tags && prod.product_tags.length > 0 && (
-                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                {prod.product_tags.map((pt: any) => {
-                                                    const tag = pt.tags;
-                                                    if (!tag) return null;
-                                                    return (
-                                                        <span 
-                                                            key={tag.id} 
-                                                            className="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
-                                                            style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
-                                                            onClick={(e) => { e.stopPropagation(); setIsTagManagerOpen(true); }}
-                                                            title="Clic para editar etiqueta"
-                                                        >
-                                                            {tag.name}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                                        <div className="flex flex-wrap gap-1 mt-2 items-center">
+                                            {prod.product_tags && prod.product_tags.length > 0 && prod.product_tags.map((pt: any) => {
+                                                const tag = pt.tags;
+                                                if (!tag) return null;
+                                                return (
+                                                    <span 
+                                                        key={tag.id} 
+                                                        className="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                                        style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
+                                                        title="Clic para editar etiquetas"
+                                                    >
+                                                        {tag.name}
+                                                    </span>
+                                                );
+                                            })}
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
+                                                className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800"
+                                                title="Asignar etiquetas"
+                                            >
+                                                <span className="material-symbols-outlined text-[12px]">add</span>
+                                                Etiqueta
+                                            </button>
+                                        </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 align-top">{prod.brands?.name || '—'}</td>
-                                    <td className="px-6 py-4 text-xs text-slate-500 align-top">
-                                        {prod.last_edited_at ? (
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-slate-700 dark:text-slate-300">{prod.profiles?.full_name || 'Desconocido'}</span>
-                                                <span>{new Date(prod.last_edited_at).toLocaleDateString()} {new Date(prod.last_edited_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                            </div>
-                                        ) : (
-                                            '—'
-                                        )}
-                                    </td>
                                     <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white align-top">
                                         {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
                                     </td>
@@ -783,12 +778,13 @@ const Products: React.FC = () => {
                 onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))}
             />
 
-            {isTagManagerOpen && (
-                <TagManager onClose={() => {
-                    setIsTagManagerOpen(false);
-                    fetchCatalogData(pagination.page); // Refresh products to show updated tags
-                }} />
-            )}
+            <QuickTagAssignModal 
+                isOpen={!!selectedProductForTags}
+                onClose={() => setSelectedProductForTags(null)}
+                onSuccess={() => fetchCatalogData(pagination.page)}
+                productId={selectedProductForTags?.id}
+                productName={selectedProductForTags?.name || ''}
+            />
 
             {/* ═══════ FLOATING ACTION BAR ═══════ */}
             {selectedIds.size > 0 && (

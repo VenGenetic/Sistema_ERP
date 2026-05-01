@@ -777,16 +777,30 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     </div>
 
                     {/* ═══ Actions ═══ */}
-                    <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                        <button type="button" onClick={onClose}
-                            className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium">
-                            Cancelar
-                        </button>
-                        <button type="submit" disabled={loading}
-                            className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-                            {loading && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
-                            {loading ? 'Guardando...' : 'Guardar Producto'}
-                        </button>
+                    <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                        <div className="flex justify-between items-center w-full">
+                            {productToEdit?.last_edited_at ? (
+                                <div className="text-xs text-slate-500 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700">
+                                    <span className="material-symbols-outlined text-[14px]">history</span>
+                                    <span>
+                                        Última modificación por <strong>{productToEdit.profiles?.full_name || 'Desconocido'}</strong> el {new Date(productToEdit.last_edited_at).toLocaleDateString()} a las {new Date(productToEdit.last_edited_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div></div>
+                            )}
+                            <div className="flex justify-end gap-3">
+                                <button type="button" onClick={onClose}
+                                    className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium">
+                                    Cancelar
+                                </button>
+                                <button type="submit" disabled={loading}
+                                    className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                                    {loading && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
+                                    {loading ? 'Guardando...' : 'Guardar Producto'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
