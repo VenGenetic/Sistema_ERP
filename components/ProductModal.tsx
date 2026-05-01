@@ -286,6 +286,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         setLoading(true);
 
         try {
+            // Compute implied image URL based on SKU if not manually uploaded
+            const defaultImageUrl = supabase.storage
+                .from('product_images')
+                .getPublicUrl('products/' + formData.sku + '_cut.webp').data.publicUrl;
+
             const payload: any = {
                 sku: formData.sku,
                 name: formData.name,
