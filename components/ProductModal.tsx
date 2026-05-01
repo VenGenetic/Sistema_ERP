@@ -48,7 +48,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const [formData, setFormData] = useState({
         sku: '',
         name: '',
-        category: '',
         brandId: null as number | null,
         minStock: 10,
         profitMargin: 0.65,
@@ -113,7 +112,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 setFormData({
                     sku: productToEdit.sku || '',
                     name: productToEdit.name || '',
-                    category: productToEdit.category || '',
                     brandId: productToEdit.brand_id,
                     minStock: productToEdit.min_stock_threshold || 10,
                     profitMargin: Math.round(margin * 100) / 100,
@@ -127,7 +125,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 setFormData({
                     sku: '',
                     name: '',
-                    category: '',
                     brandId: null,
                     minStock: 10,
                     profitMargin: 0.65,
@@ -289,15 +286,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         setLoading(true);
 
         try {
-            // Compute implied image URL based on SKU if not manually uploaded
-            const defaultImageUrl = supabase.storage
-                .from('product_images')
-                .getPublicUrl('products/' + formData.sku + '_cut.webp').data.publicUrl;
-
-            const payload = {
+            const payload: any = {
                 sku: formData.sku,
                 name: formData.name,
-                category: formData.category,
                 brand_id: formData.brandId,
                 min_stock_threshold: formData.minStock,
                 profit_margin: formData.profitMargin,
@@ -482,12 +473,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             <label className={labelClass}>SKU *</label>
                             <input required type="text" className={`${inputClass} font-mono uppercase`}
                                 value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value.toUpperCase() })} />
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>Categoría</label>
-                            <input type="text" className={inputClass}
-                                value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} />
                         </div>
 
                         <div className="col-span-1 md:col-span-2">
