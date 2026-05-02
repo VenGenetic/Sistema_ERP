@@ -45,6 +45,12 @@ async function exportInventory() {
                 reference_image_url,
                 brands (
                     name
+                ),
+                product_tags (
+                    tags (
+                        name,
+                        color
+                    )
                 )
             )
         `)
@@ -64,6 +70,16 @@ async function exportInventory() {
     // 3. Formatear los datos
     const formattedData = inventory.map(item => {
         const prod = item.products;
+        
+        const tags = [];
+        if (prod.product_tags && Array.isArray(prod.product_tags)) {
+            for (const pt of prod.product_tags) {
+                if (pt.tags) {
+                    tags.push({ name: pt.tags.name, color: pt.tags.color });
+                }
+            }
+        }
+        
         return {
             id: prod.sku,
             codigo_referencia: prod.sku,
@@ -72,7 +88,8 @@ async function exportInventory() {
             precio: Math.ceil(prod.price || 0),
             categoria: prod.category || "General",
             imagen: prod.reference_image_url || "sin_imagen.jpg",
-            stock: item.current_stock > 0
+            stock: item.current_stock > 0,
+            tags: tags
         };
     });
 

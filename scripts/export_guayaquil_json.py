@@ -49,6 +49,12 @@ def export_inventory():
                 reference_image_url,
                 brands (
                     name
+                ),
+                product_tags (
+                    tags (
+                        name,
+                        color
+                    )
                 )
             )
         """).eq('warehouse_id', guayaquil_id).gt('current_stock', 0).execute()
@@ -70,6 +76,13 @@ def export_inventory():
             brand = prod.get('brands')
             brand_name = brand.get('name') if brand else "N/A"
             
+            product_tags = prod.get('product_tags', [])
+            tags = []
+            for pt in product_tags:
+                tag = pt.get('tags')
+                if tag:
+                    tags.append({"name": tag.get('name'), "color": tag.get('color')})
+            
             formatted_data.append({
                 "id": prod.get('sku'),
                 "codigo_referencia": prod.get('sku'),
@@ -78,7 +91,8 @@ def export_inventory():
                 "precio": math.ceil(prod.get('price') or 0),
                 "categoria": prod.get('category') or "General",
                 "imagen": prod.get('reference_image_url') or "sin_imagen.jpg",
-                "stock": item.get('current_stock') > 0
+                "stock": item.get('current_stock') > 0,
+                "tags": tags
             })
 
         # 4. Guardar a JSON

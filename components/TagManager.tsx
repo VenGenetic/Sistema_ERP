@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export interface Tag {
     id: string;
@@ -17,10 +34,64 @@ interface Props {
     embedded?: boolean;
 }
 
+const SortableTagItem = ({ tag, onEdit, onDelete }: { tag: Tag, onEdit: () => void, onDelete: () => void }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: tag.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 1 : 0,
+        position: isDragging ? 'relative' as const : undefined
+    };
+
+    return (
+        <div 
+            ref={setNodeRef} 
+            style={style} 
+            className={`flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 group hover:border-slate-300 dark:hover:border-slate-600 transition-colors ${isDragging ? 'shadow-lg border-blue-500 dark:border-blue-500' : ''}`}
+        >
+            <div className="flex items-center gap-3">
+                <div 
+                    {...attributes} 
+                    {...listeners} 
+                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-300 dark:text-slate-600 hover:text-slate-500"
+                >
+                    <span className="material-symbols-outlined">drag_indicator</span>
+                </div>
+                <span 
+                    className="px-2 py-0.5 text-xs font-bold rounded"
+                    style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
+                >
+                    {tag.name}
+                </span>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={onEdit} className="p-1 text-slate-400 hover:text-blue-500 rounded"><span className="material-symbols-outlined text-[18px]">edit</span></button>
+                <button onClick={onDelete} className="p-1 text-slate-400 hover:text-rose-500 rounded"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+            </div>
+        </div>
+    );
+};
+
 export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
     const [tags, setTags] = useState<Tag[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingTag, setEditingTag] = useState<Partial<Tag> | null>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     useEffect(() => {
         fetchTags();
@@ -74,6 +145,38 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
             fetchTags();
         } catch (err: any) {
             alert('Error al eliminar: ' + err.message);
+        }
+    };
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            setTags((items) => {
+                const oldIndex = items.findIndex(item => item.id === active.id);
+                const newIndex = items.findIndex(item => item.id === over.id);
+
+                const newItems = arrayMove(items, oldIndex, newIndex);
+                updateOrder(newItems);
+                return newItems;
+            });
+        }
+    };
+
+    const updateOrder = async (newTags: Tag[]) => {
+        try {
+            const updates = newTags.map((tag, index) => ({
+                id: tag.id,
+                name: tag.name,
+                color: tag.color,
+                order_index: index
+            }));
+
+            const { error } = await supabase.from('tags').upsert(updates);
+            if (error) throw error;
+        } catch (err: any) {
+            console.error('Error updating order:', err);
+            fetchTags(); // Revert on error
         }
     };
 
@@ -142,23 +245,25 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
                     <div className="text-center py-8 text-slate-400"><span className="material-symbols-outlined animate-spin text-[24px]">progress_activity</span></div>
                 ) : (
                     <div className="flex flex-col gap-2">
-                        {tags.map(tag => (
-                            <div key={tag.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 group hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 cursor-grab">drag_indicator</span>
-                                    <span 
-                                        className="px-2 py-0.5 text-xs font-bold rounded"
-                                        style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
-                                    >
-                                        {tag.name}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => setEditingTag(tag)} className="p-1 text-slate-400 hover:text-blue-500 rounded"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                                    <button onClick={() => handleDelete(tag.id)} className="p-1 text-slate-400 hover:text-rose-500 rounded"><span className="material-symbols-outlined text-[18px]">delete</span></button>
-                                </div>
-                            </div>
-                        ))}
+                        <DndContext 
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext 
+                                items={tags.map(t => t.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                {tags.map(tag => (
+                                    <SortableTagItem 
+                                        key={tag.id} 
+                                        tag={tag} 
+                                        onEdit={() => setEditingTag(tag)}
+                                        onDelete={() => handleDelete(tag.id)}
+                                    />
+                                ))}
+                            </SortableContext>
+                        </DndContext>
                         {tags.length === 0 && !editingTag && (
                             <div className="text-center py-8 text-slate-400 text-sm">No hay etiquetas creadas.</div>
                         )}
