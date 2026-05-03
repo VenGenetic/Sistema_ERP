@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit } from 'lucide-react';
+import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone } from 'lucide-react';
 import { supabase } from '../supabaseClient';
+import WhatsAppButton from '../components/WhatsAppButton';
 
 // Interfaces
 interface OrderItem { id: string; product: { name: string; sku: string }; quantity: number; unitPrice: number; subtotal: number; }
@@ -9,7 +10,7 @@ interface Order {
     id: number;
     customerName: string;
     phone: string;
-    status: 'Borrador' | 'Pendiente_Pago' | 'Listo_Cumplimiento' | 'Sourcing_Pendiente' | 'Alerta_Margen' | 'En_Transito' | 'Entregado' | 'RMA_Pendiente' | 'Cancelado' | 'Reembolsado';
+    status: 'Borrador' | 'Sourcing_Pendiente' | 'Confirmado_Proveedor' | 'Pendiente_Pago' | 'Listo_Cumplimiento' | 'Alerta_Margen' | 'En_Transito' | 'Entregado' | 'RMA_Pendiente' | 'Cancelado' | 'Reembolsado';
     total: number;
     date: string;
     paymentReceiptUrl?: string;
@@ -22,9 +23,11 @@ interface Order {
 // Kanban Column Config based on strict pipeline
 const columns = [
     { id: 'Borrador', title: 'Borrador / Cotización', color: 'bg-gray-100', borderColor: 'border-gray-300', icon: <FileText size={18} className="text-gray-500" /> },
-    { id: 'Pendiente_Pago', title: 'Cliente Aprobó (Verif. Pago)', color: 'bg-yellow-50', borderColor: 'border-yellow-300', icon: <CheckCircle2 size={18} className="text-yellow-500" /> },
-    { id: 'Listo_Cumplimiento', title: 'En Preparación / Parcial', color: 'bg-purple-50', borderColor: 'border-purple-300', icon: <div className="w-4 h-4 rounded-full bg-purple-500"></div> },
-    { id: 'En_Transito', title: 'Bodega / Mostrador', color: 'bg-indigo-50', borderColor: 'border-indigo-300', icon: <CheckCircle2 size={18} className="text-indigo-500" /> },
+    { id: 'Sourcing_Pendiente', title: 'Pendiente Proveedor', color: 'bg-orange-50', borderColor: 'border-orange-300', icon: <PackageSearch size={18} className="text-orange-500" /> },
+    { id: 'Confirmado_Proveedor', title: 'Confirmado (WhatsApp)', color: 'bg-green-50', borderColor: 'border-green-300', icon: <MessageCircle size={18} className="text-green-500" /> },
+    { id: 'Pendiente_Pago', title: 'Verificación de Pago', color: 'bg-yellow-50', borderColor: 'border-yellow-300', icon: <CheckCircle2 size={18} className="text-yellow-500" /> },
+    { id: 'Listo_Cumplimiento', title: 'Listo para Despacho', color: 'bg-purple-50', borderColor: 'border-purple-300', icon: <div className="w-4 h-4 rounded-full bg-purple-500"></div> },
+    { id: 'En_Transito', title: 'En Tránsito', color: 'bg-indigo-50', borderColor: 'border-indigo-300', icon: <CheckCircle2 size={18} className="text-indigo-500" /> },
     { id: 'Entregado', title: 'Completado', color: 'bg-green-50', borderColor: 'border-green-300', icon: <CheckCircle2 size={18} className="text-green-500" /> },
 ];
 
@@ -82,7 +85,7 @@ const Orders: React.FC = () => {
                     id: o.id,
                     customerName: o.customers?.name || 'Cliente Desconocido',
                     phone: o.customers?.phone || '',
-                    status: (o.status === 'En_Transito' ? 'Entregado' : o.status) as Order['status'], // Map in-transit to completed for view if needed, but 'Entregado' is there
+                    status: o.status as Order['status'],
                     total: o.total_amount,
                     shippingCost: o.shipping_cost || 0,
                     shippingAddress: o.shipping_address || '',

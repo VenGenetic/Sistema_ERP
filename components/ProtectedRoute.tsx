@@ -39,6 +39,61 @@ const ProtectedRoute: React.FC = () => {
         );
     }
 
+    // Role Fencing: Sourcing Manager (role_id === 3)
+    if (userProfile?.role_id === 3) {
+        const allowedRoutes = ['/dispatch', '/settings', '/products', '/inventory'];
+        const isAllowed = allowedRoutes.includes(location.pathname) 
+            || location.pathname.startsWith('/orders')
+            || location.pathname === '/';
+
+        if (!isAllowed) {
+            return <Navigate to="/dispatch" replace />;
+        }
+        return (
+            <>
+                <SessionTimeoutHandler />
+                <Outlet />
+            </>
+        );
+    }
+
+    // Role Fencing: Warehouse (role_id === 4)
+    if (userProfile?.role_id === 4) {
+        const allowedRoutes = ['/dispatch', '/inventory', '/settings'];
+        const isAllowed = allowedRoutes.includes(location.pathname) 
+            || location.pathname.startsWith('/orders')
+            || location.pathname === '/';
+
+        if (!isAllowed) {
+            return <Navigate to="/dispatch" replace />;
+        }
+        return (
+            <>
+                <SessionTimeoutHandler />
+                <Outlet />
+            </>
+        );
+    }
+
+    // Role Fencing: Sales Monitor / CS (role_id === 5)
+    if (userProfile?.role_id === 5) {
+        const allowedRoutes = ['/pos', '/rep-dashboard', '/customers', '/settings'];
+        const isAllowed = allowedRoutes.includes(location.pathname) 
+            || location.pathname.startsWith('/orders')
+            || location.pathname.startsWith('/dispatch')
+            || location.pathname === '/';
+
+        if (!isAllowed) {
+            return <Navigate to="/" replace />;
+        }
+        return (
+            <>
+                <SessionTimeoutHandler />
+                <Outlet />
+            </>
+        );
+    }
+
     // Default Denial Logic based on permissions JSON
     const pathSegments = location.pathname.split('/').filter(Boolean);
     const topLevelRoute = pathSegments[0];
