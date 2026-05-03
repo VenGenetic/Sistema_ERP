@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone } from 'lucide-react';
+import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone, Truck } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { isTransitionAllowed } from '../utils/orderStateMachine';
@@ -210,7 +210,7 @@ const Orders: React.FC = () => {
     };
 
     // Generic status transition handler (uses RPC)
-    const handleStatusTransition = async (orderId: number, newStatus: Order['status']) => {
+    const handleStatusTransition = async (orderId: number, newStatus: Order['status'], extraFields?: { tracking_number?: string; carrier_name?: string }) => {
         setIsProcessing(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -219,7 +219,9 @@ const Orders: React.FC = () => {
             const { data, error } = await supabase.rpc('update_order_status', {
                 p_order_id: orderId,
                 p_new_status: newStatus,
-                p_user_id: userId || null
+                p_user_id: userId || null,
+                p_tracking_number: extraFields?.tracking_number || null,
+                p_carrier_name: extraFields?.carrier_name || null
             });
 
             if (error) throw error;
@@ -267,7 +269,18 @@ const Orders: React.FC = () => {
             return;
         }
 
-        await handleStatusTransition(draggedOrderId, targetColumnId);
+        let extraFields = undefined;
+        if (targetColumnId === 'En_Transito') {
+            const tracking = window.prompt('Ingrese el código de rastreo o guía de despacho:');
+            if (!tracking) {
+                alert('Debe ingresar un código de rastreo para enviar a tránsito.');
+                setDraggedOrderId(null);
+                return;
+            }
+            extraFields = { tracking_number: tracking, carrier_name: 'Servientrega' };
+        }
+
+        await handleStatusTransition(draggedOrderId, targetColumnId, extraFields);
     };
 
     if (loading) {
@@ -511,10 +524,27 @@ const Orders: React.FC = () => {
                                                 <span>🔒 Cliente Aprobó (Verificar)</span>
                                             </button>
                                         )}
-                                        {!canConvert && (
+                                        {selectedOrder?.status === 'Listo_Cumplimiento' && (
+                                            <button
+                                                onClick={() => {
+                                                    const tracking = window.prompt('Ingrese el número de guía / rastreo para el despacho:');
+                                                    if (!tracking) {
+                                                        alert('Debe ingresar un código de rastreo para enviar a tránsito.');
+                                                        return;
+                                                    }
+                                                    handleStatusTransition(selectedOrder.id, 'En_Transito', { tracking_number: tracking, carrier_name: 'Servientrega' });
+                                                }}
+                                                disabled={isProcessing}
+                                                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white py-2 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors text-sm mt-2"
+                                            >
+                                                <Truck size={16} />
+                                                <span>{isProcessing ? 'Enviando...' : 'Despachar (Enviar a Tránsito)'}</span>
+                                            </button>
+                                        )}
+                                        {!canConvert && selectedOrder?.status !== 'Listo_Cumplimiento' && selectedOrder?.status !== 'Borrador' && (
                                             <button
                                                 onClick={() => setIsModalOpen(false)}
-                                                className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-lg font-bold"
+                                                className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-lg font-bold mt-2"
                                             >
                                                 Cerrar Vista
                                             </button>

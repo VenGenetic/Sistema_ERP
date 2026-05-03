@@ -56,10 +56,10 @@ export const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; bord
  */
 export const VALID_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
     Borrador:              ['Sourcing_Pendiente', 'Pendiente_Pago', 'Cancelado'],
-    Sourcing_Pendiente:    ['Confirmado_Proveedor', 'Cancelado'],
-    Confirmado_Proveedor:  ['Pendiente_Pago', 'Cancelado'],
-    Pendiente_Pago:        ['Listo_Cumplimiento', 'Borrador', 'Cancelado'],
-    Listo_Cumplimiento:    ['En_Transito', 'Cancelado'],
+    Sourcing_Pendiente:    ['Confirmado_Proveedor', 'Borrador', 'Cancelado'],
+    Confirmado_Proveedor:  ['Pendiente_Pago', 'Sourcing_Pendiente', 'Borrador', 'Cancelado'],
+    Pendiente_Pago:        ['Listo_Cumplimiento', 'Confirmado_Proveedor', 'Borrador', 'Cancelado'],
+    Listo_Cumplimiento:    ['En_Transito', 'Pendiente_Pago', 'Borrador', 'Cancelado'],
     En_Transito:           ['Entregado', 'RMA_Pendiente'],
     Entregado:             ['RMA_Pendiente', 'Reembolsado'],
 };

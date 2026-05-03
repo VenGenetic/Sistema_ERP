@@ -108,17 +108,17 @@ BEGIN
         -- From Borrador → can go to Sourcing or directly to Pendiente_Pago (POS flow)
         WHEN v_current_status = 'Borrador' AND v_new_status IN ('Sourcing_Pendiente', 'Pendiente_Pago', 'Cancelado') THEN TRUE
         
-        -- From Sourcing_Pendiente → provider confirms
-        WHEN v_current_status = 'Sourcing_Pendiente' AND v_new_status IN ('Confirmado_Proveedor', 'Cancelado') THEN TRUE
+        -- From Sourcing_Pendiente → provider confirms or backward
+        WHEN v_current_status = 'Sourcing_Pendiente' AND v_new_status IN ('Confirmado_Proveedor', 'Borrador', 'Cancelado') THEN TRUE
         
-        -- From Confirmado_Proveedor → customer sends payment OR cancel
-        WHEN v_current_status = 'Confirmado_Proveedor' AND v_new_status IN ('Pendiente_Pago', 'Cancelado') THEN TRUE
+        -- From Confirmado_Proveedor → customer sends payment OR backward OR cancel
+        WHEN v_current_status = 'Confirmado_Proveedor' AND v_new_status IN ('Pendiente_Pago', 'Sourcing_Pendiente', 'Borrador', 'Cancelado') THEN TRUE
         
-        -- From Pendiente_Pago → payment verified → ready for dispatch
-        WHEN v_current_status = 'Pendiente_Pago' AND v_new_status IN ('Listo_Cumplimiento', 'Borrador', 'Cancelado') THEN TRUE
+        -- From Pendiente_Pago → payment verified → ready for dispatch OR backward
+        WHEN v_current_status = 'Pendiente_Pago' AND v_new_status IN ('Listo_Cumplimiento', 'Confirmado_Proveedor', 'Borrador', 'Cancelado') THEN TRUE
         
-        -- From Listo_Cumplimiento → warehouse ships (requires tracking)
-        WHEN v_current_status = 'Listo_Cumplimiento' AND v_new_status IN ('En_Transito', 'Cancelado') THEN TRUE
+        -- From Listo_Cumplimiento → warehouse ships (requires tracking) OR backward
+        WHEN v_current_status = 'Listo_Cumplimiento' AND v_new_status IN ('En_Transito', 'Pendiente_Pago', 'Borrador', 'Cancelado') THEN TRUE
         
         -- From En_Transito → delivered (triggers accounting)
         WHEN v_current_status = 'En_Transito' AND v_new_status IN ('Entregado', 'RMA_Pendiente') THEN TRUE
