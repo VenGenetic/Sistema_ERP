@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import WhatsAppButton from '../components/WhatsAppButton';
+import { isTransitionAllowed } from '../utils/orderStateMachine';
 
 // Interfaces
 interface OrderItem { id: string; product: { name: string; sku: string }; quantity: number; unitPrice: number; subtotal: number; }
@@ -44,6 +45,10 @@ const Orders: React.FC = () => {
     const [shippingCost, setShippingCost] = useState(0);
     const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
+    
+    // Drag & Drop / Transition state
+    const [draggedOrderId, setDraggedOrderId] = useState<number | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         fetchOrders();
@@ -204,6 +209,67 @@ const Orders: React.FC = () => {
         }
     };
 
+    // Generic status transition handler (uses RPC)
+    const handleStatusTransition = async (orderId: number, newStatus: Order['status']) => {
+        setIsProcessing(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const userId = session?.user?.id;
+
+            const { data, error } = await supabase.rpc('update_order_status', {
+                p_order_id: orderId,
+                p_new_status: newStatus,
+                p_user_id: userId || null
+            });
+
+            if (error) throw error;
+
+            alert(`Orden actualizada a ${newStatus.replace('_', ' ')}`);
+            if (isModalOpen) setIsModalOpen(false);
+            fetchOrders();
+        } catch (err: any) {
+            console.error("Error updating status:", err);
+            alert(`Error: ${err.message || 'No se pudo actualizar el estado.'}`);
+        } finally {
+            setIsProcessing(false);
+            setDraggedOrderId(null);
+        }
+    };
+
+    // Drag & Drop Handlers
+    const handleDragStart = (e: React.DragEvent, orderId: number) => {
+        setDraggedOrderId(orderId);
+        e.dataTransfer.effectAllowed = 'move';
+        // Some browsers require setting data
+        e.dataTransfer.setData('text/plain', orderId.toString());
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault(); // Necessary to allow dropping
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetColumnId: Order['status']) => {
+        e.preventDefault();
+        if (!draggedOrderId) return;
+
+        const order = orders.find(o => o.id === draggedOrderId);
+        if (!order) return;
+
+        if (order.status === targetColumnId) {
+            setDraggedOrderId(null);
+            return;
+        }
+
+        if (!isTransitionAllowed(order.status, targetColumnId)) {
+            alert(`No puedes mover una orden de ${order.status.replace('_', ' ')} a ${targetColumnId.replace('_', ' ')} directamente.`);
+            setDraggedOrderId(null);
+            return;
+        }
+
+        await handleStatusTransition(draggedOrderId, targetColumnId);
+    };
+
     if (loading) {
         return <div className="p-6 text-slate-500">Cargando pipeline...</div>;
     }
@@ -229,7 +295,12 @@ const Orders: React.FC = () => {
             <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
                 <div className="flex gap-6 h-full min-w-max">
                     {columns.map(col => (
-                        <div key={col.id} className="w-80 flex flex-col bg-slate-100/50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm h-full">
+                        <div 
+                            key={col.id} 
+                            className="w-80 flex flex-col bg-slate-100/50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm h-full"
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, col.id as Order['status'])}
+                        >
                             <div className={`px-4 py-3 border-b border-t-4 border-t-transparent ${col.borderColor} bg-white dark:bg-[#0c1117] flex justify-between items-center`}>
                                 <div className="flex items-center gap-2">
                                     {col.icon}
@@ -245,7 +316,9 @@ const Orders: React.FC = () => {
                                     <div
                                         key={order.id}
                                         onClick={() => handleViewOrder(order)}
-                                        className={`bg-white dark:bg-[#0c1117] p-4 rounded-lg shadow-sm border ${order.status === 'Borrador' ? 'border-slate-200 hover:border-blue-400' : 'border-slate-200/50 hover:border-slate-400 opacity-90'} dark:border-slate-800 cursor-pointer transition-colors group`}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, order.id)}
+                                        className={`bg-white dark:bg-[#0c1117] p-4 rounded-lg shadow-sm border ${order.status === 'Borrador' ? 'border-slate-200 hover:border-blue-400' : 'border-slate-200/50 hover:border-slate-400 opacity-90'} dark:border-slate-800 cursor-grab active:cursor-grabbing transition-colors group ${draggedOrderId === order.id ? 'opacity-50' : ''}`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-xs font-mono text-slate-500 group-hover:text-blue-500 transition-colors">#{order.id}</span>
@@ -411,18 +484,28 @@ const Orders: React.FC = () => {
 
                                     <div className="space-y-2">
                                         {selectedOrder?.status === 'Borrador' && (
-                                            <button
-                                                onClick={handleSendQuote}
-                                                disabled={selectedOrder.items.length === 0}
-                                                className="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg font-bold shadow-md transition-colors text-sm"
-                                            >
-                                                Marcar como Cotización Enviada
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => handleStatusTransition(selectedOrder.id, 'Sourcing_Pendiente')}
+                                                    disabled={selectedOrder.items.length === 0 || isProcessing}
+                                                    className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 text-white py-2 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors text-sm"
+                                                >
+                                                    <PackageSearch size={16} />
+                                                    <span>{isProcessing ? 'Enviando...' : 'Solicitar a Sourcing (Pendiente Proveedor)'}</span>
+                                                </button>
+                                                <button
+                                                    onClick={handleSendQuote}
+                                                    disabled={selectedOrder.items.length === 0 || isProcessing}
+                                                    className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white py-2 rounded-lg font-bold shadow-md transition-colors text-sm"
+                                                >
+                                                    Marcar como Cotización Enviada
+                                                </button>
+                                            </>
                                         )}
                                         {canConvert && (
                                             <button
                                                 onClick={handleProcessSale}
-                                                disabled={selectedOrder.items.length === 0 || !bankRef || !receiptPreview}
+                                                disabled={selectedOrder.items.length === 0 || !bankRef || !receiptPreview || isProcessing}
                                                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white py-3 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors mt-2"
                                             >
                                                 <span>🔒 Cliente Aprobó (Verificar)</span>
