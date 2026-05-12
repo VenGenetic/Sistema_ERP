@@ -32,7 +32,7 @@ const SortableAccountCard = ({ account, balance, onClick, formatCurrency }: any)
         transform,
         transition,
         isDragging
-    } = useSortable({ id: account.id });
+    } = useSortable({ id: String(account.id) });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -178,10 +178,12 @@ const FinanceDashboard: React.FC = () => {
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
 
-        if (active.id !== over?.id) {
+        if (over && active.id !== over.id) {
             setAccounts((items) => {
-                const oldIndex = items.findIndex((item) => item.id === active.id);
-                const newIndex = items.findIndex((item) => item.id === over?.id);
+                const oldIndex = items.findIndex((item) => String(item.id) === String(active.id));
+                const newIndex = items.findIndex((item) => String(item.id) === String(over.id));
+
+                if (oldIndex === -1 || newIndex === -1) return items;
 
                 const newItems = arrayMove(items, oldIndex, newIndex);
 
@@ -199,11 +201,15 @@ const FinanceDashboard: React.FC = () => {
 
     const updatePositions = async (updates: { id: number; position: number }[]) => {
         try {
-            await Promise.all(updates.map(u =>
-                supabase.from('accounts').update({ position: u.position }).eq('id', u.id)
-            ));
+            const promises = updates.map(async (u) => {
+                const { error } = await supabase.from('accounts').update({ position: u.position }).eq('id', u.id);
+                if (error) throw error;
+            });
+            await Promise.all(promises);
+            console.log('Positions updated successfully in Supabase');
         } catch (error) {
-            console.error('Error updating positions:', error);
+            console.error('Error updating positions in Supabase:', error);
+            alert('Hubo un error al guardar las posiciones. Por favor, refresca la página e inténtalo de nuevo.');
         }
     };
 
@@ -277,7 +283,7 @@ const FinanceDashboard: React.FC = () => {
                         <div className="col-span-3 text-center py-8 text-slate-500">No hay cuentas para mostrar.</div>
                     ) : (
                         <SortableContext
-                            items={accounts.map(acc => acc.id)}
+                            items={accounts.map(acc => String(acc.id))}
                             strategy={rectSortingStrategy}
                         >
                             {accounts.map(account => (
