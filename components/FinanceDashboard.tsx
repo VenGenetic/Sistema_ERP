@@ -201,15 +201,25 @@ const FinanceDashboard: React.FC = () => {
 
     const updatePositions = async (updates: { id: number; position: number }[]) => {
         try {
+            console.log('Sending updates to Supabase:', updates);
             const promises = updates.map(async (u) => {
-                const { error } = await supabase.from('accounts').update({ position: u.position }).eq('id', u.id);
+                const { data, error } = await supabase
+                    .from('accounts')
+                    .update({ position: u.position })
+                    .eq('id', u.id)
+                    .select();
+                
                 if (error) throw error;
+                if (!data || data.length === 0) {
+                    throw new Error(`Update for account ${u.id} matched no rows. Posible problema de RLS.`);
+                }
+                return data;
             });
             await Promise.all(promises);
             console.log('Positions updated successfully in Supabase');
         } catch (error) {
             console.error('Error updating positions in Supabase:', error);
-            alert('Hubo un error al guardar las posiciones. Por favor, refresca la página e inténtalo de nuevo.');
+            alert('Hubo un error al guardar las posiciones en la base de datos: ' + (error instanceof Error ? error.message : JSON.stringify(error)));
         }
     };
 
