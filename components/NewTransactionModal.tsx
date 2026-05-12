@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Account } from '../types/finance';
+import { getAccountEffect, getAccountNatureLabel } from '../utils/accountNature';
 
 interface NewTransactionModalProps {
     isOpen: boolean;
@@ -186,7 +187,14 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                 </tr>
                             </thead>
                             <tbody>
-                                {lines.map((line, index) => (
+                                {lines.map((line, index) => {
+                                    const selectedAccount = accounts.find(a => a.id.toString() === line.account_id);
+                                    const debitVal = parseFloat(line.debit) || 0;
+                                    const creditVal = parseFloat(line.credit) || 0;
+                                    const effect = selectedAccount ? getAccountEffect(selectedAccount.category, debitVal, creditVal) : null;
+                                    const nature = selectedAccount ? getAccountNatureLabel(selectedAccount.category) : null;
+
+                                    return (
                                     <tr key={index} className="group border-t border-slate-100 dark:border-slate-700/50">
                                         <td className="py-3 pr-4">
                                             <select
@@ -202,6 +210,25 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                     </option>
                                                 ))}
                                             </select>
+                                            {/* Effect badge: shows what the entry does to this account */}
+                                            {selectedAccount && (
+                                                <div className="mt-1 flex items-center gap-1">
+                                                    {effect ? (
+                                                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                                            effect.direction === 'increase'
+                                                                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'
+                                                                : 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
+                                                        }`}>
+                                                            <span>{effect.icon}</span>
+                                                            {effect.label}
+                                                        </span>
+                                                    ) : nature ? (
+                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                                                            Débito {nature.debitEffect} {nature.debitLabel} · Crédito {nature.creditEffect} {nature.creditLabel}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="py-3 px-2">
                                             <input
@@ -209,7 +236,13 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                 step="0.01"
                                                 value={line.debit}
                                                 onChange={(e) => handleLineChange(index, 'debit', e.target.value)}
-                                                className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-primary text-right text-sm dark:text-white"
+                                                className={`w-full px-3 py-1.5 bg-white dark:bg-slate-900 border rounded-md outline-none text-right text-sm dark:text-white transition-all ${
+                                                    debitVal > 0 && effect
+                                                        ? effect.direction === 'increase'
+                                                            ? 'border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-200 dark:ring-emerald-800'
+                                                            : 'border-amber-300 dark:border-amber-700 ring-1 ring-amber-200 dark:ring-amber-800'
+                                                        : 'border-slate-200 dark:border-slate-700 focus:border-primary'
+                                                }`}
                                                 placeholder="0.00"
                                             />
                                         </td>
@@ -219,7 +252,13 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                 step="0.01"
                                                 value={line.credit}
                                                 onChange={(e) => handleLineChange(index, 'credit', e.target.value)}
-                                                className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-primary text-right text-sm dark:text-white"
+                                                className={`w-full px-3 py-1.5 bg-white dark:bg-slate-900 border rounded-md outline-none text-right text-sm dark:text-white transition-all ${
+                                                    creditVal > 0 && effect
+                                                        ? effect.direction === 'increase'
+                                                            ? 'border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-200 dark:ring-emerald-800'
+                                                            : 'border-amber-300 dark:border-amber-700 ring-1 ring-amber-200 dark:ring-amber-800'
+                                                        : 'border-slate-200 dark:border-slate-700 focus:border-primary'
+                                                }`}
                                                 placeholder="0.00"
                                             />
                                         </td>
@@ -235,7 +274,8 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                             )}
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 border-slate-100 dark:border-slate-700 font-bold">

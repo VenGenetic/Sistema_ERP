@@ -8,7 +8,7 @@ import re
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-pdf_path = r'c:\Users\ASUS\Documents\Sistema_ERP-main\Sistema_ERP-main\scripts\Lista de precios (8).pdf'
+pdf_path = r'C:\Users\ASUS\Documents\Sistema_ERP-main\Sistema_ERP-main\scripts\Lista de precios (1).pdf'
 output_excel = r'c:\Users\ASUS\Documents\Sistema_ERP-main\Sistema_ERP-main\public\lista_precios_simplificada.xlsx'
 
 def clean_text(text):

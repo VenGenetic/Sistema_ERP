@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Account } from '../types/finance';
+import { getAccountNatureLabel, categoryDisplayName } from '../utils/accountNature';
 
 const FinanceConfig: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'accounts' | 'rules' | 'settings'>('accounts');
@@ -60,6 +61,7 @@ const FinanceConfig: React.FC = () => {
                                 <th className="px-6 py-3">Código</th>
                                 <th className="px-6 py-3">Nombre</th>
                                 <th className="px-6 py-3">Tipo</th>
+                                <th className="px-6 py-3">Naturaleza</th>
                                 <th className="px-6 py-3 text-right">Balance Actual</th>
                                 <th className="px-6 py-3 text-right">Moneda</th>
                             </tr>
@@ -67,11 +69,11 @@ const FinanceConfig: React.FC = () => {
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-4 text-center text-slate-500">Cargando cuentas...</td>
+                                    <td colSpan={6} className="px-6 py-4 text-center text-slate-500">Cargando cuentas...</td>
                                 </tr>
                             ) : accounts.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-4 text-center text-slate-500">No hay cuentas registradas</td>
+                                    <td colSpan={6} className="px-6 py-4 text-center text-slate-500">No hay cuentas registradas</td>
                                 </tr>
                             ) : (
                                 accounts.map((account) => (
@@ -83,8 +85,23 @@ const FinanceConfig: React.FC = () => {
                                                 ? 'bg-emerald-100 text-emerald-700'
                                                 : 'bg-blue-100 text-blue-700'
                                                 }`}>
-                                                {account.category}
+                                                {categoryDisplayName(account.category)}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {(() => {
+                                                const nature = getAccountNatureLabel(account.category);
+                                                const isDeudora = nature.nature === 'Deudora';
+                                                return (
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${
+                                                        isDeudora
+                                                            ? 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-400'
+                                                            : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400'
+                                                    }`}>
+                                                        {nature.nature} (Débito {nature.debitEffect})
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className={`px-6 py-4 text-right font-medium ${Number(account.current_balance || 0) < 0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
                                             {formatCurrency(account.current_balance || 0, account.currency)}

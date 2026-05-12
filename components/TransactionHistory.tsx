@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Transaction, TransactionLine, Account } from '../types/finance';
 import { useNavigate } from 'react-router-dom';
+import { getAccountEffect, categoryDisplayName } from '../utils/accountNature';
 
 interface ExpandedTransaction extends Transaction {
     transaction_lines: (TransactionLine & { account: Account })[];
@@ -179,7 +180,9 @@ const TransactionHistory: React.FC = () => {
                                                                 </tr>
                                                             </thead>
                                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                                                {t.transaction_lines.map((line, i) => (
+                                                                {t.transaction_lines.map((line, i) => {
+                                                                    const effect = getAccountEffect(line.account?.category, line.debit || 0, line.credit || 0);
+                                                                    return (
                                                                     <tr key={i} className="hover:bg-primary/5">
                                                                         <td className="py-2 text-slate-700 dark:text-slate-300 font-medium">
                                                                             <span
@@ -188,15 +191,39 @@ const TransactionHistory: React.FC = () => {
                                                                             >
                                                                                 {line.account?.code} - {line.account?.name}
                                                                             </span>
+                                                                            {line.account?.category && (
+                                                                                <span className="ml-1.5 text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase">
+                                                                                    {categoryDisplayName(line.account.category)}
+                                                                                </span>
+                                                                            )}
                                                                         </td>
                                                                         <td className="py-2 text-right text-slate-600 dark:text-slate-400">
-                                                                            {line.debit > 0 ? formatCurrency(line.debit, line.account?.currency) : '-'}
+                                                                            {line.debit > 0 ? (
+                                                                                <span className="inline-flex items-center gap-1">
+                                                                                    {formatCurrency(line.debit, line.account?.currency)}
+                                                                                    {effect && (
+                                                                                        <span className={`text-[10px] font-bold ${effect.direction === 'increase' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                                                            {effect.icon}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </span>
+                                                                            ) : '-'}
                                                                         </td>
                                                                         <td className="py-2 text-right text-slate-600 dark:text-slate-400">
-                                                                            {line.credit > 0 ? formatCurrency(line.credit, line.account?.currency) : '-'}
+                                                                            {line.credit > 0 ? (
+                                                                                <span className="inline-flex items-center gap-1">
+                                                                                    {formatCurrency(line.credit, line.account?.currency)}
+                                                                                    {effect && (
+                                                                                        <span className={`text-[10px] font-bold ${effect.direction === 'increase' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                                                            {effect.icon}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </span>
+                                                                            ) : '-'}
                                                                         </td>
                                                                     </tr>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </tbody>
                                                         </table>
                                                     </div>

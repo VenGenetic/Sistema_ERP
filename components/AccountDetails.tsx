@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Account, Transaction, TransactionLine } from '../types/finance';
 import NewTransactionModal from './NewTransactionModal';
+import { getAccountNatureLabel } from '../utils/accountNature';
 
 interface TransactionDisplay extends TransactionLine {
     transaction: Transaction;
@@ -137,8 +138,8 @@ const AccountDetails: React.FC = () => {
                             <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
                                 <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[120px]">Fecha</th>
                                 <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descripción / Referencia</th>
-                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[140px]">Débito (Entrada)</th>
-                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[140px]">Crédito (Salida)</th>
+                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[140px]">Débito ({(() => { const n = getAccountNatureLabel(account?.category); return `${n.debitEffect} ${n.debitLabel}`; })()})</th>
+                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[140px]">Crédito ({(() => { const n = getAccountNatureLabel(account?.category); return `${n.creditEffect} ${n.creditLabel}`; })()})</th>
                                 <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[160px]">Saldo</th>
                             </tr>
                         </thead>

@@ -4,6 +4,7 @@ import { Account } from '../types/finance';
 import { useNavigate } from 'react-router-dom';
 import NewTransactionModal from './NewTransactionModal';
 import TransactionHistory from './TransactionHistory';
+import { getAccountNatureLabel, categoryDisplayName } from '../utils/accountNature';
 import {
     DndContext,
     closestCenter,
@@ -67,6 +68,18 @@ const SortableAccountCard = ({ account, balance, onClick, formatCurrency }: any)
                 </div>
                 <div className="flex items-center gap-1 mt-2 text-sm text-slate-400">
                     <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{account.code}</span>
+                    {(() => {
+                        const nature = getAccountNatureLabel(account.category);
+                        return (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                nature.nature === 'Deudora'
+                                    ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400'
+                                    : 'bg-violet-50 text-violet-600 dark:bg-violet-900/20 dark:text-violet-400'
+                            }`}>
+                                {categoryDisplayName(account.category)} · Débito {nature.debitEffect}
+                            </span>
+                        );
+                    })()}
                 </div>
             </div>
         </div>
@@ -106,7 +119,8 @@ const FinanceDashboard: React.FC = () => {
                 .from('accounts')
                 .select('*')
                 .eq('is_nominal', false)
-                .order('position', { ascending: true }); // Order by position
+                .order('position', { ascending: true, nullsFirst: false })
+                .order('id', { ascending: true }); // deterministic tiebreaker
 
             if (accountsError) throw accountsError;
 
