@@ -152,7 +152,7 @@ const FinanceDashboard: React.FC = () => {
             const { data: orderItemsData, error: orderItemsError } = await supabase
                 .from('order_items')
                 .select('quantity, unit_price, unit_cost, orders!inner(status)')
-                .eq('orders.status', 'completed'); // Only calculate for completed sales
+                .eq('orders.status', 'Entregado'); // Only calculate for completed POS sales
 
             if (!orderItemsError && orderItemsData) {
                 let totalCogs = 0;

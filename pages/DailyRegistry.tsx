@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 // Ecuador is UTC-5
@@ -62,16 +62,14 @@ const DailyRegistry: React.FC = () => {
     const [editingDate, setEditingDate] = useState<string>('');
     const [justUpdatedId, setJustUpdatedId] = useState<number | null>(null);
     const [expandedOrderIds, setExpandedOrderIds] = useState<number[]>([]);
+    const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
         start: nDaysAgoLocal(7),
         end: todayLocal(),
     });
 
-    useEffect(() => {
-        fetchDailyData();
-    }, [dateRange]);
-
+    // ─── Fetch data ─────────────────────────────────────────────────
     const fetchDailyData = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -111,6 +109,34 @@ const DailyRegistry: React.FC = () => {
             setLoading(false);
         }
     }, [dateRange]);
+
+    // ─── Re-fetch when date range changes ────────────────────────────────
+    useEffect(() => {
+        fetchDailyData();
+    }, [dateRange]);
+
+    // ─── Real-time: auto-refresh when any order changes ───────────────────────
+    useEffect(() => {
+        const channel = supabase
+            .channel('daily-registry-realtime')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'orders' },
+                () => {
+                    // Debounce: coalesce rapid bursts into a single fetch
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => {
+                        fetchDailyData();
+                    }, 800);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            supabase.removeChannel(channel);
+        };
+    }, [fetchDailyData]);
 
     const dailySummaries: DailySummary[] = useMemo(() => {
         const summaryMap: Record<string, DailySummary> = {};

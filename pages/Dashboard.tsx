@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -29,138 +29,160 @@ const Dashboard: React.FC = () => {
     const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
     const [counts, setCounts] = useState({ warehouses: 0, accounts: 0, users: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    const [justRefreshed, setJustRefreshed] = useState(false);
+    const debounceRef = useRef<NodeJS.Timeout | null>(null);
     const [buildTime] = useState<string>(() => {
         // Tiempo aproximado del build actual (cuando se cargó la página)
         return new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' });
     });
 
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                // 1. Fetch Aggregated Data via RPC
-                if (currentUserId) {
-                    const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats', {
-                        p_user_id: currentUserId
-                    });
-
-                    if (!rpcError && stats) {
-                        setTodaySales(Number(stats.todaySales) || 0);
-                        setMyTodaySales(Number(stats.myTodaySales) || 0);
-                        setLowStockCount(stats.lowStockCount || 0);
-                        
-                        const total = stats.totalSkus || 0;
-                        const low = stats.lowStockCount || 0;
-                        setInventoryHealth(total > 0 ? ((total - low) / total) * 100 : 100);
-                        
-                        setInventoryCapitalCost(Number(stats.capitalCost) || 0);
-                        setInventoryCapitalPvp(Number(stats.capitalPvp) || 0);
-                        
-                        setNetLiquidity(Number(stats.netLiquidity) || 0);
-                        setTopLostDemand(stats.topLostDemand || []);
-                    }
-                }
-
-                // 2. Activity Stream (Orders, Inventory Logs, Transactions)
-                const activities: ActivityItem[] = [];
-
-                // Fetch recent orders
-                const { data: recentOrders } = await supabase
-                    .from('orders')
-                    .select('id, created_at, total_amount, status, customers(name)')
-                    .order('created_at', { ascending: false })
-                    .limit(5);
-
-                if (recentOrders) {
-                    recentOrders.forEach(o => {
-                        const date = new Date(o.created_at);
-                        activities.push({
-                            type: 'PEDIDO',
-                            id: `ORD-${o.id}`,
-                            time: date.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' }),
-                            user: (o.customers as any)?.name || 'Consumidor Final',
-                            detail: `Pedido ${o.status}`,
-                            status: o.status === 'Entregado' ? 'Completado' : 'Pendiente',
-                            amount: `$${Number(o.total_amount).toFixed(2)}`,
-                            timestamp: date.getTime()
-                        });
-                    });
-                }
-
-                // Fetch recent inventory logs
-                const { data: recentLogs } = await supabase
-                    .from('inventory_logs')
-                    .select('id, created_at, quantity_change, reason, type:transaction_type, products:product_id(sku), users:user_id(email)')
-                    .order('created_at', { ascending: false })
-                    .limit(5);
-
-                if (recentLogs) {
-                    recentLogs.forEach(l => {
-                        const date = new Date(l.created_at);
-                        activities.push({
-                            type: 'STOCK',
-                            id: `LOG-${l.id}`,
-                            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            user: (l.users as any)?.email || 'Sistema',
-                            detail: `${Number(l.quantity_change) > 0 ? 'Entrada' : 'Salida'} de ${Math.abs(Number(l.quantity_change))}u SKU: ${(l.products as any)?.sku || 'N/A'}${l.reason ? ` - ${l.reason}` : ''}`,
-                            status: 'Completado',
-                            timestamp: date.getTime()
-                        });
-                    });
-                }
-
-                // Fetch recent transactions
-                const { data: recentTxes } = await supabase
-                    .from('transactions')
-                    .select('id, created_at, description, transaction_entries(amount, is_debit, account_id), accounts:transaction_entries(account_id, name)')
-                    .order('created_at', { ascending: false })
-                    .limit(5);
-
-                if (recentTxes) {
-                    recentTxes.forEach(tx => {
-                        const date = new Date(tx.created_at);
-                        // find a primary amount to show
-                        const firstEntry = tx.transaction_entries && tx.transaction_entries.length > 0 ? tx.transaction_entries[0] : null;
-                        activities.push({
-                            type: 'FINANZAS',
-                            id: `TX-${tx.id}`,
-                            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            user: 'Sistema Contable',
-                            detail: tx.description || 'Transacción Financiera',
-                            status: 'Registrado',
-                            amount: firstEntry ? `$${Number(firstEntry.amount).toFixed(2)}` : '',
-                            timestamp: date.getTime()
-                        });
-                    });
-                }
-
-                // Sort activities by timestamp descending and take top 5
-                activities.sort((a, b) => b.timestamp - a.timestamp);
-                setActivityStream(activities.slice(0, 6));
-
-                // 6. Header Counts
-                const [{ count: wCount }, { count: aCount }, { count: uCount }] = await Promise.all([
-                    supabase.from('warehouses').select('*', { count: 'exact', head: true }),
-                    supabase.from('accounts').select('*', { count: 'exact', head: true }),
-                    supabase.from('profiles').select('*', { count: 'exact', head: true })
-                ]);
-
-                setCounts({
-                    warehouses: wCount || 0,
-                    accounts: aCount || 0,
-                    users: uCount || 0
+    // ─── Core data fetch (memoised so Realtime can call it) ───────────────────
+    const fetchDashboardData = useCallback(async () => {
+        try {
+            // 1. Aggregated KPIs via RPC
+            if (currentUserId) {
+                const { data: stats, error: rpcError } = await supabase.rpc('get_dashboard_stats', {
+                    p_user_id: currentUserId
                 });
 
-            } catch (error) {
-                console.error("Error fetching dashboard data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+                if (!rpcError && stats) {
+                    setTodaySales(Number(stats.todaySales) || 0);
+                    setMyTodaySales(Number(stats.myTodaySales) || 0);
+                    setLowStockCount(stats.lowStockCount || 0);
 
-        if (currentUserId) {
-            fetchDashboardData();
+                    const total = stats.totalSkus || 0;
+                    const low   = stats.lowStockCount || 0;
+                    setInventoryHealth(total > 0 ? ((total - low) / total) * 100 : 100);
+
+                    setInventoryCapitalCost(Number(stats.capitalCost) || 0);
+                    setInventoryCapitalPvp(Number(stats.capitalPvp) || 0);
+                    setNetLiquidity(Number(stats.netLiquidity) || 0);
+                    setTopLostDemand(stats.topLostDemand || []);
+                }
+            }
+
+            // 2. Activity Stream
+            const activities: ActivityItem[] = [];
+
+            const { data: recentOrders } = await supabase
+                .from('orders')
+                .select('id, created_at, total_amount, status, customers(name)')
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            if (recentOrders) {
+                recentOrders.forEach(o => {
+                    const date = new Date(o.created_at);
+                    activities.push({
+                        type: 'PEDIDO',
+                        id: `ORD-${o.id}`,
+                        time: date.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' }),
+                        user: (o.customers as any)?.name || 'Consumidor Final',
+                        detail: `Pedido ${o.status}`,
+                        status: o.status === 'Entregado' ? 'Completado' : 'Pendiente',
+                        amount: `$${Number(o.total_amount).toFixed(2)}`,
+                        timestamp: date.getTime()
+                    });
+                });
+            }
+
+            const { data: recentLogs } = await supabase
+                .from('inventory_logs')
+                .select('id, created_at, quantity_change, reason, type:transaction_type, products:product_id(sku), users:user_id(email)')
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            if (recentLogs) {
+                recentLogs.forEach(l => {
+                    const date = new Date(l.created_at);
+                    activities.push({
+                        type: 'STOCK',
+                        id: `LOG-${l.id}`,
+                        time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        user: (l.users as any)?.email || 'Sistema',
+                        detail: `${Number(l.quantity_change) > 0 ? 'Entrada' : 'Salida'} de ${Math.abs(Number(l.quantity_change))}u SKU: ${(l.products as any)?.sku || 'N/A'}${l.reason ? ` - ${l.reason}` : ''}`,
+                        status: 'Completado',
+                        timestamp: date.getTime()
+                    });
+                });
+            }
+
+            const { data: recentTxes } = await supabase
+                .from('transactions')
+                .select('id, created_at, description, transaction_entries(amount, is_debit, account_id)')
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            if (recentTxes) {
+                recentTxes.forEach(tx => {
+                    const date = new Date(tx.created_at);
+                    const firstEntry = tx.transaction_entries?.length > 0 ? tx.transaction_entries[0] : null;
+                    activities.push({
+                        type: 'FINANZAS',
+                        id: `TX-${tx.id}`,
+                        time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        user: 'Sistema Contable',
+                        detail: tx.description || 'Transacción Financiera',
+                        status: 'Registrado',
+                        amount: firstEntry ? `$${Number(firstEntry.amount).toFixed(2)}` : '',
+                        timestamp: date.getTime()
+                    });
+                });
+            }
+
+            activities.sort((a, b) => b.timestamp - a.timestamp);
+            setActivityStream(activities.slice(0, 6));
+
+            const [{ count: wCount }, { count: aCount }, { count: uCount }] = await Promise.all([
+                supabase.from('warehouses').select('*', { count: 'exact', head: true }),
+                supabase.from('accounts').select('*', { count: 'exact', head: true }),
+                supabase.from('profiles').select('*', { count: 'exact', head: true })
+            ]);
+
+            setCounts({
+                warehouses: wCount || 0,
+                accounts:   aCount || 0,
+                users:      uCount || 0
+            });
+
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setIsLoading(false);
         }
     }, [currentUserId]);
+
+    // ─── Initial load ─────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (currentUserId) fetchDashboardData();
+    }, [currentUserId, fetchDashboardData]);
+
+    // ─── Real-time subscription — auto-refresh on any order change ────────────
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        const channel = supabase
+            .channel('dashboard-realtime')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'orders' },
+                () => {
+                    // Debounce: wait 800ms then fetch once, even if multiple rows arrive
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => {
+                        fetchDashboardData();
+                        setJustRefreshed(true);
+                        setTimeout(() => setJustRefreshed(false), 3000);
+                    }, 800);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            supabase.removeChannel(channel);
+        };
+    }, [currentUserId, fetchDashboardData]);
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto min-h-screen">
@@ -168,8 +190,15 @@ const Dashboard: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Centro de Comando</h1>
-                    <p className="text-slate-500 text-sm font-mono mt-1">
-                        <span className="text-emerald-500 animate-pulse">● En Vivo</span> | Monitoreando {counts.warehouses} Bodegas, {counts.accounts} Cuentas, {counts.users} Socios
+                    <p className="text-slate-500 text-sm font-mono mt-1 flex items-center gap-2">
+                        <span className="text-emerald-500 animate-pulse">● En Vivo</span>
+                        <span>| Monitoreando {counts.warehouses} Bodegas, {counts.accounts} Cuentas, {counts.users} Socios</span>
+                        {justRefreshed && (
+                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800 animate-pulse">
+                                <span className="material-symbols-outlined text-[12px]">sync</span>
+                                Actualizado
+                            </span>
+                        )}
                     </p>
                 </div>
                 <div className="flex gap-3">
