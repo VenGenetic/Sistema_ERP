@@ -404,6 +404,7 @@ const Products: React.FC = () => {
         { key: 'sku', label: 'SKU', align: '' },
         { key: 'name', label: 'Nombre y Etiquetas', align: '' },
         { key: 'brand', label: 'Marca', align: '' },
+        { key: 'price', label: 'Precios y Costos', align: '' },
     ];
 
     return (
@@ -538,7 +539,7 @@ const Products: React.FC = () => {
                                                     <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
                                                 </div>
                                             </div>
-                                            {col.key !== 'brand' && (
+                                            {col.key !== 'brand' && col.key !== 'price' && (
                                                 <input
                                                     type="text"
                                                     placeholder="Filtrar..."
@@ -649,6 +650,31 @@ const Products: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 align-top">{prod.brands?.name || '—'}</td>
+                                    
+                                    {/* Precios y Costos */}
+                                    <td className="px-6 py-4 align-top">
+                                        <div className="flex flex-col gap-1 text-xs min-w-[130px]">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-slate-400 dark:text-slate-500 font-medium">Costo:</span>
+                                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                                    ${(prod.cost_without_vat || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-slate-400 dark:text-slate-500 font-medium">Con IVA:</span>
+                                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                                    ${((prod.cost_without_vat || 0) * (1 + (prod.vat_percentage || 15.0) / 100)).toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/50">
+                                                <span className="text-slate-500 dark:text-slate-400 font-semibold">PVP:</span>
+                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                    ${(prod.price || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+
                                     <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white align-top">
                                         {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
                                     </td>
@@ -674,7 +700,7 @@ const Products: React.FC = () => {
                             ))}
                             {products.length === 0 && !loading && (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                                         <div className="flex flex-col items-center gap-2">
                                             <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
                                             <span>No se encontraron productos que coincidan con tu búsqueda.</span>
@@ -684,7 +710,7 @@ const Products: React.FC = () => {
                             )}
                             {products.length === 0 && loading && (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                                         <div className="flex flex-col items-center gap-2">
                                             <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
                                             <span>Cargando catálogo...</span>

@@ -101,7 +101,7 @@ export const WarehouseSelect: React.FC<WarehouseSelectProps> = ({ value, onChang
             </div>
 
             {isOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                <div className="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-auto">
                     {loading ? (
                         <div className="p-3 text-center text-slate-500 text-sm">Cargando...</div>
                     ) : (

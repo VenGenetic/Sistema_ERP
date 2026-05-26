@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import math
 import sys
 import os
 
@@ -7,11 +8,11 @@ def clean_price(price_str):
     if pd.isna(price_str):
         return 0.0
     if isinstance(price_str, (int, float)):
-        return float(price_str)
+        return float(math.ceil(price_str))
     # Remove $ and replace comma with dot
     clean_str = str(price_str).replace('$', '').replace(',', '.').strip()
     try:
-        return float(clean_str)
+        return float(math.ceil(float(clean_str)))
     except:
         return 0.0
 
@@ -29,6 +30,15 @@ def main():
     print(f"Leyendo {excel_path} ...")
     try:
         df = pd.read_excel(excel_path)
+        # Si las columnas detectadas no contienen código/nombre/precio,
+        # pero la primera fila de datos sí contiene 'código' o 'codigo',
+        # entonces la primera fila contiene los encabezados reales.
+        has_expected = any('código' in str(c).lower() or 'codigo' in str(c).lower() for c in df.columns)
+        if not has_expected and len(df) > 0:
+            first_row = df.iloc[0]
+            if any('código' in str(val).lower() or 'codigo' in str(val).lower() for val in first_row):
+                df.columns = [str(val).strip() for val in first_row]
+                df = df[1:].reset_index(drop=True)
     except Exception as e:
         print(f"Error al leer el excel: {e}")
         sys.exit(1)
@@ -69,8 +79,7 @@ def main():
             "precio": precio,
             "categoria": categoria,
             "imagen": "sin_imagen.jpg",
-            "stock": True,
-            "tags": []
+            "stock": True
         }
         data_list.append(item)
 
