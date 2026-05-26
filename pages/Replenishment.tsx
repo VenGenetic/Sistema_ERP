@@ -7,6 +7,7 @@ interface ImporterProduct {
     codigo: string;
     nombre: string;
     cantidad: number;
+    costo: number; // Provider cost from JSON
 }
 
 interface CartItem extends ImporterProduct {
@@ -49,7 +50,16 @@ const Replenishment: React.FC = () => {
                 const response = await fetch('/pedidos.json');
                 if (!response.ok) throw new Error('No se pudo leer el archivo pedidos.json');
                 const data = await response.json();
-                setImporterProducts(data || []);
+                
+                // Map data to ensure cost property is parsed correctly as number
+                const parsedData = (data || []).map((item: any) => ({
+                    codigo: item.codigo || '',
+                    nombre: item.nombre || '',
+                    cantidad: parseInt(item.cantidad) || 0,
+                    costo: parseFloat(item.costo) || 0
+                }));
+                
+                setImporterProducts(parsedData);
             } catch (error) {
                 console.error('Error cargando el catálogo del importador:', error);
             } finally {
@@ -197,11 +207,27 @@ const Replenishment: React.FC = () => {
             return;
         }
 
+        // Map data to match exact requested columns + cost
         const dataToExport = cartItems.map(item => ({
             'Código': item.codigo,
             'Nombre': item.nombre,
-            'Cantidad': item.quantity
+            'Cantidad': item.quantity,
+            'Costo Unitario ($)': item.costo,
+            'Subtotal ($)': parseFloat((item.costo * item.quantity).toFixed(2))
         }));
+
+        // Calculate totals
+        const totalQty = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+        const totalCost = cartItems.reduce((acc, item) => acc + (item.costo * item.quantity), 0);
+
+        // Add total row at the end
+        dataToExport.push({
+            'Código': '',
+            'Nombre': 'TOTAL DEL PEDIDO',
+            'Cantidad': totalQty,
+            'Costo Unitario ($)': 0, // Leave empty visually
+            'Subtotal ($)': parseFloat(totalCost.toFixed(2))
+        });
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
@@ -211,7 +237,9 @@ const Replenishment: React.FC = () => {
         worksheet['!cols'] = [
             { wch: 15 }, // Código
             { wch: 60 }, // Nombre
-            { wch: 10 }  // Cantidad
+            { wch: 10 }, // Cantidad
+            { wch: 18 }, // Costo Unitario
+            { wch: 18 }  // Subtotal
         ];
 
         const dateStr = new Date().toISOString().slice(0, 10);
@@ -223,9 +251,10 @@ const Replenishment: React.FC = () => {
     // ──────────────────────────────────────────────
     const cartList = useMemo(() => Object.values(cart), [cart]);
     const cartCount = useMemo(() => cartList.reduce((acc, item) => acc + item.quantity, 0), [cartList]);
+    const cartTotalAmount = useMemo(() => cartList.reduce((acc, item) => acc + (item.costo * item.quantity), 0), [cartList]);
 
     return (
-        <div className="p-6 md:p-8 max-w-[1500px] mx-auto flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-64px)]">
+        <div className="p-6 md:p-8 max-w-[1550px] mx-auto flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-64px)]">
             
             {/* ═══════ LEFT PANEL: CATALOG & CONTROLS ═══════ */}
             <div className="flex-1 flex flex-col gap-6">
@@ -237,12 +266,12 @@ const Replenishment: React.FC = () => {
                         Abastecimiento de Importadora
                     </h1>
                     <p className="text-slate-500 mt-1">
-                        Compara tu stock local con las existencias de la importadora y genera pedidos rápidos descargables en Excel.
+                        Compara tu stock local con las existencias de la importadora y genera pedidos rápidos descargables en Excel con cálculo de costos.
                     </p>
                 </div>
 
                 {/* Filters & Selector */}
-                <div className="relative z-20 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative z-20">
                     {/* Warehouse Dropdown */}
                     <div className="md:col-span-1">
                         <WarehouseSelect
@@ -289,13 +318,14 @@ const Replenishment: React.FC = () => {
                                     <th className="px-6 py-3.5">Nombre del Repuesto</th>
                                     <th className="px-6 py-3.5 text-center">Mi Stock (Local)</th>
                                     <th className="px-6 py-3.5 text-center">Stock Importadora</th>
+                                    <th className="px-6 py-3.5 text-right">Costo Prov.</th>
                                     <th className="px-6 py-3.5 text-center w-28">Acción</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                 {loadingProducts ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
+                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
                                             <div className="flex flex-col items-center gap-2">
                                                 <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
                                                 <span>Cargando catálogo de la importadora...</span>
@@ -304,7 +334,7 @@ const Replenishment: React.FC = () => {
                                     </tr>
                                 ) : paginatedProducts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
+                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
                                             <div className="flex flex-col items-center gap-2">
                                                 <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
                                                 <span>No se encontraron productos coincidentes en el catálogo.</span>
@@ -321,7 +351,7 @@ const Replenishment: React.FC = () => {
                                             <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{prod.codigo}</td>
                                             
                                             {/* Nombre */}
-                                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white break-words whitespace-normal max-w-md">{prod.nombre}</td>
+                                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white break-words whitespace-normal max-w-sm">{prod.nombre}</td>
                                             
                                             {/* Mi Stock */}
                                             <td className="px-6 py-4 text-center align-middle">
@@ -331,7 +361,7 @@ const Replenishment: React.FC = () => {
                                                     <span className="material-symbols-outlined text-[16px] animate-spin text-slate-400">progress_activity</span>
                                                 ) : localStock !== null ? (
                                                     <span className={`px-2.5 py-1 text-xs font-bold rounded-md ${localStock > 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800'}`}>
-                                                        {localStock} unidades
+                                                        {localStock} uds
                                                     </span>
                                                 ) : (
                                                     <span className="px-2.5 py-1 text-xs font-bold rounded-md bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700">
@@ -343,8 +373,13 @@ const Replenishment: React.FC = () => {
                                             {/* Stock Importadora */}
                                             <td className="px-6 py-4 text-center align-middle">
                                                 <span className={`px-2.5 py-1 text-xs font-bold rounded-md ${prod.cantidad > 0 ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}>
-                                                    {prod.cantidad} unidades
+                                                    {prod.cantidad} uds
                                                 </span>
+                                            </td>
+
+                                            {/* Costo Proveedor */}
+                                            <td className="px-6 py-4 text-right font-mono font-semibold text-slate-700 dark:text-slate-350">
+                                                ${(prod.costo || 0).toFixed(2)}
                                             </td>
 
                                             {/* Acción */}
@@ -357,9 +392,9 @@ const Replenishment: React.FC = () => {
                                                         Agotado
                                                     </button>
                                                 ) : inCart ? (
-                                                    <div className="flex items-center justify-center gap-1.5 bg-primary/10 dark:bg-primary/20 text-primary border border-primary/30 rounded-lg px-2 py-1">
-                                                        <span className="material-symbols-outlined text-[14px]">done</span>
-                                                        <span className="text-xs font-bold">En lista ({inCart.quantity})</span>
+                                                    <div className="flex items-center justify-center gap-1 bg-primary/10 dark:bg-primary/20 text-primary border border-primary/30 rounded-lg px-2 py-1.5">
+                                                        <span className="material-symbols-outlined text-[12px]">done</span>
+                                                        <span className="text-[10px] font-bold">Añadido ({inCart.quantity})</span>
                                                     </div>
                                                 ) : (
                                                     <button
@@ -440,10 +475,10 @@ const Replenishment: React.FC = () => {
                                 {/* Delete Button */}
                                 <button
                                     onClick={() => handleRemoveFromCart(item.codigo)}
-                                    className="absolute top-2 right-2 text-slate-400 hover:text-rose-600 transition-colors"
+                                    className="absolute top-2 right-2 text-slate-400 hover:text-rose-600 transition-colors bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-0.5 rounded-full"
                                     title="Quitar"
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                    <span className="material-symbols-outlined text-[14px]">close</span>
                                 </button>
 
                                 <div>
@@ -452,10 +487,13 @@ const Replenishment: React.FC = () => {
                                 </div>
 
                                 <div className="flex items-center justify-between mt-1">
-                                    <span className="text-[10px] text-slate-400 font-medium">Stock Prov: {item.cantidad}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-slate-400 font-medium">Costo: ${(item.costo || 0).toFixed(2)}</span>
+                                        <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Subt: ${((item.costo || 0) * item.quantity).toFixed(2)}</span>
+                                    </div>
                                     
                                     {/* Counter */}
-                                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 overflow-hidden">
+                                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 overflow-hidden self-end">
                                         <button
                                             onClick={() => handleUpdateQuantity(item.codigo, item.quantity - 1, item.cantidad)}
                                             className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
@@ -488,9 +526,13 @@ const Replenishment: React.FC = () => {
                             <span>Total de Repuestos:</span>
                             <span className="font-bold text-slate-700 dark:text-slate-300">{cartList.length} SKU</span>
                         </div>
-                        <div className="flex justify-between text-sm text-slate-950 dark:text-white font-bold pb-2">
+                        <div className="flex justify-between text-xs text-slate-500 font-medium">
                             <span>Total de Unidades:</span>
-                            <span>{cartCount} piezas</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300">{cartCount} piezas</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-slate-950 dark:text-white font-extrabold pb-2 border-t border-dashed border-slate-200 dark:border-slate-700 pt-2">
+                            <span>SUMA TOTAL:</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 text-base">${cartTotalAmount.toFixed(2)}</span>
                         </div>
                         
                         <div className="flex gap-2">
