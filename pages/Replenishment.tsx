@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../supabaseClient';
 import { WarehouseSelect } from '../components/WarehouseSelect';
+import { MediaLightbox } from '../components/MediaLightbox';
 
 interface ImporterProduct {
     codigo: string;
     nombre: string;
     cantidad: number;
     costo: number; // Provider cost from JSON
+    imagen: string; // Product image URL from JSON
 }
 
 interface CartItem extends ImporterProduct {
@@ -23,8 +25,19 @@ const Replenishment: React.FC = () => {
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
     const [loadingProducts, setLoadingProducts] = useState(false);
     const [loadingStock, setLoadingStock] = useState(false);
+    
+    // Performance Optimization: Debounced Search Input
+    const [searchInput, setSearchInput] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    
     const [cart, setCart] = useState<{ [sku: string]: CartItem }>({});
+    
+    // Media Lightbox State
+    const [lightbox, setLightbox] = useState<{ isOpen: boolean; media: any[]; initialIndex: number }>({
+        isOpen: false,
+        media: [],
+        initialIndex: 0
+    });
     
     // Pagination for the virtualized/paged display (9k items is too much to render at once in DOM)
     const [currentPage, setCurrentPage] = useState(1);
@@ -51,12 +64,13 @@ const Replenishment: React.FC = () => {
                 if (!response.ok) throw new Error('No se pudo leer el archivo pedidos.json');
                 const data = await response.json();
                 
-                // Map data to ensure cost property is parsed correctly as number
+                // Map data to ensure cost and image properties are parsed correctly
                 const parsedData = (data || []).map((item: any) => ({
                     codigo: item.codigo || '',
                     nombre: item.nombre || '',
                     cantidad: parseInt(item.cantidad) || 0,
-                    costo: parseFloat(item.costo) || 0
+                    costo: parseFloat(item.costo) || 0,
+                    imagen: item.imagen || ''
                 }));
                 
                 setImporterProducts(parsedData);
@@ -114,7 +128,20 @@ const Replenishment: React.FC = () => {
     }, [selectedWarehouseId, fetchLocalStock]);
 
     // ──────────────────────────────────────────────
-    // 3. FILTERING & SEARCH (Client side, fast)
+    // 3. SEARCH DEBOUNCING (Performance Optimization)
+    // ──────────────────────────────────────────────
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setSearchTerm(searchInput);
+        }, 300); // 300ms debounce delay to prevent UI lag on keystrokes across 9,000 items
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [searchInput]);
+
+    // ──────────────────────────────────────────────
+    // 4. FILTERING & PAGINATION (Client side, fast)
     // ──────────────────────────────────────────────
     const filteredProducts = useMemo(() => {
         if (!searchTerm.trim()) return importerProducts;
@@ -139,7 +166,7 @@ const Replenishment: React.FC = () => {
     const totalPages = Math.ceil(filteredProducts.length / pageSize);
 
     // ──────────────────────────────────────────────
-    // 4. CART HANDLERS
+    // 5. CART & LIGHTBOX HANDLERS
     // ──────────────────────────────────────────────
     const handleAddToCart = (product: ImporterProduct) => {
         setCart(prev => {
@@ -197,8 +224,17 @@ const Replenishment: React.FC = () => {
         }
     };
 
+    const handleOpenLightbox = (product: ImporterProduct) => {
+        if (!product.imagen) return;
+        setLightbox({
+            isOpen: true,
+            media: [{ type: 'image', url: product.imagen, title: `${product.codigo} - ${product.nombre}` }],
+            initialIndex: 0
+        });
+    };
+
     // ──────────────────────────────────────────────
-    // 5. EXPORT TO EXCEL
+    // 6. EXPORT TO EXCEL
     // ──────────────────────────────────────────────
     const handleExportExcel = () => {
         const cartItems = Object.values(cart);
@@ -207,7 +243,7 @@ const Replenishment: React.FC = () => {
             return;
         }
 
-        // Map data to match exact requested columns + cost
+        // Map data to match exact requested columns + cost (clean text-only columns, no images)
         const dataToExport = cartItems.map(item => ({
             'Código': item.codigo,
             'Nombre': item.nombre,
@@ -247,7 +283,7 @@ const Replenishment: React.FC = () => {
     };
 
     // ──────────────────────────────────────────────
-    // 6. GENERAL CALCS
+    // 7. GENERAL CALCS
     // ──────────────────────────────────────────────
     const cartList = useMemo(() => Object.values(cart), [cart]);
     const cartCount = useMemo(() => cartList.reduce((acc, item) => acc + item.quantity, 0), [cartList]);
@@ -266,7 +302,7 @@ const Replenishment: React.FC = () => {
                         Abastecimiento de Importadora
                     </h1>
                     <p className="text-slate-500 mt-1">
-                        Compara tu stock local con las existencias de la importadora y genera pedidos rápidos descargables en Excel con cálculo de costos.
+                        Compara tu stock local con las existencias y fotos de la importadora, y genera pedidos rápidos descargables en Excel.
                     </p>
                 </div>
 
@@ -292,13 +328,13 @@ const Replenishment: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Buscar por código (SKU) o por nombre..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm"
                             />
-                            {searchTerm && (
+                            {searchInput && (
                                 <button
-                                    onClick={() => setSearchTerm('')}
+                                    onClick={() => setSearchInput('')}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                                 >
                                     <span className="material-symbols-outlined text-[18px]">close</span>
@@ -314,8 +350,7 @@ const Replenishment: React.FC = () => {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-6 py-3.5">Código (SKU)</th>
-                                    <th className="px-6 py-3.5">Nombre del Repuesto</th>
+                                    <th className="px-6 py-3.5">Repuesto</th>
                                     <th className="px-6 py-3.5 text-center">Mi Stock (Local)</th>
                                     <th className="px-6 py-3.5 text-center">Stock Importadora</th>
                                     <th className="px-6 py-3.5 text-right">Costo Prov.</th>
@@ -325,7 +360,7 @@ const Replenishment: React.FC = () => {
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                 {loadingProducts ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
+                                        <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
                                             <div className="flex flex-col items-center gap-2">
                                                 <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
                                                 <span>Cargando catálogo de la importadora...</span>
@@ -334,7 +369,7 @@ const Replenishment: React.FC = () => {
                                     </tr>
                                 ) : paginatedProducts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
+                                        <td colSpan={5} className="px-6 py-16 text-center text-slate-500">
                                             <div className="flex flex-col items-center gap-2">
                                                 <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
                                                 <span>No se encontraron productos coincidentes en el catálogo.</span>
@@ -347,11 +382,46 @@ const Replenishment: React.FC = () => {
                                     
                                     return (
                                         <tr key={prod.codigo} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                                            {/* Código SKU */}
-                                            <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{prod.codigo}</td>
-                                            
-                                            {/* Nombre */}
-                                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white break-words whitespace-normal max-w-sm">{prod.nombre}</td>
+                                            {/* Repuesto (Foto + Nombre + SKU) */}
+                                            <td className="px-6 py-4 align-top">
+                                                <div className="flex items-center gap-3">
+                                                    {prod.imagen ? (
+                                                        <div 
+                                                            onClick={() => handleOpenLightbox(prod)}
+                                                            className="h-12 w-12 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-zoom-in group/img"
+                                                        >
+                                                            <img 
+                                                                src={prod.imagen} 
+                                                                alt="" 
+                                                                loading="lazy"
+                                                                className="h-full w-full object-cover group-hover/img:scale-110 transition-transform" 
+                                                                onError={(e) => {
+                                                                    const target = e.currentTarget;
+                                                                    target.style.display = 'none';
+                                                                    if (target.parentElement) {
+                                                                        target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[18px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                                                        target.parentElement.className = "h-12 w-12 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative cursor-default";
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors"></div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="h-12 w-12 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center relative">
+                                                            <span className="material-symbols-outlined text-[18px] text-slate-400">image</span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="font-semibold text-slate-900 dark:text-white break-words whitespace-normal max-w-md block leading-tight">
+                                                            {prod.nombre}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono font-medium block">
+                                                            SKU: {prod.codigo}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
                                             
                                             {/* Mi Stock */}
                                             <td className="px-6 py-4 text-center align-middle">
@@ -471,49 +541,64 @@ const Replenishment: React.FC = () => {
                         </div>
                     ) : (
                         cartList.map(item => (
-                            <div key={item.codigo} className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-850 flex flex-col gap-2 relative group hover:border-slate-300 dark:hover:border-slate-650 transition-colors">
+                            <div key={item.codigo} className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-850 flex items-center gap-3 relative group hover:border-slate-300 dark:hover:border-slate-650 transition-colors">
+                                {/* Cart Item Image */}
+                                {item.imagen ? (
+                                    <div 
+                                        onClick={() => handleOpenLightbox(item)}
+                                        className="h-11 w-11 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-zoom-in group/cartimg"
+                                    >
+                                        <img src={item.imagen} alt="" className="h-full w-full object-cover group-hover/cartimg:scale-105 transition-transform" />
+                                    </div>
+                                ) : (
+                                    <div className="h-11 w-11 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center relative">
+                                        <span className="material-symbols-outlined text-[16px] text-slate-400">image</span>
+                                    </div>
+                                )}
+
+                                {/* Item Info */}
+                                <div className="flex-1 min-w-0 pr-4">
+                                    <span className="text-[9px] font-mono font-bold text-slate-400 block leading-none">{item.codigo}</span>
+                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate mt-0.5" title={item.nombre}>{item.nombre}</h4>
+                                    
+                                    <div className="flex items-center justify-between mt-1">
+                                        <div className="flex flex-col">
+                                            <span className="text-[9px] text-slate-400 font-medium leading-none">Cost: ${(item.costo || 0).toFixed(2)}</span>
+                                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 mt-0.5">Subt: ${((item.costo || 0) * item.quantity).toFixed(2)}</span>
+                                        </div>
+
+                                        {/* Counter */}
+                                        <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 overflow-hidden">
+                                            <button
+                                                onClick={() => handleUpdateQuantity(item.codigo, item.quantity - 1, item.cantidad)}
+                                                className="px-1 py-0.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-[12px] leading-none font-bold">remove</span>
+                                            </button>
+                                            <input
+                                                type="number"
+                                                value={item.quantity}
+                                                onChange={(e) => handleUpdateQuantity(item.codigo, parseInt(e.target.value) || 0, item.cantidad)}
+                                                className="w-8 text-center text-[10px] font-semibold bg-transparent border-none outline-none focus:ring-0 p-0"
+                                            />
+                                            <button
+                                                onClick={() => handleUpdateQuantity(item.codigo, item.quantity + 1, item.cantidad)}
+                                                className="px-1 py-0.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-[12px] leading-none font-bold">add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Delete Button */}
                                 <button
                                     onClick={() => handleRemoveFromCart(item.codigo)}
-                                    className="absolute top-2 right-2 text-slate-400 hover:text-rose-600 transition-colors bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-0.5 rounded-full"
+                                    className="absolute top-2 right-2 text-slate-400 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
                                     title="Quitar"
                                 >
                                     <span className="material-symbols-outlined text-[14px]">close</span>
                                 </button>
-
-                                <div>
-                                    <span className="text-[10px] font-mono font-bold text-slate-400">{item.codigo}</span>
-                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white pr-6 line-clamp-2 mt-0.5" title={item.nombre}>{item.nombre}</h4>
-                                </div>
-
-                                <div className="flex items-center justify-between mt-1">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] text-slate-400 font-medium">Costo: ${(item.costo || 0).toFixed(2)}</span>
-                                        <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Subt: ${((item.costo || 0) * item.quantity).toFixed(2)}</span>
-                                    </div>
-                                    
-                                    {/* Counter */}
-                                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 overflow-hidden self-end">
-                                        <button
-                                            onClick={() => handleUpdateQuantity(item.codigo, item.quantity - 1, item.cantidad)}
-                                            className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                                        >
-                                            <span className="material-symbols-outlined text-[14px] leading-none font-bold">remove</span>
-                                        </button>
-                                        <input
-                                            type="number"
-                                            value={item.quantity}
-                                            onChange={(e) => handleUpdateQuantity(item.codigo, parseInt(e.target.value) || 0, item.cantidad)}
-                                            className="w-10 text-center text-xs font-semibold bg-transparent border-none outline-none focus:ring-0 p-0"
-                                        />
-                                        <button
-                                            onClick={() => handleUpdateQuantity(item.codigo, item.quantity + 1, item.cantidad)}
-                                            className="px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                                        >
-                                            <span className="material-symbols-outlined text-[14px] leading-none font-bold">add</span>
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         ))
                     )}
@@ -553,6 +638,14 @@ const Replenishment: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Media Lightbox */}
+            <MediaLightbox
+                isOpen={lightbox.isOpen}
+                media={lightbox.media}
+                initialIndex={lightbox.initialIndex}
+                onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };
