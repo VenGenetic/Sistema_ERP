@@ -529,17 +529,6 @@
             "tags": []
         },
         {
-            "id": "CG200WINGEV-002",
-            "codigo_referencia": "CG200WINGEV-002",
-            "nombre": "DIRECCIONALES (SET4) WING EVO 2 2024/2025/TD VENOM GT/TH R200/TK CR3 MAX 200CC",
-            "marca": "DAYTONA",
-            "precio": 23,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "CB200-041",
             "codigo_referencia": "CB200-041",
             "nombre": "FARO SHARK III N/M",
@@ -639,11 +628,11 @@
             "tags": []
         },
         {
-            "id": "CGEA150-108",
-            "codigo_referencia": "CGEA150-108",
-            "nombre": "PORTA PLACAS EAGLE 150CC III/DK FALCON",
+            "id": "CG200WINGEV-002",
+            "codigo_referencia": "CG200WINGEV-002",
+            "nombre": "DIRECCIONALES (SET4) WING EVO 2 2024/2025/TD VENOM GT/FORCE/SPITFIRE 250CC",
             "marca": "DAYTONA",
-            "precio": 18,
+            "precio": 26,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -787,17 +776,6 @@
             "nombre": "PLACA TANQUE (I-D) WING EVO 202 2025 BLANCO",
             "marca": "DAYTONA",
             "precio": 141,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
-            "id": "CGB250SPF-048",
-            "codigo_referencia": "CGB250SPF-048",
-            "nombre": "PLACA LAT. POST. (I-D) SPITFIRE 250 N-VERDE",
-            "marca": "DAYTONA",
-            "precio": 69,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -1137,6 +1115,17 @@
             "id": "CB250-283",
             "codigo_referencia": "CB250-283",
             "nombre": "PORTA PLACAS TEKKEN",
+            "marca": "DAYTONA",
+            "precio": 18,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "CGEA150-108",
+            "codigo_referencia": "CGEA150-108",
+            "nombre": "PORTA PLACAS EAGLE 150CC III/DK FALCON",
             "marca": "DAYTONA",
             "precio": 18,
             "categoria": "General",
@@ -1849,17 +1838,6 @@
             "tags": []
         },
         {
-            "id": "CB250SCB-069R",
-            "codigo_referencia": "CB250SCB-069R",
-            "nombre": "PLACA LAT POST (I-D) SCRAMBLER REVOLUTION 250CC ROJO",
-            "marca": "DAYTONA",
-            "precio": 57,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "CB250SCB-092",
             "codigo_referencia": "CB250SCB-092",
             "nombre": "PLACA CUBRE SWITCH (I-D) SCRAMBLER REVOLUTION 250CC/300CC",
@@ -1919,7 +1897,7 @@
             "codigo_referencia": "CB250SCB-014",
             "nombre": "GUARDAFANGO DEL SCRAMBLER CLASICA/REVOLUTION/AXXO SCRAMBLER 250CC PLOMO",
             "marca": "DAYTONA",
-            "precio": 23,
+            "precio": 46,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -2227,7 +2205,7 @@
             "codigo_referencia": "CB180S1ADV-020",
             "nombre": "ESTRIBOS POST (I-D) S1 ADVENTURE/S1 CROSSOVER 180CC",
             "marca": "DAYTONA",
-            "precio": 17,
+            "precio": 23,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -2338,17 +2316,6 @@
             "nombre": "GUARDAFANGO POST MONTANA 150CC N-NARANJA",
             "marca": "DAYTONA",
             "precio": 35,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
-            "id": "CB250GP1-065",
-            "codigo_referencia": "CB250GP1-065",
-            "nombre": "MANUBRIOS Y PESAS (I-D) GP1- 250/TUNDRA VELOCE 250CC",
-            "marca": "DAYTONA",
-            "precio": 16,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -3839,17 +3806,6 @@
             "tags": []
         },
         {
-            "id": "CG150WRF-004",
-            "codigo_referencia": "CG150WRF-004",
-            "nombre": "TIMON WORKFORCE/TH-B52 150CC",
-            "marca": "DAYTONA",
-            "precio": 15,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "CB200PDT-010",
             "codigo_referencia": "CB200PDT-010",
             "nombre": "ESPEJOS (I-D) PREDATOR 200",
@@ -3920,7 +3876,7 @@
             "codigo_referencia": "CG150WRF-007",
             "nombre": "CABLE VELOCIMETRO WORKFORCE/TH-B52 150CC",
             "marca": "DAYTONA",
-            "precio": 3,
+            "precio": 5,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -4075,6 +4031,17 @@
             "nombre": "GUIA CADENILLA (1-2) CB180 GY6 S1ADV/AGILITY/EVO2/S1ADV CROSSOVER/AGILITY X 180CC",
             "marca": "DAYTONA",
             "precio": 10,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "CG150WRF-004",
+            "codigo_referencia": "CG150WRF-004",
+            "nombre": "TIMON WORKFORCE/TH-B52 150CC",
+            "marca": "DAYTONA",
+            "precio": 15,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -6654,8 +6621,8 @@
             "tags": []
         },
         {
-            "id": "KIT13-TK32",
-            "codigo_referencia": "KIT13-TK32",
+            "id": "KIT230-TK32",
+            "codigo_referencia": "KIT230-TK32",
             "nombre": "KIT ARRASTRE TEKKEN",
             "marca": "DAYTONA",
             "precio": 38,
@@ -6954,17 +6921,6 @@
             "nombre": "ESCAPE COMP S1 ADVENTURE 180CC 2026",
             "marca": "DAYTONA",
             "precio": 80,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
-            "id": "CB250SC-052ALT",
-            "codigo_referencia": "CB250SC-052ALT",
-            "nombre": "MASCARILLA FARO SCORPION 250 ROJO ALT",
-            "marca": "ALTERNA",
-            "precio": 21,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -8005,17 +7961,6 @@
             "tags": []
         },
         {
-            "id": "LC250EA-004",
-            "codigo_referencia": "LC250EA-004",
-            "nombre": "SOPORTE PORTA PLACAS EAGLE III",
-            "marca": "DAYTONA",
-            "precio": 13,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "CGEA150-115B",
             "codigo_referencia": "CGEA150-115B",
             "nombre": "GUARDAFANGO POST. EAGLE 150CC III/DK FALCON BLANCO",
@@ -8031,7 +7976,7 @@
             "codigo_referencia": "CB200WF-102 ",
             "nombre": "MANIGUETA FRENO DEL WOLF ",
             "marca": "DAYTONA",
-            "precio": 8,
+            "precio": 10,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -8648,6 +8593,28 @@
             "nombre": "GUARDAFANGO DEL. XPOWER 250 ROJO BARRAS INVERTIDAS",
             "marca": "DAYTONA",
             "precio": 38,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "LC250EA-004",
+            "codigo_referencia": "LC250EA-004",
+            "nombre": "SOPORTE PORTA PLACAS EAGLE III",
+            "marca": "DAYTONA",
+            "precio": 13,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "CB250TKN-037",
+            "codigo_referencia": "CB250TKN-037",
+            "nombre": "KIT RUN Y LUCES TEKKEN EVO/AXXO TRACKER/DK NATIVA 250CC",
+            "marca": "DAYTONA",
+            "precio": 36,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,

@@ -1,8 +1,29 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="es" class="dark">
 
 <head>
   <meta charset="utf-8" />
+  <script>
+    // MutationObserver to prevent browser translation tools from breaking Material Symbols icons
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === 1) { // Node.ELEMENT_NODE
+            if (node.classList.contains('material-symbols-outlined')) {
+              node.setAttribute('translate', 'no');
+              node.classList.add('notranslate');
+            }
+            const children = node.getElementsByClassName('material-symbols-outlined');
+            for (let i = 0; i < children.length; i++) {
+              children[i].setAttribute('translate', 'no');
+              children[i].classList.add('notranslate');
+            }
+          }
+        }
+      }
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DropshipERP Suite</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
