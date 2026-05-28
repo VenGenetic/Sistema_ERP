@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import type { Customer } from '../store/cartStore'; // Reuse the interface we already have
-import { Plus, Search, Edit2, Trash2, X, Briefcase, User, Percent, Users, MessageSquare, Bell, ClipboardList, Check, AlertCircle, Calendar, DollarSign, ShoppingBag, Sparkles, Phone, Package } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Briefcase, User, Percent, Users, MessageSquare, Bell, ClipboardList, Check, AlertCircle, Calendar, DollarSign, ShoppingBag, Sparkles, Phone, Package, Zap } from 'lucide-react';
 
 export interface CustomerRequest {
     id: number;
@@ -26,6 +26,27 @@ export interface CustomerRequest {
         inventory_levels?: { current_stock: number; warehouse_id: number }[];
     } | null;
 }
+
+// Helper to parse reminder from notes prefix
+export const parseRequestReminder = (notes: string | null): { cleanNotes: string, reminderAt: string | null } => {
+    if (!notes) return { cleanNotes: '', reminderAt: null };
+    const match = notes.match(/^\[REMINDER:\s*([^\]]+)\](.*)$/);
+    if (match) {
+        return {
+            reminderAt: match[1].trim(),
+            cleanNotes: match[2].trim()
+        };
+    }
+    return { cleanNotes: notes, reminderAt: null };
+};
+
+// Helper to format reminder into notes prefix
+export const formatRequestNotes = (cleanNotes: string, reminderAt: string | null): string => {
+    if (reminderAt) {
+        return `[REMINDER: ${reminderAt}] ${cleanNotes}`;
+    }
+    return cleanNotes;
+};
 
 export default function Customers() {
     const navigate = useNavigate();
@@ -58,6 +79,17 @@ export default function Customers() {
     const [isSavingDrawerPhone, setIsSavingDrawerPhone] = useState(false);
     const [isAlertsBannerCollapsed, setIsAlertsBannerCollapsed] = useState(false);
 
+    // Quick Register Modal States
+    const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
+    const [quickPhone, setQuickPhone] = useState('');
+    const [quickItems, setQuickItems] = useState<string[]>(['']);
+    const [quickReminder, setQuickReminder] = useState('');
+    const [quickUrgent, setQuickUrgent] = useState(false);
+    const [isSavingQuick, setIsSavingQuick] = useState(false);
+
+    // Regular Drawer Reservation reminder date state
+    const [reminderAt, setReminderAt] = useState('');
+
     // Form State
     const [formData, setFormData] = useState<Partial<Customer>>({
         identification_number: '',
@@ -75,7 +107,18 @@ export default function Customers() {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setRequests(data || []);
+
+            // Map virtual reminder properties from notes prefix
+            const mapped = (data || []).map((req: any) => {
+                const parsed = parseRequestReminder(req.notes);
+                return {
+                    ...req,
+                    reminder_at: parsed.reminderAt,
+                    notes: parsed.cleanNotes
+                };
+            });
+
+            setRequests(mapped);
         } catch (error) {
             console.error('Error fetching requests:', error);
         }
@@ -184,7 +227,7 @@ export default function Customers() {
                 custom_part_description: isCustomPart ? customDescription : null,
                 motorcycle_details: motorcycleDetails,
                 quantity,
-                notes,
+                notes: formatRequestNotes(notes, reminderAt),
                 is_urgent: isUrgent,
                 status: 'pending'
             };
@@ -203,12 +246,125 @@ export default function Customers() {
             setMotorcycleDetails('');
             setQuantity(1);
             setNotes('');
+            setReminderAt('');
             setIsUrgent(false);
 
             await fetchRequests();
         } catch (error: any) {
             console.error('Error adding request:', error);
             alert(`Error al guardar la reserva: ${error.message}`);
+        }
+    };
+
+    // Action for ⚡ Quick Register (WhatsApp & Reminder ONLY required)
+    const handleQuickSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quickPhone.trim()) {
+            alert('Por favor ingresa el número de teléfono');
+            return;
+        }
+
+        const activeItems = quickItems
+            .map(item => item.trim())
+            .filter(item => item.length > 0);
+
+        if (activeItems.length === 0) {
+            alert('Por favor ingresa al menos un repuesto o código');
+            return;
+        }
+
+        if (!quickReminder) {
+            alert('Por favor selecciona una fecha de recordatorio');
+            return;
+        }
+
+        setIsSavingQuick(true);
+        try {
+            // Clean phone number: remove non-digits
+            const cleanedPhone = quickPhone.replace(/\D/g, '');
+            if (!cleanedPhone) {
+                alert('Por favor ingresa un número de teléfono válido');
+                setIsSavingQuick(false);
+                return;
+            }
+
+            // 1. Check if customer with this phone number already exists
+            const { data: existing, error: findError } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('phone', cleanedPhone)
+                .limit(1);
+
+            if (findError) throw findError;
+
+            let customerId: number;
+
+            if (existing && existing.length > 0) {
+                customerId = existing[0].id;
+            } else {
+                // Create customer automatically
+                const tempDocId = `WA-${Date.now().toString().slice(-6)}`;
+                const { data: newCust, error: createError } = await supabase
+                    .from('customers')
+                    .insert([{
+                        name: `WhatsApp - ${cleanedPhone}`,
+                        phone: cleanedPhone,
+                        identification_number: tempDocId,
+                        is_final_consumer: false
+                    }])
+                    .select();
+
+                if (createError) throw createError;
+                if (!newCust || newCust.length === 0) throw new Error('No se pudo registrar el cliente automático');
+                customerId = newCust[0].id;
+            }
+
+            // 2. Insert into customer_requests with reminder in notes
+            const requestsData = activeItems.map(item => ({
+                customer_id: customerId,
+                product_id: null,
+                custom_part_description: item,
+                motorcycle_details: '',
+                quantity: 1,
+                notes: formatRequestNotes('', quickReminder), // Empty clean notes, set reminder at prefix
+                is_urgent: quickUrgent,
+                status: 'pending'
+            }));
+
+            const { error: reqError } = await supabase
+                .from('customer_requests')
+                .insert(requestsData);
+
+            if (reqError) throw reqError;
+
+            // Reset quick register states
+            setQuickPhone('');
+            setQuickItems(['']);
+            setQuickReminder('');
+            setQuickUrgent(false);
+            setIsQuickModalOpen(false);
+
+            // Refresh lists
+            await fetchCustomers();
+            await fetchRequests();
+
+            // Fetch the updated customer row to open in drawer
+            const { data: finalCust, error: fetchCustErr } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('id', customerId)
+                .single();
+
+            if (!fetchCustErr && finalCust) {
+                setSelectedCustomerForDrawer(finalCust);
+            }
+
+            alert('Reserva rápida y recordatorio registrados correctamente');
+        } catch (error: any) {
+            console.error('Error saving quick request:', error);
+            alert(`Error al guardar: ${error.message}`);
+        } finally {
+            setIsSavingQuick(false);
         }
     };
 
@@ -383,16 +539,47 @@ export default function Customers() {
         }
     };
 
-    const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.identification_number.includes(searchQuery)
-    );
+    const filteredCustomers = customers.filter(c => {
+        const query = searchQuery.toLowerCase().trim();
+        if (!query) return true;
+
+        const matchesBasic = (c.name || '').toLowerCase().includes(query) ||
+            (c.identification_number || '').toLowerCase().includes(query) ||
+            (c.phone || '').includes(query);
+
+        if (matchesBasic) return true;
+
+        const customerRequests = requests.filter(r => r.customer_id === c.id);
+        const matchesRequests = customerRequests.some(r => {
+            const customDesc = (r.custom_part_description || '').toLowerCase();
+            const motoDetails = (r.motorcycle_details || '').toLowerCase();
+            const notes = (r.notes || '').toLowerCase();
+            const prodName = r.product ? (r.product.name || '').toLowerCase() : '';
+            const prodSku = r.product ? (r.product.sku || '').toLowerCase() : '';
+
+            return customDesc.includes(query) ||
+                motoDetails.includes(query) ||
+                notes.includes(query) ||
+                prodName.includes(query) ||
+                prodSku.includes(query);
+        });
+
+        return matchesRequests;
+    });
 
     const pendingWithStock = requests.filter(r => 
         (r.status === 'pending' || r.status === 'arrived') && 
         r.product && 
         getProductStockSum(r) > 0
     );
+
+    const activeReminders = requests.filter(r => {
+        if (!r.reminder_at || r.status === 'completed' || r.status === 'cancelled') return false;
+        const remDate = new Date(r.reminder_at);
+        const now = new Date();
+        // Show in banner if reminder is overdue or due within the next 24 hours
+        return remDate <= now || (remDate.getTime() - now.getTime()) <= 24 * 60 * 60 * 1000;
+    });
 
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -406,83 +593,132 @@ export default function Customers() {
                         Gestiona tu cartera de clientes, talleres mecánicos y aliados comerciales.
                     </p>
                 </div>
-                <button
-                    onClick={() => handleOpenModal()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
-                >
-                    <Plus className="w-5 h-5" />
-                    Nuevo Cliente
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setIsQuickModalOpen(true)}
+                        className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+                    >
+                        <Zap className="w-4 h-4" />
+                        ⚡ Registro Rápido (WhatsApp)
+                    </button>
+                    <button
+                        onClick={() => handleOpenModal()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+                    >
+                        <Plus className="w-5 h-5" />
+                        Nuevo Cliente
+                    </button>
+                </div>
             </div>
 
-            {/* Global Reminders Dashboard */}
-            {pendingWithStock.length > 0 && !isAlertsBannerCollapsed && (
-                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl shadow-lg p-5 border border-emerald-400/20 overflow-hidden relative animate-in slide-in-from-top duration-300">
-                    <div className="absolute -right-10 -top-10 text-emerald-400/20 opacity-40">
-                        <Sparkles className="w-40 h-40" />
+            {/* Global Reminders & Alerts Dashboard */}
+            {((pendingWithStock.length > 0) || (activeReminders.length > 0)) && !isAlertsBannerCollapsed && (
+                <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-xl shadow-lg p-5 border border-blue-500/20 overflow-hidden relative animate-in slide-in-from-top duration-300">
+                    <div className="absolute -right-10 -top-10 text-blue-500/10 opacity-30">
+                        <Bell className="w-40 h-40" />
                     </div>
                     
                     <div className="flex justify-between items-start gap-4">
                         <div className="flex items-start gap-3">
-                            <div className="p-2 bg-white/10 rounded-lg shrink-0">
-                                <Bell className="w-6 h-6 text-white animate-bounce" />
+                            <div className="p-2 bg-blue-500/20 rounded-lg shrink-0 border border-blue-500/30">
+                                <Bell className="w-6 h-6 text-blue-400 animate-bounce" />
                             </div>
                             <div>
                                 <h2 className="text-base font-bold flex items-center gap-2">
-                                    ¡Stock Disponible en Bodega!
+                                    Centro de Alertas y Recordatorios
                                 </h2>
-                                <p className="text-sm text-emerald-50 mt-1">
-                                    Hay <strong>{pendingWithStock.length}</strong> reservas de repuestos pendientes que ya cuentan con stock en bodega. Envía un WhatsApp o factúrales con 1 clic.
+                                <p className="text-xs text-slate-300 mt-1">
+                                    Monitorea las reservas que ya cuentan con stock o los contactos programados para hoy.
                                 </p>
                             </div>
                         </div>
                         <button
                             onClick={() => setIsAlertsBannerCollapsed(true)}
-                            className="p-1 hover:bg-white/10 rounded-full transition-colors text-emerald-100"
+                            className="p-1 hover:bg-white/10 rounded-full transition-colors text-slate-400"
                         >
                             <X className="w-4 h-4" />
                         </button>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 relative z-10">
-                        {pendingWithStock.slice(0, 3).map(req => {
-                            const customerName = customers.find(c => c.id === req.customer_id)?.name || 'Cliente Especial';
-                            const partName = req.product ? req.product.name : req.custom_part_description;
-                            const totalStock = getProductStockSum(req);
-                            
-                            return (
-                                <div key={req.id} className="bg-white/10 rounded-lg p-3 text-xs flex justify-between items-center gap-2 border border-white/10 backdrop-blur-sm">
-                                    <div className="truncate">
-                                        <div className="font-semibold truncate">{customerName}</div>
-                                        <div className="text-emerald-100 truncate">{partName}</div>
-                                        <div className="text-[10px] text-emerald-200 mt-0.5">Stock total: {totalStock} uds</div>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            const cust = customers.find(c => c.id === req.customer_id);
-                                            if (cust) setSelectedCustomerForDrawer(cust);
-                                        }}
-                                        className="shrink-0 bg-white hover:bg-emerald-50 text-emerald-700 font-semibold px-2 py-1 rounded shadow-sm transition-colors text-[10px]"
-                                    >
-                                        Ver Reserva
-                                    </button>
+                    <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+                        {/* Column 1: Stock alerts */}
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-1.5">
+                                <Package className="w-3.5 h-3.5" />
+                                Piezas Reservadas con Stock Disponible ({pendingWithStock.length})
+                            </h3>
+                            {pendingWithStock.length === 0 ? (
+                                <div className="text-slate-400 text-xs py-2 italic">No hay piezas pendientes con stock en bodega.</div>
+                            ) : (
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                    {pendingWithStock.map(req => {
+                                        const customerName = customers.find(c => c.id === req.customer_id)?.name || 'Cliente';
+                                        const partName = req.product ? req.product.name : req.custom_part_description;
+                                        const totalStock = getProductStockSum(req);
+                                        
+                                        return (
+                                            <div key={req.id} className="bg-white/5 rounded-lg p-2.5 text-xs flex justify-between items-center gap-2 border border-white/5 backdrop-blur-sm">
+                                                <div className="truncate">
+                                                    <span className="font-semibold block truncate text-slate-200">{customerName}</span>
+                                                    <span className="text-slate-400 truncate text-[11px] block">{partName}</span>
+                                                    <span className="text-[10px] text-emerald-300 mt-0.5">Stock total: {totalStock} uds</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        const cust = customers.find(c => c.id === req.customer_id);
+                                                        if (cust) setSelectedCustomerForDrawer(cust);
+                                                    }}
+                                                    className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-2 py-1 rounded shadow-sm transition-colors text-[10px]"
+                                                >
+                                                    Ver
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            );
-                        })}
-                        {pendingWithStock.length > 3 && (
-                            <div className="bg-white/5 hover:bg-white/10 rounded-lg p-3 text-xs flex items-center justify-center border border-white/5 backdrop-blur-sm transition-colors">
-                                <button
-                                    onClick={() => {
-                                        const nextReq = pendingWithStock[3];
-                                        const cust = customers.find(c => c.id === nextReq.customer_id);
-                                        if (cust) setSelectedCustomerForDrawer(cust);
-                                    }}
-                                    className="text-white hover:underline text-xs font-bold text-center"
-                                >
-                                    + {pendingWithStock.length - 3} reservas más...
-                                </button>
-                            </div>
-                        )}
+                            )}
+                        </div>
+
+                        {/* Column 2: Reminders */}
+                        <div className="space-y-3">
+                            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-1.5">
+                                <Calendar className="w-3.5 h-3.5" />
+                                Recordatorios de Clientes Activos ({activeReminders.length})
+                            </h3>
+                            {activeReminders.length === 0 ? (
+                                <div className="text-slate-400 text-xs py-2 italic">No hay recordatorios pendientes para hoy.</div>
+                            ) : (
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                    {activeReminders.map(req => {
+                                        const customer = customers.find(c => c.id === req.customer_id);
+                                        const customerName = customer ? customer.name : 'Cliente';
+                                        const comment = req.custom_part_description || (req.product ? req.product.name : 'Reserva');
+                                        const dateStr = req.reminder_at ? new Date(req.reminder_at).toLocaleString('es-EC', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                                        const isOverdue = req.reminder_at && new Date(req.reminder_at) < new Date();
+
+                                        return (
+                                            <div key={req.id} className="bg-white/5 rounded-lg p-2.5 text-xs flex justify-between items-center gap-2 border border-white/5 backdrop-blur-sm">
+                                                <div className="truncate">
+                                                    <span className="font-semibold block truncate text-slate-200">{customerName}</span>
+                                                    <span className="text-slate-400 truncate text-[11px] block">{comment}</span>
+                                                    <span className={`text-[10px] font-medium block mt-0.5 ${isOverdue ? 'text-red-400 animate-pulse' : 'text-amber-400'}`}>
+                                                        {isOverdue ? '⚠️ Vencido: ' : '⏰ Recordar: '}{dateStr}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        if (customer) setSelectedCustomerForDrawer(customer);
+                                                    }}
+                                                    className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-bold px-2 py-1 rounded shadow-sm transition-colors text-[10px]"
+                                                >
+                                                    Ver
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -493,7 +729,7 @@ export default function Customers() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Buscar por nombre o cédula/RUC..."
+                            placeholder="Buscar por nombre, cédula/RUC, teléfono o repuesto..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 transition-all dark:text-white"
@@ -692,6 +928,201 @@ export default function Customers() {
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
                                 >
                                     Guardar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Reservation (WhatsApp) Modal */}
+            {isQuickModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-amber-500 animate-pulse" />
+                                Registro Rápido (WhatsApp)
+                            </h2>
+                            <button onClick={() => setIsQuickModalOpen(false)} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleQuickSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    Teléfono del Cliente *
+                                </label>
+                                <input
+                                    type="tel"
+                                    required
+                                    value={quickPhone}
+                                    onChange={(e) => setQuickPhone(e.target.value)}
+                                    className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                    placeholder="Ej: 0999999999"
+                                />
+                            </div>
+
+                            {/* Quick items list instead of textarea */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                                    <span>Repuestos / Códigos a Registrar *</span>
+                                    <span className="text-xs text-slate-400">({quickItems.length} {quickItems.length === 1 ? 'ítem' : 'ítems'})</span>
+                                </label>
+                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    {quickItems.map((item, idx) => (
+                                        <div key={idx} className="flex gap-2 items-center animate-in slide-in-from-left duration-200">
+                                            <input
+                                                type="text"
+                                                required
+                                                value={item}
+                                                onChange={(e) => {
+                                                    const newItems = [...quickItems];
+                                                    newItems[idx] = e.target.value;
+                                                    setQuickItems(newItems);
+                                                }}
+                                                className="flex-1 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                                placeholder={`Repuesto o Código #${idx + 1}`}
+                                            />
+                                            {quickItems.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newItems = quickItems.filter((_, i) => i !== idx);
+                                                        setQuickItems(newItems);
+                                                    }}
+                                                    className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors border border-slate-200 dark:border-slate-800 shrink-0"
+                                                    title="Eliminar repuesto"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setQuickItems([...quickItems, ''])}
+                                    className="w-full mt-3 py-2 px-4 border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-1.5 bg-slate-50/50 dark:bg-slate-800/30"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Agregar nuevo producto
+                                </button>
+                            </div>
+
+                            {/* Calendar Picker restoration */}
+                            <div className="grid grid-cols-1 gap-4 my-2">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                                        <Calendar className="w-4 h-4 text-amber-500" />
+                                        Fecha y Hora de Recordatorio *
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        required
+                                        value={quickReminder}
+                                        onChange={(e) => setQuickReminder(e.target.value)}
+                                        onClick={(e) => {
+                                            try {
+                                                e.currentTarget.showPicker();
+                                            } catch (err) {
+                                                console.debug('showPicker not supported', err);
+                                            }
+                                        }}
+                                        className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const d = new Date();
+                                                if (d.getHours() >= 16) {
+                                                    d.setDate(d.getDate() + 1);
+                                                    d.setHours(10, 0, 0, 0);
+                                                } else {
+                                                    d.setHours(17, 0, 0, 0);
+                                                }
+                                                const pad = (n: number) => n.toString().padStart(2, '0');
+                                                setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                            }}
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                        >
+                                            Hoy tarde / Mañana
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const d = new Date();
+                                                d.setDate(d.getDate() + 1);
+                                                d.setHours(10, 0, 0, 0);
+                                                const pad = (n: number) => n.toString().padStart(2, '0');
+                                                setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                            }}
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                        >
+                                            +1 día
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const d = new Date();
+                                                d.setDate(d.getDate() + 3);
+                                                d.setHours(10, 0, 0, 0);
+                                                const pad = (n: number) => n.toString().padStart(2, '0');
+                                                setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                            }}
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                        >
+                                            +3 días
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const d = new Date();
+                                                d.setDate(d.getDate() + 7);
+                                                d.setHours(10, 0, 0, 0);
+                                                const pad = (n: number) => n.toString().padStart(2, '0');
+                                                setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                            }}
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                        >
+                                            +1 semana
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80">
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                                    ¿Es un pedido Urgente?
+                                </span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={quickUrgent}
+                                        onChange={(e) => setQuickUrgent(e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                                </label>
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickModalOpen(false)}
+                                    className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingQuick}
+                                    className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5 font-bold"
+                                >
+                                    {isSavingQuick ? 'Guardando...' : 'Registrar'}
                                 </button>
                             </div>
                         </form>
@@ -898,17 +1329,96 @@ export default function Customers() {
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                                            Notas Internas
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ej: Pago seña 50%..."
-                                            value={notes}
-                                            onChange={(e) => setNotes(e.target.value)}
-                                            className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                                Notas Internas
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej: Pago seña 50%..."
+                                                value={notes}
+                                                onChange={(e) => setNotes(e.target.value)}
+                                                className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                                                Recordatorio
+                                            </label>
+                                            <input
+                                                type="datetime-local"
+                                                value={reminderAt}
+                                                onChange={(e) => setReminderAt(e.target.value)}
+                                                onClick={(e) => {
+                                                    try {
+                                                        e.currentTarget.showPicker();
+                                                    } catch (err) {
+                                                        console.debug('showPicker not supported', err);
+                                                    }
+                                                }}
+                                                className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                            <div className="flex flex-wrap gap-1 mt-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const d = new Date();
+                                                        if (d.getHours() >= 16) {
+                                                            d.setDate(d.getDate() + 1);
+                                                            d.setHours(10, 0, 0, 0);
+                                                        } else {
+                                                            d.setHours(17, 0, 0, 0);
+                                                        }
+                                                        const pad = (n: number) => n.toString().padStart(2, '0');
+                                                        setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                                    }}
+                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                >
+                                                    Hoy/Mañana
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const d = new Date();
+                                                        d.setDate(d.getDate() + 1);
+                                                        d.setHours(10, 0, 0, 0);
+                                                        const pad = (n: number) => n.toString().padStart(2, '0');
+                                                        setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                                    }}
+                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                >
+                                                    +1d
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const d = new Date();
+                                                        d.setDate(d.getDate() + 3);
+                                                        d.setHours(10, 0, 0, 0);
+                                                        const pad = (n: number) => n.toString().padStart(2, '0');
+                                                        setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                                    }}
+                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                >
+                                                    +3d
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const d = new Date();
+                                                        d.setDate(d.getDate() + 7);
+                                                        d.setHours(10, 0, 0, 0);
+                                                        const pad = (n: number) => n.toString().padStart(2, '0');
+                                                        setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                                    }}
+                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                >
+                                                    +1s
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80">
@@ -1017,6 +1527,12 @@ export default function Customers() {
                                                             {req.notes && (
                                                                 <div className="italic text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 px-2 py-1 rounded mt-1">
                                                                     Nota: "{req.notes}"
+                                                                </div>
+                                                            )}
+                                                            {req.reminder_at && (
+                                                                <div className="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1.5 bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
+                                                                    <Calendar className="w-3.5 h-3.5" />
+                                                                    Recordar: {new Date(req.reminder_at).toLocaleString('es-EC', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                                 </div>
                                                             )}
                                                         </div>
