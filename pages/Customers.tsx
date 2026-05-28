@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Edit2, Trash2, X, Briefcase, User, Percent, Users, MessageSquare, Bell, ClipboardList, Check, AlertCircle, Calendar, DollarSign, ShoppingBag, Sparkles } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import type { Customer } from '../store/cartStore'; // Reuse the interface we already have
