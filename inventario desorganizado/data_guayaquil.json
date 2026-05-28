@@ -1068,17 +1068,6 @@
             "tags": []
         },
         {
-            "id": "CB300SW-012",
-            "codigo_referencia": "CB300SW-012",
-            "nombre": "FARO LED SUPER WOLF 300",
-            "marca": "DAYTONA",
-            "precio": 86,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "CG200WEV-043",
             "codigo_referencia": "CG200WEV-043",
             "nombre": "STOP WING EVO 200",
@@ -1128,17 +1117,6 @@
             "nombre": "PORTA PLACAS EAGLE 150CC III/DK FALCON",
             "marca": "DAYTONA",
             "precio": 18,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
-            "id": "CBB250XP-040",
-            "codigo_referencia": "CBB250XP-040",
-            "nombre": "DEPURADOR XPOWER/THD SR71/PEGASSO DUKK 250CC/FACTORY FZ 300CC",
-            "marca": "DAYTONA",
-            "precio": 28,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -2223,17 +2201,6 @@
             "tags": []
         },
         {
-            "id": "CG150WRF-009",
-            "codigo_referencia": "CG150WRF-009",
-            "nombre": "STOP WORKFORCE/TH-B52 150CC",
-            "marca": "DAYTONA",
-            "precio": 18,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "CB250CRF-047",
             "codigo_referencia": "CB250CRF-047",
             "nombre": "DISCO FRENO POST CROSSFIRE/XTREEM/THUNDER F16/DK HORNET/IGM WIND250/Z1 V8200",
@@ -2283,6 +2250,28 @@
             "nombre": "KIT RUN Y LUCES WOLF/ADV200/RANGER CFZ 250/HONDA CB190",
             "marca": "DAYTONA",
             "precio": 23,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "CBB250XP-040",
+            "codigo_referencia": "CBB250XP-040",
+            "nombre": "DEPURADOR XPOWER/THD SR71/PEGASSO DUKK 250CC/FACTORY FZ 300CC",
+            "marca": "DAYTONA",
+            "precio": 28,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "CG150WRF-009",
+            "codigo_referencia": "CG150WRF-009",
+            "nombre": "STOP WORKFORCE/TH-B52 150CC",
+            "marca": "DAYTONA",
+            "precio": 18,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -3920,7 +3909,7 @@
             "codigo_referencia": "CG150CR-020",
             "nombre": "ESPEJOS (I-D) CAFE RACER 150/170/SCRAMBLER 250/300CC UNIVERSAL DE TIMON",
             "marca": "DAYTONA",
-            "precio": 25,
+            "precio": 38,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -5972,17 +5961,6 @@
             "tags": []
         },
         {
-            "id": "CB250TKN-069",
-            "codigo_referencia": "CB250TKN-069",
-            "nombre": "CAUCHO DESLIZ CADENA TEKKEN/TRACKER/SCRAMBLER/AXXO SCRAM 250",
-            "marca": "DAYTONA",
-            "precio": 9,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "MRZCBB250XP-024",
             "codigo_referencia": "MRZCBB250XP-024",
             "nombre": "CATALINA XPOWER 6 HUECOS",
@@ -6690,6 +6668,17 @@
             "nombre": "ASIENTO TEKKEN EVO/AXXO TRACKER/DK NATIVA 250CC",
             "marca": "DAYTONA",
             "precio": 67,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "CB250TKN-069",
+            "codigo_referencia": "CB250TKN-069",
+            "nombre": "CAUCHO DESLIZ CADENA TEKKEN/TRACKER/SCRAMBLER/AXXO SCRAM 250",
+            "marca": "DAYTONA",
+            "precio": 9,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -7416,17 +7405,6 @@
             "nombre": " FILTRO ACEITE TEKKEN DISCOVERY 300CC",
             "marca": "DAYTONA",
             "precio": 9,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
-            "id": "CG150WRF-030",
-            "codigo_referencia": "CG150WRF-030",
-            "nombre": "MANIGUETA EMBRAGUE CON BASE WORKFORCE/TH-B52 150CC ",
-            "marca": "DAYTONA",
-            "precio": 5,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -8357,6 +8335,17 @@
             "tags": []
         },
         {
+            "id": "CG150WRF-030",
+            "codigo_referencia": "CG150WRF-030",
+            "nombre": "MANIGUETA EMBRAGUE CON BASE WORKFORCE/TH-B52 150CC ",
+            "marca": "DAYTONA",
+            "precio": 5,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
             "id": "YB300-022",
             "codigo_referencia": "YB300-022",
             "nombre": "CARTER DER TEKKEN DISCOVERY 300CC",
@@ -8511,22 +8500,11 @@
             "tags": []
         },
         {
-            "id": "CG150IND-002",
-            "codigo_referencia": "CG150IND-002",
-            "nombre": "TELESCOPICAS (I-D) DELTA/PANTHER/WORKFORCE 150 NEGRO",
-            "marca": "DAYTONA",
-            "precio": 86,
-            "categoria": "General",
-            "imagen": "sin_imagen.jpg",
-            "stock": true,
-            "tags": []
-        },
-        {
             "id": "FE250GP1R-001V",
             "codigo_referencia": "FE250GP1R-001V",
             "nombre": "PLACA LAT. POST. (I-D) GP1-R 250/SHM CHIEF II/CHIEF 2.5/CHIEF II PRO//THUNDER F22 250CC G-VERDE",
             "marca": "DAYTONA",
-            "precio": 86,
+            "precio": 114,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
@@ -8615,6 +8593,17 @@
             "nombre": "KIT RUN Y LUCES TEKKEN EVO/AXXO TRACKER/DK NATIVA 250CC",
             "marca": "DAYTONA",
             "precio": 36,
+            "categoria": "General",
+            "imagen": "sin_imagen.jpg",
+            "stock": true,
+            "tags": []
+        },
+        {
+            "id": "FE250GP1R-002",
+            "codigo_referencia": "FE250GP1R-002",
+            "nombre": "PORTA PLACAS GP1-R 250/SHM CHIEF II/CHIEF 2.5/CHIEF II PRO//THUNDER F22 250CC/F370/FK370/DRAKON F300CC",
+            "marca": "DAYTONA",
+            "precio": 45,
             "categoria": "General",
             "imagen": "sin_imagen.jpg",
             "stock": true,
