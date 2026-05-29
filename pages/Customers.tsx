@@ -527,15 +527,67 @@ export default function Customers() {
     const handleDelete = async (id: number) => {
         if (!window.confirm('¿Estás seguro de que deseas eliminar este cliente?')) return;
         try {
+            // Prevent deleting CONSUMIDOR FINAL
+            const { data: currentCust, error: getErr } = await supabase
+                .from('customers')
+                .select('identification_number, name')
+                .eq('id', id)
+                .single();
+            
+            if (!getErr && currentCust?.identification_number === '9999999999') {
+                alert('No se puede eliminar el cliente "CONSUMIDOR FINAL" porque es requerido por el sistema.');
+                return;
+            }
+
+            // Check if there are orders associated with this customer
+            const { data: ordersWithCust, error: ordersErr } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('customer_id', id);
+
+            if (ordersErr) throw ordersErr;
+
+            if (ordersWithCust && ordersWithCust.length > 0) {
+                const confirmReassign = window.confirm(
+                    `Este cliente tiene ${ordersWithCust.length} venta(s) o pedido(s) de prueba registrados.\n\n` +
+                    `Para proceder con la eliminación sin perder los registros contables, ¿deseas reasignar automáticamente estas ventas a "CONSUMIDOR FINAL" y eliminar al cliente?`
+                );
+                
+                if (!confirmReassign) return;
+
+                // Find the CONSUMIDOR FINAL customer id
+                const { data: defaultCust, error: defErr } = await supabase
+                    .from('customers')
+                    .select('id')
+                    .eq('identification_number', '9999999999')
+                    .limit(1);
+
+                if (defErr) throw defErr;
+                if (!defaultCust || defaultCust.length === 0) {
+                    throw new Error('No se encontró el cliente "CONSUMIDOR FINAL" para reasignar las ventas.');
+                }
+                const defaultCustomerId = defaultCust[0].id;
+
+                // Update orders to point to CONSUMIDOR FINAL
+                const { error: updateErr } = await supabase
+                    .from('orders')
+                    .update({ customer_id: defaultCustomerId })
+                    .eq('customer_id', id);
+
+                if (updateErr) throw updateErr;
+            }
+
+            // Now delete the customer
             const { error } = await supabase
                 .from('customers')
                 .delete()
                 .eq('id', id);
+
             if (error) throw error;
             fetchCustomers();
         } catch (error: any) {
             console.error('Error deleting customer:', error);
-            alert(`Error al eliminar (Puede tener ventas asociadas): ${error.message}`);
+            alert(`Error al eliminar el cliente: ${error.message}`);
         }
     };
 
@@ -989,6 +1041,9 @@ export default function Customers() {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
+                                                        if (item.trim() && !window.confirm('¿Estás seguro de que deseas eliminar este repuesto de la lista?')) {
+                                                            return;
+                                                        }
                                                         const newItems = quickItems.filter((_, i) => i !== idx);
                                                         setQuickItems(newItems);
                                                     }}
