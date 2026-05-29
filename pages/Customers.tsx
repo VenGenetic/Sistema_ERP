@@ -653,13 +653,6 @@ export default function Customers() {
                         <Zap className="w-4 h-4" />
                         ⚡ Registro Rápido (WhatsApp)
                     </button>
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Nuevo Cliente
-                    </button>
                 </div>
             </div>
 
