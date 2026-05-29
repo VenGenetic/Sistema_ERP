@@ -357,7 +357,7 @@ const POS: React.FC = () => {
                 .limit(5);
 
             if (!error && data) {
-                setCustomerSearchResults(data as Customer[]);
+                setCustomerSearchResults((data as Customer[]).filter(c => !c.identification_number?.startsWith('DEL-')));
             }
         };
 

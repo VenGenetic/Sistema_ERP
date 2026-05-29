@@ -530,7 +530,7 @@ export default function Customers() {
             // Prevent deleting CONSUMIDOR FINAL
             const { data: currentCust, error: getErr } = await supabase
                 .from('customers')
-                .select('identification_number, name')
+                .select('identification_number, phone, name')
                 .eq('id', id)
                 .single();
             
@@ -539,52 +539,47 @@ export default function Customers() {
                 return;
             }
 
-            // Check if there are orders associated with this customer
-            const { data: ordersWithCust, error: ordersErr } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('customer_id', id);
-
-            if (ordersErr) throw ordersErr;
-
-            if (ordersWithCust && ordersWithCust.length > 0) {
-                const confirmReassign = window.confirm(
-                    `Este cliente tiene ${ordersWithCust.length} venta(s) o pedido(s) de prueba registrados.\n\n` +
-                    `Para proceder con la eliminación sin perder los registros contables, ¿deseas reasignar automáticamente estas ventas a "CONSUMIDOR FINAL" y eliminar al cliente?`
-                );
-                
-                if (!confirmReassign) return;
-
-                // Find the CONSUMIDOR FINAL customer id
-                const { data: defaultCust, error: defErr } = await supabase
-                    .from('customers')
-                    .select('id')
-                    .eq('identification_number', '9999999999')
-                    .limit(1);
-
-                if (defErr) throw defErr;
-                if (!defaultCust || defaultCust.length === 0) {
-                    throw new Error('No se encontró el cliente "CONSUMIDOR FINAL" para reasignar las ventas.');
-                }
-                const defaultCustomerId = defaultCust[0].id;
-
-                // Update orders to point to CONSUMIDOR FINAL
-                const { error: updateErr } = await supabase
-                    .from('orders')
-                    .update({ customer_id: defaultCustomerId })
-                    .eq('customer_id', id);
-
-                if (updateErr) throw updateErr;
-            }
-
-            // Now delete the customer
-            const { error } = await supabase
+            // 1. Try to physically delete the customer
+            const { error: deleteErr } = await supabase
                 .from('customers')
                 .delete()
                 .eq('id', id);
 
-            if (error) throw error;
-            fetchCustomers();
+            if (!deleteErr) {
+                // Physical delete succeeded!
+                fetchCustomers();
+                return;
+            }
+
+            // 2. If it failed due to foreign key constraint (sales/orders associated), offer soft delete/archive
+            if (deleteErr.code === '23503') {
+                const confirmSoft = window.confirm(
+                    `Este cliente tiene ventas o pedidos registrados en el sistema.\n\n` +
+                    `Para preservar el historial financiero, ¿deseas desactivarlo y ocultarlo permanentemente del directorio? (El número de teléfono quedará liberado para futuros registros).`
+                );
+
+                if (!confirmSoft) return;
+
+                const origIdent = currentCust?.identification_number || `ID-${id}`;
+                const origPhone = currentCust?.phone || '';
+                
+                // We update identification_number to "DEL-..." to hide it from the UI, and we prefix the phone to liberate the number
+                const { error: updateErr } = await supabase
+                    .from('customers')
+                    .update({
+                        identification_number: `DEL-${origIdent}-${Date.now().toString().slice(-4)}`,
+                        phone: origPhone ? `DEL-${origPhone}` : null,
+                        name: `[Eliminado] ${currentCust?.name || ''}`
+                    })
+                    .eq('id', id);
+
+                if (updateErr) throw updateErr;
+
+                alert('Cliente desactivado y ocultado exitosamente del directorio.');
+                fetchCustomers();
+            } else {
+                throw deleteErr;
+            }
         } catch (error: any) {
             console.error('Error deleting customer:', error);
             alert(`Error al eliminar el cliente: ${error.message}`);
@@ -592,6 +587,11 @@ export default function Customers() {
     };
 
     const filteredCustomers = customers.filter(c => {
+        // Hide soft-deleted/archived customers
+        if (c.identification_number && c.identification_number.startsWith('DEL-')) {
+            return false;
+        }
+
         const query = searchQuery.toLowerCase().trim();
         if (!query) return true;
 
