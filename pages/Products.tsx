@@ -554,7 +554,7 @@ const Products: React.FC = () => {
                                         </div>
                                     </th>
                                 ))}
-                                <th className="px-6 py-3 text-center">Stock Global</th>
+                                <th className="px-6 py-3 text-center">Stock (Local / Imp.)</th>
                                 <th className="px-6 py-3 text-center">Acciones</th>
                             </tr>
                         </thead>
@@ -677,8 +677,22 @@ const Products: React.FC = () => {
                                         </div>
                                     </td>
 
-                                    <td className="px-6 py-4 text-center font-bold text-slate-900 dark:text-white align-top">
-                                        {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
+                                    <td className="px-6 py-4 text-center align-top">
+                                        <div className="flex flex-col items-center justify-center">
+                                            <span className="font-bold text-slate-900 dark:text-white">
+                                                {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
+                                            </span>
+                                            {prod.importer_stock > 0 ? (
+                                                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                                    {prod.importer_stock} imp.
+                                                </span>
+                                            ) : (
+                                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-full">
+                                                    Agotado imp.
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-center align-top">
                                         <div className="flex items-center justify-center gap-1">
