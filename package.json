@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "sync-products": "node scripts/sync-odoo-products.js"
+    "sync-products": "node scripts/sync-odoo-products.js",
+    "sync-importer-stock": "node scripts/sync-importer-stock.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

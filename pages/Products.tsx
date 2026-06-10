@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
@@ -49,22 +49,31 @@ const Products: React.FC = () => {
     // ──────────────────────────────────────────────
     // 3. DEBOUNCED SEARCH, FILTER, AND PAGINATION EFFECT
     // ──────────────────────────────────────────────
-    // Coalesce all dependency changes and debounce query by 300ms to eliminate redundant fetches on mount/input
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+    const [debouncedFilters, setDebouncedFilters] = useState(filters);
+
+    // Debounce search term and column filters by 300ms
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            fetchCatalogData(pagination.page);
+            setDebouncedSearchTerm(searchTerm);
+            setDebouncedFilters(filters);
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, filters, pagination.page, pagination.pageSize, sortConfig]);
+    }, [searchTerm, filters]);
 
-    // Separate effect to reset page to 1 on search/filter changes (this will trigger the main effect above)
+    // Separate effect to reset page to 1 on search/filter changes
     useEffect(() => {
         setPagination(prev => {
             if (prev.page === 1) return prev;
             return { ...prev, page: 1 };
         });
     }, [searchTerm, filters]);
+
+    // Fetch data immediately when debounced search/filters, page, pageSize, or sort config change
+    useEffect(() => {
+        fetchCatalogData(pagination.page);
+    }, [debouncedSearchTerm, debouncedFilters, pagination.page, pagination.pageSize, sortConfig]);
 
     // ──────────────────────────────────────────────
     // 4. SUPABASE QUERY ENGINE
@@ -87,33 +96,48 @@ const Products: React.FC = () => {
                 .eq('is_active', true);
 
             // Global Search (OR across name and sku)
-            if (searchTerm) {
-                query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+            if (debouncedSearchTerm) {
+                query = query.or(`name.ilike.%${debouncedSearchTerm}%,sku.ilike.%${debouncedSearchTerm}%`);
             }
 
             // Column Filters (AND logic)
-            if (filters.sku) {
-                query = query.ilike('sku', `%${filters.sku}%`);
+            if (debouncedFilters.sku) {
+                query = query.ilike('sku', `%${debouncedFilters.sku}%`);
             }
-            if (filters.name) {
-                query = query.ilike('name', `%${filters.name}%`);
+            if (debouncedFilters.name) {
+                query = query.ilike('name', `%${debouncedFilters.name}%`);
             }
-            if (filters.category) {
-                query = query.ilike('category', `%${filters.category}%`);
+            if (debouncedFilters.category) {
+                query = query.ilike('category', `%${debouncedFilters.category}%`);
             }
             
             // Image Status Filter
-            if (filters.imageStatus === 'con_imagen') {
+            if (debouncedFilters.imageStatus === 'con_imagen') {
                 query = query.not('image_url', 'is', null);
-            } else if (filters.imageStatus === 'sin_imagen') {
+            } else if (debouncedFilters.imageStatus === 'sin_imagen') {
                 query = query.is('image_url', null);
             }
 
             // Video Status Filter
-            if (filters.videoStatus === 'con_video') {
+            if (debouncedFilters.videoStatus === 'con_video') {
                 query = query.not('video_url', 'is', null);
-            } else if (filters.videoStatus === 'sin_video') {
+            } else if (debouncedFilters.videoStatus === 'sin_video') {
                 query = query.is('video_url', null);
+            }
+
+            // Stock Status Filter
+            if (debouncedFilters.stockStatus === 'disponibles_importadora') {
+                query = query.gt('importer_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'solo_local') {
+                query = query.gt('local_stock', 0).eq('importer_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'disponibles_local') {
+                query = query.gt('local_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'solo_importadora') {
+                query = query.eq('local_stock', 0).gt('importer_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'disponibles_cualquiera') {
+                query = query.or('local_stock.gt.0,importer_stock.gt.0');
+            } else if (debouncedFilters.stockStatus === 'agotados') {
+                query = query.eq('local_stock', 0).eq('importer_stock', 0);
             }
 
             // Sorting
@@ -143,7 +167,7 @@ const Products: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [searchTerm, filters, sortConfig, pagination.page, pagination.pageSize]);
+    }, [debouncedSearchTerm, debouncedFilters, sortConfig, pagination.page, pagination.pageSize]);
 
     // ──────────────────────────────────────────────
     // HANDLERS
@@ -409,6 +433,168 @@ const Products: React.FC = () => {
         { key: 'price', label: 'Precios y Costos', align: '' },
     ];
 
+    // Memoize the catalog table rows to eliminate typing lag when searching
+    const renderedRows = useMemo(() => {
+        return products.map(prod => (
+            <tr key={prod.id} className={`transition-colors group ${selectedIds.has(prod.id) ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                <td className="px-3 py-4 align-top">
+                    <input
+                        type="checkbox"
+                        checked={selectedIds.has(prod.id)}
+                        onChange={() => toggleSelectRow(prod.id)}
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer mt-1"
+                    />
+                </td>
+                <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">{prod.sku}</td>
+                <td className="px-6 py-4 align-top">
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                        {/* Video Thumbnail */}
+                        {prod.video_url ? (
+                            <VideoThumbnail src={prod.video_url} onClick={() => handleOpenLightbox(prod, 'video')} />
+                        ) : (
+                            <div 
+                                title="Sin Video" 
+                                className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-900/10 flex items-center justify-center relative"
+                            >
+                                <span className="material-symbols-outlined text-[16px] text-rose-400">videocam_off</span>
+                            </div>
+                        )}
+
+                        {/* Image Thumbnail */}
+                        {prod.image_url ? (
+                            <div 
+                                onClick={() => handleOpenLightbox(prod, 'image')}
+                                className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-pointer group"
+                            >
+                                <img 
+                                   src={getThumbnailUrl(prod.image_url, 80, 80)} 
+                                   alt="" 
+                                   loading="lazy"
+                                   decoding="async"
+                                   className="h-full w-full object-cover group-hover:scale-110 transition-transform" 
+                                   onError={(e) => {
+                                       const target = e.currentTarget;
+                                       if (target.src.includes('render/image')) {
+                                           try {
+                                               localStorage.setItem('supabase_transform_unsupported', 'true');
+                                           } catch (err) {}
+                                           target.src = prod.image_url || '';
+                                       } else {
+                                           target.style.display = 'none';
+                                           if (target.parentElement) {
+                                               target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                               target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                           }
+                                       }
+                                   }}
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                            </div>
+                        ) : (
+                            <div 
+                                title="Sin Imagen"
+                                className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center"
+                            >
+                                <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
+                            </div>
+                        )}
+                        
+                        <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
+                    </div>
+                    {/* Tags Rendering */}
+                    <div className="flex flex-wrap gap-1 mt-2 items-center">
+                        {prod.product_tags && prod.product_tags.length > 0 && prod.product_tags.map((pt: any) => {
+                            const tag = pt.tags;
+                            if (!tag) return null;
+                            return (
+                                <span 
+                                    key={tag.id} 
+                                    className="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                    style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
+                                    onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
+                                    title="Clic para editar etiquetas"
+                                >
+                                    {tag.name}
+                                </span>
+                            );
+                        })}
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800"
+                            title="Asignar etiquetas"
+                        >
+                            <span className="material-symbols-outlined text-[12px]">add</span>
+                            Etiqueta
+                        </button>
+                    </div>
+                    </div>
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 align-top">{prod.brands?.name || '—'}</td>
+                
+                {/* Precios y Costos */}
+                <td className="px-6 py-4 align-top">
+                    <div className="flex flex-col gap-1 text-xs min-w-[130px]">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">Costo:</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                ${(prod.cost_without_vat || 0).toFixed(2)}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">Con IVA:</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                ${((prod.cost_without_vat || 0) * (1 + (prod.vat_percentage || 15.0) / 100)).toFixed(2)}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/50">
+                            <span className="text-slate-500 dark:text-slate-400 font-semibold">PVP:</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                ${(prod.price || 0).toFixed(2)}
+                            </span>
+                        </div>
+                    </div>
+                </td>
+
+                <td className="px-6 py-4 text-center align-top">
+                    <div className="flex flex-col items-center justify-center">
+                        <span className="font-bold text-slate-900 dark:text-white">
+                            {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
+                        </span>
+                        {prod.importer_stock > 0 ? (
+                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                {prod.importer_stock} imp.
+                            </span>
+                        ) : (
+                            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-full">
+                                Agotado imp.
+                            </span>
+                        )}
+                    </div>
+                </td>
+                <td className="px-6 py-4 text-center align-top">
+                    <div className="flex items-center justify-center gap-1">
+                        <button
+                            onClick={() => handleOpenModal(prod)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            title="Editar Producto"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button
+                            onClick={() => handleDeleteProduct(prod)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                            title="Eliminar Producto"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        ));
+    }, [products, selectedIds]);
+
     return (
         <div className="p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
             {/* ═══════ HEADER ═══════ */}
@@ -510,6 +696,19 @@ const Products: React.FC = () => {
                         <option value="con_video">✅ Mostrar Con Video</option>
                         <option value="sin_video">❌ Falta Video</option>
                     </select>
+                    <select
+                        value={filters.stockStatus || ''}
+                        onChange={(e) => handleFilterChange('stockStatus', e.target.value)}
+                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[200px]"
+                    >
+                        <option value="">📦 Todos los Repuestos</option>
+                        <option value="disponibles_importadora">🟢 En Importadora</option>
+                        <option value="solo_local">🏠 Solo Local (Agotado Imp.)</option>
+                        <option value="disponibles_local">🏢 Con Stock Local</option>
+                        <option value="solo_importadora">✈️ Solo Importadora (Agotado Local)</option>
+                        <option value="disponibles_cualquiera">⚡ Disponible (Local o Imp.)</option>
+                        <option value="agotados">🔴 Agotado en Ambos</option>
+                    </select>
                 </div>
             </div>
 
@@ -559,161 +758,7 @@ const Products: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {products.map(prod => (
-                                <tr key={prod.id} className={`transition-colors group ${selectedIds.has(prod.id) ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
-                                    <td className="px-3 py-4 align-top">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(prod.id)}
-                                            onChange={() => toggleSelectRow(prod.id)}
-                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer mt-1"
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">{prod.sku}</td>
-                                    <td className="px-6 py-4 align-top">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-start gap-3">
-                                            {/* Video Thumbnail */}
-                                            {prod.video_url ? (
-                                                <VideoThumbnail src={prod.video_url} onClick={() => handleOpenLightbox(prod, 'video')} />
-                                            ) : (
-                                                <div 
-                                                    title="Sin Video" 
-                                                    className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-900/10 flex items-center justify-center relative"
-                                                >
-                                                    <span className="material-symbols-outlined text-[16px] text-rose-400">videocam_off</span>
-                                                </div>
-                                            )}
-
-                                            {/* Image Thumbnail */}
-                                            {prod.image_url ? (
-                                                <div 
-                                                    onClick={() => handleOpenLightbox(prod, 'image')}
-                                                    className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-pointer group"
-                                                >
-                                                    <img 
-                                                       src={getThumbnailUrl(prod.image_url, 80, 80)} 
-                                                       alt="" 
-                                                       loading="lazy"
-                                                       decoding="async"
-                                                       className="h-full w-full object-cover group-hover:scale-110 transition-transform" 
-                                                       onError={(e) => {
-                                                           const target = e.currentTarget;
-                                                           if (target.src.includes('render/image')) {
-                                                               target.src = prod.image_url || '';
-                                                           } else {
-                                                               target.style.display = 'none';
-                                                               if (target.parentElement) {
-                                                                   target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
-                                                                   target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
-                                                               }
-                                                           }
-                                                       }}
-                                                    />
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                                                </div>
-                                            ) : (
-                                                <div 
-                                                    title="Sin Imagen"
-                                                    className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center"
-                                                >
-                                                    <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
-                                                </div>
-                                            )}
-                                            
-                                            <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
-                                        </div>
-                                        {/* Tags Rendering */}
-                                        <div className="flex flex-wrap gap-1 mt-2 items-center">
-                                            {prod.product_tags && prod.product_tags.length > 0 && prod.product_tags.map((pt: any) => {
-                                                const tag = pt.tags;
-                                                if (!tag) return null;
-                                                return (
-                                                    <span 
-                                                        key={tag.id} 
-                                                        className="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
-                                                        style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
-                                                        onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
-                                                        title="Clic para editar etiquetas"
-                                                    >
-                                                        {tag.name}
-                                                    </span>
-                                                );
-                                            })}
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
-                                                className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800"
-                                                title="Asignar etiquetas"
-                                            >
-                                                <span className="material-symbols-outlined text-[12px]">add</span>
-                                                Etiqueta
-                                            </button>
-                                        </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 align-top">{prod.brands?.name || '—'}</td>
-                                    
-                                    {/* Precios y Costos */}
-                                    <td className="px-6 py-4 align-top">
-                                        <div className="flex flex-col gap-1 text-xs min-w-[130px]">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="text-slate-400 dark:text-slate-500 font-medium">Costo:</span>
-                                                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                                    ${(prod.cost_without_vat || 0).toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="text-slate-400 dark:text-slate-500 font-medium">Con IVA:</span>
-                                                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                                    ${((prod.cost_without_vat || 0) * (1 + (prod.vat_percentage || 15.0) / 100)).toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/50">
-                                                <span className="text-slate-500 dark:text-slate-400 font-semibold">PVP:</span>
-                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                                    ${(prod.price || 0).toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </td>
-
-                                    <td className="px-6 py-4 text-center align-top">
-                                        <div className="flex flex-col items-center justify-center">
-                                            <span className="font-bold text-slate-900 dark:text-white">
-                                                {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
-                                            </span>
-                                            {prod.importer_stock > 0 ? (
-                                                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                                                    {prod.importer_stock} imp.
-                                                </span>
-                                            ) : (
-                                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-full">
-                                                    Agotado imp.
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center align-top">
-                                        <div className="flex items-center justify-center gap-1">
-                                            <button
-                                                onClick={() => handleOpenModal(prod)}
-                                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                                title="Editar Producto"
-                                            >
-                                                <span className="material-symbols-outlined text-[18px]">edit</span>
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteProduct(prod)}
-                                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                                                title="Eliminar Producto"
-                                            >
-                                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {renderedRows}
                             {products.length === 0 && !loading && (
                                 <tr>
                                     <td colSpan={7} className="px-6 py-12 text-center text-slate-500">

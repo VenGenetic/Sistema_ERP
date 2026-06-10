@@ -5,6 +5,15 @@
 export function getThumbnailUrl(originalUrl: string | null | undefined, width = 100, height = 100): string | undefined {
     if (!originalUrl) return undefined;
     
+    // Check if Supabase image transformation failed in the past to avoid double loading waterfall
+    try {
+        if (typeof window !== 'undefined' && localStorage.getItem('supabase_transform_unsupported') === 'true') {
+            return originalUrl;
+        }
+    } catch (e) {
+        // Safe check for environments where localStorage might be blocked
+    }
+    
     // Solo aplica si es una URL de Supabase Storage
     if (originalUrl.includes('supabase.co/storage/v1/object/public/')) {
         // Cambia 'object/public' por 'render/image/public' e inyecta los parmetros
