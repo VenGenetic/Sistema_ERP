@@ -112,22 +112,26 @@ const Inventory: React.FC = () => {
     const [backupLoading, setBackupLoading] = useState(false);
 
     // ──────────────────────────────────────────────
-    // 3. DEBOUNCED SEARCH EFFECT
+    // 3. DEBOUNCED SEARCH, FILTER, AND PAGINATION EFFECT
     // ──────────────────────────────────────────────
+    // Coalesce all dependency changes and debounce query by 300ms to eliminate redundant fetches on mount/input
     useEffect(() => {
         if (activeTab !== 'stock') return;
         const delayDebounceFn = setTimeout(() => {
-            setPagination(prev => ({ ...prev, page: 1 }));
-            fetchStockData(1);
-        }, 500);
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, filters]);
+            fetchStockData(pagination.page);
+        }, 300);
 
-    // Direct fetch on pagination or sort change (no debounce needed)
+        return () => clearTimeout(delayDebounceFn);
+    }, [activeTab, searchTerm, filters, pagination.page, pagination.pageSize, sortConfig, selectedWarehouseId, fitmentFilter]);
+
+    // Separate effect to reset page to 1 on search/filter changes (this will trigger the main effect above)
     useEffect(() => {
         if (activeTab !== 'stock') return;
-        fetchStockData(pagination.page);
-    }, [pagination.page, pagination.pageSize, sortConfig, selectedWarehouseId]);
+        setPagination(prev => {
+            if (prev.page === 1) return prev;
+            return { ...prev, page: 1 };
+        });
+    }, [activeTab, searchTerm, filters]);
 
     // Fetch warehouses / movements when those tabs change
     useEffect(() => {
@@ -135,11 +139,8 @@ const Inventory: React.FC = () => {
             fetchWarehouses();
         } else if (activeTab === 'movements') {
             fetchMovements();
-        } else if (activeTab === 'stock') {
-            // Initial stock load when switching to stock tab
-            fetchStockData(pagination.page);
         }
-    }, [activeTab, fitmentFilter]);
+    }, [activeTab]);
 
     // ──────────────────────────────────────────────
     // 4. SUPABASE QUERY ENGINE (STOCK TAB)

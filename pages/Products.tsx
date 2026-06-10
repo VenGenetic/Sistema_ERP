@@ -47,22 +47,24 @@ const Products: React.FC = () => {
     });
 
     // ──────────────────────────────────────────────
-    // 3. DEBOUNCED SEARCH EFFECT
+    // 3. DEBOUNCED SEARCH, FILTER, AND PAGINATION EFFECT
     // ──────────────────────────────────────────────
+    // Coalesce all dependency changes and debounce query by 300ms to eliminate redundant fetches on mount/input
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            // Reset to page 1 whenever search/filters change
-            setPagination(prev => ({ ...prev, page: 1 }));
-            fetchCatalogData(1);
-        }, 500);
+            fetchCatalogData(pagination.page);
+        }, 300);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, filters]);
+    }, [searchTerm, filters, pagination.page, pagination.pageSize, sortConfig]);
 
-    // Direct fetch on pagination or sort change (no debounce needed)
+    // Separate effect to reset page to 1 on search/filter changes (this will trigger the main effect above)
     useEffect(() => {
-        fetchCatalogData(pagination.page);
-    }, [pagination.page, pagination.pageSize, sortConfig]);
+        setPagination(prev => {
+            if (prev.page === 1) return prev;
+            return { ...prev, page: 1 };
+        });
+    }, [searchTerm, filters]);
 
     // ──────────────────────────────────────────────
     // 4. SUPABASE QUERY ENGINE

@@ -132,7 +132,15 @@ const Dashboard: React.FC = () => {
 
             activities.sort((a, b) => b.timestamp - a.timestamp);
             setActivityStream(activities.slice(0, 6));
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [currentUserId]);
 
+    const fetchStaticCounts = useCallback(async () => {
+        try {
             const [{ count: wCount }, { count: aCount }, { count: uCount }] = await Promise.all([
                 supabase.from('warehouses').select('*', { count: 'exact', head: true }),
                 supabase.from('accounts').select('*', { count: 'exact', head: true }),
@@ -144,18 +152,18 @@ const Dashboard: React.FC = () => {
                 accounts:   aCount || 0,
                 users:      uCount || 0
             });
-
         } catch (error) {
-            console.error('Error fetching dashboard data:', error);
-        } finally {
-            setIsLoading(false);
+            console.error('Error fetching static counts:', error);
         }
-    }, [currentUserId]);
+    }, []);
 
     // ─── Initial load ─────────────────────────────────────────────────────────
     useEffect(() => {
-        if (currentUserId) fetchDashboardData();
-    }, [currentUserId, fetchDashboardData]);
+        if (currentUserId) {
+            fetchDashboardData();
+            fetchStaticCounts();
+        }
+    }, [currentUserId, fetchDashboardData, fetchStaticCounts]);
 
     // ─── Real-time subscription — auto-refresh on any order change ────────────
     useEffect(() => {

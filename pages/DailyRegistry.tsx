@@ -121,7 +121,7 @@ const DailyRegistry: React.FC = () => {
             .channel('daily-registry-realtime')
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'orders' },
+                { event: '*', schema: 'public', table: 'orders', filter: 'status=eq.Entregado' },
                 () => {
                     // Debounce: coalesce rapid bursts into a single fetch
                     if (debounceRef.current) clearTimeout(debounceRef.current);

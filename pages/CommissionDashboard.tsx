@@ -68,13 +68,14 @@ const CommissionDashboard: React.FC = () => {
             if (poolError) throw poolError;
             setGlobalPool(poolData);
 
-            // 3. To calculate Payroll, we need Total Company Released Points for the current period
-            // (For simplicity in this phase, we just sum all released points across all users. 
-            // In a real app, this would be filtered by date range).
+            // 3. To calculate Payroll, we need Total Company Released Points for the current period (filtered by date range)
+            const startOfMonthISO = startOfMonth.toISOString();
+
             const { data: allReleasedData, error: allReleasedError } = await supabase
                 .from('point_ledger')
                 .select('points')
-                .eq('status', 'released');
+                .eq('status', 'released')
+                .gte('created_at', startOfMonthISO);
 
             if (allReleasedError) throw allReleasedError;
 

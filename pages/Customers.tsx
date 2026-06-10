@@ -61,6 +61,8 @@ export default function Customers() {
     // Requests Waitlist States
     const [requests, setRequests] = useState<CustomerRequest[]>([]);
     const [selectedCustomerForDrawer, setSelectedCustomerForDrawer] = useState<Customer | null>(null);
+    const [drawerRequests, setDrawerRequests] = useState<CustomerRequest[]>([]);
+    const [isLoadingDrawerRequests, setIsLoadingDrawerRequests] = useState(false);
 
     // Request Form States
     const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -104,6 +106,7 @@ export default function Customers() {
             const { data, error } = await supabase
                 .from('customer_requests')
                 .select('*, product:products(id, sku, name, price, cost_without_vat, inventory_levels(current_stock, warehouse_id))')
+                .in('status', ['pending', 'arrived', 'notified'])
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -121,6 +124,41 @@ export default function Customers() {
             setRequests(mapped);
         } catch (error) {
             console.error('Error fetching requests:', error);
+        }
+    };
+
+    const fetchDrawerRequests = async (customerId: number) => {
+        setIsLoadingDrawerRequests(true);
+        try {
+            const { data, error } = await supabase
+                .from('customer_requests')
+                .select('*, product:products(id, sku, name, price, cost_without_vat, inventory_levels(current_stock, warehouse_id))')
+                .eq('customer_id', customerId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const mapped = (data || []).map((req: any) => {
+                const parsed = parseRequestReminder(req.notes);
+                return {
+                    ...req,
+                    reminder_at: parsed.reminderAt,
+                    notes: parsed.cleanNotes
+                };
+            });
+
+            setDrawerRequests(mapped);
+        } catch (error) {
+            console.error('Error fetching drawer requests:', error);
+        } finally {
+            setIsLoadingDrawerRequests(false);
+        }
+    };
+
+    const refreshRequestsData = async () => {
+        await fetchRequests();
+        if (selectedCustomerForDrawer) {
+            await fetchDrawerRequests(selectedCustomerForDrawer.id);
         }
     };
 
@@ -175,10 +213,13 @@ export default function Customers() {
         return () => clearTimeout(delayDebounceFn);
     }, [productSearchQuery, isCustomPart]);
 
-    // Update phone number inside the drawer
+    // Update phone number and load requests inside the drawer
     useEffect(() => {
         if (selectedCustomerForDrawer) {
             setDrawerPhone(selectedCustomerForDrawer.phone || '');
+            fetchDrawerRequests(selectedCustomerForDrawer.id);
+        } else {
+            setDrawerRequests([]);
         }
     }, [selectedCustomerForDrawer]);
 
@@ -249,7 +290,7 @@ export default function Customers() {
             setReminderAt('');
             setIsUrgent(false);
 
-            await fetchRequests();
+            await refreshRequestsData();
         } catch (error: any) {
             console.error('Error adding request:', error);
             alert(`Error al guardar la reserva: ${error.message}`);
@@ -346,7 +387,7 @@ export default function Customers() {
 
             // Refresh lists
             await fetchCustomers();
-            await fetchRequests();
+            await refreshRequestsData();
 
             // Fetch the updated customer row to open in drawer
             const { data: finalCust, error: fetchCustErr } = await supabase
@@ -377,7 +418,7 @@ export default function Customers() {
                 .eq('id', requestId);
 
             if (error) throw error;
-            await fetchRequests();
+            await refreshRequestsData();
         } catch (error: any) {
             console.error('Error deleting request:', error);
             alert(`Error al eliminar: ${error.message}`);
@@ -414,7 +455,7 @@ export default function Customers() {
                 .eq('id', request.id);
 
             if (error) throw error;
-            await fetchRequests();
+            await refreshRequestsData();
         } catch (error: any) {
             console.error('Error updating status:', error);
         }
@@ -1501,15 +1542,17 @@ export default function Customers() {
                                     Reservas de {selectedCustomerForDrawer.name}
                                 </h3>
 
-                                {requests.filter(r => r.customer_id === selectedCustomerForDrawer.id).length === 0 ? (
+                                {isLoadingDrawerRequests ? (
                                     <div className="text-center py-6 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                                        No hay reservas activas registradas.
+                                        Cargando historial de reservas...
+                                    </div>
+                                ) : drawerRequests.length === 0 ? (
+                                    <div className="text-center py-6 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        No hay reservas registradas.
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {requests
-                                            .filter(r => r.customer_id === selectedCustomerForDrawer.id)
-                                            .map(req => {
+                                        {drawerRequests.map(req => {
                                                 const stockSum = getProductStockSum(req);
                                                 const hasStock = req.product && stockSum > 0;
                                                 
