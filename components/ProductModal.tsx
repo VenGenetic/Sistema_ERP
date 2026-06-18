@@ -190,6 +190,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         }
     };
 
+    const handleCostWithVatChange = (newCostWithVat: number) => {
+        const costWithoutVatValue = newCostWithVat / (1 + (formData.vatPercentage / 100));
+        const price = calcPrice(costWithoutVatValue, formData.vatPercentage, formData.profitMargin);
+        setFormData(prev => ({
+            ...prev,
+            costWithoutVat: r(costWithoutVatValue),
+            price: Math.round(price * 100) / 100
+        }));
+    };
+
     const handleVatChange = (newVat: number) => {
         if (entryByPrice) {
             // Price is fixed, update Cost
@@ -595,6 +605,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 <input type="number" step="0.0001" min="0" className={`${inputClass} ${entryByPrice ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50' : ''}`}
                                     value={formData.costWithoutVat}
                                     onChange={e => handleCostChange(parseFloat(e.target.value) || 0)}
+                                    readOnly={entryByPrice}
+                                />
+                                {entryByPrice && <p className="text-[10px] text-amber-600 mt-1 italic">Calculado desde el PVP</p>}
+                            </div>
+
+                            <div>
+                                <label className={labelClass}>Costo con IVA ($)</label>
+                                <input type="number" step="0.0001" min="0" className={`${inputClass} ${entryByPrice ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50' : ''}`}
+                                    value={costoConIva === 0 ? 0 : Math.round(costoConIva * 10000) / 10000}
+                                    onChange={e => handleCostWithVatChange(parseFloat(e.target.value) || 0)}
                                     readOnly={entryByPrice}
                                 />
                                 {entryByPrice && <p className="text-[10px] text-amber-600 mt-1 italic">Calculado desde el PVP</p>}
