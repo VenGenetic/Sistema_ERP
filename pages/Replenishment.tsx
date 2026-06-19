@@ -387,6 +387,54 @@ const Replenishment: React.FC = () => {
         }
     };
 
+    const handleAutoSuggest = async () => {
+        const confirmed = window.confirm('¿Deseas buscar repuestos que ahora tienen stock y auto-agregarlos al carrito (saltando aquellos que marcaste como "No pedir automáticamente")?');
+        if (!confirmed) return;
+
+        try {
+            const { data, error } = await supabase
+                .from('products')
+                .select('codigo:sku, nombre:name, cantidad:importer_stock, costo:cost_without_vat, imagen:image_url')
+                .gt('importer_stock', 0)
+                .eq('auto_order_disabled', false)
+                .eq('is_active', true);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                setCart(prev => {
+                    const next = { ...prev };
+                    let added = 0;
+                    data.forEach((prod: any) => {
+                        if (!next[prod.codigo]) {
+                            next[prod.codigo] = {
+                                ...prod,
+                                quantity: 1
+                            };
+                            added++;
+                        }
+                    });
+                    
+                    // Allow React render cycle to complete before alert, or simply alert with setTimeout
+                    setTimeout(() => {
+                        if (added > 0) {
+                            alert(`Se han añadido ${added} nuevos repuestos al pedido.`);
+                        } else {
+                            alert('No se añadieron repuestos. Todos los sugeridos ya estaban en la lista.');
+                        }
+                    }, 100);
+                    
+                    return next;
+                });
+            } else {
+                alert('No hay repuestos que requieran pedido automático en este momento.');
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert('Error al obtener sugerencias: ' + err.message);
+        }
+    };
+
     const handleOpenLightbox = (product: ImporterProduct) => {
         if (!product.imagen) return;
         setLightbox({
@@ -733,9 +781,18 @@ const Replenishment: React.FC = () => {
                         <span className="material-symbols-outlined text-[20px] text-primary">shopping_basket</span>
                         <h2 className="font-bold text-slate-900 dark:text-white">Pedido de Abastecimiento</h2>
                     </div>
-                    <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">
-                        {cartCount} piezas
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleAutoSuggest}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-indigo-500 rounded transition-colors"
+                            title="Auto-Pedir Repuestos Sourcing"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                        </button>
+                        <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">
+                            {cartCount} piezas
+                        </span>
+                    </div>
                 </div>
 
                 {/* Drafts Selector & Actions */}

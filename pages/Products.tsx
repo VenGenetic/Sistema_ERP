@@ -10,6 +10,7 @@ import { MediaLightbox } from '../components/MediaLightbox';
 import { QuickTagAssignModal } from '../components/QuickTagAssignModal';
 import { getThumbnailUrl } from '../utils/image';
 import { ProductDemandModal } from '../components/ProductDemandModal';
+import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
 
 const Products: React.FC = () => {
     // ──────────────────────────────────────────────
@@ -28,6 +29,9 @@ const Products: React.FC = () => {
     const [isBulkMediaOpen, setIsBulkMediaOpen] = useState(false);
     const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
     const [demandProduct, setDemandProduct] = useState<any>(null);
+
+    const [isSourcingModalOpen, setIsSourcingModalOpen] = useState(false);
+    const [sourcingProduct, setSourcingProduct] = useState<any>(null);
 
     // Export ZIP
     const [isExporting, setIsExporting] = useState(false);
@@ -503,7 +507,19 @@ const Products: React.FC = () => {
                             </div>
                         )}
                         
-                        <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
+                            {prod.investigation_status === 'en_consulta' && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title="En consulta de sourcing">
+                                    En Consulta
+                                </span>
+                            )}
+                            {prod.investigation_status === 'no_encontrado' && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" title="No se encontró repuesto">
+                                    No Encontrado
+                                </span>
+                            )}
+                        </div>
                     </div>
                     {/* Tags Rendering */}
                     <div className="flex flex-wrap gap-1 mt-2 items-center">
@@ -578,6 +594,13 @@ const Products: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-center align-top">
                     <div className="flex items-center justify-center gap-1">
+                        <button
+                            onClick={() => { setSourcingProduct(prod); setIsSourcingModalOpen(true); }}
+                            className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
+                            title="Estudio de Repuesto (Sourcing)"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+                        </button>
                         <button
                             onClick={() => handleOpenModal(prod)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
@@ -866,6 +889,13 @@ const Products: React.FC = () => {
                 isOpen={isDemandModalOpen}
                 onClose={() => { setIsDemandModalOpen(false); setDemandProduct(null); }}
                 product={demandProduct}
+            />
+
+            <SourcingQuickEditModal
+                isOpen={isSourcingModalOpen}
+                onClose={() => { setIsSourcingModalOpen(false); setSourcingProduct(null); }}
+                product={sourcingProduct}
+                onSuccess={() => fetchCatalogData(pagination.page)}
             />
 
             <BulkMediaUploadModal

@@ -29,6 +29,7 @@ const CapitalStats = React.lazy(() => import('./pages/CapitalStats'));
 const Tags = React.lazy(() => import('./pages/Tags'));
 const Replenishment = React.lazy(() => import('./pages/Replenishment'));
 const ProductDemands = React.lazy(() => import('./pages/ProductDemands'));
+const SourcingPipeline = React.lazy(() => import('./pages/SourcingPipeline'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -63,6 +64,7 @@ const App: React.FC = () => {
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="replenishment" element={<Replenishment />} />
                 <Route path="product-demands" element={<ProductDemands />} />
+                <Route path="sourcing" element={<SourcingPipeline />} />
                 <Route path="orders/*" element={<Orders />} />
                 <Route path="dispatch" element={<DispatchPipeline />} />
                 <Route path="data-steward" element={<DataSteward />} />
