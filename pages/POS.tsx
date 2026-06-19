@@ -12,8 +12,8 @@ const POS: React.FC = () => {
 
     // Global State
     const {
-        cart, customer, shippingCost,
-        setCustomer, setShippingCost, addToCart,
+        cart, customer,
+        setCustomer, addToCart,
         updateQuantity, updateUnitPrice, removeFromCart, clearCart,
         getSubtotal, getTotal
     } = useCartStore();
@@ -136,10 +136,7 @@ const POS: React.FC = () => {
                 });
             }
 
-            // Set shipping cost
-            if (order.shipping_cost) {
-                setShippingCost(order.shipping_cost);
-            }
+            // Shipping cost is not set from POS (walk-in sales only)
 
             // Add each item to cart
             const items = order.order_items as any[];
@@ -565,7 +562,7 @@ const POS: React.FC = () => {
         updateUnitPrice(itemId, newPrice);
     };
 
-    const processCheckout = async (paymentAccountId: number, shippingExpenseAccountId?: number | null, saleDate?: string) => {
+    const processCheckout = async (paymentAccountId: number, saleDate?: string) => {
         if (cartRef.current.length === 0) return;
 
         try {
@@ -580,10 +577,10 @@ const POS: React.FC = () => {
             const { data, error } = await supabase.rpc('process_pos_sale', {
                 p_customer_id: customer.id,
                 p_payment_account_id: paymentAccountId,
-                p_shipping_cost: shippingCost,
+                p_shipping_cost: 0,
                 p_items: itemsPayload,
                 p_closer_id: customer.claimed_by || null,
-                p_shipping_expense_account_id: shippingExpenseAccountId || null,
+                p_shipping_expense_account_id: null,
                 p_draft_id: activeDraftId || null
             });
 
@@ -643,7 +640,7 @@ const POS: React.FC = () => {
 
             const { data, error } = await supabase.rpc('save_draft_order', {
                 p_customer_id: customer.id,
-                p_shipping_cost: shippingCost,
+                p_shipping_cost: 0,
                 p_items: itemsPayload,
                 p_closer_id: customer.claimed_by || null,
                 p_draft_id: activeDraftId
@@ -989,20 +986,7 @@ const POS: React.FC = () => {
                             ) : null}
 
 
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-slate-600 font-medium whitespace-nowrap mr-2">Costo de Envío</span>
-                                <div className="relative">
-                                    <span className="absolute left-2 top-1.5 text-slate-400 text-xs">$</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={shippingCost || ''}
-                                        onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
-                                        className="w-24 pl-5 pr-2 py-1 text-right text-sm border border-slate-300 rounded focus:border-blue-500 outline-none font-bold"
-                                    />
-                                </div>
-                            </div>
+
                         </div>
 
                         <div className="mt-4 pt-4 border-t border-slate-200">

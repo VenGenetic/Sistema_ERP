@@ -11,15 +11,13 @@ const todayEcuador = () => {
 interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onProcess: (paymentAccountId: number, shippingExpenseAccountId?: number | null, saleDate?: string) => Promise<void>;
+    onProcess: (paymentAccountId: number, saleDate?: string) => Promise<void>;
     paymentAccounts: { id: number, name: string }[];
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onProcess, paymentAccounts }) => {
-    const { customer, getSubtotal, getTotal, shippingCost } = useCartStore();
+    const { customer, getSubtotal, getTotal } = useCartStore();
     const [selectedAccount, setSelectedAccount] = useState<number>(paymentAccounts[0]?.id || 0);
-    // Shipping expense account always defaults to first account so the trigger always fires
-    const [selectedShippingAccount, setSelectedShippingAccount] = useState<number>(paymentAccounts[0]?.id || 0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [saleDate, setSaleDate] = useState<string>(todayEcuador());
 
@@ -31,11 +29,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
     const handleConfirm = async () => {
         setIsProcessing(true);
         try {
-            // Always pass a shipping expense account when there is a shipping cost.
-            // This ensures the trigger condition (shipping_expense_account_id IS NOT NULL)
-            // is always satisfied and the expense deduction is always recorded.
-            const shippingAccId = shippingCost > 0 ? selectedShippingAccount : null;
-            await onProcess(selectedAccount, shippingAccId, saleDate);
+            await onProcess(selectedAccount, saleDate);
             onClose(); // only close on success
         } catch (e) {
             // error handled by parent
@@ -122,40 +116,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                                 ))}
                             </div>
                         </label>
-
-                        {shippingCost > 0 && (
-                            <div className="mt-4 border-t border-slate-200 pt-4">
-                                {/* Shipping expense account — always required when there is a shipping cost */}
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100">
-                                        <span className="material-symbols-outlined text-amber-600 text-[16px]">local_shipping</span>
-                                    </span>
-                                    <span className="text-sm font-bold text-slate-700">
-                                        Envío <span className="text-amber-600 font-black">${shippingCost.toFixed(2)}</span> — ¿desde qué cuenta se paga al mensajero?
-                                    </span>
-                                </div>
-                                <div className="grid grid-cols-1 gap-2">
-                                    {paymentAccounts.map(acc => (
-                                        <div
-                                            key={`ship-${acc.id}`}
-                                            onClick={() => setSelectedShippingAccount(acc.id)}
-                                            className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedShippingAccount === acc.id
-                                                ? 'border-amber-500 bg-amber-50/50 shadow-sm'
-                                                : 'border-slate-200 hover:border-slate-300 bg-white'
-                                                }`}
-                                        >
-                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedShippingAccount === acc.id ? 'border-amber-500' : 'border-slate-300'
-                                                }`}>
-                                                {selectedShippingAccount === acc.id && <div className="w-2 h-2 bg-amber-500 rounded-full"></div>}
-                                            </div>
-                                            <span className={`text-sm font-bold ${selectedShippingAccount === acc.id ? 'text-amber-700' : 'text-slate-700'}`}>
-                                                {acc.name}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
 

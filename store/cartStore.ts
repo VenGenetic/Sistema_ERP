@@ -43,12 +43,10 @@ export interface CartItem {
 interface CartState {
     cart: CartItem[];
     customer: Customer;
-    shippingCost: number;
     promoDiscount: number;
 
     // Actions
     setCustomer: (customer: Customer) => void;
-    setShippingCost: (cost: number) => void;
     setPromoDiscount: (amount: number) => void;
     addToCart: (item: InventoryResult) => void;
     updateQuantity: (itemId: string, quantity: number) => void;
@@ -71,12 +69,9 @@ export const defaultConsumidorFinal: Customer = {
 export const useCartStore = create<CartState>((set, get) => ({
     cart: [],
     customer: defaultConsumidorFinal,
-    shippingCost: 0,
     promoDiscount: 0,
 
     setCustomer: (customer) => set({ customer }),
-
-    setShippingCost: (cost) => set({ shippingCost: cost }),
 
     setPromoDiscount: (amount) => set({ promoDiscount: amount }),
 
@@ -139,7 +134,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     },
 
     clearCart: () => {
-        set({ cart: [], customer: defaultConsumidorFinal, shippingCost: 0, promoDiscount: 0 });
+        set({ cart: [], customer: defaultConsumidorFinal, promoDiscount: 0 });
     },
 
     getSubtotal: () => {
@@ -148,6 +143,6 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     getTotal: () => {
         const discountMultiplier = 1 - ((get().customer.discount_percentage || 0) / 100);
-        return (get().getSubtotal() * discountMultiplier) - get().promoDiscount + get().shippingCost;
+        return (get().getSubtotal() * discountMultiplier) - get().promoDiscount;
     }
 }));

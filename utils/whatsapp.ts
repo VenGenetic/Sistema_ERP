@@ -74,6 +74,33 @@ Total pagado: *$${context.totalAmount.toFixed(2)}*
     return `https://wa.me/${phone}?text=${encodedMessage}`;
 }
 
+interface WhatsAppDemandContext {
+    customerPhone: string;
+    customerName?: string;
+    productSku: string;
+    productName: string;
+}
+
+/**
+ * Builds a WhatsApp URL for product demand notification (when stock arrives).
+ */
+export function buildWhatsAppDemandURL(context: WhatsAppDemandContext): string | null {
+    const phone = normalizePhoneEC(context.customerPhone);
+    if (!phone) return null;
+
+    const greeting = context.customerName ? `¡Hola ${context.customerName}!` : `¡Hola!`;
+    const message = `${greeting} 👋
+
+Te escribimos para avisarte que el producto que estabas buscando ya se encuentra disponible en stock:
+
+📦 *${context.productName}* (SKU: ${context.productSku})
+
+¿Sigues interesado? Avísanos para ayudarte con tu compra. 🏍️💨`;
+
+    const encodedMessage = encodeURIComponent(message);
+    return `https://wa.me/${phone}?text=${encodedMessage}`;
+}
+
 /**
  * Opens a WhatsApp URL in a new tab/window.
  * Falls back gracefully if the URL is invalid.

@@ -9,6 +9,7 @@ import { VideoThumbnail } from '../components/VideoThumbnail';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { QuickTagAssignModal } from '../components/QuickTagAssignModal';
 import { getThumbnailUrl } from '../utils/image';
+import { ProductDemandModal } from '../components/ProductDemandModal';
 
 const Products: React.FC = () => {
     // ──────────────────────────────────────────────
@@ -25,6 +26,8 @@ const Products: React.FC = () => {
     const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
     const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
     const [isBulkMediaOpen, setIsBulkMediaOpen] = useState(false);
+    const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
+    const [demandProduct, setDemandProduct] = useState<any>(null);
 
     // Export ZIP
     const [isExporting, setIsExporting] = useState(false);
@@ -583,6 +586,13 @@ const Products: React.FC = () => {
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                         </button>
                         <button
+                            onClick={() => { setDemandProduct(prod); setIsDemandModalOpen(true); }}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                            title="Registrar Demanda (Lista de Espera)"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+                        </button>
+                        <button
                             onClick={() => handleDeleteProduct(prod)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
                             title="Eliminar Producto"
@@ -850,6 +860,12 @@ const Products: React.FC = () => {
                 onClose={() => setIsBulkEditOpen(false)}
                 onSuccess={handleBulkEditSuccess}
                 selectedProducts={selectedProducts}
+            />
+
+            <ProductDemandModal
+                isOpen={isDemandModalOpen}
+                onClose={() => { setIsDemandModalOpen(false); setDemandProduct(null); }}
+                product={demandProduct}
             />
 
             <BulkMediaUploadModal
