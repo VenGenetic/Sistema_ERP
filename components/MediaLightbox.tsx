@@ -43,14 +43,24 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
 
     if (!isOpen || media.length === 0) return null;
 
-    const currentMedia = media[currentIndex];
+    // Prevención de error: si currentIndex está fuera del rango porque la lista de media cambió
+    const safeIndex = currentIndex >= media.length ? 0 : currentIndex;
+    const currentMedia = media[safeIndex];
+
+    if (!currentMedia) return null; // Fallback adicional por si media[safeIndex] es undefined
 
     const handlePrev = () => {
-        setCurrentIndex((prev) => (prev === 0 ? media.length - 1 : prev - 1));
+        setCurrentIndex((prev) => {
+            const current = prev >= media.length ? 0 : prev;
+            return current === 0 ? media.length - 1 : current - 1;
+        });
     };
 
     const handleNext = () => {
-        setCurrentIndex((prev) => (prev === media.length - 1 ? 0 : prev + 1));
+        setCurrentIndex((prev) => {
+            const current = prev >= media.length ? 0 : prev;
+            return current === media.length - 1 ? 0 : current + 1;
+        });
     };
 
     const handleDownload = async (item: MediaItem) => {
