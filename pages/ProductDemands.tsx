@@ -220,13 +220,15 @@ const ProductDemands: React.FC = () => {
 
     const filteredAndSortedDemands = useMemo(() => {
         let filtered = demands.filter(d => {
-            // Status Filter
-            if (statusFilter === 'active') {
-                if (d.status !== 'pending_stock' && d.status !== 'stock_available') return false;
-            } else if (statusFilter === 'inactive') {
-                if (d.status !== 'notified' && d.status !== 'cancelled') return false;
-            } else if (statusFilter !== 'all') {
-                if (d.status !== statusFilter) return false;
+            // Status Filter (Kanban view shows all statuses by design to allow dragging)
+            if (viewType !== 'kanban') {
+                if (statusFilter === 'active') {
+                    if (d.status !== 'pending_stock' && d.status !== 'stock_available') return false;
+                } else if (statusFilter === 'inactive') {
+                    if (d.status !== 'notified' && d.status !== 'cancelled') return false;
+                } else if (statusFilter !== 'all') {
+                    if (d.status !== statusFilter) return false;
+                }
             }
 
             // Stock Filter
@@ -259,7 +261,7 @@ const ProductDemands: React.FC = () => {
         });
 
         return filtered;
-    }, [demands, statusFilter, stockFilter, searchTerm, sortBy]);
+    }, [demands, statusFilter, stockFilter, searchTerm, sortBy, viewType]);
 
     const grouped = useMemo(() => {
         const map = new Map<number, { productId: number; product: any; demands: ProductDemand[] }>();
