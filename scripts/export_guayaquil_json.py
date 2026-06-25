@@ -10,12 +10,12 @@ env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # Supabase configuration
-URL = os.getenv("VITE_SUPABASE_URL")
+URL = os.getenv("VITE_SUPABASE_URL") or "https://xzsdsmskyosepemalage.supabase.co"
 # Using the service role key provided in the original script
 SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6c2RzbXNreW9zZXBlbWFsYWdlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTMzMTk4MywiZXhwIjoyMDg2OTA3OTgzfQ.XY-OoGMVyhCcJIbb2sq7VSGL1NnEzZszjs8a6BswizE"
 
 if not URL:
-    print("❌ Error: VITE_SUPABASE_URL not found in .env file.")
+    print("❌ Error: VITE_SUPABASE_URL not found.")
     exit(1)
 
 supabase: Client = create_client(URL, SERVICE_ROLE_KEY)
@@ -100,9 +100,7 @@ def export_inventory():
             "RAW_SCRAPED_DATA": formatted_data
         }
 
-        output_path = Path(__file__).parent.parent / 'inventario desorganizado' / 'data_guayaquil.json'
-        # Ensure the directory exists
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path = "C:\\Users\\ASUS\\Documents\\Xsistem\\catalogo-motos-main\\catalogo-motos\\public\\data_guayaquil.json"
         
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(output, f, indent=4, ensure_ascii=False)

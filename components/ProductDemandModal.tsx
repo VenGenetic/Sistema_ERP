@@ -13,7 +13,8 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
     onClose,
     product
 }) => {
-    const { user } = useAuth();
+    const { session } = useAuth();
+    const user = session?.user;
     const [phone, setPhone] = useState('');
     const [name, setName] = useState('');
     const [notes, setNotes] = useState('');

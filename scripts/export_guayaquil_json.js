@@ -98,7 +98,7 @@ async function exportInventory() {
         "RAW_SCRAPED_DATA": formattedData
     };
 
-    const outputPath = path.join(__dirname, '..', 'inventario desorganizado', 'data_guayaquil.json');
+    const outputPath = "C:\\Users\\ASUS\\Documents\\Xsistem\\catalogo-motos-main\\catalogo-motos\\public\\data_guayaquil.json";
     writeFileSync(outputPath, JSON.stringify(output, null, 4), 'utf-8');
 
     console.log(`✅ Exportación completa: ${formattedData.length} productos guardados en ${outputPath}`);
