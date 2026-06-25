@@ -36,6 +36,7 @@ const ProductDemands: React.FC = () => {
     const [stockFilter, setStockFilter] = useState<'all' | 'has_stock' | 'no_stock'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
+    const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
 
     const fetchDemands = async () => {
         setLoading(true);
@@ -165,6 +166,49 @@ const ProductDemands: React.FC = () => {
         }
     };
 
+    const handleMarkNotifiedDirectly = async (demand: ProductDemand, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        if (window.confirm(`¿Marcar como notificado a ${demand.customer_name || demand.phone_number} sin enviar WhatsApp?`)) {
+            try {
+                const { error } = await supabase
+                    .from('product_demands')
+                    .update({
+                        status: 'notified',
+                        notified_at: new Date().toISOString(),
+                        notified_by: user?.id
+                    })
+                    .eq('id', demand.id);
+
+                if (error) throw error;
+                fetchDemands();
+            } catch (error: any) {
+                alert(`Error al marcar como notificado: ${error.message}`);
+            }
+        }
+    };
+
+    const handleStatusChange = async (demandId: number, newStatus: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled') => {
+        try {
+            const updates: any = { status: newStatus };
+            if (newStatus === 'notified') {
+                updates.notified_at = new Date().toISOString();
+                updates.notified_by = user?.id;
+            } else if (newStatus === 'stock_available') {
+                updates.stock_detected_at = new Date().toISOString();
+            }
+            
+            const { error } = await supabase
+                .from('product_demands')
+                .update(updates)
+                .eq('id', demandId);
+
+            if (error) throw error;
+            fetchDemands();
+        } catch (error: any) {
+            alert(`Error al cambiar el estado: ${error.message}`);
+        }
+    };
+
     // Derived Data
     const stats = useMemo(() => {
         const total = demands.length;
@@ -217,6 +261,17 @@ const ProductDemands: React.FC = () => {
         return filtered;
     }, [demands, statusFilter, stockFilter, searchTerm, sortBy]);
 
+    const grouped = useMemo(() => {
+        const map = new Map<number, { productId: number; product: any; demands: ProductDemand[] }>();
+        filteredAndSortedDemands.forEach(d => {
+            const pId = d.product_id;
+            if (!map.has(pId)) map.set(pId, { productId: pId, product: d.product, demands: [] });
+            map.get(pId)!.demands.push(d);
+        });
+        // Sort groups by number of demands descending
+        return Array.from(map.values()).sort((a, b) => b.demands.length - a.demands.length);
+    }, [filteredAndSortedDemands]);
+
     // Components
     const StatusBadge = ({ status }: { status: string }) => {
         if (status === 'pending_stock') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800"><span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>Esperando Stock</span>;
@@ -234,6 +289,36 @@ const ProductDemands: React.FC = () => {
         </div>
     );
 
+    const StockDisplay = ({ prod }: { prod: any }) => {
+        if (!prod) return <span className="text-xs text-slate-400 italic">Sin Stock</span>;
+        
+        const localStock = prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
+        const importerStock = prod.importer_stock || 0;
+        
+        return (
+            <div className="flex flex-col gap-0.5 text-[11px] mt-1 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800 text-left min-w-[120px]">
+                <span className="flex items-center gap-1.5 justify-between">
+                    <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                        <span className="text-slate-500 dark:text-slate-400">Local:</span>
+                    </span>
+                    <span className={`font-bold ${localStock > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
+                        {localStock}
+                    </span>
+                </span>
+                <span className="flex items-center gap-1.5 justify-between">
+                    <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <span className="text-slate-500 dark:text-slate-400">Impo:</span>
+                    </span>
+                    <span className={`font-bold ${importerStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                        {importerStock}
+                    </span>
+                </span>
+            </div>
+        );
+    };
+
     const ActionButtons = ({ demand }: { demand: ProductDemand }) => {
         const isReady = demand.status === 'stock_available';
         const isActive = demand.status === 'pending_stock' || demand.status === 'stock_available';
@@ -247,6 +332,7 @@ const ProductDemands: React.FC = () => {
                         {!isReady && (
                             <button onClick={(e) => handleMarkAvailable(demand, e)} className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">Marcar Disp.</button>
                         )}
+                        <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-slate-500 hover:text-blue-600 transition-colors">Marcar Notificado</button>
                         <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-rose-500 hover:text-rose-700 transition-colors">Cancelar</button>
                     </>
                 ) : (
@@ -301,9 +387,7 @@ const ProductDemands: React.FC = () => {
                                     <td className="px-6 py-4 align-top">
                                         <div className="flex flex-col gap-1 text-sm">
                                             <span className="text-slate-500 dark:text-slate-400">Reg: {new Date(demand.created_at).toLocaleDateString()}</span>
-                                            {demand.product && (
-                                                <span className={`font-semibold ${totalStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>Stock Actual: {totalStock}</span>
-                                            )}
+                                            <StockDisplay prod={demand.product} />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-center align-top">
@@ -338,9 +422,9 @@ const ProductDemands: React.FC = () => {
                         <div className="bg-slate-50 dark:bg-[#161b22] p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                             <span className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Producto Requerido:</span>
                             <span className="font-medium text-sm text-slate-900 dark:text-slate-200 line-clamp-2">{demand.product?.name || 'Producto Desconocido'}</span>
-                            <div className="flex justify-between items-center mt-2">
+                            <div className="flex justify-between items-start mt-2">
                                 <span className="text-xs font-mono text-slate-500">{demand.product?.sku}</span>
-                                <span className={`text-xs font-bold ${totalStock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>Stock: {totalStock}</span>
+                                <StockDisplay prod={demand.product} />
                             </div>
                         </div>
                         <div className="flex justify-between items-end mt-auto pt-2">
@@ -358,18 +442,34 @@ const ProductDemands: React.FC = () => {
 
     const renderKanbanView = () => {
         const columns = [
-            { id: 'pending_stock', title: 'Esperando Stock', color: 'bg-amber-50 dark:bg-amber-900/10', header: 'border-amber-300 dark:border-amber-600', text: 'text-amber-700 dark:text-amber-400' },
-            { id: 'stock_available', title: 'Stock Disponible', color: 'bg-emerald-50 dark:bg-emerald-900/10', header: 'border-emerald-300 dark:border-emerald-600', text: 'text-emerald-700 dark:text-emerald-400' },
-            { id: 'notified', title: 'Notificados', color: 'bg-blue-50 dark:bg-blue-900/10', header: 'border-blue-300 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-400' },
-            { id: 'cancelled', title: 'Cancelados', color: 'bg-slate-50 dark:bg-slate-900/10', header: 'border-slate-300 dark:border-slate-600', text: 'text-slate-700 dark:text-slate-300' }
+            { id: 'pending_stock', title: 'Esperando Stock', color: 'bg-amber-50 dark:bg-amber-900/10', hoverColor: 'bg-amber-100/80 dark:bg-amber-900/20', header: 'border-amber-300 dark:border-amber-600', text: 'text-amber-700 dark:text-amber-400' },
+            { id: 'stock_available', title: 'Stock Disponible', color: 'bg-emerald-50 dark:bg-emerald-900/10', hoverColor: 'bg-emerald-100/80 dark:bg-emerald-900/20', header: 'border-emerald-300 dark:border-emerald-600', text: 'text-emerald-700 dark:text-emerald-400' },
+            { id: 'notified', title: 'Notificados', color: 'bg-blue-50 dark:bg-blue-900/10', hoverColor: 'bg-blue-100/80 dark:bg-blue-900/20', header: 'border-blue-300 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-400' },
+            { id: 'cancelled', title: 'Cancelados', color: 'bg-slate-50 dark:bg-slate-900/10', hoverColor: 'bg-slate-100/80 dark:bg-slate-900/20', header: 'border-slate-300 dark:border-slate-600', text: 'text-slate-700 dark:text-slate-300' }
         ];
 
         return (
             <div className="flex gap-6 overflow-x-auto pb-4 items-start">
                 {columns.map(col => {
                     const colItems = filteredAndSortedDemands.filter(d => d.status === col.id);
+                    const isOver = draggedOverColumn === col.id;
                     return (
-                        <div key={col.id} className={`flex flex-col w-80 min-w-[320px] rounded-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden ${col.color}`}>
+                        <div
+                            key={col.id}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDragEnter={() => setDraggedOverColumn(col.id)}
+                            onDragLeave={() => setDraggedOverColumn(null)}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                const demandIdStr = e.dataTransfer.getData('text/plain');
+                                const demandId = parseInt(demandIdStr);
+                                setDraggedOverColumn(null);
+                                if (!isNaN(demandId)) {
+                                    handleStatusChange(demandId, col.id as any);
+                                }
+                            }}
+                            className={`flex flex-col w-80 min-w-[320px] rounded-xl border transition-all duration-200 overflow-hidden ${isOver ? `${col.hoverColor} border-dashed border-indigo-400 scale-[1.01] shadow-md` : `${col.color} border-slate-200 dark:border-slate-750`}`}
+                        >
                             <div className={`p-4 border-b-2 bg-white/50 dark:bg-black/20 ${col.header}`}>
                                 <h3 className={`font-bold text-sm uppercase tracking-wider flex items-center justify-between ${col.text}`}>
                                     {col.title}
@@ -378,10 +478,23 @@ const ProductDemands: React.FC = () => {
                             </div>
                             <div className="p-3 flex flex-col gap-3 max-h-[70vh] overflow-y-auto">
                                 {colItems.map(demand => (
-                                    <div key={demand.id} className="bg-white dark:bg-[#0c1117] p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-3">
-                                        <div>
-                                            <span className="font-semibold text-slate-900 dark:text-white block">{demand.customer_name || 'Sin Nombre'}</span>
-                                            <PhoneDisplay phone={demand.phone_number} />
+                                    <div
+                                        key={demand.id}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData('text/plain', String(demand.id));
+                                            e.dataTransfer.effectAllowed = 'move';
+                                        }}
+                                        className="bg-white dark:bg-[#0c1117] p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col gap-3 cursor-grab active:cursor-grabbing hover:border-slate-400 dark:hover:border-slate-500 transition-all"
+                                    >
+                                        <div className="flex justify-between items-start gap-1">
+                                            <div>
+                                                <span className="font-semibold text-slate-900 dark:text-white block">{demand.customer_name || 'Sin Nombre'}</span>
+                                                <PhoneDisplay phone={demand.phone_number} />
+                                            </div>
+                                            <div className="p-1 text-slate-300 dark:text-slate-600">
+                                                <span className="material-symbols-outlined text-[18px]">drag_indicator</span>
+                                            </div>
                                         </div>
                                         <div className="text-xs text-slate-500 dark:text-slate-400">
                                             <span className="line-clamp-2">{demand.product?.name}</span>
@@ -391,7 +504,7 @@ const ProductDemands: React.FC = () => {
                                     </div>
                                 ))}
                                 {colItems.length === 0 && (
-                                    <div className="py-8 text-center text-slate-400 text-xs">Vacío</div>
+                                    <div className="py-8 text-center text-slate-400 text-xs">Arrastra aquí una solicitud</div>
                                 )}
                             </div>
                         </div>
@@ -402,22 +515,10 @@ const ProductDemands: React.FC = () => {
     };
 
     const renderGroupedView = () => {
-        const grouped = useMemo(() => {
-            const map = new Map<number, { productId: number; product: any; demands: ProductDemand[] }>();
-            filteredAndSortedDemands.forEach(d => {
-                const pId = d.product_id;
-                if (!map.has(pId)) map.set(pId, { productId: pId, product: d.product, demands: [] });
-                map.get(pId)!.demands.push(d);
-            });
-            // Sort groups by number of demands descending
-            return Array.from(map.values()).sort((a, b) => b.demands.length - a.demands.length);
-        }, [filteredAndSortedDemands]);
-
         return (
             <div className="flex flex-col gap-4">
                 {grouped.map(group => {
                     const isExpanded = expandedProducts[group.productId];
-                    const stock = getStockValue(group.product);
                     const prodName = group.product?.name || 'Producto Desconocido';
                     const prodSku = group.product?.sku || `ID: ${group.productId}`;
                     return (
@@ -432,8 +533,7 @@ const ProductDemands: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-6">
                                     <div className="text-right hidden md:block">
-                                        <span className="block text-xs text-slate-500">Stock Actual</span>
-                                        <span className={`font-bold ${stock > 0 ? 'text-emerald-500' : 'text-slate-400'}`}>{stock}</span>
+                                        <StockDisplay prod={group.product} />
                                     </div>
                                     <div className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 rounded-lg flex items-center gap-2">
                                         <span className="material-symbols-outlined text-[18px]">group</span>
