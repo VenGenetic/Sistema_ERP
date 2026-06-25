@@ -403,10 +403,10 @@ const ProductDemands: React.FC = () => {
 
     const renderGroupedView = () => {
         const grouped = useMemo(() => {
-            const map = new Map<number, { product: any, demands: ProductDemand[] }>();
+            const map = new Map<number, { productId: number; product: any; demands: ProductDemand[] }>();
             filteredAndSortedDemands.forEach(d => {
                 const pId = d.product_id;
-                if (!map.has(pId)) map.set(pId, { product: d.product, demands: [] });
+                if (!map.has(pId)) map.set(pId, { productId: pId, product: d.product, demands: [] });
                 map.get(pId)!.demands.push(d);
             });
             // Sort groups by number of demands descending
@@ -416,16 +416,18 @@ const ProductDemands: React.FC = () => {
         return (
             <div className="flex flex-col gap-4">
                 {grouped.map(group => {
-                    const isExpanded = expandedProducts[group.product?.id || 0];
+                    const isExpanded = expandedProducts[group.productId];
                     const stock = getStockValue(group.product);
+                    const prodName = group.product?.name || 'Producto Desconocido';
+                    const prodSku = group.product?.sku || `ID: ${group.productId}`;
                     return (
-                        <div key={group.product?.id || Math.random()} className="bg-white dark:bg-[#0c1117] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                            <div onClick={() => toggleProductExpand(group.product?.id || 0)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <div key={group.productId} className="bg-white dark:bg-[#0c1117] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                            <div onClick={() => toggleProductExpand(group.productId)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                 <div className="flex items-center gap-4">
                                     <span className={`material-symbols-outlined transition-transform ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
                                     <div>
-                                        <h3 className="font-bold text-slate-900 dark:text-white">{group.product?.name || 'Producto Desconocido'}</h3>
-                                        <span className="text-sm font-mono text-slate-500">{group.product?.sku}</span>
+                                        <h3 className="font-bold text-slate-900 dark:text-white">{prodName}</h3>
+                                        <span className="text-sm font-mono text-slate-500">{prodSku}</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-6">
