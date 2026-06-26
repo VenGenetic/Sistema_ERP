@@ -97,7 +97,7 @@ const Login: React.FC = () => {
                                         <span className="material-symbols-outlined text-gray-500 text-[20px] transition-colors group-focus-within:text-primary">lock</span>
                                     </div>
                                     <input
-                                        className="block w-full rounded-lg border border-dark-border bg-dark-input py-3 pl-10 text-white placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm sm:leading-6 transition-all duration-200"
+                                        className="block w-full rounded-lg border border-dark-border bg-dark-input py-3 pl-10 pr-10 text-white placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm sm:leading-6 transition-all duration-200"
                                         id="password"
                                         name="password"
                                         placeholder="••••••••"
@@ -106,7 +106,7 @@ const Login: React.FC = () => {
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
                                     />
-                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 z-10">
                                         <button 
                                             className="text-gray-500 hover:text-gray-300 focus:outline-none transition-colors" 
                                             type="button"
