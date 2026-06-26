@@ -6,7 +6,7 @@ interface ProductGroupModalProps {
     isOpen: boolean;
     onClose: () => void;
     groupId: string | null;
-    currentProduct: any;
+    initialProduct: any;
     onEditProduct: (product: any) => void;
     onSuccess: () => void;
 }
@@ -15,7 +15,7 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
     isOpen,
     onClose,
     groupId,
-    currentProduct,
+    initialProduct,
     onEditProduct,
     onSuccess
 }) => {
@@ -54,14 +54,14 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
         setLoading(true);
         try {
             if (!currentGroupId) {
-                // If there is no group_id, just load the currentProduct in the group list
-                setProducts([currentProduct]);
+                // If there is no group_id, just load the initialProduct in the group list
+                setProducts([initialProduct]);
                 setEditStates({
-                    [currentProduct.id]: {
-                        sku: currentProduct.sku || '',
-                        name: currentProduct.name || '',
-                        cost: currentProduct.cost_without_vat || 0,
-                        price: currentProduct.price || 0
+                    [initialProduct.id]: {
+                        sku: initialProduct.sku || '',
+                        name: initialProduct.name || '',
+                        cost: initialProduct.cost_without_vat || 0,
+                        price: initialProduct.price || 0
                     }
                 });
                 setLoading(false);
@@ -205,7 +205,7 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
     };
 
     const handleUnlink = (prodId: number) => {
-        if (prodId === currentProduct.id) {
+        if (prodId === initialProduct?.id) {
             alert('No puedes desenlazar el producto actual desde su propio visor de grupo.');
             return;
         }
@@ -443,7 +443,7 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
                             {products.map(prod => {
                                 const edits = editStates[prod.id] || { sku: '', name: '', cost: 0, price: 0 };
-                                const isCurrent = prod.id === currentProduct?.id;
+                                const isCurrent = prod.id === initialProduct?.id;
                                 return (
                                     <tr key={prod.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${isCurrent ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}>
                                         <td className="px-3 py-2">
@@ -494,7 +494,7 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                                         </td>
                                         <td className="px-3 py-2 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                {products.length > 1 && prod.id !== currentProduct?.id && (
+                                                {products.length > 1 && prod.id !== initialProduct?.id && (
                                                     <button
                                                         type="button"
                                                         onClick={() => handleUnlink(prod.id)}

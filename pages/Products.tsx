@@ -124,6 +124,8 @@ const Products: React.FC = () => {
 
     // Sync state changes to the URL (using replace navigation to avoid polluting history on typing)
     useEffect(() => {
+        if (location.pathname !== '/products') return;
+
         const params = new URLSearchParams();
         
         if (searchTerm) params.set('search', searchTerm);
@@ -143,10 +145,12 @@ const Products: React.FC = () => {
         if (currentHash !== targetHash) {
             navigate(targetHash, { replace: true });
         }
-    }, [searchTerm, filters, sortConfig.key, sortConfig.direction, pagination.page, navigate]);
+    }, [searchTerm, filters, sortConfig.key, sortConfig.direction, pagination.page, navigate, location.pathname]);
 
     // Sync URL changes back to state (essential for browser history back/forward navigation)
     useEffect(() => {
+        if (location.pathname !== '/products') return;
+
         const params = getInitialParams();
         
         const urlSearch = params.get('search') || '';
@@ -314,6 +318,13 @@ const Products: React.FC = () => {
         setSelectedGroupId(groupId);
         setGroupModalProduct(product);
         setIsGroupModalOpen(true);
+    };
+
+    const handleEditFromGroupModal = (product: any) => {
+        setIsGroupModalOpen(false);
+        setGroupModalProduct(null);
+        setSelectedGroupId(null);
+        handleOpenModal(product);
     };
 
     const handleOpenLightbox = (prod: any, clickedType: 'video' | 'image') => {
@@ -1108,12 +1119,12 @@ const Products: React.FC = () => {
                 productName={selectedProductForTags?.name || ''}
             />
 
-            {isGroupModalOpen && selectedGroupId && (
+            {isGroupModalOpen && groupModalProduct && (
                 <ProductGroupModal
                     isOpen={isGroupModalOpen}
                     onClose={() => { setIsGroupModalOpen(false); setSelectedGroupId(null); setGroupModalProduct(null); }}
                     groupId={selectedGroupId}
-                    currentProduct={groupModalProduct}
+                    initialProduct={groupModalProduct}
                     onEditProduct={(prod) => {
                         setIsGroupModalOpen(false);
                         handleOpenModal(prod);
