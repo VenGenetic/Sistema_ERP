@@ -394,8 +394,9 @@ const ProductDemands: React.FC = () => {
                                                     />
                                                 )}
                                                 <div className="flex flex-col">
-                                                <span className="font-medium text-slate-900 dark:text-slate-200 line-clamp-2" title={demand.product.name}>{demand.product.name}</span>
-                                                <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">{demand.product.sku}</span>
+                                                    <span className="font-medium text-slate-900 dark:text-slate-200 line-clamp-2" title={demand.product.name}>{demand.product.name}</span>
+                                                    <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">{demand.product.sku}</span>
+                                                </div>
                                             </div>
                                         ) : (
                                             <span className="text-slate-400 italic">Producto no encontrado</span>
