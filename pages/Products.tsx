@@ -82,9 +82,25 @@ const Products: React.FC = () => {
     // Set initial search term from URL query parameter (e.g., ?search=SKU)
     const location = useLocation();
     useEffect(() => {
-        const params = new URLSearchParams(location.search);
-        const q = params.get('search');
-        if (q) setSearchTerm(q);
+        // 1. Try to get search query from React Router's location.search
+        let q = new URLSearchParams(location.search).get('search');
+
+        // 2. Fallback: Parse query parameter from window.location.hash (essential for HashRouter setup)
+        if (!q && window.location.hash) {
+            const hashParts = window.location.hash.split('?');
+            if (hashParts.length > 1) {
+                q = new URLSearchParams(hashParts[1]).get('search');
+            }
+        }
+
+        // 3. Fallback: Parse from window.location.search
+        if (!q && window.location.search) {
+            q = new URLSearchParams(window.location.search).get('search');
+        }
+
+        if (q) {
+            setSearchTerm(decodeURIComponent(q));
+        }
     }, [location.search]);
 
     useEffect(() => {
