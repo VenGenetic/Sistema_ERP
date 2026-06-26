@@ -15,6 +15,7 @@ export interface CustomerRequest {
     notes: string;
     status: 'pending' | 'arrived' | 'notified' | 'completed' | 'cancelled';
     is_urgent: boolean;
+    reminder_at?: string | null;
     created_at: string;
     updated_at: string;
     product?: {
