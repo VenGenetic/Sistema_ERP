@@ -503,13 +503,52 @@ const Products: React.FC = () => {
         }
     };
 
-    const toggleSelectRow = (id: number) => {
+    const toggleSelectRow = async (id: number) => {
+        const targetProd = products.find(p => p.id === id);
+        if (!targetProd) return;
+
+        if (!targetProd.group_id) {
+            setSelectedIds(prev => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+            });
+            return;
+        }
+
+        // Determine intended state based on current selection
+        const willBeSelected = !selectedIds.has(id);
+
+        // 1. Synchronously update the UI for visible items instantly
         setSelectedIds(prev => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
+            products.forEach(p => {
+                if (p.group_id === targetProd.group_id) {
+                    if (willBeSelected) next.add(p.id);
+                    else next.delete(p.id);
+                }
+            });
             return next;
         });
+
+        // 2. Asynchronously fetch and select all other group members across pages
+        try {
+            const { data } = await supabase.from('products').select('id').eq('group_id', targetProd.group_id);
+            if (data) {
+                const groupIds = data.map(d => d.id);
+                setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    groupIds.forEach(gid => {
+                        if (willBeSelected) next.add(gid);
+                        else next.delete(gid);
+                    });
+                    return next;
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching group ids for selection", error);
+        }
     };
 
     const selectedProducts = products.filter(p => selectedIds.has(p.id));
@@ -603,6 +642,12 @@ const Products: React.FC = () => {
                         
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
+                            {prod.group_id && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 flex items-center gap-1 cursor-help" title={`Grupo: ${prod.group_id.split('-')[0]}`}>
+                                    <span className="material-symbols-outlined text-[10px]">link</span>
+                                    Equivalente
+                                </span>
+                            )}
                             {prod.investigation_status === 'en_consulta' && (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title="En consulta de sourcing">
                                     En Consulta

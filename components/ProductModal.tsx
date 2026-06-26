@@ -21,6 +21,9 @@ interface ProductModalProps {
         price: number;
         image_url?: string | null;
         video_url?: string | null;
+        group_id?: string | null;
+        last_edited_at?: string | null;
+        profiles?: any;
     } | null;
 }
 
@@ -47,6 +50,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const [isVideoUploading, setIsVideoUploading] = useState(false);
     const [entryByPrice, setEntryByPrice] = useState(false);
     
+    const [activeTab, setActiveTab] = useState<'general' | 'related'>('general');
+    
+    // Repuestos relacionados state
+    const [linkedProducts, setLinkedProducts] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [productToLink, setProductToLink] = useState<any>(null);
+
     // Tags state
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -146,6 +159,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             }
             setImageRemoved(false);
             setVideoRemoved(false);
+            setActiveTab('general');
+            setSearchQuery('');
+            setSearchResults([]);
             const defaultWh = localStorage.getItem('erp_default_warehouse_id');
             const defaultWarehouseId = defaultWh ? parseInt(defaultWh) : null;
             // Reset stock adjustment
@@ -165,6 +181,18 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             } else {
                 setSelectedTags([]);
             }
+
+            // Fetch Linked Products
+            if (productToEdit && productToEdit.group_id) {
+                supabase.from('products').select('id, sku, name, image_url, group_id')
+                    .eq('group_id', productToEdit.group_id)
+                    .neq('id', productToEdit.id)
+                    .then(({ data }) => {
+                        if (data) setLinkedProducts(data);
+                    });
+            } else {
+                setLinkedProducts([]);
+            }
         }
     }, [isOpen, productToEdit]);
 
@@ -174,6 +202,79 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             if (data) setAccounts(data);
         } catch (error) {
             console.error('Error fetching accounts', error);
+        }
+    };
+
+    // ─── Relationship Logic ───
+    useEffect(() => {
+        if (!searchQuery) {
+            setSearchResults([]);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setIsSearching(true);
+            const { data } = await supabase
+                .from('products')
+                .select('id, sku, name, image_url, group_id')
+                .or(`sku.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
+                .neq('id', productToEdit?.id || 0)
+                .limit(5);
+            if (data) setSearchResults(data);
+            setIsSearching(false);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery, productToEdit?.id]);
+
+    const initiateLink = (prod: any) => {
+        setProductToLink(prod);
+        setShowConfirmModal(true);
+    };
+
+    const confirmLink = async () => {
+        if (!productToLink || !productToEdit?.id) return;
+        setLoading(true);
+        try {
+            let targetGroupId = productToEdit.group_id;
+            if (!targetGroupId) {
+                targetGroupId = productToLink.group_id || crypto.randomUUID();
+                await supabase.from('products').update({ group_id: targetGroupId }).eq('id', productToEdit.id);
+            }
+
+            if (productToLink.group_id && productToLink.group_id !== targetGroupId) {
+                await supabase.from('products').update({ group_id: targetGroupId }).eq('group_id', productToLink.group_id);
+            } else if (!productToLink.group_id) {
+                await supabase.from('products').update({ group_id: targetGroupId }).eq('id', productToLink.id);
+            }
+
+            const { data } = await supabase.from('products').select('id, sku, name, image_url, group_id')
+                .eq('group_id', targetGroupId)
+                .neq('id', productToEdit.id);
+            if (data) setLinkedProducts(data);
+            
+            productToEdit.group_id = targetGroupId;
+            
+            setSearchQuery('');
+            setShowConfirmModal(false);
+            setProductToLink(null);
+            onSuccess();
+        } catch (error: any) {
+            alert('Error al enlazar: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUnlink = async (prodId: number) => {
+        if (!window.confirm('¿Estás seguro que deseas desenlazar este repuesto específico?')) return;
+        setLoading(true);
+        try {
+            await supabase.from('products').update({ group_id: null }).eq('id', prodId);
+            setLinkedProducts(prev => prev.filter(p => p.id !== prodId));
+            onSuccess();
+        } catch (error: any) {
+            alert('Error al desenlazar: ' + error.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -455,8 +556,33 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5">
-                    {/* ═══ Image Upload ═══ */}
+                {productToEdit && (
+                    <div className="flex border-b border-slate-200 dark:border-slate-700 px-6">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('general')}
+                            className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === 'general' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        >
+                            General
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('related')}
+                            className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'related' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        >
+                            Repuestos Relacionados
+                            {linkedProducts.length > 0 && (
+                                <span className="bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                    {linkedProducts.length}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="p-6">
+                    <div className={activeTab === 'general' ? 'flex flex-col gap-5' : 'hidden'}>
+                        {/* ═══ Image Upload ═══ */}
                     <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group">
                         {formData.imageUrl ? (
                             <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -795,6 +921,105 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             </div>
                         </div>
                     </div>
+                    </div> {/* End of General Tab */}
+
+                    {/* ═══ Related Parts Tab ═══ */}
+                    {productToEdit && (
+                        <div className={activeTab === 'related' ? 'flex flex-col gap-5' : 'hidden'}>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-3 rounded-lg text-sm flex items-start gap-2 border border-blue-200 dark:border-blue-800/30">
+                                <span className="material-symbols-outlined text-[18px] mt-0.5">info</span>
+                                <div>
+                                    Enlaza repuestos que son exactamente el mismo pero en otra marca. Al enlazar, se crea un grupo y todos los miembros quedan enlazados bidireccionalmente de forma automática. Se reflejará automáticamente en todas las selecciones.
+                                </div>
+                            </div>
+
+                            <div className="relative">
+                                <label className={labelClass}>Buscar repuesto para enlazar (Código o Nombre)</label>
+                                <div className="relative">
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                                    <input 
+                                        type="text" 
+                                        className={`${inputClass} pl-10`} 
+                                        placeholder="Escribe para buscar..."
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                    />
+                                    {isSearching && <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin text-[18px]">progress_activity</span>}
+                                </div>
+                                {searchResults.length > 0 && searchQuery && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                                        {searchResults.map(res => (
+                                            <div key={res.id} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded border border-slate-200 dark:border-slate-600 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
+                                                        {res.image_url ? (
+                                                            <img src={res.image_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-slate-400">image</span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{res.sku}</div>
+                                                        <div className="text-xs text-slate-500 truncate max-w-[200px]">{res.name}</div>
+                                                    </div>
+                                                </div>
+                                                {linkedProducts.some(p => p.id === res.id) || (productToEdit.group_id && res.group_id === productToEdit.group_id) ? (
+                                                    <span className="text-xs font-semibold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">Ya enlazado</span>
+                                                ) : (
+                                                    <button type="button" onClick={() => initiateLink(res)} className="px-3 py-1 bg-primary text-white text-xs font-medium rounded hover:bg-primary/90 transition-colors">
+                                                        Enlazar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-4">
+                                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[18px]">link</span>
+                                    Repuestos Enlazados ({linkedProducts.length})
+                                </h4>
+                                {linkedProducts.length === 0 ? (
+                                    <div className="text-center p-6 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 text-sm flex flex-col items-center">
+                                        <span className="material-symbols-outlined text-[32px] text-slate-300 mb-2">link_off</span>
+                                        No hay repuestos relacionados actualmente.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {linkedProducts.map(lp => (
+                                            <div key={lp.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg group hover:border-slate-300 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 rounded border border-slate-200 dark:border-slate-600 overflow-hidden shrink-0 bg-white flex items-center justify-center shadow-sm">
+                                                        {lp.image_url ? (
+                                                            <img src={lp.image_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-slate-400">image</span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                            {lp.sku}
+                                                            {lp.group_id && (
+                                                                <span className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-medium border border-emerald-200/50">
+                                                                    Grupo: {lp.group_id.split('-')[0]}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 truncate max-w-[250px]">{lp.name}</div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" onClick={() => handleUnlink(lp.id)} title="Desenlazar este repuesto de su grupo" className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-200 hover:text-rose-500 text-slate-400 transition-all opacity-70 group-hover:opacity-100">
+                                                    <span className="material-symbols-outlined text-[16px]">link_off</span>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* ═══ Actions ═══ */}
                     <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
@@ -832,6 +1057,43 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                         if (data) setAvailableTags(data);
                     });
                 }} />
+            )}
+
+            {showConfirmModal && productToLink && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 bg-blue-50/50 dark:bg-blue-900/10">
+                            <span className="material-symbols-outlined text-blue-500 text-[24px]">info</span>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Confirmar Enlace</h3>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-slate-700 dark:text-slate-300 mb-3 text-sm font-medium">
+                                ¿Estás seguro que quieres enlazar estos productos?
+                            </p>
+                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs mb-4">
+                                <strong>Nota:</strong> Esto hará que todos los repuestos del grupo también se enlacen de manera directa formando un único grupo relacional.
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg mb-6 shadow-sm">
+                                <div className="w-12 h-12 rounded border border-slate-200 bg-white overflow-hidden shrink-0">
+                                    {productToLink.image_url ? <img src={productToLink.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-100 flex items-center justify-center"><span className="material-symbols-outlined text-slate-400">image</span></div>}
+                                </div>
+                                <div>
+                                    <div className="text-sm font-bold text-slate-900">{productToLink.sku}</div>
+                                    <div className="text-xs text-slate-500 truncate max-w-[250px]">{productToLink.name}</div>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowConfirmModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 rounded-lg transition-colors">
+                                    Cancelar
+                                </button>
+                                <button type="button" onClick={confirmLink} disabled={loading} className="px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg shadow transition-colors flex items-center gap-2">
+                                    {loading ? <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> : null}
+                                    Confirmar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
