@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
@@ -12,6 +12,17 @@ import { QuickTagAssignModal } from '../components/QuickTagAssignModal';
 import { getThumbnailUrl } from '../utils/image';
 import { ProductDemandModal } from '../components/ProductDemandModal';
 import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
+
+// Helper to parse query parameters from the hash or query string
+const getInitialParams = () => {
+    let searchStr = '';
+    if (window.location.hash && window.location.hash.includes('?')) {
+        searchStr = window.location.hash.split('?')[1];
+    } else if (window.location.search) {
+        searchStr = window.location.search;
+    }
+    return new URLSearchParams(searchStr);
+};
 
 const Products: React.FC = () => {
     // ──────────────────────────────────────────────
@@ -42,16 +53,42 @@ const Products: React.FC = () => {
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [selectedProductForTags, setSelectedProductForTags] = useState<any | null>(null);
 
+    const navigate = useNavigate();
+    const location = useLocation();
+
     // ──────────────────────────────────────────────
     // 2. FILTER, SORT, PAGINATION STATES
     // ──────────────────────────────────────────────
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filters, setFilters] = useState<{ [key: string]: string }>({});
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
-    const [pagination, setPagination] = useState({
-        page: 1,
-        pageSize: 20,
-        totalRecords: 0
+    const [searchTerm, setSearchTerm] = useState(() => {
+        const params = getInitialParams();
+        return params.get('search') || '';
+    });
+    const [filters, setFilters] = useState<{ [key: string]: string }>(() => {
+        const params = getInitialParams();
+        const initialFilters: { [key: string]: string } = {};
+        const filterKeys = ['sku', 'name', 'category', 'brand', 'imageStatus', 'videoStatus', 'stockStatus'];
+        filterKeys.forEach(key => {
+            const val = params.get(key);
+            if (val) initialFilters[key] = val;
+        });
+        return initialFilters;
+    });
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>(() => {
+        const params = getInitialParams();
+        return {
+            key: params.get('sortKey') || 'name',
+            direction: (params.get('sortDir') as 'asc' | 'desc') || 'asc'
+        };
+    });
+    const [pagination, setPagination] = useState(() => {
+        const params = getInitialParams();
+        const pageVal = params.get('page');
+        const page = pageVal ? parseInt(pageVal, 10) : 1;
+        return {
+            page: isNaN(page) ? 1 : page,
+            pageSize: 20,
+            totalRecords: 0
+        };
     });
 
     // ──────────────────────────────────────────────
@@ -78,30 +115,62 @@ const Products: React.FC = () => {
         });
     }, [searchTerm, filters]);
 
-    // Fetch data immediately when debounced search/filters, page, pageSize, or sort config change
-    // Set initial search term from URL query parameter (e.g., ?search=SKU)
-    const location = useLocation();
+    // Sync state changes to the URL (using replace navigation to avoid polluting history on typing)
     useEffect(() => {
-        // 1. Try to get search query from React Router's location.search
-        let q = new URLSearchParams(location.search).get('search');
-
-        // 2. Fallback: Parse query parameter from window.location.hash (essential for HashRouter setup)
-        if (!q && window.location.hash) {
-            const hashParts = window.location.hash.split('?');
-            if (hashParts.length > 1) {
-                q = new URLSearchParams(hashParts[1]).get('search');
-            }
+        const params = new URLSearchParams();
+        
+        if (searchTerm) params.set('search', searchTerm);
+        
+        Object.entries(filters).forEach(([key, val]) => {
+            if (val) params.set(key, val);
+        });
+        
+        if (sortConfig.key !== 'name') params.set('sortKey', sortConfig.key);
+        if (sortConfig.direction !== 'asc') params.set('sortDir', sortConfig.direction);
+        if (pagination.page > 1) params.set('page', String(pagination.page));
+        
+        const queryString = params.toString();
+        const targetHash = `/products${queryString ? '?' + queryString : ''}`;
+        
+        const currentHash = window.location.hash.replace(/^#/, '');
+        if (currentHash !== targetHash) {
+            navigate(targetHash, { replace: true });
         }
+    }, [searchTerm, filters, sortConfig.key, sortConfig.direction, pagination.page, navigate]);
 
-        // 3. Fallback: Parse from window.location.search
-        if (!q && window.location.search) {
-            q = new URLSearchParams(window.location.search).get('search');
+    // Sync URL changes back to state (essential for browser history back/forward navigation)
+    useEffect(() => {
+        const params = getInitialParams();
+        
+        const urlSearch = params.get('search') || '';
+        if (urlSearch !== searchTerm) {
+            setSearchTerm(urlSearch);
         }
-
-        if (q) {
-            setSearchTerm(decodeURIComponent(q));
+        
+        const urlFilters: { [key: string]: string } = {};
+        const filterKeys = ['sku', 'name', 'category', 'brand', 'imageStatus', 'videoStatus', 'stockStatus'];
+        filterKeys.forEach(key => {
+            const val = params.get(key);
+            if (val) urlFilters[key] = val;
+        });
+        const filtersChanged = JSON.stringify(urlFilters) !== JSON.stringify(filters);
+        if (filtersChanged) {
+            setFilters(urlFilters);
         }
-    }, [location.search]);
+        
+        const urlSortKey = params.get('sortKey') || 'name';
+        const urlSortDir = (params.get('sortDir') as 'asc' | 'desc') || 'asc';
+        if (urlSortKey !== sortConfig.key || urlSortDir !== sortConfig.direction) {
+            setSortConfig({ key: urlSortKey, direction: urlSortDir });
+        }
+        
+        const pageVal = params.get('page');
+        const urlPage = pageVal ? parseInt(pageVal, 10) : 1;
+        const validPage = isNaN(urlPage) ? 1 : urlPage;
+        if (validPage !== pagination.page) {
+            setPagination(prev => ({ ...prev, page: validPage }));
+        }
+    }, [location]);
 
     useEffect(() => {
         fetchCatalogData(pagination.page);
