@@ -55,10 +55,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     // Repuestos relacionados state
     const [linkedProducts, setLinkedProducts] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [searchProducts, setSearchProducts] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [productToLink, setProductToLink] = useState<any>(null);
+    const [productsToMerge, setProductsToMerge] = useState<any[]>([]);
+    const [pendingUnlinks, setPendingUnlinks] = useState<Set<number>>(new Set());
 
     // Tags state
     const [availableTags, setAvailableTags] = useState<Tag[]>([]);
@@ -184,7 +186,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             // Fetch Linked Products
             if (productToEdit && productToEdit.group_id) {
-                supabase.from('products').select('id, sku, name, image_url, group_id')
+                supabase.from('products').select('id, sku, name, image_url, group_id, local_stock, importer_stock')
                     .eq('group_id', productToEdit.group_id)
                     .neq('id', productToEdit.id)
                     .then(({ data }) => {
@@ -193,6 +195,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             } else {
                 setLinkedProducts([]);
             }
+            setPendingUnlinks(new Set());
         }
     }, [isOpen, productToEdit]);
 
@@ -205,77 +208,100 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         }
     };
 
-    // ─── Relationship Logic ───
+    // Fetch Products for the search table (filter on type)
     useEffect(() => {
-        if (!searchQuery) {
-            setSearchResults([]);
-            return;
-        }
-        const timer = setTimeout(async () => {
+        if (activeTab !== 'related' || !isOpen) return;
+
+        const fetchProducts = async () => {
             setIsSearching(true);
-            const { data } = await supabase
-                .from('products')
-                .select('id, sku, name, image_url, group_id')
-                .or(`sku.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
-                .neq('id', productToEdit?.id || 0)
-                .limit(5);
-            if (data) setSearchResults(data);
-            setIsSearching(false);
-        }, 300);
+            try {
+                let query = supabase
+                    .from('products')
+                    .select('id, sku, name, image_url, group_id, local_stock, importer_stock')
+                    .neq('id', productToEdit?.id || 0)
+                    .eq('is_active', true)
+                    .limit(10);
+                
+                if (searchQuery.trim() !== '') {
+                    query = query.or(`sku.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
+                }
+                
+                const { data } = await query;
+                if (data) {
+                    setSearchProducts(data);
+                }
+            } catch (error) {
+                console.error('Error fetching search products:', error);
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+        const timer = setTimeout(fetchProducts, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery, productToEdit?.id]);
+    }, [searchQuery, activeTab, productToEdit?.id, isOpen]);
 
-    const initiateLink = (prod: any) => {
-        setProductToLink(prod);
-        setShowConfirmModal(true);
-    };
-
-    const confirmLink = async () => {
-        if (!productToLink || !productToEdit?.id) return;
+    const initiateLink = async (prod: any) => {
         setLoading(true);
         try {
-            let targetGroupId = productToEdit.group_id;
-            if (!targetGroupId) {
-                targetGroupId = productToLink.group_id || crypto.randomUUID();
-                await supabase.from('products').update({ group_id: targetGroupId }).eq('id', productToEdit.id);
+            if (prod.group_id) {
+                // Fetch all products in the target group
+                const { data } = await supabase
+                    .from('products')
+                    .select('id, sku, name, image_url, group_id, local_stock, importer_stock')
+                    .eq('group_id', prod.group_id);
+                
+                if (data && data.length > 0) {
+                    setProductsToMerge(data);
+                } else {
+                    setProductsToMerge([prod]);
+                }
+            } else {
+                setProductsToMerge([prod]);
             }
-
-            if (productToLink.group_id && productToLink.group_id !== targetGroupId) {
-                await supabase.from('products').update({ group_id: targetGroupId }).eq('group_id', productToLink.group_id);
-            } else if (!productToLink.group_id) {
-                await supabase.from('products').update({ group_id: targetGroupId }).eq('id', productToLink.id);
-            }
-
-            const { data } = await supabase.from('products').select('id, sku, name, image_url, group_id')
-                .eq('group_id', targetGroupId)
-                .neq('id', productToEdit.id);
-            if (data) setLinkedProducts(data);
-            
-            productToEdit.group_id = targetGroupId;
-            
-            setSearchQuery('');
-            setShowConfirmModal(false);
-            setProductToLink(null);
-            onSuccess();
-        } catch (error: any) {
-            alert('Error al enlazar: ' + error.message);
+            setProductToLink(prod);
+            setShowConfirmModal(true);
+        } catch (error) {
+            console.error('Error fetching group members:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleUnlink = async (prodId: number) => {
+    const confirmLink = () => {
+        if (!productToLink) return;
+        
+        // Add all products to merge to linkedProducts
+        setLinkedProducts(prev => {
+            const next = [...prev];
+            productsToMerge.forEach(pm => {
+                if (!next.some(p => p.id === pm.id)) {
+                    next.push(pm);
+                }
+            });
+            return next;
+        });
+
+        // Remove from pending unlinks if they were there
+        setPendingUnlinks(prev => {
+            const next = new Set(prev);
+            productsToMerge.forEach(pm => next.delete(pm.id));
+            return next;
+        });
+
+        setShowConfirmModal(false);
+        setProductToLink(null);
+        setProductsToMerge([]);
+    };
+
+    const handleUnlink = (prodId: number) => {
         if (!window.confirm('¿Estás seguro que deseas desenlazar este repuesto específico?')) return;
-        setLoading(true);
-        try {
-            await supabase.from('products').update({ group_id: null }).eq('id', prodId);
-            setLinkedProducts(prev => prev.filter(p => p.id !== prodId));
-            onSuccess();
-        } catch (error: any) {
-            alert('Error al desenlazar: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
+        setLinkedProducts(prev => prev.filter(p => p.id !== prodId));
+        setPendingUnlinks(prev => {
+            const next = new Set(prev);
+            next.add(prodId);
+            return next;
+        });
     };
 
     // ─── Change handlers that keep everything in sync ───
@@ -477,6 +503,51 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 if (selectedTags.length > 0) {
                     const tagInserts = selectedTags.map(tagId => ({ product_id: productId, tag_id: tagId }));
                     await supabase.from('product_tags').insert(tagInserts);
+                }
+            }
+
+            // Sync Product Grouping
+            if (productId) {
+                let targetGroupId = productToEdit?.group_id || null;
+
+                if (linkedProducts.length > 0) {
+                    if (!targetGroupId) {
+                        const firstWithGroupId = linkedProducts.find(p => p.group_id);
+                        targetGroupId = firstWithGroupId ? firstWithGroupId.group_id : crypto.randomUUID();
+                    }
+                    
+                    // Update targetGroupId on current product
+                    const { error: groupUpdateError } = await supabase
+                        .from('products')
+                        .update({ group_id: targetGroupId })
+                        .eq('id', productId);
+                    if (groupUpdateError) throw groupUpdateError;
+
+                    // Set group_id for all currently linked products
+                    const linkedIds = linkedProducts.map(p => p.id);
+                    const { error: linksUpdateError } = await supabase
+                        .from('products')
+                        .update({ group_id: targetGroupId })
+                        .in('id', linkedIds);
+                    if (linksUpdateError) throw linksUpdateError;
+                } else {
+                    if (productToEdit?.group_id) {
+                        const { error: clearGroupError } = await supabase
+                            .from('products')
+                            .update({ group_id: null })
+                            .eq('id', productId);
+                        if (clearGroupError) throw clearGroupError;
+                    }
+                }
+
+                // Process unlinked products
+                if (pendingUnlinks.size > 0) {
+                    const unlinkedIds = Array.from(pendingUnlinks);
+                    const { error: unlinkError } = await supabase
+                        .from('products')
+                        .update({ group_id: null })
+                        .in('id', unlinkedIds);
+                    if (unlinkError) throw unlinkError;
                 }
             }
 
@@ -917,104 +988,132 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             );
                                         }
                                     })()}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    </div> {/* End of General Tab */}
-
-                    {/* ═══ Related Parts Tab ═══ */}
+                                    {/* ═══ Related Parts Tab ═══ */}
                     {productToEdit && (
                         <div className={activeTab === 'related' ? 'flex flex-col gap-5' : 'hidden'}>
                             <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-3 rounded-lg text-sm flex items-start gap-2 border border-blue-200 dark:border-blue-800/30">
                                 <span className="material-symbols-outlined text-[18px] mt-0.5">info</span>
                                 <div>
-                                    Enlaza repuestos que son exactamente el mismo pero en otra marca. Al enlazar, se crea un grupo y todos los miembros quedan enlazados bidireccionalmente de forma automática. Se reflejará automáticamente en todas las selecciones.
+                                    Enlaza repuestos que son exactamente el mismo pero en otra marca. Los cambios que realices aquí (enlazar o desenlazar) se guardarán únicamente cuando hagas clic en <strong>Guardar Producto</strong>.
                                 </div>
                             </div>
 
-                            <div className="relative">
+                            {/* Search and Table */}
+                            <div className="flex flex-col gap-3">
                                 <label className={labelClass}>Buscar repuesto para enlazar (Código o Nombre)</label>
                                 <div className="relative">
                                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
                                     <input 
                                         type="text" 
                                         className={`${inputClass} pl-10`} 
-                                        placeholder="Escribe para buscar..."
+                                        placeholder="Escribe el código o nombre para buscar..."
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
                                     />
                                     {isSearching && <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin text-[18px]">progress_activity</span>}
                                 </div>
-                                {searchResults.length > 0 && searchQuery && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto">
-                                        {searchResults.map(res => (
-                                            <div key={res.id} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded border border-slate-200 dark:border-slate-600 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
-                                                        {res.image_url ? (
-                                                            <img src={res.image_url} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span className="material-symbols-outlined text-slate-400">image</span>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{res.sku}</div>
-                                                        <div className="text-xs text-slate-500 truncate max-w-[200px]">{res.name}</div>
-                                                    </div>
-                                                </div>
-                                                {linkedProducts.some(p => p.id === res.id) || (productToEdit.group_id && res.group_id === productToEdit.group_id) ? (
-                                                    <span className="text-xs font-semibold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">Ya enlazado</span>
-                                                ) : (
-                                                    <button type="button" onClick={() => initiateLink(res)} className="px-3 py-1 bg-primary text-white text-xs font-medium rounded hover:bg-primary/90 transition-colors">
-                                                        Enlazar
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+
+                                <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900 shadow-sm max-h-72 overflow-y-auto mt-1">
+                                    <table className="w-full text-left border-collapse text-xs">
+                                        <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase sticky top-0 z-10">
+                                            <tr>
+                                                <th className="px-3 py-2">Foto</th>
+                                                <th className="px-3 py-2">SKU</th>
+                                                <th className="px-3 py-2">Nombre</th>
+                                                <th className="px-3 py-2 text-center">Stock</th>
+                                                <th className="px-3 py-2 text-right">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                                            {searchProducts.map(prod => {
+                                                const isLinked = linkedProducts.some(lp => lp.id === prod.id);
+                                                const totalStock = (prod.local_stock || 0) + (prod.importer_stock || 0);
+                                                return (
+                                                    <tr key={prod.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                        <td className="px-3 py-2">
+                                                            <div className="w-8 h-8 rounded border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
+                                                                {prod.image_url ? (
+                                                                    <img src={prod.image_url} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <span className="material-symbols-outlined text-slate-400 text-base">image</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2 font-mono font-bold text-xs">{prod.sku}</td>
+                                                        <td className="px-3 py-2 max-w-[150px] truncate" title={prod.name}>{prod.name}</td>
+                                                        <td className="px-3 py-2 text-center font-semibold">{totalStock} u.</td>
+                                                        <td className="px-3 py-2 text-right">
+                                                            {isLinked ? (
+                                                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-200/30">
+                                                                    Enlazado
+                                                                </span>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => initiateLink(prod)}
+                                                                    className="px-2.5 py-1 bg-primary hover:bg-primary/95 text-white text-[11px] font-semibold rounded shadow-sm transition-colors inline-flex items-center gap-0.5"
+                                                                >
+                                                                    <span className="material-symbols-outlined text-[12px]">link</span>
+                                                                    Enlazar
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {searchProducts.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="text-center py-6 text-slate-400">
+                                                        No hay repuestos para mostrar.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
-                            <div className="mt-4">
+                            {/* Linked parts */}
+                            <div className="mt-2">
                                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px]">link</span>
                                     Repuestos Enlazados ({linkedProducts.length})
                                 </h4>
                                 {linkedProducts.length === 0 ? (
-                                    <div className="text-center p-6 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 text-sm flex flex-col items-center">
+                                    <div className="text-center p-6 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 text-sm flex flex-col items-center bg-slate-50/50 dark:bg-slate-900/10">
                                         <span className="material-symbols-outlined text-[32px] text-slate-300 mb-2">link_off</span>
-                                        No hay repuestos relacionados actualmente.
+                                        No hay repuestos relacionados en este grupo temporal.
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {linkedProducts.map(lp => (
-                                            <div key={lp.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg group hover:border-slate-300 transition-colors">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded border border-slate-200 dark:border-slate-600 overflow-hidden shrink-0 bg-white flex items-center justify-center shadow-sm">
-                                                        {lp.image_url ? (
-                                                            <img src={lp.image_url} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span className="material-symbols-outlined text-slate-400">image</span>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                                            {lp.sku}
-                                                            {lp.group_id && (
-                                                                <span className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] px-1.5 py-0.5 rounded font-medium border border-emerald-200/50">
-                                                                    Grupo: {lp.group_id.split('-')[0]}
-                                                                </span>
+                                    <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
+                                        {linkedProducts.map(lp => {
+                                            const totalStock = (lp.local_stock || 0) + (lp.importer_stock || 0);
+                                            return (
+                                                <div key={lp.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg group hover:border-slate-300 transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded border border-slate-200 dark:border-slate-600 overflow-hidden shrink-0 bg-white flex items-center justify-center shadow-sm">
+                                                            {lp.image_url ? (
+                                                                <img src={lp.image_url} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="material-symbols-outlined text-slate-400 text-[18px]">image</span>
                                                             )}
                                                         </div>
-                                                        <div className="text-xs text-slate-500 truncate max-w-[250px]">{lp.name}</div>
+                                                        <div>
+                                                            <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                                {lp.sku}
+                                                                <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded text-slate-500 font-medium">
+                                                                    Stock: {totalStock} u.
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-500 truncate max-w-[250px]">{lp.name}</div>
+                                                        </div>
                                                     </div>
+                                                    <button type="button" onClick={() => handleUnlink(lp.id)} title="Desenlazar este repuesto" className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-200 hover:text-rose-500 text-slate-400 transition-all opacity-70 group-hover:opacity-100">
+                                                        <span className="material-symbols-outlined text-[14px]">link_off</span>
+                                                    </button>
                                                 </div>
-                                                <button type="button" onClick={() => handleUnlink(lp.id)} title="Desenlazar este repuesto de su grupo" className="w-8 h-8 flex items-center justify-center rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-200 hover:text-rose-500 text-slate-400 transition-all opacity-70 group-hover:opacity-100">
-                                                    <span className="material-symbols-outlined text-[16px]">link_off</span>
-                                                </button>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -1060,34 +1159,51 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             )}
 
             {showConfirmModal && productToLink && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 bg-blue-50/50 dark:bg-blue-900/10">
-                            <span className="material-symbols-outlined text-blue-500 text-[24px]">info</span>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Confirmar Enlace</h3>
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 bg-blue-50/50 dark:bg-blue-900/10">
+                            <span className="material-symbols-outlined text-blue-500 text-[20px]">info</span>
+                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Confirmar Enlace</h3>
                         </div>
-                        <div className="p-6">
-                            <p className="text-slate-700 dark:text-slate-300 mb-3 text-sm font-medium">
+                        <div className="p-5">
+                            <p className="text-slate-700 dark:text-slate-300 mb-3 text-xs font-semibold">
                                 ¿Estás seguro que quieres enlazar estos productos?
                             </p>
-                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs mb-4">
-                                <strong>Nota:</strong> Esto hará que todos los repuestos del grupo también se enlacen de manera directa formando un único grupo relacional.
+                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-lg text-[11px] mb-4">
+                                <strong>Nota importante:</strong> Esto hará que todos estos productos (y todos los que ya estén vinculados a ellos) se enlacen de forma bidireccional formando un único grupo.
                             </div>
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg mb-6 shadow-sm">
-                                <div className="w-12 h-12 rounded border border-slate-200 bg-white overflow-hidden shrink-0">
-                                    {productToLink.image_url ? <img src={productToLink.image_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-100 flex items-center justify-center"><span className="material-symbols-outlined text-slate-400">image</span></div>}
-                                </div>
-                                <div>
-                                    <div className="text-sm font-bold text-slate-900">{productToLink.sku}</div>
-                                    <div className="text-xs text-slate-500 truncate max-w-[250px]">{productToLink.name}</div>
-                                </div>
+                            
+                            <div className="max-h-40 overflow-y-auto space-y-2 mb-5 pr-1">
+                                {productsToMerge.map(pm => {
+                                    const totalStock = (pm.local_stock || 0) + (pm.importer_stock || 0);
+                                    return (
+                                        <div key={pm.id} className="flex items-center gap-2.5 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xs">
+                                            <div className="w-8 h-8 rounded border border-slate-200 bg-white overflow-hidden shrink-0">
+                                                {pm.image_url ? (
+                                                    <img src={pm.image_url} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-slate-400 text-sm">image</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                    {pm.sku}
+                                                    <span className="text-[10px] text-slate-500 font-normal">(Stock: {totalStock} u.)</span>
+                                                </div>
+                                                <div className="text-[9px] text-slate-500 truncate max-w-[220px]">{pm.name}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setShowConfirmModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 rounded-lg transition-colors">
+                            
+                            <div className="flex justify-end gap-2.5">
+                                <button type="button" onClick={() => { setShowConfirmModal(false); setProductToLink(null); setProductsToMerge([]); }} className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 rounded-lg transition-colors">
                                     Cancelar
                                 </button>
-                                <button type="button" onClick={confirmLink} disabled={loading} className="px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg shadow transition-colors flex items-center gap-2">
-                                    {loading ? <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span> : null}
+                                <button type="button" onClick={confirmLink} className="px-4 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg shadow transition-colors flex items-center gap-1.5">
                                     Confirmar
                                 </button>
                             </div>
