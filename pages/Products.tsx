@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
+import { ProductGroupModal } from '../components/ProductGroupModal';
 import { CatalogImportWizard } from '../components/CatalogImportWizard';
 import { BulkEditModal } from '../components/BulkEditModal';
 import { BulkMediaUploadModal } from '../components/BulkMediaUploadModal';
@@ -36,6 +37,12 @@ const Products: React.FC = () => {
     const [productToEdit, setProductToEdit] = useState<any>(null);
 
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    
+    // Product Grouping states
+    const [groupCounts, setGroupCounts] = useState<{ [key: string]: number }>({});
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [groupModalProduct, setGroupModalProduct] = useState<any>(null);
+    const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
     const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
     const [isBulkMediaOpen, setIsBulkMediaOpen] = useState(false);
@@ -263,6 +270,31 @@ const Products: React.FC = () => {
             if (count !== null) {
                 setPagination(prev => ({ ...prev, totalRecords: count }));
             }
+
+            // Fetch group counts for the products on this page
+            if (data && data.length > 0) {
+                const groupIds = data.map((p: any) => p.group_id).filter(Boolean);
+                if (groupIds.length > 0) {
+                    const { data: countData, error: countError } = await supabase
+                        .from('products')
+                        .select('group_id')
+                        .in('group_id', groupIds);
+                    
+                    if (!countError && countData) {
+                        const counts: { [key: string]: number } = {};
+                        countData.forEach((row: any) => {
+                            if (row.group_id) {
+                                counts[row.group_id] = (counts[row.group_id] || 0) + 1;
+                            }
+                        });
+                        setGroupCounts(counts);
+                    }
+                } else {
+                    setGroupCounts({});
+                }
+            } else {
+                setGroupCounts({});
+            }
         } catch (error) {
             console.error('Error fetching catalog:', error);
         } finally {
@@ -276,6 +308,12 @@ const Products: React.FC = () => {
     const handleOpenModal = (product: any = null) => {
         setProductToEdit(product);
         setIsModalOpen(true);
+    };
+
+    const handleOpenGroupModal = (groupId: string, product: any) => {
+        setSelectedGroupId(groupId);
+        setGroupModalProduct(product);
+        setIsGroupModalOpen(true);
     };
 
     const handleOpenLightbox = (prod: any, clickedType: 'video' | 'image') => {
@@ -733,6 +771,20 @@ const Products: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-center align-top">
                     <div className="flex items-center justify-center gap-1">
+                        {prod.group_id && (
+                            <button
+                                onClick={() => handleOpenGroupModal(prod.group_id, prod)}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors relative"
+                                title="Ver Repuestos Relacionados"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">link</span>
+                                {groupCounts[prod.group_id] > 1 && (
+                                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
+                                        {groupCounts[prod.group_id] - 1}
+                                    </span>
+                                )}
+                            </button>
+                        )}
                         <button
                             onClick={() => { setSourcingProduct(prod); setIsSourcingModalOpen(true); }}
                             className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
@@ -765,7 +817,7 @@ const Products: React.FC = () => {
                 </td>
             </tr>
         ));
-    }, [products, selectedIds]);
+    }, [products, selectedIds, groupCounts]);
 
     return (
         <div className="p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
@@ -1057,6 +1109,20 @@ const Products: React.FC = () => {
                 productId={selectedProductForTags?.id}
                 productName={selectedProductForTags?.name || ''}
             />
+
+            {isGroupModalOpen && selectedGroupId && (
+                <ProductGroupModal
+                    isOpen={isGroupModalOpen}
+                    onClose={() => { setIsGroupModalOpen(false); setSelectedGroupId(null); setGroupModalProduct(null); }}
+                    groupId={selectedGroupId}
+                    currentProduct={groupModalProduct}
+                    onEditProduct={(prod) => {
+                        setIsGroupModalOpen(false);
+                        handleOpenModal(prod);
+                    }}
+                    onSuccess={() => fetchCatalogData(pagination.page)}
+                />
+            )}
 
             {/* ═══════ FLOATING ACTION BAR ═══════ */}
             {selectedIds.size > 0 && (
