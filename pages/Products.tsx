@@ -648,19 +648,19 @@ const Products: React.FC = () => {
                     />
                 </td>
                 <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">
-                    <div className="flex items-center gap-1.5 group/sku" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <span>{prod.sku}</span>
                         <button
                             type="button"
                             onClick={(e) => handleCopySku(prod.sku, e)}
-                            className={`p-1 rounded transition-all flex items-center justify-center ${
+                            className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${
                                 copiedSku === prod.sku
-                                    ? 'text-emerald-500 dark:text-emerald-400 opacity-100'
-                                    : 'opacity-0 group-hover/sku:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
+                                    : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                             }`}
                             title={copiedSku === prod.sku ? "¡Copiado!" : "Copiar Código"}
                         >
-                            <span className="material-symbols-outlined text-[15px]">
+                            <span className="material-symbols-outlined text-[16px]">
                                 {copiedSku === prod.sku ? 'check' : 'content_copy'}
                             </span>
                         </button>

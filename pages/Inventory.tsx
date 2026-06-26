@@ -968,15 +968,15 @@ const Inventory: React.FC = () => {
                                                         {group.product?.brands?.name || '-'}
                                                     </td>
                                                      <td className="px-6 py-4 text-slate-500 font-mono text-sm">
-                                                         <div className="flex items-center gap-1.5 group/sku" onClick={(e) => e.stopPropagation()}>
+                                                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                              <span>{group.product?.sku}</span>
                                                              <button
                                                                  type="button"
                                                                  onClick={(e) => handleCopySku(group.product?.sku || '', e)}
-                                                                 className={`p-1 rounded transition-all flex items-center justify-center ${
+                                                                 className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${
                                                                      copiedSku === group.product?.sku
-                                                                         ? 'text-emerald-500 dark:text-emerald-400 opacity-100'
-                                                                         : 'opacity-0 group-hover/sku:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                                         ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
+                                                                         : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                                                                  }`}
                                                                  title={copiedSku === group.product?.sku ? "¡Copiado!" : "Copiar Código"}
                                                              >
