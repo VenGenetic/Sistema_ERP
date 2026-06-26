@@ -21,8 +21,11 @@ if (!supabaseUrl) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Path definitions
-const jsonPath = path.resolve(__dirname, '../../odoo_scraper/data_costos.json');
+// Path definitions - check for data_costos_cantidad.json first, fallback to data_costos.json
+let jsonPath = path.resolve(__dirname, '../../odoo_scraper/data_costos_cantidad.json');
+if (!fs.existsSync(jsonPath)) {
+    jsonPath = path.resolve(__dirname, '../../odoo_scraper/data_costos.json');
+}
 const localImagesDir = path.resolve(__dirname, '../../odoo_scraper/imagenes_recortadas');
 
 async function main() {
@@ -210,20 +213,20 @@ async function main() {
     }
     console.log(`✅ Found ${existingStorageFiles.size} images in Supabase Storage products/ directory.`);
 
-    // Check which images are missing and exist locally
+    // Check which images are missing and exist locally ONLY for the newly inserted products
     const imageUploadQueue = [];
-    for (const item of jsonProducts) {
-        const sku = (item.id || item.codigo_referencia || '').trim();
-        if (!sku) continue;
-
-        const skuUpper = sku.toUpperCase();
-        // Check if the product exists either from before or just inserted
-        if (!dbSkus.has(skuUpper) && !isDryRun) continue;
-
+    for (const prod of productsToInsert) {
+        const sku = prod.sku;
         const targetFilename = `${sku}_cut.webp`;
         if (existingStorageFiles.has(targetFilename.toUpperCase())) continue; // already uploaded
 
-        const localFilename = item.imagen || `${sku}.webp`;
+        // Find match in JSON to get the correct imagen filename
+        const match = jsonProducts.find(item => {
+            const itemSku = (item.id || item.codigo_referencia || '').trim();
+            return itemSku.toUpperCase() === sku.toUpperCase();
+        });
+
+        const localFilename = (match && match.imagen) ? match.imagen : `${sku}.webp`;
         const localFilePath = path.join(localImagesDir, localFilename);
 
         if (fs.existsSync(localFilePath)) {

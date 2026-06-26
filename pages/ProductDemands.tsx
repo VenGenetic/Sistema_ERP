@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { buildWhatsAppDemandURL, openWhatsApp } from '../utils/whatsapp';
+import { MediaLightbox } from '../components/MediaLightbox';
+import { getThumbnailUrl } from '../utils/image';
 
 interface ProductDemand {
     id: number;
@@ -34,6 +36,7 @@ const ProductDemands: React.FC = () => {
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled'>('active');
     const [stockFilter, setStockFilter] = useState<'all' | 'has_stock' | 'no_stock'>('all');
+    const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
     const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
@@ -185,6 +188,12 @@ const ProductDemands: React.FC = () => {
                 alert(`Error al marcar como notificado: ${error.message}`);
             }
         }
+    };
+    // Open Lightbox for demand product image
+    const handleOpenLightboxDemand = (demand: ProductDemand) => {
+        if (!demand.product?.image_url) return;
+        const media = [{ type: 'image', url: demand.product.image_url, title: `${demand.product.sku} - ${demand.product.name}` }];
+        setLightbox({ isOpen: true, media, initialIndex: 0 });
     };
 
     const handleStatusChange = async (demandId: number, newStatus: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled') => {
@@ -375,7 +384,16 @@ const ProductDemands: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 align-top max-w-[250px]">
                                         {demand.product ? (
-                                            <div className="flex flex-col">
+                                            <div className="flex items-start gap-2">
+                                                {demand.product?.image_url && (
+                                                    <img
+                                                        src={getThumbnailUrl(demand.product.image_url, 60, 60)}
+                                                        alt=""
+                                                        className="h-12 w-12 object-cover rounded cursor-pointer"
+                                                        onClick={() => handleOpenLightboxDemand(demand)}
+                                                    />
+                                                )}
+                                                <div className="flex flex-col">
                                                 <span className="font-medium text-slate-900 dark:text-slate-200 line-clamp-2" title={demand.product.name}>{demand.product.name}</span>
                                                 <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">{demand.product.sku}</span>
                                             </div>
@@ -703,5 +721,14 @@ const ProductDemands: React.FC = () => {
         </div>
     );
 };
+
+{lightbox.isOpen && (
+        <MediaLightbox
+            isOpen={lightbox.isOpen}
+            media={lightbox.media}
+            initialIndex={lightbox.initialIndex}
+            onClose={() => setLightbox({ ...lightbox, isOpen: false })}
+        />
+    )}
 
 export default ProductDemands;

@@ -104,6 +104,22 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm transition-opacity" onClick={onClose}>
             {/* Download Button */}
+            {/* Open in Catalog Button */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    // Extract SKU from title (format: "SKU - Name")
+                    const sku = currentMedia.title ? currentMedia.title.split(' - ')[0].trim() : '';
+                    if (sku) {
+                        const url = `${window.location.origin}/#/products?search=${encodeURIComponent(sku)}`;
+                        window.open(url, '_blank');
+                    }
+                }}
+                title="Abrir en Catálogo"
+                className="absolute top-6 right-36 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md z-10"
+            >
+                <span className="material-symbols-outlined">open_in_new</span>
+            </button>
             <button 
                 onClick={(e) => { e.stopPropagation(); handleDownload(currentMedia); }}
                 title="Descargar archivo"

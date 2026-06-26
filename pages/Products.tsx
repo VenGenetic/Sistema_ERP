@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
@@ -78,6 +79,14 @@ const Products: React.FC = () => {
     }, [searchTerm, filters]);
 
     // Fetch data immediately when debounced search/filters, page, pageSize, or sort config change
+    // Set initial search term from URL query parameter (e.g., ?search=SKU)
+    const location = useLocation();
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const q = params.get('search');
+        if (q) setSearchTerm(q);
+    }, [location.search]);
+
     useEffect(() => {
         fetchCatalogData(pagination.page);
     }, [debouncedSearchTerm, debouncedFilters, pagination.page, pagination.pageSize, sortConfig]);
