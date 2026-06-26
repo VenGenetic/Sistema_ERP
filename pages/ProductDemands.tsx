@@ -21,6 +21,7 @@ interface ProductDemand {
         sku: string;
         importer_stock: number;
         local_stock: number;
+        image_url?: string | null;
         inventory_levels: { current_stock: number }[];
     } | null;
 }
@@ -48,7 +49,7 @@ const ProductDemands: React.FC = () => {
                 .from('product_demands')
                 .select(`
                     *,
-                    product:products(id, name, sku, importer_stock, local_stock, inventory_levels(current_stock))
+                    product:products(id, name, sku, importer_stock, local_stock, image_url, inventory_levels(current_stock))
                 `)
                 .order('created_at', { ascending: false });
 
@@ -440,12 +441,22 @@ const ProductDemands: React.FC = () => {
                             </div>
                             <StatusBadge status={demand.status} />
                         </div>
-                        <div className="bg-slate-50 dark:bg-[#161b22] p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                            <span className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Producto Requerido:</span>
-                            <span className="font-medium text-sm text-slate-900 dark:text-slate-200 line-clamp-2">{demand.product?.name || 'Producto Desconocido'}</span>
-                            <div className="flex justify-between items-start mt-2">
-                                <span className="text-xs font-mono text-slate-500">{demand.product?.sku}</span>
-                                <StockDisplay prod={demand.product} />
+                        <div className="bg-slate-50 dark:bg-[#161b22] p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex items-start gap-3">
+                            {demand.product?.image_url && (
+                                <img
+                                    src={getThumbnailUrl(demand.product.image_url, 60, 60)}
+                                    alt=""
+                                    className="h-12 w-12 object-cover rounded cursor-pointer mt-1 flex-shrink-0"
+                                    onClick={() => handleOpenLightboxDemand(demand)}
+                                />
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <span className="block text-xs text-slate-500 dark:text-slate-400 mb-1">Producto Requerido:</span>
+                                <span className="font-medium text-sm text-slate-900 dark:text-slate-200 line-clamp-2" title={demand.product?.name}>{demand.product?.name || 'Producto Desconocido'}</span>
+                                <div className="flex justify-between items-start mt-2">
+                                    <span className="text-xs font-mono text-slate-500">{demand.product?.sku}</span>
+                                    <StockDisplay prod={demand.product} />
+                                </div>
                             </div>
                         </div>
                         <div className="flex justify-between items-end mt-auto pt-2">
@@ -517,9 +528,19 @@ const ProductDemands: React.FC = () => {
                                                 <span className="material-symbols-outlined text-[18px]">drag_indicator</span>
                                             </div>
                                         </div>
-                                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                                            <span className="line-clamp-2">{demand.product?.name}</span>
-                                            <span className="font-mono mt-1 block">{demand.product?.sku}</span>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-2">
+                                            {demand.product?.image_url && (
+                                                <img
+                                                    src={getThumbnailUrl(demand.product.image_url, 48, 48)}
+                                                    alt=""
+                                                    className="h-10 w-10 object-cover rounded cursor-pointer flex-shrink-0"
+                                                    onClick={() => handleOpenLightboxDemand(demand)}
+                                                />
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <span className="line-clamp-2 font-medium">{demand.product?.name}</span>
+                                                <span className="font-mono mt-1 block">{demand.product?.sku}</span>
+                                            </div>
                                         </div>
                                         <div className="mt-2"><ActionButtons demand={demand} /></div>
                                     </div>
@@ -547,6 +568,17 @@ const ProductDemands: React.FC = () => {
                             <div onClick={() => toggleProductExpand(group.productId)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                 <div className="flex items-center gap-4">
                                     <span className={`material-symbols-outlined transition-transform ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
+                                    {group.product?.image_url && (
+                                        <img
+                                            src={getThumbnailUrl(group.product.image_url, 60, 60)}
+                                            alt=""
+                                            className="h-12 w-12 object-cover rounded cursor-pointer flex-shrink-0"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenLightboxDemand({ product: group.product } as any);
+                                            }}
+                                        />
+                                    )}
                                     <div>
                                         <h3 className="font-bold text-slate-900 dark:text-white">{prodName}</h3>
                                         <span className="text-sm font-mono text-slate-500">{prodSku}</span>
