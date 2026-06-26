@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation, Link, useSearchParams } from 'react-router-dom';
+import { Outlet, useLocation, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import HeaderAccount from './HeaderAccount';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -19,11 +19,51 @@ const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isAdmin, permissions, userProfile } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchVal, setSearchVal] = useState('');
 
   // Cerrar menú móvil al cambiar de ruta
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
+
+  // Sync searchVal with URL search param if we are on /products
+  useEffect(() => {
+    if (location.pathname === '/products') {
+      let searchStr = '';
+      if (window.location.hash && window.location.hash.includes('?')) {
+        searchStr = window.location.hash.split('?')[1];
+      } else if (window.location.search) {
+        searchStr = window.location.search;
+      }
+      const params = new URLSearchParams(searchStr);
+      setSearchVal(params.get('search') || '');
+    } else {
+      setSearchVal('');
+    }
+  }, [location.pathname, location.search, location.hash]);
+
+  // Handle Ctrl+K shortcut to focus search input
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Check if user pressed Ctrl+K or Cmd+K
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const searchInput = document.getElementById('header-search-input');
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchVal(value);
+    navigate(`/products?search=${encodeURIComponent(value)}`, { replace: true });
+  };
 
   const isActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
@@ -208,8 +248,12 @@ const Layout: React.FC = () => {
           <div className="relative hidden md:block w-64">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[18px] text-slate-400">search</span>
             <input
+              id="header-search-input"
+              type="text"
+              value={searchVal}
+              onChange={handleSearchChange}
               className="w-full bg-slate-100 dark:bg-[#161b22] border-none rounded-md py-1.5 pl-9 pr-4 text-sm focus:ring-1 focus:ring-slate-400 placeholder:text-slate-500 text-slate-900 dark:text-slate-200 font-mono transition-all"
-              placeholder="CMD + K para buscar..."
+              placeholder="Control + K para buscar..."
             />
           </div>
 

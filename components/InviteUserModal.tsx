@@ -45,21 +45,11 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, onIn
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Rol Asignado</label>
-                        <select
-                            value={role}
-                            onChange={(e) => setRole(e.target.value)}
-                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-primary focus:border-primary"
-                        >
-                            <option value="admin">Admin (Acceso Total)</option>
-                            <option value="onsite">Onsite (Bodega & Envíos)</option>
-                            <option value="closer">Closer (Ventas & Clientes)</option>
-                            <option value="dev">Developer (API & Webhooks)</option>
-                        </select>
+                        <div className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-2 text-sm font-medium">
+                            Admin (Acceso Total)
+                        </div>
                         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                            {role === 'admin' && "Tiene control total sobre la configuración, usuarios y finanzas."}
-                            {role === 'onsite' && "Puede gestionar inventario, movimientos y despachos."}
-                            {role === 'closer' && "Acceso limitado a dashboard de ventas y gestión de clientes."}
-                            {role === 'dev' && "Puede gestionar API Keys, webhooks y logs del sistema."}
+                            Tiene control total sobre la configuración, usuarios, inventario y finanzas de todo el sistema.
                         </p>
                     </div>
 

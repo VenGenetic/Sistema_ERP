@@ -30,7 +30,6 @@ const Team: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [showRoleEditor, setShowRoleEditor] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -122,16 +121,9 @@ const Team: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">Gestión de Equipo</h1>
-          <p className="text-text-secondary text-base max-w-2xl">Administra el acceso y define roles específicos (Closer, Onsite) para tu operación.</p>
+          <p className="text-text-secondary text-base max-w-2xl">Administra los accesos de los miembros de tu equipo. Todos los usuarios tienen rol de Administrador y acceso total al sistema.</p>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={() => setShowRoleEditor(!showRoleEditor)}
-            className="bg-surface-dark border border-border-dark hover:bg-surface-hover text-white font-medium py-2.5 px-5 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap"
-          >
-            <span className="material-symbols-outlined text-[20px]">shield_person</span>
-            Editor de Roles
-          </button>
           <button
             onClick={() => setIsInviteModalOpen(true)}
             className="bg-primary hover:bg-blue-600 text-white font-medium py-2.5 px-5 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap bg-blue-600"
@@ -141,45 +133,6 @@ const Team: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {/* Role Editor Panel (Conditional) */}
-      {showRoleEditor && (
-        <div className="bg-surface-dark border border-border-dark rounded-xl p-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-300">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">gpp_maybe</span>
-            Definición de Roles (RBAC)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { role: 'Closer', perms: ['Ver Leads', 'Crear Orden', 'Chat Clientes'], forbidden: ['Ver Balance', 'Ajustar Stock'] },
-              { role: 'Onsite', perms: ['Ver Pedidos', 'Ajustar Inventario', 'Imprimir Etiquetas'], forbidden: ['Ver Finanzas', 'Invitar Usuarios'] },
-              { role: 'Admin', perms: ['Acceso Total'], forbidden: [] },
-              { role: 'Dev', perms: ['API Keys', 'Webhooks', 'Logs'], forbidden: ['Editar Finanzas'] }
-            ].map((r) => (
-              <div key={r.role} className="bg-background-dark/50 rounded-lg p-4 border border-border-dark">
-                <div className="font-bold text-white mb-2">{r.role}</div>
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-green-400 uppercase tracking-wider">Permitido</div>
-                  <ul className="list-disc list-inside text-xs text-text-secondary space-y-1">
-                    {r.perms.map(p => <li key={p}>{p}</li>)}
-                  </ul>
-                  {r.forbidden.length > 0 && (
-                    <>
-                      <div className="text-xs font-semibold text-red-400 uppercase tracking-wider mt-3">Restringido</div>
-                      <ul className="list-disc list-inside text-xs text-text-secondary space-y-1">
-                        {r.forbidden.map(p => <li key={p}>{p}</li>)}
-                      </ul>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex justify-end">
-            <button className="text-sm text-primary hover:underline">Configurar permisos avanzados &rarr;</button>
-          </div>
-        </div>
-      )}
 
       {/* Filters & Search Toolbar */}
       <div className="bg-surface-dark border border-border-dark rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
