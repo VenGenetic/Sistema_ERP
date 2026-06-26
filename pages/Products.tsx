@@ -771,20 +771,18 @@ const Products: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-center align-top">
                     <div className="flex items-center justify-center gap-1">
-                        {prod.group_id && (
-                            <button
-                                onClick={() => handleOpenGroupModal(prod.group_id, prod)}
-                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors relative"
-                                title="Ver Repuestos Relacionados"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">link</span>
-                                {groupCounts[prod.group_id] > 1 && (
-                                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
-                                        {groupCounts[prod.group_id] - 1}
-                                    </span>
-                                )}
-                            </button>
-                        )}
+                        <button
+                            onClick={() => handleOpenGroupModal(prod.group_id, prod)}
+                            className={`p-1.5 rounded-lg transition-colors relative ${prod.group_id ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                            title="Ver Repuestos Relacionados"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">link</span>
+                            {prod.group_id && groupCounts[prod.group_id] > 1 && (
+                                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
+                                    {groupCounts[prod.group_id] - 1}
+                                </span>
+                            )}
+                        </button>
                         <button
                             onClick={() => { setSourcingProduct(prod); setIsSourcingModalOpen(true); }}
                             className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
