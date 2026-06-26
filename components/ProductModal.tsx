@@ -163,7 +163,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             setVideoRemoved(false);
             setActiveTab('general');
             setSearchQuery('');
-            setSearchResults([]);
+            setSearchProducts([]);
             const defaultWh = localStorage.getItem('erp_default_warehouse_id');
             const defaultWarehouseId = defaultWh ? parseInt(defaultWh) : null;
             // Reset stock adjustment
@@ -988,7 +988,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             );
                                         }
                                     })()}
-                                    {/* ═══ Related Parts Tab ═══ */}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div> {/* End of General Tab */}
+
+                    {/* ═══ Related Parts Tab ═══ */}
                     {productToEdit && (
                         <div className={activeTab === 'related' ? 'flex flex-col gap-5' : 'hidden'}>
                             <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-3 rounded-lg text-sm flex items-start gap-2 border border-blue-200 dark:border-blue-800/30">
