@@ -718,18 +718,17 @@ const ProductDemands: React.FC = () => {
             {viewType === 'list' && renderListView()}
             {viewType === 'kanban' && renderKanbanView()}
             {viewType === 'grouped' && renderGroupedView()}
-            
+
+            {lightbox.isOpen && (
+                <MediaLightbox
+                    isOpen={lightbox.isOpen}
+                    media={lightbox.media}
+                    initialIndex={lightbox.initialIndex}
+                    onClose={() => setLightbox({ ...lightbox, isOpen: false })}
+                />
+            )}
         </div>
     );
 };
-
-{lightbox.isOpen && (
-        <MediaLightbox
-            isOpen={lightbox.isOpen}
-            media={lightbox.media}
-            initialIndex={lightbox.initialIndex}
-            onClose={() => setLightbox({ ...lightbox, isOpen: false })}
-        />
-    )}
 
 export default ProductDemands;
