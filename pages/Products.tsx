@@ -59,6 +59,19 @@ const Products: React.FC = () => {
     // Lightbox State
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [selectedProductForTags, setSelectedProductForTags] = useState<any | null>(null);
+    const [copiedSku, setCopiedSku] = useState<string | null>(null);
+
+    const handleCopySku = (sku: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(sku).then(() => {
+            setCopiedSku(sku);
+            setTimeout(() => {
+                setCopiedSku(prev => prev === sku ? null : prev);
+            }, 2000);
+        }).catch(err => {
+            console.error('Error al copiar SKU: ', err);
+        });
+    };
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -634,7 +647,25 @@ const Products: React.FC = () => {
                         className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer mt-1"
                     />
                 </td>
-                <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">{prod.sku}</td>
+                <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">
+                    <div className="flex items-center gap-1.5 group/sku" onClick={(e) => e.stopPropagation()}>
+                        <span>{prod.sku}</span>
+                        <button
+                            type="button"
+                            onClick={(e) => handleCopySku(prod.sku, e)}
+                            className={`p-1 rounded transition-all flex items-center justify-center ${
+                                copiedSku === prod.sku
+                                    ? 'text-emerald-500 dark:text-emerald-400 opacity-100'
+                                    : 'opacity-0 group-hover/sku:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                            title={copiedSku === prod.sku ? "¡Copiado!" : "Copiar Código"}
+                        >
+                            <span className="material-symbols-outlined text-[15px]">
+                                {copiedSku === prod.sku ? 'check' : 'content_copy'}
+                            </span>
+                        </button>
+                    </div>
+                </td>
                 <td className="px-6 py-4 align-top">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-start gap-3">
@@ -826,7 +857,7 @@ const Products: React.FC = () => {
                 </td>
             </tr>
         ));
-    }, [products, selectedIds, groupCounts]);
+    }, [products, selectedIds, groupCounts, copiedSku]);
 
     return (
         <div className="p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">

@@ -94,6 +94,19 @@ const Inventory: React.FC = () => {
     // Product Edit Modal (Prices / Image)
     const [isProductEditOpen, setIsProductEditOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<any>(null);
+    const [copiedSku, setCopiedSku] = useState<string | null>(null);
+
+    const handleCopySku = (sku: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(sku).then(() => {
+            setCopiedSku(sku);
+            setTimeout(() => {
+                setCopiedSku(prev => prev === sku ? null : prev);
+            }, 2000);
+        }).catch(err => {
+            console.error('Error al copiar SKU: ', err);
+        });
+    };
 
     // Fitment Filter
     const [fitmentFilter, setFitmentFilter] = useState<{ make: string; model: string; year: number | null } | null>(null);
@@ -954,9 +967,25 @@ const Inventory: React.FC = () => {
                                                     <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
                                                         {group.product?.brands?.name || '-'}
                                                     </td>
-                                                    <td className="px-6 py-4 text-slate-500 font-mono text-sm inline-flex flex-col">
-                                                        {group.product?.sku}
-                                                    </td>
+                                                     <td className="px-6 py-4 text-slate-500 font-mono text-sm">
+                                                         <div className="flex items-center gap-1.5 group/sku" onClick={(e) => e.stopPropagation()}>
+                                                             <span>{group.product?.sku}</span>
+                                                             <button
+                                                                 type="button"
+                                                                 onClick={(e) => handleCopySku(group.product?.sku || '', e)}
+                                                                 className={`p-1 rounded transition-all flex items-center justify-center ${
+                                                                     copiedSku === group.product?.sku
+                                                                         ? 'text-emerald-500 dark:text-emerald-400 opacity-100'
+                                                                         : 'opacity-0 group-hover/sku:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                                 }`}
+                                                                 title={copiedSku === group.product?.sku ? "¡Copiado!" : "Copiar Código"}
+                                                             >
+                                                                 <span className="material-symbols-outlined text-[15px]">
+                                                                     {copiedSku === group.product?.sku ? 'check' : 'content_copy'}
+                                                                 </span>
+                                                             </button>
+                                                         </div>
+                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="text-sm font-bold text-slate-900 dark:text-white">${(group.product?.price || 0).toFixed(2)}</div>
                                                         <div className="text-xs text-slate-500">C/I: ${(group.product?.cost_without_vat * (1 + (group.product?.vat_percentage||15)/100)).toFixed(2)}</div>
