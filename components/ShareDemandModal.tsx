@@ -108,9 +108,9 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                         <div className="flex-1 flex flex-col p-6">
                             
                             {/* Product Info Section */}
-                            <div className="flex gap-4 items-center mb-6">
+                            <div className="flex gap-4 items-center mb-4">
                                 {demand.product?.image_url ? (
-                                    <div className="w-24 h-24 bg-slate-50 rounded-lg overflow-hidden border border-slate-100 flex-shrink-0 flex items-center justify-center">
+                                    <div className="w-20 h-20 bg-slate-50 rounded-lg overflow-hidden border border-slate-100 flex-shrink-0 flex items-center justify-center">
                                         <img 
                                             src={demand.product.image_url} 
                                             alt={demand.product.sku} 
@@ -119,53 +119,64 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                         />
                                     </div>
                                 ) : (
-                                    <div className="w-24 h-24 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 border border-slate-200 text-slate-400">
+                                    <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 border border-slate-200 text-slate-400">
                                         <span className="material-symbols-outlined text-4xl">inventory_2</span>
                                     </div>
                                 )}
                                 
                                 <div className="flex flex-col min-w-0 flex-1">
-                                    <span className="text-xs font-bold text-blue-500 tracking-wider uppercase mb-1">{demand.product?.sku}</span>
-                                    <h3 className="text-base font-semibold text-slate-800 leading-tight line-clamp-3">{demand.product?.name || 'Producto Desconocido'}</h3>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[11px] font-bold text-blue-500 tracking-wider uppercase">{demand.product?.sku}</span>
+                                        <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">Ticket #{demand.id}</span>
+                                    </div>
+                                    <h3 className="text-[13px] font-semibold text-slate-800 leading-tight">{demand.product?.name || 'Producto Desconocido'}</h3>
                                 </div>
                             </div>
 
                             <hr className="border-slate-100 my-1" />
 
                             {/* Client Info Section */}
-                            <div className="py-4 flex-1 flex flex-col justify-center">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-slate-400 text-sm">person</span>
+                            <div className="py-2 flex-1 flex flex-col justify-center">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <span className="material-symbols-outlined text-slate-400 text-[13px]">person</span>
                                     {demand.customer_name && demand.customer_name.trim() !== '' ? (
-                                        <span className="text-slate-700 font-medium">{demand.customer_name}</span>
+                                        <span className="text-slate-700 font-medium text-sm">{demand.customer_name}</span>
                                     ) : (
-                                        <span className="text-slate-300 italic">No registrado</span>
+                                        <span className="text-slate-300 italic text-sm">No registrado</span>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-slate-400 text-sm">call</span>
-                                    <span className="text-slate-700 font-bold font-mono">{demand.phone_number}</span>
+                                    <span className="material-symbols-outlined text-slate-400 text-[13px]">call</span>
+                                    <span className="text-slate-700 font-bold font-mono text-sm">{demand.phone_number}</span>
                                 </div>
                             </div>
 
                             <hr className="border-slate-100 my-1" />
 
                             {/* Footer Info Section */}
-                            <div className="pt-4 grid grid-cols-2 gap-4">
+                            <div className="pt-2 grid grid-cols-2 gap-x-2 gap-y-3">
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Estado</span>
-                                    <span className="text-sm font-semibold text-slate-700">{getStatusText(demand.status)}</span>
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Estado</span>
+                                    <span className="text-[13px] font-semibold text-slate-700">{getStatusText(demand.status)}</span>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Stock Actual</span>
-                                    <span className={`text-sm font-bold ${totalStock > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Stock Actual</span>
+                                    <span className={`text-[13px] font-bold ${totalStock > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
                                         {totalStock > 0 ? `${totalStock} unidades` : 'Agotado'}
                                     </span>
                                 </div>
-                                <div className="flex flex-col col-span-2 mt-1">
-                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Fecha de Solicitud</span>
-                                    <span className="text-sm text-slate-600">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                <div className="flex flex-col col-span-2">
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Fecha de Solicitud</span>
+                                    <span className="text-[13px] text-slate-600">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                 </div>
+                            </div>
+
+                            {/* Disclaimer & Website */}
+                            <div className="mt-auto pt-3 border-t border-slate-100 flex flex-col items-center text-center">
+                                <span className="text-[9px] text-slate-500 leading-tight max-w-[95%] mb-1">
+                                    Este es tu ticket de pedido. Nosotros le daremos seguimiento a tu repuesto y solicitud. Gracias por confiar en nosotros.
+                                </span>
+                                <span className="text-[11px] font-bold text-blue-500">https://www.lvparts.ec/</span>
                             </div>
                             
                         </div>
