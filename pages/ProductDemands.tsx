@@ -21,6 +21,7 @@ interface ProductDemand {
         id: number;
         name: string;
         sku: string;
+        price?: number;
         importer_stock: number;
         local_stock: number;
         image_url?: string | null;
@@ -53,7 +54,7 @@ const ProductDemands: React.FC = () => {
                 .from('product_demands')
                 .select(`
                     *,
-                    product:products(id, name, sku, importer_stock, local_stock, image_url, inventory_levels(current_stock))
+                    product:products(id, name, sku, price, importer_stock, local_stock, image_url, inventory_levels(current_stock))
                 `)
                 .order('created_at', { ascending: false });
 

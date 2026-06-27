@@ -88,6 +88,7 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                 product: {
                     name: product.name,
                     sku: product.sku,
+                    price: product.price,
                     image_url: product.image_url,
                     importer_stock: product.importer_stock,
                     inventory_levels: product.inventory_levels

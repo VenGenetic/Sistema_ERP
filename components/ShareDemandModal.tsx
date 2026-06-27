@@ -10,6 +10,7 @@ interface ProductDemand {
     product?: {
         name: string;
         sku: string;
+        price?: number;
         image_url?: string | null;
         importer_stock?: number;
         inventory_levels?: { current_stock: number }[];
@@ -78,7 +79,8 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
         }
     };
 
-    const totalStock = getStockValue(demand.product);
+    const localStock = demand.product?.inventory_levels ? demand.product.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
+    const importerStock = demand.product?.importer_stock || 0;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -130,6 +132,11 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                         <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">Ticket #{demand.id}</span>
                                     </div>
                                     <h3 className="text-[13px] font-semibold text-slate-800 leading-tight">{demand.product?.name || 'Producto Desconocido'}</h3>
+                                    {demand.product?.price != null && (
+                                        <div className="mt-1">
+                                            <span className="text-[15px] font-bold text-emerald-600">${Math.ceil(demand.product.price)}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -160,14 +167,20 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                     <span className="text-[13px] font-semibold text-slate-700">{getStatusText(demand.status)}</span>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Stock Actual</span>
-                                    <span className={`text-[13px] font-bold ${totalStock > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                        {totalStock > 0 ? `${totalStock} unidades` : 'Agotado'}
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Fecha Solicitud</span>
+                                    <span className="text-[13px] text-slate-600">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Stock Local</span>
+                                    <span className={`text-[13px] font-bold ${localStock > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                        {localStock > 0 ? `${localStock} un.` : 'Agotado'}
                                     </span>
                                 </div>
-                                <div className="flex flex-col col-span-2">
-                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Fecha de Solicitud</span>
-                                    <span className="text-[13px] text-slate-600">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Stock Importadora</span>
+                                    <span className={`text-[13px] font-bold ${importerStock > 0 ? 'text-indigo-600' : 'text-rose-500'}`}>
+                                        {importerStock > 0 ? `${importerStock} un.` : 'Agotado'}
+                                    </span>
                                 </div>
                             </div>
 
