@@ -82,15 +82,15 @@ async function main() {
         console.log(`✅ Found brand 'DAYTONA' with ID: ${brandId}`);
     }
 
-    // 3. Fetch existing product SKUs from database
+    // 3. Fetch existing product SKUs and their activation status from database
     console.log("🔍 Fetching existing products in Supabase...");
-    const dbSkus = new Set();
+    const dbProducts = new Map(); // Map<skuUpper, { is_active: boolean }>
     let page = 0;
     const pageSize = 1000;
     while (true) {
         const { data, error } = await supabase
             .from('products')
-            .select('sku')
+            .select('sku, is_active')
             .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (error) {
@@ -99,12 +99,18 @@ async function main() {
         }
         if (!data || data.length === 0) break;
         data.forEach(p => {
-            if (p.sku) dbSkus.add(p.sku.trim().toUpperCase());
+            if (p.sku) {
+                const skuUpper = p.sku.trim().toUpperCase();
+                const existing = dbProducts.get(skuUpper);
+                if (!existing || p.is_active) {
+                    dbProducts.set(skuUpper, { is_active: !!p.is_active });
+                }
+            }
         });
         if (data.length < pageSize) break;
         page++;
     }
-    console.log(`✅ Total products currently in Supabase database: ${dbSkus.size}`);
+    console.log(`✅ Total products currently in Supabase database: ${dbProducts.size}`);
 
     // 4. Load scraped products from JSON
     console.log(`🔍 Loading products from JSON file...`);
@@ -112,8 +118,9 @@ async function main() {
     const jsonProducts = JSON.parse(rawData);
     console.log(`📄 Found ${jsonProducts.length} products in data_costos.json`);
 
-    // 5. Filter and prepare products to insert
+    // 5. Filter and prepare products to insert or reactivate
     const productsToInsert = [];
+    const productsToReactivate = [];
     const processedSkus = new Set();
 
     for (const item of jsonProducts) {
@@ -124,12 +131,12 @@ async function main() {
         if (processedSkus.has(skuUpper)) continue; // avoid internal JSON duplicates
         processedSkus.add(skuUpper);
 
-        // Check if SKU is already in Supabase
-        if (dbSkus.has(skuUpper)) continue;
+        const existing = dbProducts.get(skuUpper);
 
         // Calculate values
         const cost_without_vat = parseFloat(item.costo_sin_iva) || 0;
         const cost_with_iva = parseFloat(item.costo_con_iva) || 0;
+        const stock_qty = parseInt(item.stock_cantidad) || 0;
 
         let vat_percentage = 15.0; // standard fallback
         if (cost_without_vat > 0) {
@@ -146,7 +153,7 @@ async function main() {
             ? `https://xzsdsmskyosepemalage.supabase.co/storage/v1/object/public/product_images/products/${rawSku}_cut.webp`
             : null;
 
-        productsToInsert.push({
+        const productData = {
             sku: rawSku,
             name: (item.nombre || '').trim(),
             category: (item.categoria || 'General').trim(),
@@ -157,11 +164,19 @@ async function main() {
             image_url: image_url,
             is_active: true,
             status: 'official',
-            profit_margin: 0.65
-        });
+            profit_margin: 0.65,
+            importer_stock: stock_qty
+        };
+
+        if (!existing) {
+            productsToInsert.push(productData);
+        } else if (!existing.is_active) {
+            productsToReactivate.push(productData);
+        }
     }
 
     console.log(`📦 New products to import: ${productsToInsert.length}`);
+    console.log(`📦 Inactive products to reactivate: ${productsToReactivate.length}`);
 
     // 6. Perform DB insertion if needed
     if (productsToInsert.length > 0) {
@@ -183,11 +198,53 @@ async function main() {
             }
             console.log(`✅ Database insertion completed successfully!`);
 
-            // Add newly inserted products to dbSkus so they are recognized in the image upload phase
-            productsToInsert.forEach(p => dbSkus.add(p.sku.toUpperCase()));
+            // Add newly inserted products to dbProducts so they are recognized in the image upload phase
+            productsToInsert.forEach(p => dbProducts.set(p.sku.toUpperCase(), { is_active: true }));
         }
     } else {
         console.log("ℹ️ No new products found to insert.");
+    }
+
+    // 6b. Perform DB reactivations if needed
+    if (productsToReactivate.length > 0) {
+        if (isDryRun) {
+            console.log("[DRY-RUN] Simulating reactivation of inactive products...");
+        } else {
+            console.log(`📥 Reactivating ${productsToReactivate.length} inactive products in parallel batches...`);
+            const batchSize = 30;
+            let reactivatedCount = 0;
+            for (let i = 0; i < productsToReactivate.length; i += batchSize) {
+                const batch = productsToReactivate.slice(i, i + batchSize);
+                const promises = batch.map(async (item) => {
+                    const { error } = await supabase
+                        .from('products')
+                        .update({
+                            is_active: true,
+                            name: item.name,
+                            category: item.category,
+                            price: item.price,
+                            cost_without_vat: item.cost_without_vat,
+                            vat_percentage: item.vat_percentage,
+                            brand_id: item.brand_id,
+                            image_url: item.image_url,
+                            status: item.status,
+                            profit_margin: item.profit_margin,
+                            importer_stock: item.importer_stock
+                        })
+                        .eq('sku', item.sku);
+                    if (error) {
+                        console.warn(`   ⚠️ Failed to reactivate SKU ${item.sku}:`, error.message);
+                    } else {
+                        reactivatedCount++;
+                    }
+                });
+                await Promise.all(promises);
+                console.log(`   Progress: Reactivated ${Math.min(i + batchSize, productsToReactivate.length)}/${productsToReactivate.length} products...`);
+            }
+            console.log(`✅ Reactivated ${reactivatedCount} products successfully.`);
+        }
+    } else {
+        console.log("ℹ️ No inactive products to reactivate.");
     }
 
     // 7. Check and upload missing images to Storage
@@ -213,9 +270,9 @@ async function main() {
     }
     console.log(`✅ Found ${existingStorageFiles.size} images in Supabase Storage products/ directory.`);
 
-    // Check which images are missing and exist locally ONLY for the newly inserted products
+    // Check which images are missing and exist locally ONLY for the newly inserted/reactivated products
     const imageUploadQueue = [];
-    for (const prod of productsToInsert) {
+    for (const prod of [...productsToInsert, ...productsToReactivate]) {
         const sku = prod.sku;
         const targetFilename = `${sku}_cut.webp`;
         if (existingStorageFiles.has(targetFilename.toUpperCase())) continue; // already uploaded
@@ -283,6 +340,7 @@ async function main() {
     console.log(`\n======================================================================`);
     console.log(`🎉 SYNCHRONIZATION COMPLETED SUCCESSFULLY!`);
     console.log(`   New products inserted: ${isDryRun ? productsToInsert.length + ' (simulated)' : productsToInsert.length}`);
+    console.log(`   Products reactivated:  ${isDryRun ? productsToReactivate.length + ' (simulated)' : productsToReactivate.length}`);
     console.log(`   New images uploaded:  ${isDryRun ? imageUploadQueue.length + ' (simulated)' : imageUploadQueue.length}`);
     console.log(`======================================================================`);
 }

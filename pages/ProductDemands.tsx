@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { buildWhatsAppDemandURL, openWhatsApp } from '../utils/whatsapp';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { getThumbnailUrl } from '../utils/image';
+import { EditDemandModal } from '../components/EditDemandModal';
 
 interface ProductDemand {
     id: number;
@@ -41,6 +42,7 @@ const ProductDemands: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
     const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
+    const [editingDemand, setEditingDemand] = useState<ProductDemand | null>(null);
 
     const fetchDemands = async () => {
         setLoading(true);
@@ -341,9 +343,14 @@ const ProductDemands: React.FC = () => {
                         <button onClick={(e) => handleNotify(demand, e)} className={`flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold text-white transition-colors shadow-sm ${isReady ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-blue-500 hover:bg-blue-600'}`}>
                             <span className="material-symbols-outlined text-[16px]">chat</span> Notificar
                         </button>
-                        {!isReady && (
-                            <button onClick={(e) => handleMarkAvailable(demand, e)} className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">Marcar Disp.</button>
-                        )}
+                        <div className="flex items-center justify-center gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); setEditingDemand(demand); }} className="text-xs text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1" title="Editar">
+                                <span className="material-symbols-outlined text-[14px]">edit</span> Editar
+                            </button>
+                            {!isReady && (
+                                <button onClick={(e) => handleMarkAvailable(demand, e)} className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">Marcar Disp.</button>
+                            )}
+                        </div>
                         <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-slate-500 hover:text-blue-600 transition-colors">Marcar Notificado</button>
                         <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-rose-500 hover:text-rose-700 transition-colors">Cancelar</button>
                     </>
@@ -750,6 +757,13 @@ const ProductDemands: React.FC = () => {
             {viewType === 'list' && renderListView()}
             {viewType === 'kanban' && renderKanbanView()}
             {viewType === 'grouped' && renderGroupedView()}
+
+            <EditDemandModal
+                isOpen={!!editingDemand}
+                onClose={() => setEditingDemand(null)}
+                demand={editingDemand}
+                onSuccess={fetchDemands}
+            />
 
             {lightbox.isOpen && (
                 <MediaLightbox
