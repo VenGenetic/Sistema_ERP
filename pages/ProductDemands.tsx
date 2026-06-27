@@ -5,6 +5,7 @@ import { buildWhatsAppDemandURL, openWhatsApp } from '../utils/whatsapp';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { getThumbnailUrl } from '../utils/image';
 import { EditDemandModal } from '../components/EditDemandModal';
+import { ShareDemandModal } from '../components/ShareDemandModal';
 
 interface ProductDemand {
     id: number;
@@ -43,6 +44,7 @@ const ProductDemands: React.FC = () => {
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
     const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
     const [editingDemand, setEditingDemand] = useState<ProductDemand | null>(null);
+    const [sharingDemand, setSharingDemand] = useState<ProductDemand | null>(null);
 
     const fetchDemands = async () => {
         setLoading(true);
@@ -346,6 +348,9 @@ const ProductDemands: React.FC = () => {
                         <div className="flex items-center justify-center gap-2">
                             <button onClick={(e) => { e.stopPropagation(); setEditingDemand(demand); }} className="text-xs text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1" title="Editar">
                                 <span className="material-symbols-outlined text-[14px]">edit</span> Editar
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setSharingDemand(demand); }} className="text-xs text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-1" title="Compartir">
+                                <span className="material-symbols-outlined text-[14px]">share</span> Compartir
                             </button>
                             {!isReady && (
                                 <button onClick={(e) => handleMarkAvailable(demand, e)} className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">Marcar Disp.</button>
@@ -763,6 +768,12 @@ const ProductDemands: React.FC = () => {
                 onClose={() => setEditingDemand(null)}
                 demand={editingDemand}
                 onSuccess={fetchDemands}
+            />
+
+            <ShareDemandModal
+                isOpen={!!sharingDemand}
+                onClose={() => setSharingDemand(null)}
+                demand={sharingDemand}
             />
 
             {lightbox.isOpen && (
