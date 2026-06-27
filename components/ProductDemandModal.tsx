@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { ShareDemandModal } from './ShareDemandModal';
 
 interface ProductDemandModalProps {
     isOpen: boolean;
@@ -19,8 +20,26 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
     const [name, setName] = useState('');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showShare, setShowShare] = useState(false);
+    const [createdDemand, setCreatedDemand] = useState<any>(null);
 
     if (!isOpen || !product) return null;
+
+    if (showShare && createdDemand) {
+        return (
+            <ShareDemandModal 
+                isOpen={true} 
+                demand={createdDemand} 
+                onClose={() => {
+                    setShowShare(false);
+                    setPhone('');
+                    setName('');
+                    setNotes('');
+                    onClose();
+                }} 
+            />
+        );
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,7 +68,7 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                 return;
             }
 
-            const { error: insertError } = await supabase
+            const { data: insertedData, error: insertError } = await supabase
                 .from('product_demands')
                 .insert([{
                     product_id: product.id,
@@ -58,15 +77,25 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                     notes: notes || null,
                     created_by: user?.id,
                     status: 'pending_stock'
-                }]);
+                }])
+                .select()
+                .single();
 
             if (insertError) throw insertError;
 
-            alert('Demanda registrada correctamente. Se notificará cuando haya stock.');
-            onClose();
-            setPhone('');
-            setName('');
-            setNotes('');
+            const newDemand = {
+                ...insertedData,
+                product: {
+                    name: product.name,
+                    sku: product.sku,
+                    image_url: product.image_url,
+                    importer_stock: product.importer_stock,
+                    inventory_levels: product.inventory_levels
+                }
+            };
+            
+            setCreatedDemand(newDemand);
+            setShowShare(true);
         } catch (error: any) {
             console.error('Error saving demand:', error);
             alert(`Error al registrar la demanda: ${error.message}`);
