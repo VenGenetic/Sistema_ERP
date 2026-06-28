@@ -79,10 +79,50 @@ const Products: React.FC = () => {
     // ──────────────────────────────────────────────
     // 2. FILTER, SORT, PAGINATION STATES
     // ──────────────────────────────────────────────
-    const [searchTerm, setSearchTerm] = useState(() => {
+    const [searchTerms, setSearchTerms] = useState<string[]>(() => {
         const params = getInitialParams();
-        return params.get('search') || '';
+        const q = params.get('search');
+        const k = params.getAll('k');
+        
+        if (q !== null || k.length > 0) {
+            return [q || '', ...k];
+        }
+        
+        try {
+            const saved = localStorage.getItem('last_erp_products_queries');
+            const savedTime = localStorage.getItem('last_erp_products_queries_time');
+            if (saved && savedTime) {
+                const ageMs = Date.now() - parseInt(savedTime, 10);
+                if (ageMs < 24 * 60 * 60 * 1000) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Error al leer queries de catálogo de productos del ERP desde localStorage', e);
+        }
+        
+        return [''];
     });
+
+    const [expanded, setExpanded] = useState<boolean[]>(() => {
+        return [true, ...Array(Math.max(0, searchTerms.length - 1)).fill(false)];
+    });
+
+    // Guardar en localStorage
+    useEffect(() => {
+        const hasAnyQuery = searchTerms.some(b => b.trim().length > 0);
+        if (hasAnyQuery) {
+            localStorage.setItem('last_erp_products_queries', JSON.stringify(searchTerms));
+            localStorage.setItem('last_erp_products_queries_time', Date.now().toString());
+        } else {
+            localStorage.removeItem('last_erp_products_queries');
+            localStorage.removeItem('last_erp_products_queries_time');
+        }
+    }, [searchTerms]);
+
     const [filters, setFilters] = useState<{ [key: string]: string }>(() => {
         const params = getInitialParams();
         const initialFilters: { [key: string]: string } = {};
@@ -111,21 +151,64 @@ const Products: React.FC = () => {
         };
     });
 
+    // Funciones para gestionar filtros dinámicos múltiples
+    const addSearchFilter = () => {
+        setSearchTerms(prev => [...prev, '']);
+        setExpanded(prev => [...prev, true]);
+    };
+
+    const removeSearchFilter = (index: number) => {
+        setSearchTerms(prev => prev.filter((_, i) => i !== index));
+        setExpanded(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const toggleExpandFilter = (index: number) => {
+        setExpanded(prev => prev.map((exp, i) => i === index ? !exp : exp));
+    };
+
+    const updateSearchTerm = (index: number, value: string) => {
+        setSearchTerms(prev => prev.map((val, i) => i === index ? value : val));
+    };
+
+    const collapseAllFilters = () => {
+        setExpanded(prev => prev.map((_, i) => i === 0 ? true : false));
+    };
+
+    const clearAllAdditionalFilters = () => {
+        setSearchTerms([searchTerms[0]]);
+        setExpanded([true]);
+    };
+
+    const handleBlurContainer = (event: React.FocusEvent<HTMLDivElement>, index: number) => {
+        const currentTarget = event.currentTarget;
+        setTimeout(() => {
+            if (!currentTarget.contains(document.activeElement)) {
+                const query = searchTerms[index];
+                if (!query || !query.trim()) {
+                    removeSearchFilter(index);
+                }
+            }
+        }, 250);
+    };
+
     // ──────────────────────────────────────────────
     // 3. DEBOUNCED SEARCH, FILTER, AND PAGINATION EFFECT
     // ──────────────────────────────────────────────
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+    const searchTermsString = useMemo(() => JSON.stringify(searchTerms), [searchTerms]);
+    const [debouncedSearchTermsString, setDebouncedSearchTermsString] = useState(searchTermsString);
     const [debouncedFilters, setDebouncedFilters] = useState(filters);
 
     // Debounce search term and column filters by 300ms
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
+            setDebouncedSearchTermsString(searchTermsString);
             setDebouncedFilters(filters);
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, filters]);
+    }, [searchTermsString, filters]);
+
+    const debouncedSearchTerms = useMemo(() => JSON.parse(debouncedSearchTermsString) as string[], [debouncedSearchTermsString]);
 
     // Separate effect to reset page to 1 on search/filter changes
     useEffect(() => {
@@ -133,7 +216,7 @@ const Products: React.FC = () => {
             if (prev.page === 1) return prev;
             return { ...prev, page: 1 };
         });
-    }, [searchTerm, filters]);
+    }, [searchTermsString, filters]);
 
     // Sync state changes to the URL (using replace navigation to avoid polluting history on typing)
     useEffect(() => {
@@ -141,7 +224,13 @@ const Products: React.FC = () => {
 
         const params = new URLSearchParams();
         
-        if (searchTerm) params.set('search', searchTerm);
+        const q = searchTerms[0] || '';
+        const k = searchTerms.slice(1).map(s => s.trim()).filter(s => s.length > 0);
+
+        if (q) params.set('search', q);
+        k.forEach(keyword => {
+            params.append('k', keyword);
+        });
         
         Object.entries(filters).forEach(([key, val]) => {
             if (val) params.set(key, val);
@@ -158,7 +247,7 @@ const Products: React.FC = () => {
         if (currentHash !== targetHash) {
             navigate(targetHash, { replace: true });
         }
-    }, [searchTerm, filters, sortConfig.key, sortConfig.direction, pagination.page, navigate, location.pathname]);
+    }, [searchTerms, filters, sortConfig.key, sortConfig.direction, pagination.page, navigate, location.pathname]);
 
     // Sync URL changes back to state (essential for browser history back/forward navigation)
     useEffect(() => {
@@ -167,8 +256,23 @@ const Products: React.FC = () => {
         const params = getInitialParams();
         
         const urlSearch = params.get('search') || '';
-        if (urlSearch !== searchTerm) {
-            setSearchTerm(urlSearch);
+        const urlK = params.getAll('k');
+
+        const currentQ = searchTerms[0] || '';
+        const currentK = searchTerms.slice(1);
+
+        const qChanged = urlSearch !== currentQ;
+        const kChanged = urlK.length !== currentK.length || urlK.some((val, idx) => val !== currentK[idx]);
+
+        if (qChanged || kChanged) {
+            setSearchTerms([urlSearch, ...urlK]);
+            setExpanded(prev => {
+                const nextExpanded = [true];
+                for (let i = 0; i < urlK.length; i++) {
+                    nextExpanded.push(prev[i + 1] !== undefined ? prev[i + 1] : false);
+                }
+                return nextExpanded;
+            });
         }
         
         const urlFilters: { [key: string]: string } = {};
@@ -198,7 +302,7 @@ const Products: React.FC = () => {
 
     useEffect(() => {
         fetchCatalogData(pagination.page);
-    }, [debouncedSearchTerm, debouncedFilters, pagination.page, pagination.pageSize, sortConfig]);
+    }, [debouncedSearchTermsString, debouncedFilters, pagination.page, pagination.pageSize, sortConfig]);
 
     // ──────────────────────────────────────────────
     // 4. SUPABASE QUERY ENGINE
@@ -220,9 +324,10 @@ const Products: React.FC = () => {
                 `, { count: 'exact' })
                 .eq('is_active', true);
 
-            // Global Search (OR across name and sku)
-            if (debouncedSearchTerm) {
-                query = query.or(`name.ilike.%${debouncedSearchTerm}%,sku.ilike.%${debouncedSearchTerm}%`);
+            // Global Search (OR across name and sku for each active search term)
+            const activeSearchTerms = debouncedSearchTerms.map(s => s.trim()).filter(Boolean);
+            for (const term of activeSearchTerms) {
+                query = query.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
             }
 
             // Column Filters (AND logic)
@@ -317,7 +422,7 @@ const Products: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [debouncedSearchTerm, debouncedFilters, sortConfig, pagination.page, pagination.pageSize]);
+    }, [debouncedSearchTermsString, debouncedFilters, sortConfig, pagination.page, pagination.pageSize]);
 
     // ──────────────────────────────────────────────
     // HANDLERS
@@ -923,22 +1028,127 @@ const Products: React.FC = () => {
 
             {/* ═══════ GLOBAL SEARCH & FILTERS ═══════ */}
             <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre o SKU..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                    />
-                    {searchTerm && (
+                <div className="flex-1 flex flex-col gap-2">
+                    <div className="flex gap-2 items-center">
+                        <div className="relative flex-1">
+                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                            <input
+                                type="text"
+                                placeholder="Buscar por nombre o SKU..."
+                                value={searchTerms[0] || ''}
+                                onChange={(e) => updateSearchTerm(0, e.target.value)}
+                                className="w-full pl-10 pr-10 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                            />
+                            {(searchTerms[0] || '') && (
+                                <button
+                                    onClick={() => updateSearchTerm(0, '')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-650 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                </button>
+                            )}
+                        </div>
                         <button
-                            onClick={() => setSearchTerm('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                            onClick={addSearchFilter}
+                            title="Agregar palabra clave"
+                            className="h-[46px] w-[46px] bg-primary text-white hover:bg-primary/90 rounded-xl flex items-center justify-center shadow-sm hover:shadow active:scale-95 transition-all text-xl font-bold shrink-0"
                         >
-                            <span className="material-symbols-outlined text-[18px]">close</span>
+                            +
                         </button>
+                    </div>
+
+                    {searchTerms.length > 1 && (
+                        <div className="flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                            <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                                <span>Palabras Clave Adicionales</span>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={collapseAllFilters} 
+                                        className="text-primary hover:underline transition-all text-xs font-bold"
+                                    >
+                                        Contraer todos
+                                    </button>
+                                    <span>•</span>
+                                    <button 
+                                        onClick={clearAllAdditionalFilters} 
+                                        className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:underline transition-all text-xs font-bold"
+                                    >
+                                        Borrar filtros
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 items-center mt-1">
+                                {searchTerms.slice(1).map((term, idx) => {
+                                    const actualIdx = idx + 1;
+                                    const isCollapsed = !expanded[actualIdx];
+
+                                    return (
+                                        <div 
+                                            key={actualIdx} 
+                                            className="transition-all duration-300"
+                                            onBlur={(e) => handleBlurContainer(e, actualIdx)}
+                                        >
+                                            {isCollapsed ? (
+                                                <div 
+                                                    onClick={() => toggleExpandFilter(actualIdx)}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full font-semibold text-xs border border-slate-200 dark:border-slate-700 shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px] text-primary">search</span>
+                                                    <span className="truncate max-w-[120px]">{term.trim() || `Filtro ${actualIdx}`}</span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            removeSearchFilter(actualIdx);
+                                                        }}
+                                                        className="ml-1 p-0.5 hover:bg-slate-250 dark:hover:bg-slate-700 rounded-full transition-colors text-gray-400 hover:text-red-550"
+                                                        title="Eliminar filtro"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[14px]">close</span>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-2 items-center min-w-[280px] sm:min-w-[320px] bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                    <div className="relative flex-1">
+                                                        <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                                                        <input
+                                                            type="text"
+                                                            placeholder={`Palabra clave ${actualIdx}...`}
+                                                            value={term}
+                                                            onChange={(e) => updateSearchTerm(actualIdx, e.target.value)}
+                                                            className="w-full pl-8 pr-8 py-2 bg-transparent text-sm outline-none"
+                                                            autoFocus
+                                                        />
+                                                        {term && (
+                                                            <button
+                                                                onClick={() => updateSearchTerm(actualIdx, '')}
+                                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-650 transition-colors"
+                                                            >
+                                                                <span className="material-symbols-outlined text-[16px]">close</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleExpandFilter(actualIdx)}
+                                                        className="px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 hover:text-slate-750 text-xs font-semibold transition-colors shrink-0"
+                                                        title="Contraer"
+                                                    >
+                                                        Contraer
+                                                    </button>
+                                                    <button
+                                                        onClick={() => removeSearchFilter(actualIdx)}
+                                                        className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 rounded-lg border border-transparent hover:border-red-200 dark:hover:border-red-900/40 flex items-center justify-center transition-colors shrink-0"
+                                                        title="Eliminar"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[16px]">close</span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     )}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
