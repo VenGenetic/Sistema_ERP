@@ -48,6 +48,9 @@ const ProductDemands: React.FC = () => {
     const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
     const [editingDemand, setEditingDemand] = useState<ProductDemand | null>(null);
     const [sharingDemand, setSharingDemand] = useState<ProductDemand | null>(null);
+    const [discontinueProductId, setDiscontinueProductId] = useState<number | null>(null);
+    const [discontinueDuration, setDiscontinueDuration] = useState<'3' | '6' | '12' | 'permanente'>('permanente');
+    const [isDiscontinuing, setIsDiscontinuing] = useState(false);
 
     const fetchDemands = async () => {
         setLoading(true);
@@ -229,6 +232,56 @@ const ProductDemands: React.FC = () => {
             }
         }
     };
+
+    const handleConfirmDiscontinue = async () => {
+        if (!discontinueProductId) return;
+        setIsDiscontinuing(true);
+        try {
+            let discontinuedUntil: string | null = null;
+            if (discontinueDuration !== 'permanente') {
+                const months = parseInt(discontinueDuration, 10);
+                const date = new Date();
+                date.setMonth(date.getMonth() + months);
+                discontinuedUntil = date.toISOString();
+            }
+
+            // Update product
+            const { error: productError } = await supabase
+                .from('products')
+                .update({
+                    is_discontinued: true,
+                    discontinued_until: discontinuedUntil
+                })
+                .eq('id', discontinueProductId);
+
+            if (productError) throw productError;
+
+            // Automatically update active demands for this product to discontinued
+            const { error: demandError } = await supabase
+                .from('product_demands')
+                .update({ status: 'discontinued' })
+                .eq('product_id', discontinueProductId)
+                .in('status', ['pending_stock', 'stock_available']);
+
+            if (demandError) throw demandError;
+
+            // Also update customer_requests (POS waitlist)
+            await supabase
+                .from('customer_requests')
+                .update({ status: 'cancelled' }) // or you could map to cancelled
+                .eq('product_id', discontinueProductId)
+                .eq('status', 'pending');
+
+            alert('Producto marcado como descontinuado exitosamente. Las solicitudes han sido actualizadas.');
+            setDiscontinueProductId(null);
+            fetchDemands();
+        } catch (error: any) {
+            alert(`Error al descontinuar producto: ${error.message}`);
+        } finally {
+            setIsDiscontinuing(false);
+        }
+    };
+
     // Open Lightbox for demand product image
     const handleOpenLightboxDemand = (demand: ProductDemand) => {
         if (!demand.product?.image_url) return;
@@ -645,14 +698,32 @@ const ProductDemands: React.FC = () => {
                                         <span className="text-sm font-mono text-slate-500">{prodSku}</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-4 md:gap-6">
                                     <div className="text-right hidden md:block">
                                         <StockDisplay prod={group.product} />
                                     </div>
                                     <div className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 rounded-lg flex items-center gap-2">
                                         <span className="material-symbols-outlined text-[18px]">group</span>
-                                        <span className="font-bold">{group.demands.length} en espera</span>
+                                        <span className="font-bold hidden sm:inline">{group.demands.length} en espera</span>
+                                        <span className="font-bold sm:hidden">{group.demands.length}</span>
                                     </div>
+                                    {!group.product?.is_discontinued ? (
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDiscontinueProductId(group.productId);
+                                            }}
+                                            className="bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 hover:bg-rose-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold transition-colors border border-rose-200 dark:border-rose-800"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">warning</span>
+                                            <span className="hidden sm:inline">Descontinuar</span>
+                                        </button>
+                                    ) : (
+                                        <div className="bg-rose-500 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold text-xs shadow-sm">
+                                            <span className="material-symbols-outlined text-[16px]">warning</span>
+                                            Descontinuado
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             {isExpanded && (
@@ -819,11 +890,57 @@ const ProductDemands: React.FC = () => {
                 onSuccess={fetchDemands}
             />
 
-            <ShareDemandModal
-                isOpen={!!sharingDemand}
-                onClose={() => setSharingDemand(null)}
-                demand={sharingDemand}
-            />
+            {sharingDemand && (
+                <ShareDemandModal
+                    isOpen={true}
+                    onClose={() => setSharingDemand(null)}
+                    demand={sharingDemand}
+                />
+            )}
+
+            {discontinueProductId && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-rose-50 dark:bg-rose-900/20 flex items-center gap-3">
+                            <span className="material-symbols-outlined text-rose-500">warning</span>
+                            <h3 className="font-bold text-slate-900 dark:text-white">Descontinuar Producto</h3>
+                        </div>
+                        <div className="p-6 flex flex-col gap-4">
+                            <p className="text-sm text-slate-600 dark:text-slate-300">
+                                Las solicitudes en espera pasarán automáticamente al estado de "Descontinuado" para que procedas a notificarlas.
+                            </p>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-2">Duración (Bloqueo)</label>
+                                <select
+                                    value={discontinueDuration}
+                                    onChange={(e) => setDiscontinueDuration(e.target.value as any)}
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-rose-500"
+                                >
+                                    <option value="permanente">Permanente (Nunca más)</option>
+                                    <option value="3">Temporal: 3 meses</option>
+                                    <option value="6">Temporal: 6 meses</option>
+                                    <option value="12">Temporal: 1 año</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+                            <button
+                                onClick={() => setDiscontinueProductId(null)}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirmDiscontinue}
+                                disabled={isDiscontinuing}
+                                className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+                            >
+                                {isDiscontinuing ? 'Procesando...' : 'Confirmar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {lightbox.isOpen && (
                 <MediaLightbox
