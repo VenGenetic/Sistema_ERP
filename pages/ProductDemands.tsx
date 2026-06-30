@@ -41,7 +41,7 @@ const ProductDemands: React.FC = () => {
     const [viewType, setViewType] = useState<'table' | 'list' | 'kanban' | 'grouped'>('table');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued'>('active');
-    const [stockFilter, setStockFilter] = useState<'all' | 'has_stock' | 'no_stock'>('all');
+    const [stockFilter, setStockFilter] = useState<'all' | 'importer_only' | 'local_only' | 'no_stock'>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
@@ -333,11 +333,16 @@ const ProductDemands: React.FC = () => {
                 }
             }
 
-            // Stock Filter
-            const stock = getStockValue(d.product);
-            if (stockFilter === 'has_stock' && stock <= 0) return false;
-            if (stockFilter === 'no_stock' && stock > 0) return false;
+            // Stock filter
+            if (stockFilter !== 'all') {
+                const hasImporterStock = (d.product?.importer_stock || 0) > 0;
+                const localStock = d.product?.inventory_levels ? d.product.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
+                const hasLocalStock = localStock > 0;
 
+                if (stockFilter === 'importer_only' && (!hasImporterStock || hasLocalStock)) return false;
+                if (stockFilter === 'local_only' && (!hasLocalStock || hasImporterStock)) return false;
+                if (stockFilter === 'no_stock' && (hasImporterStock || hasLocalStock)) return false;
+            }
             return true;
         });
 
@@ -848,8 +853,9 @@ const ProductDemands: React.FC = () => {
                         className="w-full md:w-auto bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
                     >
                         <option value="all">Stock: Todos</option>
-                        <option value="has_stock">Con Stock</option>
-                        <option value="no_stock">Sin Stock</option>
+                        <option value="importer_only">Con stock en la importadora y no en local</option>
+                        <option value="local_only">Con stock en local y no importadora</option>
+                        <option value="no_stock">Sin stock completamente</option>
                     </select>
 
                     <select

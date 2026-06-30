@@ -127,7 +127,7 @@ const Products: React.FC = () => {
     const [filters, setFilters] = useState<{ [key: string]: string }>(() => {
         const params = getInitialParams();
         const initialFilters: { [key: string]: string } = {};
-        const filterKeys = ['sku', 'name', 'category', 'brand', 'imageStatus', 'videoStatus', 'stockStatus'];
+        const filterKeys = ['sku', 'name', 'category', 'brand', 'imageStatus', 'videoStatus', 'stockStatus', 'discontinuedStatus'];
         filterKeys.forEach(key => {
             const val = params.get(key);
             if (val) initialFilters[key] = val;
@@ -369,6 +369,13 @@ const Products: React.FC = () => {
                 query = query.or('local_stock.gt.0,importer_stock.gt.0');
             } else if (debouncedFilters.stockStatus === 'agotados') {
                 query = query.eq('local_stock', 0).eq('importer_stock', 0);
+            }
+
+            // Discontinued Status Filter
+            if (debouncedFilters.discontinuedStatus === 'descontinuados') {
+                query = query.eq('is_discontinued', true);
+            } else if (debouncedFilters.discontinuedStatus === 'activos') {
+                query = query.or('is_discontinued.is.null,is_discontinued.eq.false');
             }
 
             // Sorting
@@ -1189,6 +1196,15 @@ const Products: React.FC = () => {
                         <option value="solo_importadora">✈️ Solo Importadora (Agotado Local)</option>
                         <option value="disponibles_cualquiera">⚡ Disponible (Local o Imp.)</option>
                         <option value="agotados">🔴 Agotado en Ambos</option>
+                    </select>
+                    <select
+                        value={filters.discontinuedStatus || ''}
+                        onChange={(e) => handleFilterChange('discontinuedStatus', e.target.value)}
+                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                    >
+                        <option value="">⚙️ Todos (General)</option>
+                        <option value="activos">✅ Solo Activos</option>
+                        <option value="descontinuados">🚨 Descontinuados</option>
                     </select>
                 </div>
             </div>
