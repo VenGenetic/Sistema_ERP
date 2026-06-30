@@ -13,7 +13,8 @@ const BULK_FIELDS = [
     { key: 'cost_without_vat', label: 'Costo sin IVA ($)', type: 'currency', icon: 'payments' },
     { key: 'vat_percentage', label: 'IVA (%)', type: 'percent', icon: 'percent' },
     { key: 'profit_margin', label: 'Margen de Ganancia', type: 'margin', icon: 'trending_up' },
-    { key: 'add_stock', label: 'Añadir Stock', type: 'stock', icon: 'add_box' }
+    { key: 'add_stock', label: 'Añadir Stock', type: 'stock', icon: 'add_box' },
+    { key: 'is_discontinued', label: 'Descontinuar Producto', type: 'discontinued', icon: 'warning' }
 ] as const;
 
 type BulkFieldKey = typeof BULK_FIELDS[number]['key'];
@@ -239,6 +240,16 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                     payload.brand_id = value;
                 } else if (selectedField === 'min_stock_threshold') {
                     payload.min_stock_threshold = Number(value);
+                } else if (selectedField === 'is_discontinued') {
+                    payload.is_discontinued = value !== 'falso_activo';
+                    if (value === 'falso_activo' || value === 'permanente') {
+                        payload.discontinued_until = null;
+                    } else {
+                        const months = parseInt(value);
+                        const d = new Date();
+                        d.setMonth(d.getMonth() + months);
+                        payload.discontinued_until = d.toISOString();
+                    }
                 } else {
                     payload[selectedField] = value;
                 }
@@ -257,6 +268,20 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                         failed += chunk.length;
                     } else {
                         success += chunk.length;
+                        
+                        if (selectedField === 'is_discontinued' && payload.is_discontinued) {
+                            await supabase
+                                .from('product_demands')
+                                .update({ status: 'discontinued' })
+                                .in('product_id', chunk)
+                                .in('status', ['pending_stock', 'stock_available']);
+                                
+                            await supabase
+                                .from('customer_requests')
+                                .update({ status: 'discontinued' })
+                                .in('product_id', chunk)
+                                .eq('status', 'pending');
+                        }
                     }
                 }
             }
@@ -487,6 +512,26 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                            )}
+                            {fieldConfig?.type === 'discontinued' && (
+                                <div>
+                                    <select 
+                                        className={inputClass}
+                                        value={value || ''}
+                                        onChange={(e) => setValue(e.target.value)}
+                                        autoFocus
+                                    >
+                                        <option value="" disabled>Seleccionar estado de continuidad...</option>
+                                        <option value="falso_activo">🟢 Activo (Revertir Descontinuación)</option>
+                                        <option value="permanente">🔴 Descontinuado Permanente</option>
+                                        <option value="3">⏳ Descontinuado Temporal (3 meses)</option>
+                                        <option value="6">⏳ Descontinuado Temporal (6 meses)</option>
+                                        <option value="12">⏳ Descontinuado Temporal (1 Año)</option>
+                                    </select>
+                                    {value && value !== 'falso_activo' && (
+                                        <p className="text-xs text-rose-500 font-medium mt-2">⚠️ Al descontinuar, todas las listas de espera activas asociadas a estos productos pasarán a estado "Descontinuado" para ser notificadas.</p>
+                                    )}
                                 </div>
                             )}
                         </div>

@@ -510,6 +510,8 @@ export type Database = {
           strike_count: number | null
           strike_price_candidate: number | null
           vat_percentage: number | null
+          is_discontinued: boolean | null
+          discontinued_until: string | null
         }
         Insert: {
           brand_id?: number | null
@@ -526,6 +528,8 @@ export type Database = {
           strike_count?: number | null
           strike_price_candidate?: number | null
           vat_percentage?: number | null
+          is_discontinued?: boolean | null
+          discontinued_until?: string | null
         }
         Update: {
           brand_id?: number | null
@@ -542,6 +546,8 @@ export type Database = {
           strike_count?: number | null
           strike_price_candidate?: number | null
           vat_percentage?: number | null
+          is_discontinued?: boolean | null
+          discontinued_until?: string | null
         }
         Relationships: [
           {

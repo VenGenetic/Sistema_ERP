@@ -8,6 +8,8 @@ export interface Product {
     cost_without_vat?: number;
     vat_percentage?: number;
     final_cost_with_vat?: number;
+    is_discontinued?: boolean;
+    discontinued_until?: string | null;
 }
 
 export interface InventoryResult {

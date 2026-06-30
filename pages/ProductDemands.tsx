@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-import { buildWhatsAppDemandURL, openWhatsApp } from '../utils/whatsapp';
+import { buildWhatsAppDemandURL, buildWhatsAppDiscontinuedURL, openWhatsApp } from '../utils/whatsapp';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { getThumbnailUrl } from '../utils/image';
 import { EditDemandModal } from '../components/EditDemandModal';
@@ -13,7 +13,7 @@ interface ProductDemand {
     phone_number: string;
     customer_name: string | null;
     notes: string | null;
-    status: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled';
+    status: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued';
     created_at: string;
     stock_detected_at: string | null;
     notified_at: string | null;
@@ -25,6 +25,8 @@ interface ProductDemand {
         importer_stock: number;
         local_stock: number;
         image_url?: string | null;
+        is_discontinued?: boolean;
+        discontinued_until?: string | null;
         inventory_levels: { current_stock: number }[];
     } | null;
 }
@@ -38,7 +40,7 @@ const ProductDemands: React.FC = () => {
     // View and Filters State
     const [viewType, setViewType] = useState<'table' | 'list' | 'kanban' | 'grouped'>('table');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
-    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled'>('active');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued'>('active');
     const [stockFilter, setStockFilter] = useState<'all' | 'has_stock' | 'no_stock'>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
@@ -54,7 +56,7 @@ const ProductDemands: React.FC = () => {
                 .from('product_demands')
                 .select(`
                     *,
-                    product:products(id, name, sku, price, importer_stock, local_stock, image_url, inventory_levels(current_stock))
+                    product:products(id, name, sku, price, importer_stock, local_stock, image_url, is_discontinued, discontinued_until, inventory_levels(current_stock))
                 `)
                 .order('created_at', { ascending: false });
 
@@ -103,6 +105,38 @@ const ProductDemands: React.FC = () => {
         openWhatsApp(url);
 
         if (window.confirm(`¿Se envió el mensaje a ${demand.customer_name || demand.phone_number} correctamente?`)) {
+            try {
+                const { error } = await supabase
+                    .from('product_demands')
+                    .update({
+                        status: 'notified',
+                        notified_at: new Date().toISOString(),
+                        notified_by: user?.id
+                    })
+                    .eq('id', demand.id);
+
+                if (error) throw error;
+                fetchDemands();
+            } catch (error: any) {
+                alert(`Error al marcar como notificado: ${error.message}`);
+            }
+        }
+    };
+
+    const handleNotifyDiscontinued = async (demand: ProductDemand, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        if (!demand.product) return;
+
+        const url = buildWhatsAppDiscontinuedURL({
+            customerPhone: demand.phone_number,
+            customerName: demand.customer_name || undefined,
+            productSku: demand.product.sku,
+            productName: demand.product.name
+        });
+
+        openWhatsApp(url);
+
+        if (window.confirm(`¿Se envió el mensaje notificando la descontinuación a ${demand.customer_name || demand.phone_number} correctamente? Esto archivará la solicitud.`)) {
             try {
                 const { error } = await supabase
                     .from('product_demands')
@@ -202,7 +236,7 @@ const ProductDemands: React.FC = () => {
         setLightbox({ isOpen: true, media, initialIndex: 0 });
     };
 
-    const handleStatusChange = async (demandId: number, newStatus: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled') => {
+    const handleStatusChange = async (demandId: number, newStatus: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued') => {
         try {
             const updates: any = { status: newStatus };
             if (newStatus === 'notified') {
@@ -294,6 +328,7 @@ const ProductDemands: React.FC = () => {
         if (status === 'pending_stock') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800"><span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>Esperando Stock</span>;
         if (status === 'stock_available') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"><span className="material-symbols-outlined text-[14px]">check_circle</span>Listo para Notificar</span>;
         if (status === 'notified') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800"><span className="material-symbols-outlined text-[14px]">done_all</span>Notificado</span>;
+        if (status === 'discontinued') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800"><span className="material-symbols-outlined text-[14px]">warning</span>Descontinuado</span>;
         return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"><span className="material-symbols-outlined text-[14px]">cancel</span>Cancelado</span>;
     };
 
@@ -339,6 +374,8 @@ const ProductDemands: React.FC = () => {
     const ActionButtons = ({ demand }: { demand: ProductDemand }) => {
         const isReady = demand.status === 'stock_available';
         const isActive = demand.status === 'pending_stock' || demand.status === 'stock_available';
+        const isDiscontinued = demand.status === 'discontinued';
+        
         return (
             <div className="flex flex-col gap-2">
                 {isActive ? (
@@ -359,6 +396,16 @@ const ProductDemands: React.FC = () => {
                         </div>
                         <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-slate-500 hover:text-blue-600 transition-colors">Marcar Notificado</button>
                         <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-rose-500 hover:text-rose-700 transition-colors">Cancelar</button>
+                    </>
+                ) : isDiscontinued ? (
+                    <>
+                        <button onClick={(e) => handleNotifyDiscontinued(demand, e)} className="flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold text-white transition-colors shadow-sm bg-rose-500 hover:bg-rose-600">
+                            <span className="material-symbols-outlined text-[16px]">chat</span> Notificar Descontinuado
+                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                            <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-slate-500 hover:text-blue-600 transition-colors">Archivar/Notificado</button>
+                            <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-rose-500 hover:text-rose-700 transition-colors">Cancelar</button>
+                        </div>
                     </>
                 ) : (
                     <button onClick={(e) => handleDelete(demand, e)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors mx-auto" title="Eliminar registro">
@@ -489,6 +536,7 @@ const ProductDemands: React.FC = () => {
         const columns = [
             { id: 'pending_stock', title: 'Esperando Stock', color: 'bg-amber-50 dark:bg-amber-900/10', hoverColor: 'bg-amber-100/80 dark:bg-amber-900/20', header: 'border-amber-300 dark:border-amber-600', text: 'text-amber-700 dark:text-amber-400' },
             { id: 'stock_available', title: 'Stock Disponible', color: 'bg-emerald-50 dark:bg-emerald-900/10', hoverColor: 'bg-emerald-100/80 dark:bg-emerald-900/20', header: 'border-emerald-300 dark:border-emerald-600', text: 'text-emerald-700 dark:text-emerald-400' },
+            { id: 'discontinued', title: 'Descontinuados por Notificar', color: 'bg-rose-50 dark:bg-rose-900/10', hoverColor: 'bg-rose-100/80 dark:bg-rose-900/20', header: 'border-rose-300 dark:border-rose-600', text: 'text-rose-700 dark:text-rose-400' },
             { id: 'notified', title: 'Notificados', color: 'bg-blue-50 dark:bg-blue-900/10', hoverColor: 'bg-blue-100/80 dark:bg-blue-900/20', header: 'border-blue-300 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-400' },
             { id: 'cancelled', title: 'Cancelados', color: 'bg-slate-50 dark:bg-slate-900/10', hoverColor: 'bg-slate-100/80 dark:bg-slate-900/20', header: 'border-slate-300 dark:border-slate-600', text: 'text-slate-700 dark:text-slate-300' }
         ];

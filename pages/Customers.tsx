@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import type { Customer } from '../store/cartStore'; // Reuse the interface we already have
 import { Plus, Search, Edit2, Trash2, X, Briefcase, User, Percent, Users, MessageSquare, Bell, ClipboardList, Check, AlertCircle, Calendar, DollarSign, ShoppingBag, Sparkles, Phone, Package, Zap } from 'lucide-react';
+import { isProductDiscontinued } from '../utils/discontinuedHelper';
 
 export interface CustomerRequest {
     id: number;
@@ -198,7 +199,7 @@ export default function Customers() {
             try {
                 const { data, error } = await supabase
                     .from('products')
-                    .select('id, sku, name, price, cost_without_vat, inventory_levels(current_stock, warehouse_id)')
+                    .select('id, sku, name, price, cost_without_vat, is_discontinued, discontinued_until, inventory_levels(current_stock, warehouse_id)')
                     .or(`sku.ilike.%${productSearchQuery}%,name.ilike.%${productSearchQuery}%`)
                     .limit(5);
 
@@ -259,6 +260,11 @@ export default function Customers() {
         if (!selectedCustomerForDrawer) return;
         if (!isCustomPart && !selectedProduct) {
             alert('Por favor selecciona un repuesto del catálogo o marca "No catalogado"');
+            return;
+        }
+
+        if (!isCustomPart && selectedProduct && isProductDiscontinued(selectedProduct)) {
+            alert('El producto seleccionado se encuentra descontinuado. No es posible agregarlo a la lista de espera.');
             return;
         }
 
@@ -1364,6 +1370,9 @@ export default function Customers() {
                                                                     <div>
                                                                         <div className="text-sm font-semibold text-slate-900 dark:text-white">{prod.name}</div>
                                                                         <div className="text-xs text-slate-500 dark:text-slate-400">SKU: {prod.sku} | Precio: ${prod.price}</div>
+                                                                        {isProductDiscontinued(prod) && (
+                                                                            <div className="text-[10px] font-bold text-rose-500 mt-0.5">Descontinuado</div>
+                                                                        )}
                                                                     </div>
                                                                     <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${stock > 0 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'}`}>
                                                                         Stock: {stock}

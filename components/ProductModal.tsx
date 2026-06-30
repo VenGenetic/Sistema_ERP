@@ -23,6 +23,8 @@ interface ProductModalProps {
         video_url?: string | null;
         group_id?: string | null;
         last_edited_at?: string | null;
+        is_discontinued?: boolean;
+        discontinued_until?: string | null;
         profiles?: any;
     } | null;
 }
@@ -77,7 +79,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         vatPercentage: 15.0,
         price: 0,
         imageUrl: '',
-        videoUrl: ''
+        videoUrl: '',
+        isDiscontinued: false,
+        discontinuedDuration: 'permanente' // 'permanente', '3', '6', '12'
     });
     const [imageRemoved, setImageRemoved] = useState(false);
     const [videoRemoved, setVideoRemoved] = useState(false);
@@ -143,7 +147,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     vatPercentage: vat,
                     price: Math.round(derivedPrice * 100) / 100,
                     imageUrl: productToEdit.image_url || '',
-                    videoUrl: productToEdit.video_url || ''
+                    videoUrl: productToEdit.video_url || '',
+                    isDiscontinued: !!productToEdit.is_discontinued,
+                    discontinuedDuration: productToEdit.discontinued_until 
+                        ? (function() {
+                            const diffMonths = Math.round((new Date(productToEdit.discontinued_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 30));
+                            if (diffMonths <= 4) return '3';
+                            if (diffMonths <= 7) return '6';
+                            return '12';
+                        })()
+                        : 'permanente'
                 });
             } else {
                 setFormData({
@@ -156,7 +169,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     vatPercentage: 15.0,
                     price: 0,
                     imageUrl: '',
-                    videoUrl: ''
+                    videoUrl: '',
+                    isDiscontinued: false,
+                    discontinuedDuration: 'permanente'
                 });
             }
             setImageRemoved(false);
@@ -458,6 +473,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 .from('product_images')
                 .getPublicUrl('products/' + formData.sku + '_cut.webp').data.publicUrl;
 
+            let discontinued_until: string | null = null;
+            if (formData.isDiscontinued && formData.discontinuedDuration !== 'permanente') {
+                const months = parseInt(formData.discontinuedDuration);
+                const d = new Date();
+                d.setMonth(d.getMonth() + months);
+                discontinued_until = d.toISOString();
+            }
+
             const payload: any = {
                 sku: formData.sku,
                 name: formData.name,
@@ -468,7 +491,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 vat_percentage: formData.vatPercentage,
                 price: formData.price,
                 image_url: imageRemoved ? null : (formData.imageUrl || defaultImageUrl),
-                video_url: videoRemoved ? null : (formData.videoUrl || null)
+                video_url: videoRemoved ? null : (formData.videoUrl || null),
+                is_discontinued: formData.isDiscontinued,
+                discontinued_until: formData.isDiscontinued ? discontinued_until : null
             };
 
             const { data: { user } } = await supabase.auth.getUser();
@@ -586,6 +611,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 if (stockError) throw stockError;
                 if (!stockData.success) {
                     throw new Error('Error en ajuste de stock: ' + stockData.message);
+                }
+            }
+
+            if (!productToEdit?.is_discontinued && formData.isDiscontinued && productId) {
+                // Update active product_demands
+                const { data: updatedDemands } = await supabase
+                    .from('product_demands')
+                    .update({ status: 'discontinued' })
+                    .eq('product_id', productId)
+                    .in('status', ['pending_stock', 'stock_available'])
+                    .select('id');
+                
+                // Update active customer_requests (reservations)
+                const { data: updatedRequests } = await supabase
+                    .from('customer_requests')
+                    .update({ status: 'discontinued' })
+                    .eq('product_id', productId)
+                    .eq('status', 'pending')
+                    .select('id');
+                
+                const totalUpdated = (updatedDemands?.length || 0) + (updatedRequests?.length || 0);
+                if (totalUpdated > 0) {
+                    alert(`Se han actualizado ${totalUpdated} solicitudes al estado 'Descontinuado'. Recuerda notificar a los clientes correspondientes.`);
                 }
             }
 
@@ -866,6 +914,46 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 </div>
                             </div>
                         )}
+
+                        {/* ═══ DESCONTINUADOS ═══ */}
+                        <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
+                                <span className="material-symbols-outlined text-[18px]">warning</span>
+                                Estado de Continuidad
+                            </h3>
+                            <div className="flex flex-col gap-4">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <div className="relative">
+                                        <input type="checkbox" className="sr-only" 
+                                            checked={formData.isDiscontinued} 
+                                            onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })} 
+                                        />
+                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.isDiscontinued ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.isDiscontinued ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Marcar como Descontinuado</span>
+                                        <span className="text-xs text-slate-500">Evita que el producto siga apareciendo como disponible para nuevas listas de espera.</span>
+                                    </div>
+                                </label>
+
+                                {formData.isDiscontinued && (
+                                    <div className="pl-14">
+                                        <label className={labelClass}>Duración de la descontinuación</label>
+                                        <select 
+                                            className={inputClass}
+                                            value={formData.discontinuedDuration}
+                                            onChange={(e) => setFormData({ ...formData, discontinuedDuration: e.target.value })}
+                                        >
+                                            <option value="permanente">Permanente (Nunca volverá)</option>
+                                            <option value="3">Temporal: 3 Meses</option>
+                                            <option value="6">Temporal: 6 Meses</option>
+                                            <option value="12">Temporal: 1 Año</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
                         {/* ═══ AJUSTE DE STOCK RÁPIDO ═══ */}
                         <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { ShareDemandModal } from './ShareDemandModal';
+import { isProductDiscontinued } from '../utils/discontinuedHelper';
 
 interface ProductDemandModalProps {
     isOpen: boolean;
@@ -24,6 +25,8 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
     const [createdDemand, setCreatedDemand] = useState<any>(null);
 
     if (!isOpen || !product) return null;
+
+    const discontinued = isProductDiscontinued(product);
 
     if (showShare && createdDemand) {
         return (
@@ -128,8 +131,19 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                         <span className="block font-mono text-xs text-slate-500 mt-1">{product.sku}</span>
                     </div>
 
-                    <form id="demand-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-                        <div>
+                    {discontinued ? (
+                        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 p-6 rounded-lg mb-4 flex flex-col items-center justify-center text-center">
+                            <span className="material-symbols-outlined text-[32px] text-rose-500 mb-2">warning</span>
+                            <p className="text-sm font-bold text-rose-800 dark:text-rose-400">
+                                Este producto se encuentra descontinuado.
+                            </p>
+                            <p className="text-xs text-rose-600 dark:text-rose-500 mt-2">
+                                No es posible añadir nuevos clientes a la lista de espera de un producto descontinuado.
+                            </p>
+                        </div>
+                    ) : (
+                        <form id="demand-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+                            <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                 Teléfono <span className="text-rose-500">*</span>
                             </label>
@@ -169,6 +183,7 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                             />
                         </div>
                     </form>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -183,7 +198,7 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                     <button
                         type="submit"
                         form="demand-form"
-                        disabled={loading}
+                        disabled={loading || discontinued}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm shadow-blue-500/20"
                     >
                         {loading ? (

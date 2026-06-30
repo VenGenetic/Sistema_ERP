@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, DollarSign, AlertTriangle, ArrowLeft, LogOut, Package, Search, Trash2, Tag, CheckCircle, XCircle, Edit3 } from 'lucide-react';
+import { isProductDiscontinued } from '../utils/discontinuedHelper';
 import { supabase } from '../supabaseClient';
 import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -212,7 +213,7 @@ const POS: React.FC = () => {
         const { data, error } = await supabase
             .from('products')
             .select(`
-                id, sku, name, price, cost_without_vat, vat_percentage,
+                id, sku, name, price, cost_without_vat, vat_percentage, is_discontinued, discontinued_until,
                 inventory_levels (
                     current_stock,
                     warehouse_id,
@@ -242,7 +243,9 @@ const POS: React.FC = () => {
                         price: p.price,
                         cost_without_vat: p.cost_without_vat || 0,
                         vat_percentage: p.vat_percentage || 0,
-                        final_cost_with_vat: (p.cost_without_vat || 0) * (1 + (p.vat_percentage || 0) / 100)
+                        final_cost_with_vat: (p.cost_without_vat || 0) * (1 + (p.vat_percentage || 0) / 100),
+                        is_discontinued: p.is_discontinued,
+                        discontinued_until: p.discontinued_until
                     },
                     warehouse_id: stockLevel.warehouse_id,
                     warehouse_name: whName || 'Desconocido',
@@ -278,7 +281,7 @@ const POS: React.FC = () => {
             const { data, error } = await supabase
                 .from('products')
                 .select(`
-                    id, sku, name, price, cost_without_vat, vat_percentage,
+                    id, sku, name, price, cost_without_vat, vat_percentage, is_discontinued, discontinued_until,
                     inventory_levels (
                         current_stock,
                         warehouse_id,
@@ -308,7 +311,9 @@ const POS: React.FC = () => {
                     price: p.price,
                     cost_without_vat: cost,
                     vat_percentage: vat,
-                    final_cost_with_vat: finalCost
+                    final_cost_with_vat: finalCost,
+                    is_discontinued: p.is_discontinued,
+                    discontinued_until: p.discontinued_until
                 };
 
                 p.inventory_levels?.forEach((il: any) => {
@@ -799,7 +804,14 @@ const POS: React.FC = () => {
                                                 onClick={() => handleAddToCart(result)}
                                             >
                                                 <div>
-                                                    <div className="font-bold text-slate-800">{result.product.name}</div>
+                                                    <div className="font-bold text-slate-800 flex items-center gap-2">
+                                                        {result.product.name}
+                                                        {isProductDiscontinued(result.product) && (
+                                                            <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5" title="No habrá reposición de stock una vez agotado.">
+                                                                <AlertTriangle size={10} /> Descontinuado
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-xs font-mono text-slate-500">{result.product.sku}</div>
                                                     <div className="flex items-center gap-3 mt-1.5">
                                                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">

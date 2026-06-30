@@ -13,6 +13,7 @@ import { QuickTagAssignModal } from '../components/QuickTagAssignModal';
 import { getThumbnailUrl } from '../utils/image';
 import { ProductDemandModal } from '../components/ProductDemandModal';
 import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
+import { isProductDiscontinued } from '../utils/discontinuedHelper';
 
 // Helper to parse query parameters from the hash or query string
 const getInitialParams = () => {
@@ -827,6 +828,12 @@ const Products: React.FC = () => {
                         
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
+                            {isProductDiscontinued(prod) && (
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${prod.discontinued_until ? 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400' : 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:border-rose-800 dark:text-rose-400'} flex items-center gap-1`} title={prod.discontinued_until ? `Descontinuado Temporalmente hasta ${new Date(prod.discontinued_until).toLocaleDateString()}` : 'Descontinuado Permanentemente'}>
+                                    <span className="material-symbols-outlined text-[10px]">{prod.discontinued_until ? 'hourglass_empty' : 'warning'}</span>
+                                    {prod.discontinued_until ? 'Desc. Temporal' : 'Descontinuado'}
+                                </span>
+                            )}
                             {prod.group_id && (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 flex items-center gap-1 cursor-help" title={`Grupo: ${prod.group_id.split('-')[0]}`}>
                                     <span className="material-symbols-outlined text-[10px]">link</span>

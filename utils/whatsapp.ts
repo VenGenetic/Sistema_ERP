@@ -102,6 +102,27 @@ Te escribimos para avisarte que el producto que estabas buscando ya se encuentra
 }
 
 /**
+ * Builds a WhatsApp URL to notify that a demanded product has been discontinued.
+ */
+export function buildWhatsAppDiscontinuedURL(context: WhatsAppDemandContext): string | null {
+    const phone = normalizePhoneEC(context.customerPhone);
+    if (!phone) return null;
+
+    const greeting = context.customerName ? `¡Hola ${context.customerName}!` : `¡Hola!`;
+    const message = `${greeting} 👋
+
+Te escribimos para avisarte que el producto que estabas buscando en nuestra lista de espera ha sido descontinuado por el fabricante y ya no recibiremos más unidades:
+
+📦 *${context.productName}* (SKU: ${context.productSku})
+
+Lamentamos las molestias ocasionadas. Si necesitas ayuda buscando una alternativa, no dudes en consultarnos. 🏍️`;
+
+    const encodedMessage = encodeURIComponent(message);
+    return `https://wa.me/${phone}?text=${encodedMessage}`;
+}
+
+
+/**
  * Opens a WhatsApp URL in a new tab/window.
  * Falls back gracefully if the URL is invalid.
  */
