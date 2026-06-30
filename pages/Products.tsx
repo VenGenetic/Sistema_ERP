@@ -277,7 +277,7 @@ const Products: React.FC = () => {
         }
         
         const urlFilters: { [key: string]: string } = {};
-        const filterKeys = ['sku', 'name', 'category', 'brand', 'imageStatus', 'videoStatus', 'stockStatus'];
+        const filterKeys = ['sku', 'name', 'category', 'brand', 'imageStatus', 'videoStatus', 'stockStatus', 'discontinuedStatus'];
         filterKeys.forEach(key => {
             const val = params.get(key);
             if (val) urlFilters[key] = val;
@@ -1041,7 +1041,55 @@ const Products: React.FC = () => {
             </div>
 
             {/* ═══════ GLOBAL SEARCH & FILTERS ═══════ */}
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col gap-4">
+                {/* 1. Filtros Rápidos (Arriba) */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full justify-end items-center bg-slate-50 dark:bg-slate-900/50 p-2 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider px-2 hidden lg:block mr-auto">Filtros Rápidos</span>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <select
+                            value={filters.imageStatus || ''}
+                            onChange={(e) => handleFilterChange('imageStatus', e.target.value)}
+                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                        >
+                            <option value="">📸 Todas las Imágenes</option>
+                            <option value="con_imagen">✅ Mostrar Con Imagen</option>
+                            <option value="sin_imagen">❌ Falta Imagen</option>
+                        </select>
+                        <select
+                            value={filters.videoStatus || ''}
+                            onChange={(e) => handleFilterChange('videoStatus', e.target.value)}
+                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                        >
+                            <option value="">🎬 Todos los Videos</option>
+                            <option value="con_video">✅ Mostrar Con Video</option>
+                            <option value="sin_video">❌ Falta Video</option>
+                        </select>
+                        <select
+                            value={filters.stockStatus || ''}
+                            onChange={(e) => handleFilterChange('stockStatus', e.target.value)}
+                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[200px]"
+                        >
+                            <option value="">📦 Todos los Repuestos</option>
+                            <option value="disponibles_importadora">🟢 En Importadora</option>
+                            <option value="solo_local">🏠 Solo Local (Agotado Imp.)</option>
+                            <option value="disponibles_local">🏢 Con Stock Local</option>
+                            <option value="solo_importadora">✈️ Solo Importadora (Agotado Local)</option>
+                            <option value="disponibles_cualquiera">⚡ Disponible (Local o Imp.)</option>
+                            <option value="agotados">🔴 Agotado en Ambos</option>
+                        </select>
+                        <select
+                            value={filters.discontinuedStatus || ''}
+                            onChange={(e) => handleFilterChange('discontinuedStatus', e.target.value)}
+                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                        >
+                            <option value="">⚙️ Todos (General)</option>
+                            <option value="activos">✅ Solo Activos</option>
+                            <option value="descontinuados">🚨 Descontinuados</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* 2. Barra de Búsqueda (Abajo) */}
                 <div className="flex-1 flex flex-col gap-2">
                     <div className="flex gap-2 items-center">
                         <div className="relative flex-1">
@@ -1164,48 +1212,6 @@ const Products: React.FC = () => {
                             </div>
                         </div>
                     )}
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <select
-                        value={filters.imageStatus || ''}
-                        onChange={(e) => handleFilterChange('imageStatus', e.target.value)}
-                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
-                    >
-                        <option value="">📸 Todas las Imágenes</option>
-                        <option value="con_imagen">✅ Mostrar Con Imagen</option>
-                        <option value="sin_imagen">❌ Falta Imagen</option>
-                    </select>
-                    <select
-                        value={filters.videoStatus || ''}
-                        onChange={(e) => handleFilterChange('videoStatus', e.target.value)}
-                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
-                    >
-                        <option value="">🎬 Todos los Videos</option>
-                        <option value="con_video">✅ Mostrar Con Video</option>
-                        <option value="sin_video">❌ Falta Video</option>
-                    </select>
-                    <select
-                        value={filters.stockStatus || ''}
-                        onChange={(e) => handleFilterChange('stockStatus', e.target.value)}
-                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[200px]"
-                    >
-                        <option value="">📦 Todos los Repuestos</option>
-                        <option value="disponibles_importadora">🟢 En Importadora</option>
-                        <option value="solo_local">🏠 Solo Local (Agotado Imp.)</option>
-                        <option value="disponibles_local">🏢 Con Stock Local</option>
-                        <option value="solo_importadora">✈️ Solo Importadora (Agotado Local)</option>
-                        <option value="disponibles_cualquiera">⚡ Disponible (Local o Imp.)</option>
-                        <option value="agotados">🔴 Agotado en Ambos</option>
-                    </select>
-                    <select
-                        value={filters.discontinuedStatus || ''}
-                        onChange={(e) => handleFilterChange('discontinuedStatus', e.target.value)}
-                        className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
-                    >
-                        <option value="">⚙️ Todos (General)</option>
-                        <option value="activos">✅ Solo Activos</option>
-                        <option value="descontinuados">🚨 Descontinuados</option>
-                    </select>
                 </div>
             </div>
 
