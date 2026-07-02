@@ -7,12 +7,24 @@ type Permissions = Record<string, { read?: boolean; write?: boolean }>;
 interface UserProfile {
     id: string;
     role_id: number | null;
+    current_session_id?: string | null;
     roles?: {
         name: string;
         permissions: any;
     } | null;
     [key: string]: any;
 }
+
+const getOrCreateDeviceSessionId = () => {
+    let id = localStorage.getItem('device_session_id');
+    if (!id) {
+        id = typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('device_session_id', id);
+    }
+    return id;
+};
 
 interface AuthContextType {
     session: Session | null;
@@ -52,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         .select(`
               id,
               role_id,
+              current_session_id,
               roles (
                 name,
                 permissions
@@ -64,6 +77,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         console.error('Error fetching user profile:', profileError);
                     } else if (mounted && profile) {
                         setUserProfile(profile as unknown as UserProfile);
+
+                        const localSessionId = getOrCreateDeviceSessionId();
+                        if (profile.current_session_id !== localSessionId) {
+                            await supabase
+                                .from('profiles')
+                                .update({ current_session_id: localSessionId })
+                                .eq('id', currentSession.user.id);
+                        }
                     }
                 } else {
                     if (mounted) setSession(null);
@@ -96,6 +117,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             subscription.unsubscribe();
         };
     }, []);
+
+    useEffect(() => {
+        if (!session?.user?.id) return;
+
+        const localSessionId = getOrCreateDeviceSessionId();
+
+        const channel = supabase
+            .channel(`profile-session-${session.user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: `id=eq.${session.user.id}`,
+                },
+                (payload) => {
+                    const dbSessionId = payload.new.current_session_id;
+                    if (dbSessionId && dbSessionId !== localSessionId) {
+                        supabase.auth.signOut();
+                        alert("Tu sesión ha sido iniciada en otro dispositivo.");
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            channel.unsubscribe();
+        };
+    }, [session?.user?.id]);
 
     const permissions = (userProfile?.roles?.permissions as Permissions) || null;
     const isAdmin = userProfile?.roles?.name === 'Admin' || userProfile?.role_id === 1;

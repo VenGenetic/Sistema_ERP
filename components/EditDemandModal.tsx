@@ -9,6 +9,8 @@ interface ProductDemand {
     customer_name: string | null;
     notes: string | null;
     status: string;
+    created_at?: string;
+    creator_name?: string;
     product?: {
         name: string;
         sku: string;
@@ -115,11 +117,31 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto">
-                    <div className="mb-6 bg-slate-100 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="mb-4 bg-slate-100 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
                         <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Producto Solicitado</span>
                         <span className="block font-medium text-slate-900 dark:text-white line-clamp-2">{demand.product?.name || 'Producto Desconocido'}</span>
                         <span className="block font-mono text-xs text-slate-500 mt-1">{demand.product?.sku || ''}</span>
                     </div>
+
+                    {(demand.created_at || demand.creator_name) && (
+                        <div className="mb-6 bg-slate-50 dark:bg-slate-900/30 p-3 rounded-lg border border-slate-200 dark:border-slate-850 text-xs text-slate-500 dark:text-slate-400 flex flex-col gap-1.5">
+                            {demand.created_at && (
+                                <div className="flex justify-between items-center">
+                                    <span className="font-semibold text-slate-400">Fecha de Registro:</span>
+                                    <span>{new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
+                                </div>
+                            )}
+                            {demand.creator_name && (
+                                <div className="flex justify-between items-center">
+                                    <span className="font-semibold text-slate-400">Registrado por:</span>
+                                    <span className="font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[14px]">person</span>
+                                        {demand.creator_name}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                         

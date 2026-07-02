@@ -18,6 +18,8 @@ interface ProductDemand {
     created_at: string;
     stock_detected_at: string | null;
     notified_at: string | null;
+    created_by?: string | null;
+    creator_name?: string;
     product: {
         id: number;
         name: string;
@@ -66,7 +68,37 @@ const ProductDemands: React.FC = () => {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setDemands(data || []);
+
+            let mappedData = data || [];
+
+            // Client-side join with profiles to get creator name
+            const createdByIds = Array.from(new Set(mappedData.map(d => d.created_by).filter(Boolean)));
+            if (createdByIds.length > 0) {
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', createdByIds);
+
+                if (!profilesError && profilesData) {
+                    const profilesMap = new Map(profilesData.map(p => [p.id, p.full_name]));
+                    mappedData = mappedData.map(d => ({
+                        ...d,
+                        creator_name: d.created_by ? (profilesMap.get(d.created_by) || 'Desconocido') : 'Sistema/Desconocido'
+                    }));
+                } else {
+                    mappedData = mappedData.map(d => ({
+                        ...d,
+                        creator_name: 'Desconocido'
+                    }));
+                }
+            } else {
+                mappedData = mappedData.map(d => ({
+                    ...d,
+                    creator_name: 'Sistema/Desconocido'
+                }));
+            }
+
+            setDemands(mappedData);
         } catch (error: any) {
             console.error('Error fetching demands:', error);
         } finally {
@@ -527,8 +559,14 @@ const ProductDemands: React.FC = () => {
                                         <StatusBadge status={demand.status} />
                                     </td>
                                     <td className="px-6 py-4 align-top">
-                                        <div className="flex flex-col gap-1 text-sm">
-                                            <span className="text-slate-500 dark:text-slate-400">Reg: {new Date(demand.created_at).toLocaleDateString()}</span>
+                                        <div className="flex flex-col gap-1.5 text-sm">
+                                            <span className="text-slate-500 dark:text-slate-400 font-medium">
+                                                Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
+                                            </span>
+                                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[14px]">person</span>
+                                                {demand.creator_name || 'Desconocido'}
+                                            </span>
                                             <StockDisplay prod={demand.product} />
                                         </div>
                                     </td>
@@ -580,7 +618,13 @@ const ProductDemands: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex justify-between items-end mt-auto pt-2">
-                            <span className="text-xs text-slate-400">{new Date(demand.created_at).toLocaleDateString()}</span>
+                            <div className="flex flex-col gap-0.5 text-xs text-slate-400">
+                                <span>Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
+                                <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
+                                    <span className="material-symbols-outlined text-[13px]">person</span>
+                                    {demand.creator_name || 'Desconocido'}
+                                </span>
+                            </div>
                             <div className="w-32"><ActionButtons demand={demand} /></div>
                         </div>
                     </div>
@@ -662,6 +706,16 @@ const ProductDemands: React.FC = () => {
                                                 <span className="line-clamp-2 font-medium">{demand.product?.name}</span>
                                                 <span className="font-mono mt-1 block">{demand.product?.sku}</span>
                                             </div>
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 flex flex-col gap-0.5 mt-1 border-t border-slate-100 dark:border-slate-800 pt-1">
+                                            <span className="flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[11px]">calendar_today</span>
+                                                {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
+                                            </span>
+                                            <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
+                                                <span className="material-symbols-outlined text-[11px]">person</span>
+                                                {demand.creator_name || 'Desconocido'}
+                                            </span>
                                         </div>
                                         <div className="mt-2"><ActionButtons demand={demand} /></div>
                                     </div>
@@ -745,7 +799,13 @@ const ProductDemands: React.FC = () => {
                                                     </div>
                                                     <StatusBadge status={demand.status} />
                                                 </div>
-                                                <div className="text-xs text-slate-400">Reg: {new Date(demand.created_at).toLocaleDateString()}</div>
+                                                <div className="text-xs text-slate-400 flex flex-col gap-0.5">
+                                                    <span>Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
+                                                    <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-300">
+                                                        <span className="material-symbols-outlined text-[13px]">person</span>
+                                                        {demand.creator_name || 'Desconocido'}
+                                                    </span>
+                                                </div>
                                                 <div className="mt-auto pt-2"><ActionButtons demand={demand} /></div>
                                             </div>
                                         ))}
