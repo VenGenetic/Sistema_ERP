@@ -123,6 +123,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const localSessionId = getOrCreateDeviceSessionId();
 
+        const handleSignOutAggressive = async () => {
+            await supabase.auth.signOut();
+            localStorage.removeItem('device_session_id');
+            alert("Tu sesión ha sido iniciada en otro dispositivo.");
+            window.location.href = '/';
+        };
+
+        const checkSessionDb = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('current_session_id')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (!error && data) {
+                    if (data.current_session_id && data.current_session_id !== localSessionId) {
+                        await handleSignOutAggressive();
+                    }
+                }
+            } catch (err) {
+                console.error('Error in aggressive session check:', err);
+            }
+        };
+
+        // 1. Suscripción en Tiempo Real (Notificación inmediata)
         const channel = supabase
             .channel(`profile-session-${session.user.id}`)
             .on(
@@ -133,18 +159,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     table: 'profiles',
                     filter: `id=eq.${session.user.id}`,
                 },
-                (payload) => {
+                async (payload) => {
                     const dbSessionId = payload.new.current_session_id;
                     if (dbSessionId && dbSessionId !== localSessionId) {
-                        supabase.auth.signOut();
-                        alert("Tu sesión ha sido iniciada en otro dispositivo.");
+                        await handleSignOutAggressive();
                     }
                 }
             )
             .subscribe();
 
+        // 2. Intervalo de verificación (Cada 10 segundos)
+        const interval = setInterval(checkSessionDb, 10000);
+
+        // 3. Verificación inmediata cuando el usuario vuelve a enfocar la pestaña
+        const handleFocus = () => {
+            checkSessionDb();
+        };
+        window.addEventListener('focus', handleFocus);
+
+        // Verificación inicial inmediata
+        checkSessionDb();
+
         return () => {
             channel.unsubscribe();
+            clearInterval(interval);
+            window.removeEventListener('focus', handleFocus);
         };
     }, [session?.user?.id]);
 
