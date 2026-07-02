@@ -6,6 +6,7 @@ import { MediaLightbox } from '../components/MediaLightbox';
 import { getThumbnailUrl } from '../utils/image';
 import { EditDemandModal } from '../components/EditDemandModal';
 import { ShareDemandModal } from '../components/ShareDemandModal';
+import { ExportDemandsModal } from '../components/ExportDemandsModal';
 
 interface ProductDemand {
     id: number;
@@ -49,6 +50,7 @@ const ProductDemands: React.FC = () => {
     const [editingDemand, setEditingDemand] = useState<ProductDemand | null>(null);
     const [sharingDemand, setSharingDemand] = useState<ProductDemand | null>(null);
     const [discontinueProductId, setDiscontinueProductId] = useState<number | null>(null);
+    const [showExportModal, setShowExportModal] = useState(false);
     const [discontinueDuration, setDiscontinueDuration] = useState<'3' | '6' | '12' | 'permanente'>('permanente');
     const [isDiscontinuing, setIsDiscontinuing] = useState(false);
 
@@ -816,18 +818,29 @@ const ProductDemands: React.FC = () => {
             <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center gap-4 bg-white dark:bg-[#0c1117] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 
                 {/* Vistas */}
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-full 2xl:w-auto overflow-x-auto">
-                    <button onClick={() => setViewType('table')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'table' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-[18px]">table_rows</span> Tabla
-                    </button>
-                    <button onClick={() => setViewType('list')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'list' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-[18px]">view_list</span> Lista
-                    </button>
-                    <button onClick={() => setViewType('kanban')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'kanban' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-[18px]">view_kanban</span> Kanban
-                    </button>
-                    <button onClick={() => setViewType('grouped')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'grouped' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
-                        <span className="material-symbols-outlined text-[18px]">category</span> Agrupado
+                <div className="flex items-center gap-3 w-full 2xl:w-auto">
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto flex-1 2xl:flex-none">
+                        <button onClick={() => setViewType('table')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'table' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
+                            <span className="material-symbols-outlined text-[18px]">table_rows</span> Tabla
+                        </button>
+                        <button onClick={() => setViewType('list')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'list' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
+                            <span className="material-symbols-outlined text-[18px]">view_list</span> Lista
+                        </button>
+                        <button onClick={() => setViewType('kanban')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'kanban' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
+                            <span className="material-symbols-outlined text-[18px]">view_kanban</span> Kanban
+                        </button>
+                        <button onClick={() => setViewType('grouped')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewType === 'grouped' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white'}`}>
+                            <span className="material-symbols-outlined text-[18px]">category</span> Agrupado
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={() => setShowExportModal(true)}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                        title="Exportar demandas a CSV con filtros"
+                    >
+                        <span className="material-symbols-outlined text-[18px] text-emerald-600">download</span>
+                        <span className="hidden sm:inline">Exportar CSV</span>
                     </button>
                 </div>
 
@@ -888,6 +901,15 @@ const ProductDemands: React.FC = () => {
             {viewType === 'list' && renderListView()}
             {viewType === 'kanban' && renderKanbanView()}
             {viewType === 'grouped' && renderGroupedView()}
+
+            <ExportDemandsModal
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                demands={demands}
+                initialStatusFilter={statusFilter}
+                initialStockFilter={stockFilter}
+                initialSearchTerm={searchTerm}
+            />
 
             <EditDemandModal
                 isOpen={!!editingDemand}
