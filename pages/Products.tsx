@@ -325,10 +325,18 @@ const Products: React.FC = () => {
                 `, { count: 'exact' })
                 .eq('is_active', true);
 
-            // Global Search (OR across name and sku for each active search term)
+            // Global Search (OR across name and sku for each active search term, support exclusions with '-')
             const activeSearchTerms = debouncedSearchTerms.map(s => s.trim()).filter(Boolean);
             for (const term of activeSearchTerms) {
-                query = query.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
+                if (term.startsWith('-')) {
+                    const cleanTerm = term.slice(1).trim();
+                    if (cleanTerm) {
+                        query = query.not('name', 'ilike', `%${cleanTerm}%`);
+                        query = query.not('sku', 'ilike', `%${cleanTerm}%`);
+                    }
+                } else {
+                    query = query.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
+                }
             }
 
             // Column Filters (AND logic)
@@ -1144,6 +1152,17 @@ const Products: React.FC = () => {
                                 {searchTerms.slice(1).map((term, idx) => {
                                     const actualIdx = idx + 1;
                                     const isCollapsed = !expanded[actualIdx];
+                                    const isExclude = term.trim().startsWith('-');
+                                    const cleanTerm = isExclude ? term.trim().slice(1).trim() : term.trim();
+                                    
+                                    const toggleExclude = (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        if (isExclude) {
+                                            updateSearchTerm(actualIdx, cleanTerm);
+                                        } else {
+                                            updateSearchTerm(actualIdx, `-${cleanTerm || ''}`);
+                                        }
+                                    };
 
                                     return (
                                         <div 
@@ -1154,45 +1173,58 @@ const Products: React.FC = () => {
                                             {isCollapsed ? (
                                                 <div 
                                                     onClick={() => toggleExpandFilter(actualIdx)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full font-semibold text-xs border border-slate-200 dark:border-slate-700 shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold text-xs border shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all ${isExclude ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/50' : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}
                                                 >
-                                                    <span className="material-symbols-outlined text-[14px] text-primary">search</span>
-                                                    <span className="truncate max-w-[120px]">{term.trim() || `Filtro ${actualIdx}`}</span>
+                                                    <span className={`material-symbols-outlined text-[14px] ${isExclude ? 'text-red-500' : 'text-primary'}`}>
+                                                        {isExclude ? 'block' : 'search'}
+                                                    </span>
+                                                    <span className="truncate max-w-[120px]">{cleanTerm || `Filtro ${actualIdx}`}</span>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             removeSearchFilter(actualIdx);
                                                         }}
-                                                        className="ml-1 p-0.5 hover:bg-slate-250 dark:hover:bg-slate-700 rounded-full transition-colors text-gray-400 hover:text-red-550"
+                                                        className={`ml-1 p-0.5 rounded-full transition-colors ${isExclude ? 'hover:bg-red-200 dark:hover:bg-red-800 text-red-400 hover:text-red-700' : 'hover:bg-slate-250 dark:hover:bg-slate-700 text-gray-400 hover:text-red-550'}`}
                                                         title="Eliminar filtro"
                                                     >
                                                         <span className="material-symbols-outlined text-[14px]">close</span>
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="flex gap-2 items-center min-w-[280px] sm:min-w-[320px] bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                <div className={`flex gap-2 items-center min-w-[280px] sm:min-w-[320px] p-1 rounded-xl border shadow-sm ${isExclude ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/50' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                                     <div className="relative flex-1">
-                                                        <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                                                        <span className={`material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] ${isExclude ? 'text-red-400' : 'text-slate-400'}`}>
+                                                            {isExclude ? 'block' : 'search'}
+                                                        </span>
                                                         <input
                                                             type="text"
-                                                            placeholder={`Palabra clave ${actualIdx}...`}
+                                                            placeholder={isExclude ? `Palabra a excluir ${actualIdx}...` : `Palabra clave ${actualIdx}...`}
                                                             value={term}
                                                             onChange={(e) => updateSearchTerm(actualIdx, e.target.value)}
-                                                            className="w-full pl-8 pr-8 py-2 bg-transparent text-sm outline-none"
+                                                            className={`w-full pl-8 pr-20 py-2 bg-transparent text-sm outline-none ${isExclude ? 'text-red-700 dark:text-red-300 placeholder-red-300 dark:placeholder-red-700/50' : 'text-slate-700 dark:text-slate-200'}`}
                                                             autoFocus
                                                         />
-                                                        {term && (
+                                                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                                             <button
-                                                                onClick={() => updateSearchTerm(actualIdx, '')}
-                                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-650 transition-colors"
+                                                                onClick={toggleExclude}
+                                                                className={`px-1.5 py-0.5 rounded-md transition-colors text-[10px] font-bold uppercase tracking-wider ${isExclude ? 'bg-red-100 dark:bg-red-800/50 text-red-700 dark:text-red-300 hover:bg-red-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-200'}`}
+                                                                title={isExclude ? "Cambiar a incluir" : "Cambiar a excluir"}
                                                             >
-                                                                <span className="material-symbols-outlined text-[16px]">close</span>
+                                                                {isExclude ? 'Excluir' : 'Incluir'}
                                                             </button>
-                                                        )}
+                                                            {term && (
+                                                                <button
+                                                                    onClick={() => updateSearchTerm(actualIdx, '')}
+                                                                    className={`p-0.5 transition-colors ${isExclude ? 'text-red-400 hover:text-red-600' : 'text-slate-400 hover:text-slate-650'}`}
+                                                                >
+                                                                    <span className="material-symbols-outlined text-[16px]">close</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <button
                                                         onClick={() => toggleExpandFilter(actualIdx)}
-                                                        className="px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 hover:text-slate-750 text-xs font-semibold transition-colors shrink-0"
+                                                        className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${isExclude ? 'hover:bg-red-100 dark:hover:bg-red-800/50 text-red-600 dark:text-red-400' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-750'}`}
                                                         title="Contraer"
                                                     >
                                                         Contraer

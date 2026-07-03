@@ -199,7 +199,14 @@ const Inventory: React.FC = () => {
                     filtered = filtered.filter(item => {
                         const name = item.products?.name?.toLowerCase() || '';
                         const sku = item.products?.sku?.toLowerCase() || '';
-                        return terms.every(t => name.includes(t) || sku.includes(t));
+                        return terms.every(t => {
+                            if (t.startsWith('-')) {
+                                const cleanT = t.slice(1);
+                                if (!cleanT) return true;
+                                return !name.includes(cleanT) && !sku.includes(cleanT);
+                            }
+                            return name.includes(t) || sku.includes(t);
+                        });
                     });
                 }
 
@@ -233,7 +240,15 @@ const Inventory: React.FC = () => {
 
                 // Search (applied to products)
                 if (searchTerm) {
-                    query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+                    if (searchTerm.startsWith('-')) {
+                        const cleanTerm = searchTerm.slice(1).trim();
+                        if (cleanTerm) {
+                            query = query.not('name', 'ilike', `%${cleanTerm}%`);
+                            query = query.not('sku', 'ilike', `%${cleanTerm}%`);
+                        }
+                    } else {
+                        query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+                    }
                 }
 
                 // Column Filters
@@ -412,7 +427,15 @@ const Inventory: React.FC = () => {
                 query = query.eq('inventory_levels.warehouse_id', selectedWarehouseId);
             }
             if (searchTerm) {
-                query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+                if (searchTerm.startsWith('-')) {
+                    const cleanTerm = searchTerm.slice(1).trim();
+                    if (cleanTerm) {
+                        query = query.not('name', 'ilike', `%${cleanTerm}%`);
+                        query = query.not('sku', 'ilike', `%${cleanTerm}%`);
+                    }
+                } else {
+                    query = query.or(`name.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+                }
             }
             if (filters.product) {
                 query = query.ilike('name', `%${filters.product}%`);
