@@ -76,8 +76,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     if (profileError) {
                         console.error('Error fetching user profile:', profileError);
                     } else if (mounted && profile) {
-                        setUserProfile(profile as unknown as UserProfile);
-
                         const localSessionId = getOrCreateDeviceSessionId();
                         if (profile.current_session_id !== localSessionId) {
                             await supabase
@@ -85,6 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 .update({ current_session_id: localSessionId })
                                 .eq('id', currentSession.user.id);
                         }
+                        
+                        setUserProfile(profile as unknown as UserProfile);
                     }
                 } else {
                     if (mounted) setSession(null);
@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     useEffect(() => {
-        if (!session?.user?.id) return;
+        if (!session?.user?.id || !userProfile) return;
 
         const localSessionId = getOrCreateDeviceSessionId();
 
@@ -185,7 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             clearInterval(interval);
             window.removeEventListener('focus', handleFocus);
         };
-    }, [session?.user?.id]);
+    }, [session?.user?.id, userProfile]);
 
     const permissions = (userProfile?.roles?.permissions as Permissions) || null;
     const isAdmin = userProfile?.roles?.name === 'Admin' || userProfile?.role_id === 1;
