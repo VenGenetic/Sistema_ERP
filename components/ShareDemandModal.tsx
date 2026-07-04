@@ -79,7 +79,8 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
         }
     };
 
-    const localStock = demand.product?.inventory_levels ? demand.product.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
+    // Para el ticket siempre asumimos 0 en local porque se usa para capturar demanda
+    const localStock = 0;
     const importerStock = demand.product?.importer_stock || 0;
 
     return (
@@ -109,6 +110,13 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                         
                         <div className="flex-1 flex flex-col p-6">
                             
+                            {/* Ticket Title */}
+                            <div className="text-center mb-3">
+                                <span className={`text-[13px] font-black tracking-widest uppercase ${importerStock > 0 ? 'text-blue-600' : 'text-amber-600'}`}>
+                                    {importerStock > 0 ? 'TICKET DE PEDIDO' : 'YA ESTAS EN LA LISTA DE ESPERA'}
+                                </span>
+                            </div>
+
                             {/* Product Info Section */}
                             <div className="flex gap-4 items-center mb-4">
                                 {demand.product?.image_url ? (
@@ -187,7 +195,9 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                             {/* Disclaimer & Website */}
                             <div className="mt-auto pt-3 border-t border-slate-100 flex flex-col items-center text-center">
                                 <span className="text-[9px] text-slate-500 leading-tight max-w-[95%] mb-1">
-                                    Este es tu ticket de pedido. Nosotros le daremos seguimiento a tu repuesto y solicitud. Gracias por confiar en nosotros.
+                                    {importerStock > 0 
+                                        ? "Este es tu ticket de pedido. Los pedidos se suelen demorar DE 6 A 15 DIAS LABORABLES. Gracias por confiar en nosotros."
+                                        : "Estas en la lista de espera. Nosotros le daremos seguimiento a tu repuesto y solicitud. Apenas el repuesto vuelva a estar disponible, NOSOTROS NOS COMUNICAREMOS CONTIGO."}
                                 </span>
                                 <span className="text-[11px] font-bold text-blue-500">https://www.lvparts.ec/</span>
                             </div>
