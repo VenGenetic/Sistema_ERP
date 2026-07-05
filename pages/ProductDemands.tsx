@@ -14,7 +14,7 @@ interface ProductDemand {
     phone_number: string;
     customer_name: string | null;
     notes: string | null;
-    status: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued';
+    status: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired';
     created_at: string;
     stock_detected_at: string | null;
     notified_at: string | null;
@@ -43,7 +43,7 @@ const ProductDemands: React.FC = () => {
     // View and Filters State
     const [viewType, setViewType] = useState<'table' | 'list' | 'kanban' | 'grouped'>('table');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
-    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued'>('active');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
     const [stockFilter, setStockFilter] = useState<'all' | 'importer_only' | 'local_only' | 'no_stock'>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
@@ -125,6 +125,16 @@ const ProductDemands: React.FC = () => {
 
     const toggleProductExpand = (productId: number) => {
         setExpandedProducts(prev => ({ ...prev, [productId]: !prev[productId] }));
+    };
+
+    const ExpirationDisplay = ({ createdAt, status }: { createdAt: string, status: string }) => {
+        if (status === 'cancelled' || status === 'notified' || status === 'discontinued') return null;
+        const expirationDate = new Date(new Date(createdAt).getTime() + 60 * 24 * 60 * 60 * 1000);
+        const daysLeft = Math.ceil((expirationDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        if (daysLeft <= 0) {
+            return <span className="text-red-500 font-medium text-xs ml-1">(Vencido)</span>;
+        }
+        return <span className={`font-medium text-xs ml-1 ${daysLeft <= 10 ? 'text-amber-500' : 'text-blue-500'}`}>(Vence en {daysLeft} días)</span>;
     };
 
     // Actions
@@ -323,7 +333,7 @@ const ProductDemands: React.FC = () => {
         setLightbox({ isOpen: true, media, initialIndex: 0 });
     };
 
-    const handleStatusChange = async (demandId: number, newStatus: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued') => {
+    const handleStatusChange = async (demandId: number, newStatus: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired') => {
         try {
             const updates: any = { status: newStatus };
             if (newStatus === 'notified') {
@@ -349,7 +359,7 @@ const ProductDemands: React.FC = () => {
     const stats = useMemo(() => {
         const total = demands.length;
         const active = demands.filter(d => d.status === 'pending_stock' || d.status === 'stock_available').length;
-        const inactive = demands.filter(d => d.status === 'notified' || d.status === 'cancelled').length;
+        const inactive = demands.filter(d => d.status === 'notified' || d.status === 'cancelled' || d.status === 'expired').length;
         const readyToNotify = demands.filter(d => (d.status === 'pending_stock' || d.status === 'stock_available') && getStockValue(d.product) > 0).length;
         return { total, active, inactive, readyToNotify };
     }, [demands]);
@@ -361,7 +371,7 @@ const ProductDemands: React.FC = () => {
                 if (statusFilter === 'active') {
                     if (d.status !== 'pending_stock' && d.status !== 'stock_available') return false;
                 } else if (statusFilter === 'inactive') {
-                    if (d.status !== 'notified' && d.status !== 'cancelled') return false;
+                    if (d.status !== 'notified' && d.status !== 'cancelled' && d.status !== 'expired') return false;
                 } else if (statusFilter !== 'all') {
                     if (d.status !== statusFilter) return false;
                 }
@@ -421,6 +431,7 @@ const ProductDemands: React.FC = () => {
         if (status === 'stock_available') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"><span className="material-symbols-outlined text-[14px]">check_circle</span>Listo para Notificar</span>;
         if (status === 'notified') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800"><span className="material-symbols-outlined text-[14px]">done_all</span>Notificado</span>;
         if (status === 'discontinued') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800"><span className="material-symbols-outlined text-[14px]">warning</span>Descontinuado</span>;
+        if (status === 'expired') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800"><span className="material-symbols-outlined text-[14px]">timer_off</span>Vencido</span>;
         return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"><span className="material-symbols-outlined text-[14px]">cancel</span>Cancelado</span>;
     };
 
@@ -467,6 +478,7 @@ const ProductDemands: React.FC = () => {
         const isReady = demand.status === 'stock_available';
         const isActive = demand.status === 'pending_stock' || demand.status === 'stock_available';
         const isDiscontinued = demand.status === 'discontinued';
+        const isExpired = demand.status === 'expired';
         
         return (
             <div className="flex flex-col gap-2">
@@ -487,6 +499,7 @@ const ProductDemands: React.FC = () => {
                             )}
                         </div>
                         <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-slate-500 hover:text-blue-600 transition-colors">Marcar Notificado</button>
+                        <button onClick={(e) => handleStatusChange(demand.id, 'expired')} className="text-xs text-red-500 hover:text-red-700 transition-colors">Marcar Vencido</button>
                         <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-rose-500 hover:text-rose-700 transition-colors">Cancelar</button>
                     </>
                 ) : isDiscontinued ? (
@@ -497,6 +510,15 @@ const ProductDemands: React.FC = () => {
                         <div className="flex items-center justify-center gap-2">
                             <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-slate-500 hover:text-blue-600 transition-colors">Archivar/Notificado</button>
                             <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-rose-500 hover:text-rose-700 transition-colors">Cancelar</button>
+                        </div>
+                    </>
+                ) : isExpired ? (
+                    <>
+                        <div className="flex flex-col gap-2 justify-center items-center">
+                            <span className="text-xs text-slate-400">Expiró sin stock</span>
+                            <button onClick={(e) => handleDelete(demand, e)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors mx-auto" title="Eliminar registro">
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
                         </div>
                     </>
                 ) : (
@@ -562,6 +584,7 @@ const ProductDemands: React.FC = () => {
                                         <div className="flex flex-col gap-1.5 text-sm">
                                             <span className="text-slate-500 dark:text-slate-400 font-medium">
                                                 Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
+                                                <ExpirationDisplay createdAt={demand.created_at} status={demand.status} />
                                             </span>
                                             <span className="text-xs text-slate-400 flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-[14px]">person</span>
@@ -619,7 +642,10 @@ const ProductDemands: React.FC = () => {
                         </div>
                         <div className="flex justify-between items-end mt-auto pt-2">
                             <div className="flex flex-col gap-0.5 text-xs text-slate-400">
-                                <span>Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
+                                <span>
+                                    Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
+                                    <ExpirationDisplay createdAt={demand.created_at} status={demand.status} />
+                                </span>
                                 <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
                                     <span className="material-symbols-outlined text-[13px]">person</span>
                                     {demand.creator_name || 'Desconocido'}
@@ -641,6 +667,7 @@ const ProductDemands: React.FC = () => {
             { id: 'pending_stock', title: 'Esperando Stock', color: 'bg-amber-50 dark:bg-amber-900/10', hoverColor: 'bg-amber-100/80 dark:bg-amber-900/20', header: 'border-amber-300 dark:border-amber-600', text: 'text-amber-700 dark:text-amber-400' },
             { id: 'stock_available', title: 'Stock Disponible', color: 'bg-emerald-50 dark:bg-emerald-900/10', hoverColor: 'bg-emerald-100/80 dark:bg-emerald-900/20', header: 'border-emerald-300 dark:border-emerald-600', text: 'text-emerald-700 dark:text-emerald-400' },
             { id: 'discontinued', title: 'Descontinuados por Notificar', color: 'bg-rose-50 dark:bg-rose-900/10', hoverColor: 'bg-rose-100/80 dark:bg-rose-900/20', header: 'border-rose-300 dark:border-rose-600', text: 'text-rose-700 dark:text-rose-400' },
+            { id: 'expired', title: 'Vencidos', color: 'bg-red-50 dark:bg-red-900/10', hoverColor: 'bg-red-100/80 dark:bg-red-900/20', header: 'border-red-300 dark:border-red-600', text: 'text-red-700 dark:text-red-400' },
             { id: 'notified', title: 'Notificados', color: 'bg-blue-50 dark:bg-blue-900/10', hoverColor: 'bg-blue-100/80 dark:bg-blue-900/20', header: 'border-blue-300 dark:border-blue-600', text: 'text-blue-700 dark:text-blue-400' },
             { id: 'cancelled', title: 'Cancelados', color: 'bg-slate-50 dark:bg-slate-900/10', hoverColor: 'bg-slate-100/80 dark:bg-slate-900/20', header: 'border-slate-300 dark:border-slate-600', text: 'text-slate-700 dark:text-slate-300' }
         ];
@@ -711,6 +738,7 @@ const ProductDemands: React.FC = () => {
                                             <span className="flex items-center gap-1">
                                                 <span className="material-symbols-outlined text-[11px]">calendar_today</span>
                                                 {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
+                                                <ExpirationDisplay createdAt={demand.created_at} status={demand.status} />
                                             </span>
                                             <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
                                                 <span className="material-symbols-outlined text-[11px]">person</span>

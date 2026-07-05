@@ -44,6 +44,7 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
         if (status === 'stock_available') return 'Stock Disponible';
         if (status === 'notified') return 'Notificado';
         if (status === 'cancelled') return 'Cancelado';
+        if (status === 'expired') return 'Vencido';
         return status;
     };
 
@@ -176,7 +177,12 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Fecha Solicitud</span>
-                                    <span className="text-[13px] text-slate-600">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[13px] text-slate-600">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                        <span className="text-[11px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded" title="Fecha de Vencimiento">
+                                            Vence: {new Date(new Date(demand.created_at).getTime() + 60 * 24 * 60 * 60 * 1000).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
+                                        </span>
+                                    </div>
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Stock Local</span>
