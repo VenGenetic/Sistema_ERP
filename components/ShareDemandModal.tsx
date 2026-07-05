@@ -104,7 +104,7 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                     <div 
                         ref={printRef}
                         className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative"
-                        style={{ width: '400px', height: '400px', padding: '0', boxSizing: 'border-box' }}
+                        style={{ width: '400px', minHeight: '480px', height: 'auto', padding: '0', boxSizing: 'border-box' }}
                     >
                         {/* Decorative Top Border */}
                         <div className="h-2 w-full bg-blue-500"></div>
