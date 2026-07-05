@@ -4,6 +4,67 @@ import { useAuth } from '../contexts/AuthContext';
 import { ShareDemandModal } from './ShareDemandModal';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
 
+const parseClipboardText = (text: string) => {
+    const phoneRegex = /\+?[0-9\s\-\(\)\.]{7,20}/g;
+    let match;
+    let bestPhoneCandidate = '';
+    let rawPhoneMatch = '';
+    
+    while ((match = phoneRegex.exec(text)) !== null) {
+        const potentialPhone = match[0];
+        const digitsCount = potentialPhone.replace(/\D/g, '').length;
+        if (digitsCount >= 7 && digitsCount <= 15) {
+            bestPhoneCandidate = potentialPhone;
+            rawPhoneMatch = potentialPhone;
+            break;
+        }
+    }
+    
+    let phone = '';
+    let name = '';
+    
+    if (bestPhoneCandidate) {
+        let cleanPhone = bestPhoneCandidate.replace(/[^0-9+]/g, '');
+        if (!cleanPhone.startsWith('+')) {
+            if (cleanPhone.startsWith('593') && cleanPhone.length === 12) {
+                cleanPhone = '+' + cleanPhone;
+            } else if (cleanPhone.startsWith('0') && cleanPhone.length === 10) {
+                cleanPhone = '+593' + cleanPhone.substring(1);
+            } else if (cleanPhone.length === 9) {
+                cleanPhone = '+593' + cleanPhone;
+            } else {
+                cleanPhone = '+' + cleanPhone;
+            }
+        }
+        phone = cleanPhone;
+        
+        const textWithoutPhone = text.replace(rawPhoneMatch, ' ');
+        name = textWithoutPhone
+            .replace(/^[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]+|[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]+$/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        
+        if (name.length > 50) {
+            const nameIntroMatch = name.match(/(?:nombre\s+(?:es|de\s+la\s+persona)?\s*:?\s*|nombre\s*:\s*)([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,30})/i);
+            if (nameIntroMatch && nameIntroMatch[1]) {
+                name = nameIntroMatch[1].trim();
+            } else {
+                name = name.substring(0, 50).trim();
+            }
+        }
+
+        if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(name)) {
+            name = '';
+        }
+    } else {
+        if (text.trim().length < 30 && /[a-zA-Z]/.test(text)) {
+            name = text.trim();
+        }
+    }
+    
+    return { phone, name };
+};
+
 interface ProductDemandModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -23,6 +84,85 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
     const [loading, setLoading] = useState(false);
     const [showShare, setShowShare] = useState(false);
     const [createdDemand, setCreatedDemand] = useState<any>(null);
+
+    const handlePastePhone = async () => {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            alert('Tu navegador o conexión no permite el acceso al portapapeles. Asegúrate de usar una conexión segura (HTTPS) o un navegador compatible.');
+            return;
+        }
+        try {
+            const text = await navigator.clipboard.readText();
+            if (!text.trim()) {
+                alert('El portapapeles está vacío.');
+                return;
+            }
+
+            const parsed = parseClipboardText(text);
+            if (parsed.phone) {
+                setPhone(parsed.phone);
+            } else {
+                const cleanDigits = text.replace(/[^0-9+]/g, '');
+                if (cleanDigits.length >= 7) {
+                    let cleanPhone = cleanDigits;
+                    if (!cleanPhone.startsWith('+')) {
+                        if (cleanPhone.startsWith('593') && cleanPhone.length === 12) {
+                            cleanPhone = '+' + cleanPhone;
+                        } else if (cleanPhone.startsWith('0') && cleanPhone.length === 10) {
+                            cleanPhone = '+593' + cleanPhone.substring(1);
+                        } else if (cleanPhone.length === 9) {
+                            cleanPhone = '+593' + cleanPhone;
+                        } else {
+                            cleanPhone = '+' + cleanPhone;
+                        }
+                    }
+                    setPhone(cleanPhone);
+                } else {
+                    alert('No se pudo encontrar un número de teléfono válido en el texto copiado.');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to read clipboard: ', err);
+            alert('No se pudo acceder al portapapeles. Asegúrate de dar los permisos necesarios.');
+        }
+    };
+
+    const handlePasteName = async () => {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            alert('Tu navegador o conexión no permite el acceso al portapapeles. Asegúrate de usar una conexión segura (HTTPS) o un navegador compatible.');
+            return;
+        }
+        try {
+            const text = await navigator.clipboard.readText();
+            if (!text.trim()) {
+                alert('El portapapeles está vacío.');
+                return;
+            }
+
+            const phoneRegex = /\+?[0-9\s\-\(\)\.]{7,20}/g;
+            let match = phoneRegex.exec(text);
+            let cleanText = text;
+            if (match) {
+                const digitsCount = match[0].replace(/\D/g, '').length;
+                if (digitsCount >= 7 && digitsCount <= 15) {
+                    cleanText = text.replace(match[0], ' ');
+                }
+            }
+
+            const cleanedName = cleanText
+                .replace(/^[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]+|[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]+$/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            if (cleanedName.length > 50) {
+                setName(cleanedName.substring(0, 50));
+            } else {
+                setName(cleanedName);
+            }
+        } catch (err) {
+            console.error('Failed to read clipboard: ', err);
+            alert('No se pudo acceder al portapapeles. Asegúrate de dar los permisos necesarios.');
+        }
+    };
 
     if (!isOpen || !product) return null;
 
@@ -47,9 +187,34 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!phone.trim()) {
+        const cleanPhone = phone.trim();
+        if (!cleanPhone) {
             alert('El número de teléfono es obligatorio');
             return;
+        }
+
+        if (!cleanPhone.startsWith('+')) {
+            alert('El número de teléfono debe iniciar con el código de país (ej. +593 para Ecuador)');
+            return;
+        }
+
+        const digitsOnly = cleanPhone.substring(1);
+        if (!/^\d+$/.test(digitsOnly)) {
+            alert('El teléfono solo debe contener números después del signo +');
+            return;
+        }
+
+        if (digitsOnly.length < 7 || digitsOnly.length > 15) {
+            alert('El número de teléfono no es válido (debe tener entre 7 y 15 dígitos)');
+            return;
+        }
+
+        if (cleanPhone.startsWith('+593')) {
+            const ecuadorDigits = cleanPhone.substring(4);
+            if (ecuadorDigits.length !== 8 && ecuadorDigits.length !== 9) {
+                alert('Para Ecuador, el número debe tener 9 dígitos (celular) u 8 dígitos (teléfono fijo) después de +593.');
+                return;
+            }
         }
 
         setLoading(true);
@@ -144,23 +309,45 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                     ) : (
                         <form id="demand-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
                             <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                Teléfono <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                type="tel"
-                                required
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#161b22] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                placeholder="+593 99 999 9999"
-                            />
-                        </div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                        Teléfono <span className="text-rose-500">*</span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={handlePastePhone}
+                                        className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 font-semibold transition-colors"
+                                        title="Pega el teléfono desde el portapapeles"
+                                    >
+                                        <span className="material-symbols-outlined text-[15px]">content_paste</span>
+                                        Pegar Teléfono
+                                    </button>
+                                </div>
+                                <input
+                                    type="tel"
+                                    required
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9+]/g, ''))}
+                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#161b22] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    placeholder="+593999999999"
+                                />
+                            </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                Nombre del Cliente <span className="text-slate-400 text-xs font-normal">(Opcional)</span>
-                            </label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Nombre del Cliente <span className="text-slate-400 text-xs font-normal">(Opcional)</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={handlePasteName}
+                                    className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 font-semibold transition-colors"
+                                    title="Pega el nombre desde el portapapeles"
+                                >
+                                    <span className="material-symbols-outlined text-[15px]">content_paste</span>
+                                    Pegar Nombre
+                                </button>
+                            </div>
                             <input
                                 type="text"
                                 value={name}
