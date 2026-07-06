@@ -10,11 +10,14 @@ interface ProductDemand {
     created_at: string;
     stock_detected_at: string | null;
     notified_at: string | null;
+    is_approved?: boolean;
     product: {
         id: number;
         name: string;
         sku: string;
         price?: number;
+        cost_without_vat?: number;
+        vat_percentage?: number;
         importer_stock: number;
         local_stock: number;
         image_url?: string | null;
@@ -69,6 +72,7 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                 if (stockFilter === 'importer_only' && (!hasImporterStock || hasLocalStock)) return false;
                 if (stockFilter === 'local_only' && (!hasLocalStock || hasImporterStock)) return false;
                 if (stockFilter === 'no_stock' && (hasImporterStock || hasLocalStock)) return false;
+                if (stockFilter === 'approved_only' && !d.is_approved) return false;
             }
             return true;
         });
@@ -98,12 +102,19 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
         const productsList = Array.from(groupsMap.values()).map(group => {
             const prod = group.product;
             const localStock = prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
+            const cost = prod.cost_without_vat || 0;
+            const vat = prod.vat_percentage || 12.0;
+            const costWithVat = cost * (1 + (vat / 100));
+            const pvp = prod.price || 0;
             return {
                 sku: prod.sku,
                 name: prod.name,
                 waitingCount: group.demands.length,
                 localStock: localStock,
-                importerStock: prod.importer_stock || 0
+                importerStock: prod.importer_stock || 0,
+                cost: cost,
+                costWithVat: costWithVat,
+                pvp: pvp
             };
         });
 
@@ -120,7 +131,7 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
         const { productsList } = filteredAndGroupedData;
         if (productsList.length === 0) return;
 
-        const headers = ['Código', 'Nombre', 'Cantidad en Espera', 'Stock Local', 'Stock Importadora'];
+        const headers = ['Código', 'Nombre', 'Cantidad en Espera', 'Stock Local', 'Stock Importadora', 'Costo', 'Costo con IVA', 'PVP'];
         
         // Escape helper for CSV cells
         const escapeCSV = (val: any) => {
@@ -141,7 +152,10 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                 item.name,
                 item.waitingCount,
                 item.localStock,
-                item.importerStock
+                item.importerStock,
+                item.cost.toFixed(2),
+                item.costWithVat.toFixed(2),
+                item.pvp.toFixed(2)
             ];
             csvRows.push(row.map(escapeCSV).join(csvSeparator));
         });
@@ -213,6 +227,7 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                             <option value="importer_only">Con stock en la importadora y no en local</option>
                             <option value="local_only">Con stock en local y no importadora</option>
                             <option value="no_stock">Sin stock completamente</option>
+                            <option value="approved_only">Solo pedidos aprobados en espera</option>
                         </select>
                     </div>
 

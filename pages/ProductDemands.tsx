@@ -63,7 +63,7 @@ const ProductDemands: React.FC = () => {
                 .from('product_demands')
                 .select(`
                     *,
-                    product:products(id, name, sku, price, importer_stock, local_stock, image_url, is_discontinued, discontinued_until, inventory_levels(current_stock))
+                    product:products(id, name, sku, price, importer_stock, local_stock, image_url, is_discontinued, discontinued_until, cost_without_vat, vat_percentage, inventory_levels(current_stock))
                 `)
                 .order('created_at', { ascending: false });
 
