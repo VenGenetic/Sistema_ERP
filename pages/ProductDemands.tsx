@@ -30,6 +30,8 @@ interface ProductDemand {
         image_url?: string | null;
         is_discontinued?: boolean;
         discontinued_until?: string | null;
+        cost_without_vat?: number | null;
+        vat_percentage?: number | null;
         inventory_levels: { current_stock: number }[];
     } | null;
 }
@@ -522,6 +524,42 @@ const ProductDemands: React.FC = () => {
         );
     };
 
+    const PriceDisplay = ({ prod }: { prod: any }) => {
+        if (!prod) return null;
+        const pvp = prod.price;
+        const costWithVat =
+            prod.cost_without_vat != null && prod.vat_percentage != null
+                ? prod.cost_without_vat * (1 + prod.vat_percentage / 100)
+                : null;
+        if (pvp == null && costWithVat == null) return null;
+        return (
+            <div className="flex flex-col gap-0.5 text-[11px] mt-1 bg-blue-50 dark:bg-blue-900/10 p-2 rounded-lg border border-blue-100 dark:border-blue-900/40 text-left min-w-[120px]">
+                {costWithVat != null && (
+                    <span className="flex items-center gap-1.5 justify-between">
+                        <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+                            <span className="text-slate-500 dark:text-slate-400">Costo c/IVA:</span>
+                        </span>
+                        <span className="font-bold text-orange-600 dark:text-orange-400">
+                            ${costWithVat.toFixed(2)}
+                        </span>
+                    </span>
+                )}
+                {pvp != null && (
+                    <span className="flex items-center gap-1.5 justify-between">
+                        <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            <span className="text-slate-500 dark:text-slate-400">PVP:</span>
+                        </span>
+                        <span className="font-bold text-blue-600 dark:text-blue-400">
+                            ${pvp.toFixed(2)}
+                        </span>
+                    </span>
+                )}
+            </div>
+        );
+    };
+
     const ActionButtons = ({ demand }: { demand: ProductDemand }) => {
         const isReady = demand.status === 'stock_available';
         const isActive = demand.status === 'pending_stock' || demand.status === 'stock_available';
@@ -642,6 +680,7 @@ const ProductDemands: React.FC = () => {
                                                 {demand.creator_name || 'Desconocido'}
                                             </span>
                                             <StockDisplay prod={demand.product} />
+                                            <PriceDisplay prod={demand.product} />
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-center align-top">
@@ -692,6 +731,7 @@ const ProductDemands: React.FC = () => {
                                     <span className="text-xs font-mono text-slate-500">{demand.product?.sku}</span>
                                     <StockDisplay prod={demand.product} />
                                 </div>
+                                <PriceDisplay prod={demand.product} />
                             </div>
                         </div>
                         <div className="flex justify-between items-end mt-auto pt-2">
@@ -786,6 +826,7 @@ const ProductDemands: React.FC = () => {
                                             <div className="flex-1 min-w-0">
                                                 <span className="line-clamp-2 font-medium">{demand.product?.name}</span>
                                                 <span className="font-mono mt-1 block">{demand.product?.sku}</span>
+                                                <PriceDisplay prod={demand.product} />
                                             </div>
                                         </div>
                                         <div className="text-[10px] text-slate-400 flex flex-col gap-0.5 mt-1 border-t border-slate-100 dark:border-slate-800 pt-1">
@@ -892,6 +933,7 @@ const ProductDemands: React.FC = () => {
                                                         <span className="material-symbols-outlined text-[13px]">person</span>
                                                         {demand.creator_name || 'Desconocido'}
                                                     </span>
+                                                    <PriceDisplay prod={demand.product} />
                                                 </div>
                                                 <div className="mt-auto pt-2"><ActionButtons demand={demand} /></div>
                                             </div>
