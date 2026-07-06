@@ -17,9 +17,9 @@ interface ProductDemand {
     status: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired';
     created_at: string;
     stock_detected_at: string | null;
-    notified_at: string | null;
     created_by?: string | null;
     creator_name?: string;
+    is_approved?: boolean;
     product: {
         id: number;
         name: string;
@@ -355,6 +355,28 @@ const ProductDemands: React.FC = () => {
         }
     };
 
+    const handleToggleApproved = async (demand: ProductDemand, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const importerStock = getStockValue(demand.product, 'importer');
+        
+        if (importerStock <= 0 && !demand.is_approved) {
+            alert("No se puede aprobar: No hay stock en la importadora.\n\nDisclaimer: Si ya hay stock porque han revisado aparte, se debe solicitar a la administración la actualización del sistema con el stock visible en la importadora para poder aprobar este pedido.");
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('product_demands')
+                .update({ is_approved: !demand.is_approved })
+                .eq('id', demand.id);
+
+            if (error) throw error;
+            fetchDemands();
+        } catch (error: any) {
+            alert(`Error al cambiar estado de aprobación: ${error.message}`);
+        }
+    };
+
     // Derived Data
     const stats = useMemo(() => {
         const total = demands.length;
@@ -433,6 +455,31 @@ const ProductDemands: React.FC = () => {
         if (status === 'discontinued') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800"><span className="material-symbols-outlined text-[14px]">warning</span>Descontinuado</span>;
         if (status === 'expired') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800"><span className="material-symbols-outlined text-[14px]">timer_off</span>Vencido</span>;
         return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700"><span className="material-symbols-outlined text-[14px]">cancel</span>Cancelado</span>;
+    };
+
+    const ApprovedToggle = ({ demand }: { demand: ProductDemand }) => {
+        return (
+            <div className="flex items-center gap-2 mt-2">
+                <button
+                    onClick={(e) => handleToggleApproved(demand, e)}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        demand.is_approved ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
+                    role="switch"
+                    aria-checked={demand.is_approved}
+                >
+                    <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            demand.is_approved ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                    />
+                </button>
+                <span className={`text-xs font-medium ${demand.is_approved ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500'}`}>
+                    {demand.is_approved ? 'Aprobado en espera' : 'No aprobado'}
+                </span>
+            </div>
+        );
     };
 
     const PhoneDisplay = ({ phone }: { phone: string }) => (
@@ -578,7 +625,10 @@ const ProductDemands: React.FC = () => {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 align-top">
-                                        <StatusBadge status={demand.status} />
+                                        <div className="flex flex-col gap-2">
+                                            <StatusBadge status={demand.status} />
+                                            {demand.status === 'pending_stock' && <ApprovedToggle demand={demand} />}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 align-top">
                                         <div className="flex flex-col gap-1.5 text-sm">
@@ -620,7 +670,10 @@ const ProductDemands: React.FC = () => {
                                 <h3 className="font-bold text-slate-900 dark:text-white">{demand.customer_name || 'Cliente Sin Nombre'}</h3>
                                 <PhoneDisplay phone={demand.phone_number} />
                             </div>
-                            <StatusBadge status={demand.status} />
+                            <div className="flex flex-col items-end gap-2">
+                                <StatusBadge status={demand.status} />
+                                {demand.status === 'pending_stock' && <ApprovedToggle demand={demand} />}
+                            </div>
                         </div>
                         <div className="bg-slate-50 dark:bg-[#161b22] p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex items-start gap-3">
                             {demand.product?.image_url && (
@@ -745,7 +798,12 @@ const ProductDemands: React.FC = () => {
                                                 {demand.creator_name || 'Desconocido'}
                                             </span>
                                         </div>
-                                        <div className="mt-2"><ActionButtons demand={demand} /></div>
+                                        {demand.status === 'pending_stock' && (
+                                            <div className="mt-1">
+                                                <ApprovedToggle demand={demand} />
+                                            </div>
+                                        )}
+                                        <div className="mt-1"><ActionButtons demand={demand} /></div>
                                     </div>
                                 ))}
                                 {colItems.length === 0 && (
