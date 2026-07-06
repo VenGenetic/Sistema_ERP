@@ -81,19 +81,6 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
                 }
             }
 
-            // Validate if trying to approve
-            if (isApproved && !demand.is_approved) {
-                let importerStock = 0;
-                if (demand.product?.inventory_levels) {
-                    importerStock = demand.product.inventory_levels.find((l: any) => l.warehouses?.type === 'digital_partner')?.current_stock || 0;
-                }
-                if (importerStock <= 0) {
-                    alert("No se puede aprobar: No hay stock en la importadora.\n\nDisclaimer: Si ya hay stock porque han revisado aparte, se debe solicitar a la administración la actualización del sistema con el stock visible en la importadora para poder aprobar este pedido.");
-                    setLoading(false);
-                    return;
-                }
-            }
-
             const { error: updateError } = await supabase
                 .from('product_demands')
                 .update({
@@ -220,7 +207,19 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
                             <div className="flex items-center gap-3 mt-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
                                 <button
                                     type="button"
-                                    onClick={() => setIsApproved(!isApproved)}
+                                    onClick={() => {
+                                        if (!isApproved) {
+                                            let importerStock = 0;
+                                            if (demand.product?.inventory_levels) {
+                                                importerStock = demand.product.inventory_levels.find((l: any) => l.warehouses?.type === 'digital_partner')?.current_stock || 0;
+                                            }
+                                            if (importerStock <= 0) {
+                                                alert("No se puede aprobar: No hay stock en la importadora.\n\nDisclaimer: Si ya hay stock porque han revisado aparte, se debe solicitar a la administración la actualización del sistema con el stock visible en la importadora para poder aprobar este pedido.");
+                                                return;
+                                            }
+                                        }
+                                        setIsApproved(!isApproved);
+                                    }}
                                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                                         isApproved ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
                                     }`}
