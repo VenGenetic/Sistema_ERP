@@ -82,6 +82,7 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
     const [name, setName] = useState('');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isApproved, setIsApproved] = useState(false);
     const [showShare, setShowShare] = useState(false);
     const [createdDemand, setCreatedDemand] = useState<any>(null);
 
@@ -236,6 +237,19 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                 return;
             }
 
+            // Check importer stock if manually approving
+            if (isApproved) {
+                let importerStock = 0;
+                if (product.inventory_levels) {
+                    importerStock = product.inventory_levels.find((l: any) => l.warehouses?.type === 'digital_partner')?.current_stock || 0;
+                }
+                if (importerStock <= 0) {
+                    alert("No se puede aprobar: No hay stock en la importadora.\n\nDisclaimer: Si ya hay stock porque han revisado aparte, se debe solicitar a la administración la actualización del sistema con el stock visible en la importadora para poder aprobar este pedido.");
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const { data: insertedData, error: insertError } = await supabase
                 .from('product_demands')
                 .insert([{
@@ -244,7 +258,8 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                     customer_name: name || null,
                     notes: notes || null,
                     created_by: user?.id,
-                    status: 'pending_stock'
+                    status: 'pending_stock',
+                    is_approved: isApproved
                 }])
                 .select()
                 .single();
@@ -368,6 +383,33 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#161b22] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                                 placeholder="Ej. Busca versión en color negro..."
                             />
+                        </div>
+                        
+                        <div className="flex items-center gap-3 mt-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <button
+                                type="button"
+                                onClick={() => setIsApproved(!isApproved)}
+                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                    isApproved ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
+                                }`}
+                                role="switch"
+                                aria-checked={isApproved}
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                        isApproved ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                />
+                            </button>
+                            <div>
+                                <span className={`block text-sm font-semibold ${isApproved ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                    {isApproved ? 'Pedido Aprobado en espera' : 'Pedido No Aprobado'}
+                                </span>
+                                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                                    Activa esto si verificaste el stock en la importadora. (Opcional)
+                                </span>
+                            </div>
                         </div>
                     </form>
                     )}
