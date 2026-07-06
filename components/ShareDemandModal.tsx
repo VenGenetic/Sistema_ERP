@@ -200,12 +200,12 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
 
                             {/* Disclaimer & Website */}
                             <div className="mt-auto pt-3 border-t border-slate-100 flex flex-col items-center text-center">
-                                <span className="text-[9px] text-slate-500 leading-tight max-w-[95%] mb-1">
+                                <span className="text-[12px] text-slate-700 font-semibold leading-snug max-w-[95%] mb-2">
                                     {importerStock > 0 
                                         ? "Este es tu ticket de pedido. Los pedidos se suelen demorar DE 6 A 15 DIAS LABORABLES. Gracias por confiar en nosotros."
                                         : "Estas en la lista de espera. Nosotros le daremos seguimiento a tu repuesto y solicitud. Apenas el repuesto vuelva a estar disponible, NOSOTROS NOS COMUNICAREMOS CONTIGO."}
                                 </span>
-                                <span className="text-[11px] font-bold text-blue-500">https://www.lvparts.ec/</span>
+                                <span className="text-[13px] font-bold text-blue-600">https://www.lvparts.ec/</span>
                             </div>
                             
                         </div>
