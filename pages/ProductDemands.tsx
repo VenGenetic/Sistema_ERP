@@ -44,7 +44,7 @@ const ProductDemands: React.FC = () => {
     const [viewType, setViewType] = useState<'table' | 'list' | 'kanban' | 'grouped'>('table');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
-    const [stockFilter, setStockFilter] = useState<'all' | 'importer_only' | 'local_only' | 'no_stock'>('all');
+    const [stockFilter, setStockFilter] = useState<'all' | 'importer_only' | 'local_only' | 'no_stock' | 'approved_only'>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
@@ -408,6 +408,7 @@ const ProductDemands: React.FC = () => {
                 if (stockFilter === 'importer_only' && (!hasImporterStock || hasLocalStock)) return false;
                 if (stockFilter === 'local_only' && (!hasLocalStock || hasImporterStock)) return false;
                 if (stockFilter === 'no_stock' && (hasImporterStock || hasLocalStock)) return false;
+                if (stockFilter === 'approved_only' && !d.is_approved) return false;
             }
             return true;
         });
@@ -1015,6 +1016,7 @@ const ProductDemands: React.FC = () => {
                         <option value="importer_only">Con stock en la importadora y no en local</option>
                         <option value="local_only">Con stock en local y no importadora</option>
                         <option value="no_stock">Sin stock completamente</option>
+                        <option value="approved_only">Solo pedidos aprobados en espera</option>
                     </select>
 
                     <select
