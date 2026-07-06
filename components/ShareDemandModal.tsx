@@ -142,8 +142,9 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                     </div>
                                     <h3 className="text-[13px] font-semibold text-slate-800 leading-tight">{demand.product?.name || 'Producto Desconocido'}</h3>
                                     {demand.product?.price != null && (
-                                        <div className="mt-1">
+                                        <div className="mt-1 flex items-baseline gap-1">
                                             <span className="text-[15px] font-bold text-emerald-600">${Math.ceil(demand.product.price)}</span>
+                                            {importerStock <= 0 && <span className="text-[11px] font-medium text-slate-500">(precio estimado)</span>}
                                         </div>
                                     )}
                                 </div>
