@@ -785,6 +785,17 @@ const Products: React.FC = () => {
                                 {copiedSku === prod.sku ? 'check' : 'content_copy'}
                             </span>
                         </button>
+                        <a
+                            href={`https://www.lvparts.ec/catalogo?q=${encodeURIComponent(prod.sku)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg transition-colors flex items-center justify-center text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                            title="Buscar en catálogo LV Parts"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">
+                                open_in_new
+                            </span>
+                        </a>
                     </div>
                 </td>
                 <td className="px-6 py-4 align-top">
