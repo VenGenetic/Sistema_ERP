@@ -54,7 +54,7 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
         try {
             const canvas = await html2canvas(printRef.current, {
                 useCORS: true,
-                scale: 2, // Higher resolution
+                scale: 4, // Super high resolution
                 backgroundColor: '#ffffff'
             });
 
@@ -86,7 +86,7 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-[#0c1117] rounded-xl shadow-2xl overflow-hidden flex flex-col w-[450px]">
+            <div className="bg-white dark:bg-[#0c1117] rounded-xl shadow-2xl overflow-hidden flex flex-col w-[550px]">
                 
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#161b22]">
@@ -101,15 +101,18 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
 
                 {/* Contenido (El div que será capturado) */}
                 <div className="p-6 bg-slate-100 flex justify-center items-center">
+                    {/* Contenedor Cuadrado con Margen */}
                     <div 
                         ref={printRef}
-                        className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative"
-                        style={{ width: '400px', minHeight: '480px', height: 'auto', padding: '0', boxSizing: 'border-box' }}
+                        className="bg-white flex items-center justify-center"
+                        style={{ width: '500px', height: '500px', padding: '24px', boxSizing: 'border-box' }}
                     >
-                        {/* Decorative Top Border */}
-                        <div className="h-2 w-full bg-blue-500"></div>
-                        
-                        <div className="flex-1 flex flex-col p-6">
+                        {/* Tarjeta del Ticket interna */}
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden w-full h-full relative">
+                            {/* Decorative Top Border */}
+                            <div className="h-2 w-full bg-blue-500"></div>
+                            
+                            <div className="flex-1 flex flex-col p-6">
                             
                             {/* Ticket Title */}
                             <div className="text-center mb-3">
@@ -209,6 +212,7 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                 <span className="text-[13px] font-bold text-blue-600">https://www.lvparts.ec/</span>
                             </div>
                             
+                        </div>
                         </div>
                     </div>
                 </div>
