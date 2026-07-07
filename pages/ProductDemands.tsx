@@ -49,6 +49,7 @@ const ProductDemands: React.FC = () => {
     const [stockFilter, setStockFilter] = useState<'all' | 'importer_only' | 'local_only' | 'no_stock' | 'approved_only'>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
+    const [ticketSearchTerm, setTicketSearchTerm] = useState('');
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
     const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
     const [editingDemand, setEditingDemand] = useState<ProductDemand | null>(null);
@@ -415,6 +416,14 @@ const ProductDemands: React.FC = () => {
             return true;
         });
 
+        // Ticket Search Term
+        if (ticketSearchTerm) {
+            const ticketId = parseInt(ticketSearchTerm.trim(), 10);
+            if (!isNaN(ticketId)) {
+                filtered = filtered.filter(d => d.id === ticketId);
+            }
+        }
+
         // Search Term
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
@@ -639,6 +648,7 @@ const ProductDemands: React.FC = () => {
                                     <td className="px-6 py-4 align-top">
                                         <div className="flex flex-col">
                                             <span className="font-semibold text-slate-900 dark:text-white">{demand.customer_name || 'Sin Nombre'}</span>
+                                            <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit mt-1 mb-1">Ticket #{demand.id}</span>
                                             <PhoneDisplay phone={demand.phone_number} />
                                             {demand.notes && <span className="text-xs text-slate-400 mt-1 italic max-w-[200px] truncate" title={demand.notes}>{demand.notes}</span>}
                                         </div>
@@ -708,6 +718,7 @@ const ProductDemands: React.FC = () => {
                         <div className="flex justify-between items-start">
                             <div>
                                 <h3 className="font-bold text-slate-900 dark:text-white">{demand.customer_name || 'Cliente Sin Nombre'}</h3>
+                                <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block mt-1 mb-1">Ticket #{demand.id}</span>
                                 <PhoneDisplay phone={demand.phone_number} />
                             </div>
                             <div className="flex flex-col items-end gap-2">
@@ -808,6 +819,7 @@ const ProductDemands: React.FC = () => {
                                         <div className="flex justify-between items-start gap-1">
                                             <div>
                                                 <span className="font-semibold text-slate-900 dark:text-white block">{demand.customer_name || 'Sin Nombre'}</span>
+                                                <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block mt-1 mb-1">Ticket #{demand.id}</span>
                                                 <PhoneDisplay phone={demand.phone_number} />
                                             </div>
                                             <div className="p-1 text-slate-300 dark:text-slate-600">
@@ -923,6 +935,7 @@ const ProductDemands: React.FC = () => {
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <span className="font-semibold text-slate-900 dark:text-white block">{demand.customer_name || 'Sin Nombre'}</span>
+                                                        <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block mt-1 mb-1">Ticket #{demand.id}</span>
                                                         <PhoneDisplay phone={demand.phone_number} />
                                                     </div>
                                                     <StatusBadge status={demand.status} />
@@ -1072,6 +1085,17 @@ const ProductDemands: React.FC = () => {
                         <option value="customer_asc">Cliente (A-Z)</option>
                         <option value="stock_desc">Stock (Mayor a menor)</option>
                     </select>
+
+                    <div className="relative w-full md:w-48">
+                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">tag</span>
+                        <input
+                            type="text"
+                            placeholder="N° Ticket..."
+                            value={ticketSearchTerm}
+                            onChange={(e) => setTicketSearchTerm(e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-all"
+                        />
+                    </div>
 
                     <div className="relative w-full md:w-64">
                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
