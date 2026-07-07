@@ -446,7 +446,7 @@ const ProductDemands: React.FC = () => {
         });
 
         return filtered;
-    }, [demands, statusFilter, stockFilter, searchTerm, sortBy, viewType]);
+    }, [demands, statusFilter, stockFilter, searchTerm, ticketSearchTerm, sortBy, viewType]);
 
     const grouped = useMemo(() => {
         const map = new Map<number, { productId: number; product: any; demands: ProductDemand[] }>();
