@@ -6,10 +6,10 @@ interface ProductDemand {
     phone_number: string;
     customer_name: string | null;
     notes: string | null;
-    status: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued';
+    status: 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired';
     created_at: string;
     stock_detected_at: string | null;
-    notified_at: string | null;
+    notified_at?: string | null;
     is_approved?: boolean;
     product: {
         id: number;

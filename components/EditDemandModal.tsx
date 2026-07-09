@@ -11,6 +11,7 @@ interface ProductDemand {
     status: string;
     created_at?: string;
     creator_name?: string;
+    is_approved?: boolean;
     product?: {
         name: string;
         sku: string;

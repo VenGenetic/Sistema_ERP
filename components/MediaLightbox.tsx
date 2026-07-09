@@ -11,9 +11,10 @@ interface MediaLightboxProps {
     media: MediaItem[];
     initialIndex?: number;
     onClose: () => void;
+    onAddMedia?: () => void;
 }
 
-export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, initialIndex = 0, onClose }) => {
+export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, initialIndex = 0, onClose, onAddMedia }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
     // Reset index when opened
@@ -160,14 +161,32 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
                         <span className="material-symbols-outlined text-[32px]">chevron_right</span>
                     </button>
 
-                    {/* Pagination Indicators */}
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                        {media.map((_, idx) => (
-                            <div 
+                    {/* Thumbnail Carousel */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 z-10 bg-black/40 p-3 rounded-2xl backdrop-blur-md overflow-x-auto max-w-[90vw]">
+                        {media.map((item, idx) => (
+                            <button 
                                 key={idx} 
-                                className={`h-2 rounded-full transition-all duration-300 ${idx === currentIndex ? 'w-8 bg-white' : 'w-2 bg-white/30'}`}
-                            />
+                                onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+                                className={`h-16 w-16 rounded-lg overflow-hidden transition-all duration-300 border-2 flex-shrink-0 ${idx === currentIndex ? 'border-primary scale-110' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                            >
+                                {item.type === 'video' ? (
+                                    <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-500">play_circle</span>
+                                    </div>
+                                ) : (
+                                    <img src={item.url} alt="" className="w-full h-full object-cover" />
+                                )}
+                            </button>
                         ))}
+                        {onAddMedia && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onAddMedia(); }}
+                                className="h-16 w-16 rounded-lg overflow-hidden transition-all duration-300 border-2 border-dashed border-white/30 flex items-center justify-center text-white/50 hover:text-white hover:border-white hover:bg-white/10 flex-shrink-0"
+                                title="Añadir foto/video"
+                            >
+                                <span className="material-symbols-outlined text-[24px]">add</span>
+                            </button>
+                        )}
                     </div>
                 </>
             )}

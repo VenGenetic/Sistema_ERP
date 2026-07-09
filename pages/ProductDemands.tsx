@@ -20,6 +20,7 @@ interface ProductDemand {
     created_by?: string | null;
     creator_name?: string;
     is_approved?: boolean;
+    notified_at?: string | null;
     product: {
         id: number;
         name: string;
@@ -114,10 +115,13 @@ const ProductDemands: React.FC = () => {
     }, []);
 
     // Helper functions
-    const getStockValue = (prod: any) => {
+    const getStockValue = (prod: any, type?: 'local' | 'importer' | 'total') => {
         if (!prod) return 0;
         const local = prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
-        return local + (prod.importer_stock || 0);
+        const importer = prod.importer_stock || 0;
+        if (type === 'local') return local;
+        if (type === 'importer') return importer;
+        return local + importer;
     };
 
     const handleCopyPhone = (phone: string, e: React.MouseEvent) => {

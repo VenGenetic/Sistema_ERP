@@ -20,7 +20,7 @@ interface ProductModalProps {
         vat_percentage: number;
         price: number;
         image_url?: string | null;
-        video_url?: string | null;
+        gallery?: any[] | null;
         group_id?: string | null;
         last_edited_at?: string | null;
         is_discontinued?: boolean;
@@ -79,12 +79,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         vatPercentage: 15.0,
         price: 0,
         imageUrl: '',
-        videoUrl: '',
         isDiscontinued: false,
         discontinuedDuration: 'permanente' // 'permanente', '3', '6', '12'
     });
     const [imageRemoved, setImageRemoved] = useState(false);
-    const [videoRemoved, setVideoRemoved] = useState(false);
+    const [gallery, setGallery] = useState<{url: string, type: 'image' | 'video'}[]>([]);
 
     // Stock Adjustment State
     const [stockAdjustment, setStockAdjustment] = useState({
@@ -147,7 +146,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     vatPercentage: vat,
                     price: Math.round(derivedPrice * 100) / 100,
                     imageUrl: productToEdit.image_url || '',
-                    videoUrl: productToEdit.video_url || '',
                     isDiscontinued: !!productToEdit.is_discontinued,
                     discontinuedDuration: productToEdit.discontinued_until 
                         ? (function() {
@@ -158,6 +156,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                         })()
                         : 'permanente'
                 });
+                setGallery(productToEdit.gallery || []);
             } else {
                 setFormData({
                     sku: '',
@@ -169,13 +168,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     vatPercentage: 15.0,
                     price: 0,
                     imageUrl: '',
-                    videoUrl: '',
                     isDiscontinued: false,
                     discontinuedDuration: 'permanente'
                 });
+                setGallery([]);
             }
             setImageRemoved(false);
-            setVideoRemoved(false);
             setActiveTab('general');
             setSearchQuery('');
             setSearchProducts([]);
@@ -420,18 +418,27 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         }
     };
 
-    const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
-        const file = e.target.files[0];
         
-        setIsVideoUploading(true);
+        if (gallery.length >= 5) {
+            alert('Has alcanzado el límite máximo de 5 elementos en la galería.');
+            return;
+        }
+
+        const file = e.target.files[0];
+        const isVideo = file.type.startsWith('video/');
+        
+        setIsVideoUploading(true); // Using this state to show a loader during gallery upload
         try {
             const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-            const filePath = `${fileName}`;
+            const index = gallery.length + 1;
+            const fileName = `${formData.sku || 'NUEVO'}_gallery_${Date.now()}_${index}.${fileExt}`;
+            const bucket = isVideo ? 'product_videos' : 'product_images';
+            const filePath = isVideo ? fileName : `products/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
-                .from('product_videos')
+                .from(bucket)
                 .upload(filePath, file, {
                     cacheControl: '31536000',
                     upsert: true
@@ -439,22 +446,44 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             if (uploadError) throw uploadError;
 
-            const { data } = supabase.storage.from('product_videos').getPublicUrl(filePath);
-            setFormData(prev => ({ ...prev, videoUrl: data.publicUrl }));
-            setVideoRemoved(false);
+            const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+            
+            setGallery(prev => [...prev, { url: data.publicUrl, type: isVideo ? 'video' : 'image' }]);
         } catch (error: any) {
-            console.error('Error uploading video:', error);
-            alert('Error al subir video: ' + error.message);
+            console.error('Error uploading to gallery:', error);
+            alert('Error al subir a galería: ' + error.message);
         } finally {
             setIsVideoUploading(false);
         }
     };
 
-    const handleRemoveVideo = () => {
-        if (window.confirm('¿Estás seguro de que deseas eliminar permanentemente el video demostrativo de este repuesto?')) {
-            setFormData(prev => ({ ...prev, videoUrl: '' }));
-            setVideoRemoved(true);
+    const handleRemoveGalleryItem = (index: number) => {
+        if (window.confirm('¿Estás seguro de que deseas eliminar este elemento de la galería?')) {
+            setGallery(prev => prev.filter((_, i) => i !== index));
         }
+    };
+
+    const handleSetAsMainImage = (index: number) => {
+        const item = gallery[index];
+        if (item.type === 'video') {
+            alert('Un video no puede ser asignado como miniatura principal.');
+            return;
+        }
+        
+        // Swap
+        const currentMain = formData.imageUrl;
+        setFormData(prev => ({ ...prev, imageUrl: item.url }));
+        setImageRemoved(false);
+        
+        setGallery(prev => {
+            const newGallery = [...prev];
+            newGallery.splice(index, 1);
+            if (currentMain && !currentMain.includes('_cut.webp')) {
+                // If it wasn't the default implied image, push it back to the gallery
+                newGallery.push({ url: currentMain, type: 'image' });
+            }
+            return newGallery;
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -491,7 +520,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 vat_percentage: formData.vatPercentage,
                 price: formData.price,
                 image_url: imageRemoved ? null : (formData.imageUrl || defaultImageUrl),
-                video_url: videoRemoved ? null : (formData.videoUrl || null),
+                gallery: gallery,
                 is_discontinued: formData.isDiscontinued,
                 discontinued_until: formData.isDiscontinued ? discontinued_until : null
             };
@@ -732,38 +761,44 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                         )}
                     </div>
 
-                    {/* ═══ Video Upload ═══ */}
-                    <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group">
-                        {formData.videoUrl ? (
-                            <div className="relative w-full max-w-[200px] aspect-video rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm bg-black flex items-center justify-center">
-                                <span className="material-symbols-outlined text-[32px] text-emerald-500">play_circle</span>
-                                <button
-                                    type="button"
-                                    onClick={handleRemoveVideo}
-                                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500 backdrop-blur-sm z-10"
-                                >
-                                    <span className="material-symbols-outlined text-[16px] leading-none">close</span>
-                                </button>
-                                <div className="absolute bottom-2 left-2 right-2 text-center text-xs text-white bg-black/60 px-2 py-1 rounded backdrop-blur-sm truncate">
-                                    Video Cargado Exitosamente
-                                </div>
-                            </div>
-                        ) : (
-                            <label className="flex flex-col items-center justify-center w-full h-full min-h-[128px] cursor-pointer">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    {isVideoUploading ? (
-                                        <span className="material-symbols-outlined text-[32px] text-emerald-500 animate-spin">progress_activity</span>
-                                    ) : (
+                    {/* ═══ Gallery Section ═══ */}
+                    <div className="flex flex-col gap-2">
+                        <label className={labelClass}>Galería (Max 5) - {gallery.length}/5</label>
+                        <div className="flex flex-wrap gap-3">
+                            {gallery.map((item, index) => (
+                                <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm group bg-black flex items-center justify-center">
+                                    {item.type === 'video' ? (
                                         <>
-                                            <span className="material-symbols-outlined text-[32px] text-slate-400 mb-2 group-hover:text-emerald-500 transition-colors">movie</span>
-                                            <p className="mb-1 text-sm text-slate-600 dark:text-slate-400 font-medium">Click para subir video demostrativo</p>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500">MP4, WEBM o MOV (Max 50MB)</p>
+                                            <span className="material-symbols-outlined text-[32px] text-emerald-500 absolute z-0">play_circle</span>
+                                            <div className="absolute inset-0 bg-black/40"></div>
                                         </>
+                                    ) : (
+                                        <img src={item.url} alt="Gallery item" className="w-full h-full object-cover" />
                                     )}
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 backdrop-blur-sm z-10">
+                                        {item.type !== 'video' && (
+                                            <button type="button" onClick={() => handleSetAsMainImage(index)} title="Hacer principal" className="text-white hover:text-primary transition-colors">
+                                                <span className="material-symbols-outlined text-[18px]">star</span>
+                                            </button>
+                                        )}
+                                        <button type="button" onClick={() => handleRemoveGalleryItem(index)} title="Eliminar" className="text-white hover:text-rose-500 transition-colors">
+                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <input type="file" className="hidden" accept="video/*" onChange={handleVideoUpload} disabled={isVideoUploading} />
-                            </label>
-                        )}
+                            ))}
+
+                            {gallery.length < 5 && (
+                                <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                    {isVideoUploading ? (
+                                        <span className="material-symbols-outlined text-[24px] text-primary animate-spin">progress_activity</span>
+                                    ) : (
+                                        <span className="material-symbols-outlined text-[24px] text-slate-400">add</span>
+                                    )}
+                                    <input type="file" className="hidden" accept="image/*,video/*" onChange={handleGalleryUpload} disabled={isVideoUploading} />
+                                </label>
+                            )}
+                        </div>
                     </div>
 
                     {/* ═══ Core Fields ═══ */}

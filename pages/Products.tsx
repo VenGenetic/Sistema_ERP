@@ -58,7 +58,7 @@ const Products: React.FC = () => {
     const [exportProgress, setExportProgress] = useState({ current: 0, total: 0 });
 
     // Lightbox State
-    const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
+    const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number, product?: any}>({ isOpen: false, media: [], initialIndex: 0 });
     const [selectedProductForTags, setSelectedProductForTags] = useState<any | null>(null);
     const [copiedSku, setCopiedSku] = useState<string | null>(null);
 
@@ -357,11 +357,11 @@ const Products: React.FC = () => {
                 query = query.is('image_url', null);
             }
 
-            // Video Status Filter
+            // Video Status Filter (Checking if gallery contains video)
             if (debouncedFilters.videoStatus === 'con_video') {
-                query = query.not('video_url', 'is', null);
+                query = query.contains('gallery', '[{"type": "video"}]');
             } else if (debouncedFilters.videoStatus === 'sin_video') {
-                query = query.is('video_url', null);
+                query = query.not('gallery', 'cs', '[{"type": "video"}]');
             }
 
             // Stock Status Filter
@@ -461,20 +461,21 @@ const Products: React.FC = () => {
         handleOpenModal(product);
     };
 
-    const handleOpenLightbox = (prod: any, clickedType: 'video' | 'image') => {
+    const handleOpenLightbox = (prod: any, clickedType: 'video' | 'image' | 'gallery', index = 0) => {
         const mediaArray: any[] = [];
-        if (prod.video_url) mediaArray.push({ type: 'video', url: prod.video_url, title: prod.sku + ' - ' + prod.name });
         if (prod.image_url) mediaArray.push({ type: 'image', url: prod.image_url, title: prod.sku + ' - ' + prod.name });
         
-        let startIndex = 0;
-        if (clickedType === 'image' && prod.video_url) {
-            startIndex = 1;
+        if (prod.gallery && Array.isArray(prod.gallery)) {
+            prod.gallery.forEach((item: any) => {
+                mediaArray.push({ type: item.type, url: item.url, title: prod.sku + ' - ' + prod.name });
+            });
         }
 
         setLightbox({
             isOpen: true,
             media: mediaArray,
-            initialIndex: startIndex
+            initialIndex: index,
+            product: prod
         });
     };
 
@@ -801,56 +802,61 @@ const Products: React.FC = () => {
                 <td className="px-6 py-4 align-top">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-start gap-3">
-                        {/* Video Thumbnail */}
-                        {prod.video_url ? (
-                            <VideoThumbnail src={prod.video_url} onClick={() => handleOpenLightbox(prod, 'video')} />
-                        ) : (
-                            <div 
-                                title="Sin Video" 
-                                className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-900/10 flex items-center justify-center relative"
-                            >
-                                <span className="material-symbols-outlined text-[16px] text-rose-400">videocam_off</span>
-                            </div>
-                        )}
-
-                        {/* Image Thumbnail */}
-                        {prod.image_url ? (
-                            <div 
-                                onClick={() => handleOpenLightbox(prod, 'image')}
-                                className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-pointer group"
-                            >
-                                <img 
-                                   src={getThumbnailUrl(prod.image_url, 80, 80)} 
-                                   alt="" 
-                                   loading="lazy"
-                                   decoding="async"
-                                   className="h-full w-full object-cover group-hover:scale-110 transition-transform" 
-                                   onError={(e) => {
-                                       const target = e.currentTarget;
-                                       if (target.src.includes('render/image')) {
-                                           try {
-                                               localStorage.setItem('supabase_transform_unsupported', 'true');
-                                           } catch (err) {}
-                                           target.src = prod.image_url || '';
-                                       } else {
-                                           target.style.display = 'none';
-                                           if (target.parentElement) {
-                                               target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
-                                               target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                        {/* Image Thumbnail with Hover Gallery Preview */}
+                        <div className="relative group">
+                            {prod.image_url ? (
+                                <div 
+                                    onClick={() => handleOpenLightbox(prod, 'image', 0)}
+                                    className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-pointer"
+                                >
+                                    <img 
+                                       src={getThumbnailUrl(prod.image_url, 80, 80)} 
+                                       alt="" 
+                                       loading="lazy"
+                                       decoding="async"
+                                       className="h-full w-full object-cover transition-transform" 
+                                       onError={(e) => {
+                                           const target = e.currentTarget;
+                                           if (target.src.includes('render/image')) {
+                                               try {
+                                                   localStorage.setItem('supabase_transform_unsupported', 'true');
+                                               } catch (err) {}
+                                               target.src = prod.image_url || '';
+                                           } else {
+                                               target.style.display = 'none';
+                                               if (target.parentElement) {
+                                                   target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                                   target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                               }
                                            }
-                                       }
-                                   }}
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                            </div>
-                        ) : (
-                            <div 
-                                title="Sin Imagen"
-                                className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center"
-                            >
-                                <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
-                            </div>
-                        )}
+                                       }}
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                                </div>
+                            ) : (
+                                <div 
+                                    title="Sin Imagen"
+                                    className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center"
+                                >
+                                    <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
+                                </div>
+                            )}
+
+                            {/* Hover Gallery Preview */}
+                            {(prod.gallery && prod.gallery.length > 0) && (
+                                <div className="absolute left-12 top-0 z-50 hidden group-hover:flex flex-wrap gap-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl w-max max-w-[200px] pointer-events-none">
+                                    {prod.gallery.map((item: any, idx: number) => (
+                                        <div key={idx} className="w-10 h-10 rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-black flex items-center justify-center relative">
+                                            {item.type === 'video' ? (
+                                                <span className="material-symbols-outlined text-emerald-500 text-[18px]">play_circle</span>
+                                            ) : (
+                                                <img src={getThumbnailUrl(item.url, 80, 80)} alt="" className="w-full h-full object-cover" />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
@@ -1425,6 +1431,12 @@ const Products: React.FC = () => {
                 media={lightbox.media}
                 initialIndex={lightbox.initialIndex}
                 onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))}
+                onAddMedia={() => {
+                    setLightbox(prev => ({ ...prev, isOpen: false }));
+                    if (lightbox.product) {
+                        handleOpenModal(lightbox.product);
+                    }
+                }}
             />
 
             <QuickTagAssignModal 

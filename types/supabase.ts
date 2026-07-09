@@ -502,6 +502,7 @@ export type Database = {
           created_at: string | null
           id: number
           image_url: string | null
+          gallery: any | null
           min_stock_threshold: number | null
           name: string
           price: number | null
@@ -520,6 +521,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           image_url?: string | null
+          gallery?: any | null
           min_stock_threshold?: number | null
           name: string
           price?: number | null
@@ -538,6 +540,7 @@ export type Database = {
           created_at?: string | null
           id?: number
           image_url?: string | null
+          gallery?: any | null
           min_stock_threshold?: number | null
           name?: string
           price?: number | null
