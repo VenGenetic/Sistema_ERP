@@ -15,8 +15,6 @@ import { ProductDemandModal } from '../components/ProductDemandModal';
 import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
 
-import { useGlobalImageSearch } from '../hooks/useGlobalImageSearch';
-
 // Helper to parse query parameters from the hash or query string
 const getInitialParams = () => {
     let searchStr = '';
@@ -29,18 +27,6 @@ const getInitialParams = () => {
 };
 
 const Products: React.FC = () => {
-    const [imageSearch, setImageSearch] = useState<{ embedding: number[] | null, previewUrl: string | null }>({
-        embedding: null,
-        previewUrl: null
-    });
-
-    const { searchState: imageSearchState, isDragging: isDraggingImage, resetSearch: resetImageSearch, processImageFile } = useGlobalImageSearch(
-        (embedding, previewUrl) => {
-            setImageSearch({ embedding, previewUrl });
-            setSearchTerms(['']); // Clear standard text searches
-        }
-    );
-
     // ──────────────────────────────────────────────
     // 1. DATA STATES
     // ──────────────────────────────────────────────
@@ -317,7 +303,7 @@ const Products: React.FC = () => {
 
     useEffect(() => {
         fetchCatalogData(pagination.page);
-    }, [debouncedSearchTermsString, debouncedFilters, pagination.page, pagination.pageSize, sortConfig, imageSearch.embedding]);
+    }, [debouncedSearchTermsString, debouncedFilters, pagination.page, pagination.pageSize, sortConfig]);
 
     // ──────────────────────────────────────────────
     // 4. SUPABASE QUERY ENGINE
@@ -326,141 +312,99 @@ const Products: React.FC = () => {
         setLoading(true);
         try {
             const currentPage = page || pagination.page;
-            let data: any[] = [];
-            let count: number | null = null;
 
-            if (imageSearch.embedding) {
-                // 1. Fetch matching product IDs using the similarity search RPC
-                const { data: matchData, error: matchError } = await supabase.rpc('match_products_by_image', {
-                    query_embedding: imageSearch.embedding,
-                    match_threshold: 0.2, // Low threshold to capture similar products
-                    match_count: 50
-                });
+            // Start query with exact count
+            let query = supabase
+                .from('products')
+                .select(`
+                    *,
+                    brands (name),
+                    inventory_levels (current_stock),
+                    profiles (full_name),
+                    product_tags ( tags (*) )
+                `, { count: 'exact' })
+                .eq('is_active', true);
 
-                if (matchError) throw matchError;
-
-                if (matchData && matchData.length > 0) {
-                    const matchingIds = matchData.map((p: any) => p.id);
-                    
-                    // 2. Query full product details for these IDs
-                    const { data: productsData, error: fetchError } = await supabase
-                        .from('products')
-                        .select(`
-                            *,
-                            brands (name),
-                            inventory_levels (current_stock),
-                            profiles (full_name),
-                            product_tags ( tags (*) )
-                        `)
-                        .in('id', matchingIds)
-                        .eq('is_active', true);
-
-                    if (fetchError) throw fetchError;
-
-                    // 3. Sort the products to match the similarity order returned by pgvector
-                    data = productsData || [];
-                    data.sort((a, b) => matchingIds.indexOf(a.id) - matchingIds.indexOf(b.id));
-                    count = data.length;
-                } else {
-                    data = [];
-                    count = 0;
-                }
-            } else {
-                // Start standard text/filters query with exact count
-                let query = supabase
-                    .from('products')
-                    .select(`
-                        *,
-                        brands (name),
-                        inventory_levels (current_stock),
-                        profiles (full_name),
-                        product_tags ( tags (*) )
-                    `, { count: 'exact' })
-                    .eq('is_active', true);
-
-                // Global Search (OR across name and sku for each active search term, support exclusions with '-')
-                const activeSearchTerms = debouncedSearchTerms.map(s => s.trim()).filter(Boolean);
-                for (const term of activeSearchTerms) {
-                    if (term.startsWith('-')) {
-                        const cleanTerm = term.slice(1).trim();
-                        if (cleanTerm) {
-                            query = query.not('name', 'ilike', `%${cleanTerm}%`);
-                            query = query.not('sku', 'ilike', `%${cleanTerm}%`);
-                        }
-                    } else {
-                        query = query.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
+            // Global Search (OR across name and sku for each active search term, support exclusions with '-')
+            const activeSearchTerms = debouncedSearchTerms.map(s => s.trim()).filter(Boolean);
+            for (const term of activeSearchTerms) {
+                if (term.startsWith('-')) {
+                    const cleanTerm = term.slice(1).trim();
+                    if (cleanTerm) {
+                        query = query.not('name', 'ilike', `%${cleanTerm}%`);
+                        query = query.not('sku', 'ilike', `%${cleanTerm}%`);
                     }
-                }
-
-                // Column Filters (AND logic)
-                if (debouncedFilters.sku) {
-                    query = query.ilike('sku', `%${debouncedFilters.sku}%`);
-                }
-                if (debouncedFilters.name) {
-                    query = query.ilike('name', `%${debouncedFilters.name}%`);
-                }
-                if (debouncedFilters.category) {
-                    query = query.ilike('category', `%${debouncedFilters.category}%`);
-                }
-                
-                // Image Status Filter
-                if (debouncedFilters.imageStatus === 'con_imagen') {
-                    query = query.not('image_url', 'is', null);
-                } else if (debouncedFilters.imageStatus === 'sin_imagen') {
-                    query = query.is('image_url', null);
-                }
-
-                // Video Status Filter
-                if (debouncedFilters.videoStatus === 'con_video') {
-                    query = query.not('video_url', 'is', null);
-                } else if (debouncedFilters.videoStatus === 'sin_video') {
-                    query = query.is('video_url', null);
-                }
-
-                // Stock Status Filter
-                if (debouncedFilters.stockStatus === 'disponibles_importadora') {
-                    query = query.gt('importer_stock', 0);
-                } else if (debouncedFilters.stockStatus === 'solo_local') {
-                    query = query.gt('local_stock', 0).eq('importer_stock', 0);
-                } else if (debouncedFilters.stockStatus === 'disponibles_local') {
-                    query = query.gt('local_stock', 0);
-                } else if (debouncedFilters.stockStatus === 'solo_importadora') {
-                    query = query.eq('local_stock', 0).gt('importer_stock', 0);
-                } else if (debouncedFilters.stockStatus === 'disponibles_cualquiera') {
-                    query = query.or('local_stock.gt.0,importer_stock.gt.0');
-                } else if (debouncedFilters.stockStatus === 'agotados') {
-                    query = query.eq('local_stock', 0).eq('importer_stock', 0);
-                }
-
-                // Discontinued Status Filter
-                if (debouncedFilters.discontinuedStatus === 'descontinuados') {
-                    query = query.eq('is_discontinued', true);
-                } else if (debouncedFilters.discontinuedStatus === 'activos') {
-                    query = query.or('is_discontinued.is.null,is_discontinued.eq.false');
-                }
-
-                // Sorting
-                const isAscending = sortConfig.direction === 'asc';
-                if (sortConfig.key === 'brand') {
-                    query = query.order('name', { referencedTable: 'brands', ascending: isAscending });
                 } else {
-                    query = query.order(sortConfig.key, { ascending: isAscending });
+                    query = query.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
                 }
-
-                // Pagination (range is 0-indexed)
-                const from = (currentPage - 1) * pagination.pageSize;
-                const to = from + pagination.pageSize - 1;
-                query = query.range(from, to);
-
-                // Execute
-                const { data: queryData, error: queryError, count: queryCount } = await query;
-
-                if (queryError) throw queryError;
-                data = queryData || [];
-                count = queryCount;
             }
 
-            setProducts(data);
+            // Column Filters (AND logic)
+            if (debouncedFilters.sku) {
+                query = query.ilike('sku', `%${debouncedFilters.sku}%`);
+            }
+            if (debouncedFilters.name) {
+                query = query.ilike('name', `%${debouncedFilters.name}%`);
+            }
+            if (debouncedFilters.category) {
+                query = query.ilike('category', `%${debouncedFilters.category}%`);
+            }
+            
+            // Image Status Filter
+            if (debouncedFilters.imageStatus === 'con_imagen') {
+                query = query.not('image_url', 'is', null);
+            } else if (debouncedFilters.imageStatus === 'sin_imagen') {
+                query = query.is('image_url', null);
+            }
+
+            // Video Status Filter
+            if (debouncedFilters.videoStatus === 'con_video') {
+                query = query.not('video_url', 'is', null);
+            } else if (debouncedFilters.videoStatus === 'sin_video') {
+                query = query.is('video_url', null);
+            }
+
+            // Stock Status Filter
+            if (debouncedFilters.stockStatus === 'disponibles_importadora') {
+                query = query.gt('importer_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'solo_local') {
+                query = query.gt('local_stock', 0).eq('importer_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'disponibles_local') {
+                query = query.gt('local_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'solo_importadora') {
+                query = query.eq('local_stock', 0).gt('importer_stock', 0);
+            } else if (debouncedFilters.stockStatus === 'disponibles_cualquiera') {
+                query = query.or('local_stock.gt.0,importer_stock.gt.0');
+            } else if (debouncedFilters.stockStatus === 'agotados') {
+                query = query.eq('local_stock', 0).eq('importer_stock', 0);
+            }
+
+            // Discontinued Status Filter
+            if (debouncedFilters.discontinuedStatus === 'descontinuados') {
+                query = query.eq('is_discontinued', true);
+            } else if (debouncedFilters.discontinuedStatus === 'activos') {
+                query = query.or('is_discontinued.is.null,is_discontinued.eq.false');
+            }
+
+            // Sorting
+            const isAscending = sortConfig.direction === 'asc';
+            if (sortConfig.key === 'brand') {
+                query = query.order('name', { referencedTable: 'brands', ascending: isAscending });
+            } else {
+                query = query.order(sortConfig.key, { ascending: isAscending });
+            }
+
+            // Pagination (range is 0-indexed)
+            const from = (currentPage - 1) * pagination.pageSize;
+            const to = from + pagination.pageSize - 1;
+            query = query.range(from, to);
+
+            // Execute
+            const { data, error, count } = await query;
+
+            if (error) throw error;
+
+            setProducts(data || []);
             if (count !== null) {
                 setPagination(prev => ({ ...prev, totalRecords: count }));
             }
@@ -494,7 +438,7 @@ const Products: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [debouncedSearchTermsString, debouncedFilters, sortConfig, pagination.page, pagination.pageSize, imageSearch.embedding]);
+    }, [debouncedSearchTermsString, debouncedFilters, sortConfig, pagination.page, pagination.pageSize]);
 
     // ──────────────────────────────────────────────
     // HANDLERS
@@ -1054,17 +998,7 @@ const Products: React.FC = () => {
     }, [products, selectedIds, groupCounts, copiedSku]);
 
     return (
-        <div className="relative p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
-            {/* Drag & Drop Visual Overlay */}
-            {isDraggingImage && (
-                <div className="fixed inset-0 bg-blue-500/10 backdrop-blur-[2px] border-4 border-dashed border-blue-500 rounded-2xl z-50 flex flex-col items-center justify-center pointer-events-none transition-all duration-200">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border border-blue-100 dark:border-blue-900">
-                        <span className="material-symbols-outlined text-6xl text-blue-500 animate-bounce">photo_camera</span>
-                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">¡Suelta la imagen para buscar!</h2>
-                        <p className="text-sm text-slate-500">Buscaremos repuestos similares en tu catálogo</p>
-                    </div>
-                </div>
-            )}
+        <div className="p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
             {/* ═══════ HEADER ═══════ */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -1202,25 +1136,6 @@ const Products: React.FC = () => {
                         >
                             +
                         </button>
-                        
-                        <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            id="image-search-upload"
-                            onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                    processImageFile(e.target.files[0]);
-                                }
-                            }}
-                        />
-                        <label
-                            htmlFor="image-search-upload"
-                            title="Buscar por imagen (Arrastra una foto o pega con Ctrl+V)"
-                            className="h-[46px] w-[46px] bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center shadow-sm cursor-pointer hover:shadow active:scale-95 transition-all shrink-0"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">photo_camera</span>
-                        </label>
                     </div>
 
                     {searchTerms.length > 1 && (
@@ -1342,44 +1257,6 @@ const Products: React.FC = () => {
                     )}
                 </div>
             </div>
-
-            {/* Image Search Status Loader */}
-            {imageSearchState.status !== 'idle' && imageSearchState.status !== 'success' && (
-                <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-xl text-blue-700 dark:text-blue-400 font-semibold animate-pulse shadow-sm">
-                    <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
-                    <span>{imageSearchState.message}</span>
-                </div>
-            )}
-
-            {/* Active Image Search Banner */}
-            {imageSearch.previewUrl && (
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <img 
-                            src={imageSearch.previewUrl} 
-                            alt="Búsqueda" 
-                            className="w-12 h-12 object-cover rounded-lg border border-slate-250 dark:border-slate-700 shadow-sm" 
-                        />
-                        <div>
-                            <h4 className="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-[16px] text-blue-500">photo_camera</span>
-                                Búsqueda visual activa
-                            </h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Mostrando los repuestos más similares ordenados por coincidencia visual</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={() => {
-                            resetImageSearch();
-                            setImageSearch({ embedding: null, previewUrl: null });
-                        }}
-                        className="px-3.5 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm shadow-rose-500/20 active:scale-95 flex items-center gap-1"
-                    >
-                        <span className="material-symbols-outlined text-[14px]">close</span>
-                        Quitar Búsqueda Visual
-                    </button>
-                </div>
-            )}
 
             {/* ═══════ TABLE ═══════ */}
             <div 
