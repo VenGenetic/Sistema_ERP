@@ -832,6 +832,11 @@ const Products: React.FC = () => {
                                        }}
                                     />
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                                    {prod.gallery && prod.gallery.some((item: any) => item.type === 'video') && (
+                                        <div className="absolute bottom-0.5 right-0.5 bg-black/60 rounded p-0.5 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-[12px] text-emerald-400">play_arrow</span>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div 
@@ -844,9 +849,13 @@ const Products: React.FC = () => {
 
                             {/* Hover Gallery Preview */}
                             {(prod.gallery && prod.gallery.length > 0) && (
-                                <div className="absolute left-12 top-0 z-50 hidden group-hover:flex flex-wrap gap-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl w-max max-w-[200px] pointer-events-none">
+                                <div className="absolute left-12 top-0 z-50 hidden group-hover:flex flex-wrap gap-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl w-max max-w-[200px]">
                                     {prod.gallery.map((item: any, idx: number) => (
-                                        <div key={idx} className="w-10 h-10 rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-black flex items-center justify-center relative">
+                                        <div 
+                                            key={idx} 
+                                            onClick={(e) => { e.stopPropagation(); handleOpenLightbox(prod, 'gallery', idx + 1); }}
+                                            className="w-10 h-10 rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-black flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
+                                        >
                                             {item.type === 'video' ? (
                                                 <span className="material-symbols-outlined text-emerald-500 text-[18px]">play_circle</span>
                                             ) : (
