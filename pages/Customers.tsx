@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import type { Customer } from '../store/cartStore'; // Reuse the interface we already have
-import { Plus, Search, Edit2, Trash2, X, Briefcase, User, Percent, Users, MessageSquare, Bell, ClipboardList, Check, AlertCircle, Calendar, DollarSign, ShoppingBag, Sparkles, Phone, Package, Zap } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Briefcase, User, Percent, Users, MessageSquare, Bell, ClipboardList, Check, AlertCircle, Calendar, DollarSign, ShoppingBag, Sparkles, Phone, Package, Zap, Copy } from 'lucide-react';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
+import { normalizePhoneEC } from '../utils/phone';
 
 export interface CustomerRequest {
     id: number;
@@ -50,11 +51,27 @@ export const formatRequestNotes = (cleanNotes: string, reminderAt: string | null
     return cleanNotes;
 };
 
+
+export interface UnifiedCustomer {
+    id: string; // phone or 'pos-' + id
+    phone: string;
+    normalizedPhone: string;
+    name: string;
+    posCustomer: Customer | null;
+    waitlistRequests: any[]; // combined from product_demands and customer_requests
+    is_final_consumer: boolean;
+}
+
 export default function Customers() {
     const navigate = useNavigate();
     const { setCustomer, clearCart, addToCart } = useCartStore();
 
+
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [productDemands, setProductDemands] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<'waitlist' | 'pos'>('waitlist');
+    const [unifiedCustomers, setUnifiedCustomers] = useState<UnifiedCustomer[]>([]);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,9 +79,13 @@ export default function Customers() {
 
     // Requests Waitlist States
     const [requests, setRequests] = useState<CustomerRequest[]>([]);
-    const [selectedCustomerForDrawer, setSelectedCustomerForDrawer] = useState<Customer | null>(null);
+    const [selectedCustomerForDrawer, setSelectedCustomerForDrawer] = useState<UnifiedCustomer | null>(null);
     const [drawerRequests, setDrawerRequests] = useState<CustomerRequest[]>([]);
     const [isLoadingDrawerRequests, setIsLoadingDrawerRequests] = useState(false);
+
+    const [drawerOrders, setDrawerOrders] = useState<any[]>([]);
+    const [isLoadingDrawerOrders, setIsLoadingDrawerOrders] = useState(false);
+
 
     // Request Form States
     const [productSearchQuery, setProductSearchQuery] = useState('');
@@ -164,6 +185,20 @@ export default function Customers() {
         }
     };
 
+
+    const fetchProductDemands = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('product_demands')
+                .select('*, product:products(id, sku, name, price, cost_without_vat, inventory_levels(current_stock, warehouse_id))')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setProductDemands(data || []);
+        } catch (error) {
+            console.error('Error fetching product demands:', error);
+        }
+    };
+
     const fetchCustomers = async () => {
         try {
             setIsLoading(true);
@@ -185,7 +220,63 @@ export default function Customers() {
     useEffect(() => {
         fetchCustomers();
         fetchRequests();
+        fetchProductDemands();
     }, []);
+
+
+    useEffect(() => {
+        const unifiedMap = new Map<string, UnifiedCustomer>();
+
+        // 1. Map POS Customers
+        customers.forEach(c => {
+            const np = normalizePhoneEC(c.phone);
+            const key = np || pos-;
+            unifiedMap.set(key, {
+                id: key,
+                phone: c.phone || '',
+                normalizedPhone: np,
+                name: c.name || 'Cliente',
+                posCustomer: c,
+                waitlistRequests: [],
+                is_final_consumer: c.is_final_consumer || false
+            });
+        });
+
+        // 2. Map Product Demands (Waitlist)
+        productDemands.forEach(d => {
+            const np = normalizePhoneEC(d.phone_number);
+            const key = np || demand-;
+            let uc = unifiedMap.get(key);
+            if (!uc) {
+                uc = {
+                    id: key,
+                    phone: d.phone_number,
+                    normalizedPhone: np,
+                    name: d.customer_name || 'Cliente (Lista de Espera)',
+                    posCustomer: null,
+                    waitlistRequests: [],
+                    is_final_consumer: false
+                };
+                unifiedMap.set(key, uc);
+            }
+            uc.waitlistRequests.push({ ...d, _type: 'product_demand' });
+        });
+
+        // 3. Map Customer Requests (Old waitlist system linked by customer_id)
+        requests.forEach(r => {
+            const cust = customers.find(c => c.id === r.customer_id);
+            if (cust) {
+                const np = normalizePhoneEC(cust.phone);
+                const key = np || pos-;
+                const uc = unifiedMap.get(key);
+                if (uc) {
+                    uc.waitlistRequests.push({ ...r, _type: 'customer_request' });
+                }
+            }
+        });
+
+        setUnifiedCustomers(Array.from(unifiedMap.values()));
+    }, [customers, productDemands, requests]);
 
     // Debounced search for products in the request form
     useEffect(() => {
@@ -215,31 +306,54 @@ export default function Customers() {
         return () => clearTimeout(delayDebounceFn);
     }, [productSearchQuery, isCustomPart]);
 
-    // Update phone number and load requests inside the drawer
+// Update phone number and load requests inside the drawer
     useEffect(() => {
         if (selectedCustomerForDrawer) {
             setDrawerPhone(selectedCustomerForDrawer.phone || '');
-            fetchDrawerRequests(selectedCustomerForDrawer.id);
+            setDrawerRequests(selectedCustomerForDrawer.waitlistRequests);
+            setIsLoadingDrawerRequests(false);
+
+            // Fetch Orders if it is a POS customer
+            if (selectedCustomerForDrawer.posCustomer) {
+                setIsLoadingDrawerOrders(true);
+                supabase
+                    .from('orders')
+                    .select('*, order_items(*, product:products(sku, name, price))')
+                    .eq('customer_id', selectedCustomerForDrawer.posCustomer.id)
+                    .order('created_at', { ascending: false })
+                    .limit(10)
+                    .then(({ data, error }) => {
+                        if (!error && data) {
+                            setDrawerOrders(data);
+                        }
+                        setIsLoadingDrawerOrders(false);
+                    });
+            } else {
+                setDrawerOrders([]);
+            }
+
         } else {
             setDrawerRequests([]);
         }
     }, [selectedCustomerForDrawer]);
 
-    const handleSaveDrawerPhone = async () => {
+const handleSaveDrawerPhone = async () => {
         if (!selectedCustomerForDrawer) return;
         setIsSavingDrawerPhone(true);
         try {
-            const { error } = await supabase
-                .from('customers')
-                .update({ phone: drawerPhone })
-                .eq('id', selectedCustomerForDrawer.id);
-
-            if (error) throw error;
-            
-            // Update local state in lists
-            setCustomers(prev => prev.map(c => c.id === selectedCustomerForDrawer.id ? { ...c, phone: drawerPhone } : c));
-            setSelectedCustomerForDrawer(prev => prev ? { ...prev, phone: drawerPhone } : null);
-            alert('Teléfono de WhatsApp actualizado correctamente');
+            if (selectedCustomerForDrawer.posCustomer) {
+                const { error } = await supabase
+                    .from('customers')
+                    .update({ phone: drawerPhone })
+                    .eq('id', selectedCustomerForDrawer.posCustomer.id);
+                if (error) throw error;
+                // Fetch to refresh
+                await fetchCustomers();
+            } else {
+                // If it's only a waitlist demand, maybe create a POS customer?
+                alert('El teléfono se guardará en la próxima reserva, debe ser un cliente POS para editar su perfil directamente.');
+            }
+            alert('Teléfono actualizado correctamente');
         } catch (error: any) {
             console.error('Error updating phone:', error);
             alert(`Error al actualizar teléfono: ${error.message}`);
@@ -255,37 +369,48 @@ export default function Customers() {
     };
 
     // Actions for reservations Waitlist
-    const handleAddRequest = async (e: React.FormEvent) => {
+const handleAddRequest = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedCustomerForDrawer) return;
         if (!isCustomPart && !selectedProduct) {
             alert('Por favor selecciona un repuesto del catálogo o marca "No catalogado"');
             return;
         }
-
         if (!isCustomPart && selectedProduct && isProductDiscontinued(selectedProduct)) {
             alert('El producto seleccionado se encuentra descontinuado. No es posible agregarlo a la lista de espera.');
             return;
         }
-
         try {
-            const requestData = {
-                customer_id: selectedCustomerForDrawer.id,
-                product_id: isCustomPart ? null : selectedProduct.id,
-                custom_part_description: isCustomPart ? customDescription : null,
-                motorcycle_details: motorcycleDetails,
-                quantity,
-                notes: formatRequestNotes(notes, reminderAt),
-                is_urgent: isUrgent,
-                status: 'pending'
-            };
-
-            const { error } = await supabase
-                .from('customer_requests')
-                .insert([requestData]);
-
-            if (error) throw error;
-
+            if (selectedCustomerForDrawer.posCustomer) {
+                // Legacy / POS tied request
+                const requestData = {
+                    customer_id: selectedCustomerForDrawer.posCustomer.id,
+                    product_id: isCustomPart ? null : selectedProduct.id,
+                    custom_part_description: isCustomPart ? customDescription : null,
+                    motorcycle_details: motorcycleDetails,
+                    quantity,
+                    notes: formatRequestNotes(notes, reminderAt),
+                    is_urgent: isUrgent,
+                    status: 'pending'
+                };
+                const { error } = await supabase.from('customer_requests').insert([requestData]);
+                if (error) throw error;
+            } else {
+                // New system request (Waitlist standalone)
+                if (isCustomPart) {
+                    alert('En el CRM de Demanda pura, debes seleccionar un producto de catálogo.');
+                    return;
+                }
+                const demandData = {
+                    phone_number: selectedCustomerForDrawer.phone,
+                    customer_name: selectedCustomerForDrawer.name,
+                    product_id: selectedProduct.id,
+                    notes: formatRequestNotes(notes, reminderAt),
+                    status: 'pending_stock'
+                };
+                const { error } = await supabase.from('product_demands').insert([demandData]);
+                if (error) throw error;
+            }
             // Reset request form inputs
             setProductSearchQuery('');
             setSelectedProduct(null);
@@ -296,8 +421,9 @@ export default function Customers() {
             setNotes('');
             setReminderAt('');
             setIsUrgent(false);
-
-            await refreshRequestsData();
+            
+            await fetchRequests();
+            await fetchProductDemands();
         } catch (error: any) {
             console.error('Error adding request:', error);
             alert(`Error al guardar la reserva: ${error.message}`);
@@ -634,23 +760,25 @@ export default function Customers() {
         }
     };
 
-    const filteredCustomers = customers.filter(c => {
-        // Hide soft-deleted/archived customers
-        if (c.identification_number && c.identification_number.startsWith('DEL-')) {
-            return false;
+const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
+        // Filter by Tab
+        if (activeTab === 'pos') {
+            if (!c.posCustomer) return false;
+            if (c.is_final_consumer) return false; // Hide Consumidor Final
+        } else if (activeTab === 'waitlist') {
+            if (c.waitlistRequests.length === 0) return false;
         }
 
         const query = searchQuery.toLowerCase().trim();
         if (!query) return true;
 
         const matchesBasic = (c.name || '').toLowerCase().includes(query) ||
-            (c.identification_number || '').toLowerCase().includes(query) ||
+            (c.posCustomer?.identification_number || '').toLowerCase().includes(query) ||
             (c.phone || '').includes(query);
 
         if (matchesBasic) return true;
-
-        const customerRequests = requests.filter(r => r.customer_id === c.id);
-        const matchesRequests = customerRequests.some(r => {
+        
+        return c.waitlistRequests.some(r => {
             const customDesc = (r.custom_part_description || '').toLowerCase();
             const motoDetails = (r.motorcycle_details || '').toLowerCase();
             const notes = (r.notes || '').toLowerCase();
@@ -663,8 +791,6 @@ export default function Customers() {
                 prodName.includes(query) ||
                 prodSku.includes(query);
         });
-
-        return matchesRequests;
     });
 
     const pendingWithStock = requests.filter(r => 
@@ -816,6 +942,23 @@ export default function Customers() {
                 </div>
             )}
 
+            
+            {/* TABS */}
+            <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 max-w-fit">
+                <button
+                    onClick={() => setActiveTab('waitlist')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'waitlist' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    CRM Lista de Espera (Teléfonos)
+                </button>
+                <button
+                    onClick={() => setActiveTab('pos')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'pos' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Clientes Facturación POS
+                </button>
+            </div>
+
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                     <div className="relative max-w-md">
@@ -856,10 +999,10 @@ export default function Customers() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredCustomers.map((customer) => (
+                                filteredUnifiedCustomers.map((customer) => (
                                     <tr key={customer.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-200">
-                                            {customer.identification_number}
+                                            {customer.posCustomer ? customer.posCustomer.identification_number : 'S/N (CRM)'}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-semibold text-slate-900 dark:text-white">{customer.name}</div>
@@ -870,21 +1013,20 @@ export default function Customers() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm">{customer.email || '-'}</div>
+                                            <div className="text-sm">{customer.posCustomer?.email || '-'}</div>
                                             <div className="text-xs text-slate-500">{customer.phone || '-'}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {/* Placeholder for Phase 4 Customer Types */}
                                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
                                                 <User className="w-3.5 h-3.5" />
-                                                Minorista
+                                                {customer.posCustomer ? 'POS' : 'Demanda'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
                                             {(() => {
-                                                const custRequests = requests.filter(r => r.customer_id === customer.id && r.status !== 'completed' && r.status !== 'cancelled');
-                                                const hasStockReady = custRequests.some(r => r.product && getProductStockSum(r) > 0 && (r.status === 'pending' || r.status === 'arrived'));
-                                                const isUrgentCust = custRequests.some(r => r.is_urgent && r.status === 'pending');
+                                                const custRequests = customer.waitlistRequests.filter(r => r.status !== 'completed' && r.status !== 'cancelled');
+                                                const hasStockReady = custRequests.some(r => r.product && getProductStockSum(r) > 0 && (r.status === 'pending' || r.status === 'arrived' || r.status === 'pending_stock'));
+                                                const isUrgentCust = custRequests.some(r => r.is_urgent && (r.status === 'pending' || r.status === 'pending_stock'));
 
                                                 return (
                                                     <button
@@ -914,20 +1056,24 @@ export default function Customers() {
                                         <td className="px-6 py-4 text-right">
                                             {!customer.is_final_consumer && (
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleOpenModal(customer)}
-                                                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                                                        title="Editar Cliente"
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(customer.id)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                                                        title="Eliminar Cliente"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {customer.posCustomer && (
+                                                        <button
+                                                            onClick={() => handleOpenModal(customer.posCustomer)}
+                                                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                                            title="Editar Cliente"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {customer.posCustomer && (
+                                                        <button
+                                                            onClick={() => handleDelete(customer.posCustomer.id)}
+                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                                            title="Eliminar Cliente"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </td>
@@ -1237,23 +1383,42 @@ export default function Customers() {
 
                     {/* Drawer Content */}
                     <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl h-full flex flex-col z-10 overflow-hidden border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-300">
-                        {/* Header */}
+{/* Header */}
                         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
                             <div>
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                     <MessageSquare className="w-5 h-5 text-blue-500" />
-                                    Reservas / WhatsApp
+                                    Perfil Unificado de Cliente
                                 </h2>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                     Cliente: <strong className="text-slate-900 dark:text-white">{selectedCustomerForDrawer.name}</strong>
                                 </p>
                             </div>
-                            <button 
-                                onClick={() => setSelectedCustomerForDrawer(null)}
-                                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(selectedCustomerForDrawer.phone);
+                                        alert('Teléfono copiado');
+                                    }}
+                                    className="p-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1 text-xs font-semibold"
+                                >
+                                    <Copy className="w-4 h-4" /> Copiar
+                                </button>
+                                <a
+                                    href={`https://wa.me/${selectedCustomerForDrawer.normalizedPhone}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+                                >
+                                    <MessageSquare className="w-4 h-4" /> WhatsApp
+                                </a>
+                                <button 
+                                    onClick={() => setSelectedCustomerForDrawer(null)}
+                                    className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors ml-2"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Drawer body */}
