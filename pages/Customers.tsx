@@ -992,7 +992,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                         Cargando directorio...
                                     </td>
                                 </tr>
-                            ) : filteredCustomers.length === 0 ? (
+                            ) : filteredUnifiedCustomers.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
                                         No se encontraron clientes.
