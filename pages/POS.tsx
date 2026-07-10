@@ -32,10 +32,21 @@ const POS: React.FC = () => {
     const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
 
     const [isLostDemandModalOpen, setIsLostDemandModalOpen] = useState(false);
-    const [lostDemandBikeModel, setLostDemandBikeModel] = useState('');
     const [lostDemandBrand, setLostDemandBrand] = useState('');
 
     const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+    
+    // Till State
+    const [activeTill, setActiveTill] = useState<any>(null);
+    const [isTillModalOpen, setIsTillModalOpen] = useState(false);
+    const [tillDate, setTillDate] = useState(new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]); // Default to today Ecuador time
+    const [tillInitialCash, setTillInitialCash] = useState('0');
+
+    // Stock Correction State
+    const [isStockEditModalOpen, setIsStockEditModalOpen] = useState(false);
+    const [stockEditItem, setStockEditItem] = useState<InventoryResult | null>(null);
+    const [stockEditNewValue, setStockEditNewValue] = useState<number | ''>('');
+    const [isSavingStock, setIsSavingStock] = useState(false);
 
     // Draft Product State
     const [isDraftProductModalOpen, setIsDraftProductModalOpen] = useState(false);
@@ -83,6 +94,21 @@ const POS: React.FC = () => {
             if (accounts && accounts.length > 0) {
                 setPaymentAccounts(accounts);
                 setSelectedPaymentAccount(accounts[0].id);
+            }
+
+            // Check for active till for today (or whatever day it is in local Ecuador time)
+            const todayStr = new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const { data: tillData, error: tillError } = await supabase
+                .from('daily_tills')
+                .select('*')
+                .eq('date', todayStr)
+                .eq('status', 'open')
+                .maybeSingle();
+                
+            if (tillData) {
+                setActiveTill(tillData);
+            } else {
+                setIsTillModalOpen(true);
             }
 
             // Load draft if draft_id is in URL
@@ -666,6 +692,74 @@ const POS: React.FC = () => {
             setIsSearching(false);
         }
     };
+    const handleOpenTill = async () => {
+        try {
+            const initialCashNum = parseFloat(tillInitialCash);
+            if (isNaN(initialCashNum) || initialCashNum < 0) {
+                alert('La caja inicial debe ser un número válido mayor o igual a 0.');
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('daily_tills')
+                .insert([{
+                    date: tillDate,
+                    status: 'open',
+                    initial_cash: initialCashNum
+                }])
+                .select('*')
+                .single();
+
+            if (error) {
+                if (error.code === '23505') {
+                    alert('Ya existe una caja registrada para esta fecha. Contacte a un administrador para abrirla nuevamente si es necesario.');
+                } else {
+                    alert(`Error abriendo la caja: ${error.message}`);
+                }
+                return;
+            }
+
+            setActiveTill(data);
+            setIsTillModalOpen(false);
+            alert('¡Caja abierta exitosamente!');
+        } catch (e: any) {
+            console.error(e);
+            alert('Error inesperado abriendo la caja.');
+        }
+    };
+
+    const handleSaveStockCorrection = async () => {
+        if (!stockEditItem || typeof stockEditNewValue !== 'number' || stockEditNewValue < 0) return;
+        setIsSavingStock(true);
+        try {
+            const { error: logError } = await supabase.from('inventory_logs').insert([{
+                product_id: stockEditItem.product.id,
+                warehouse_id: stockEditItem.warehouse_id,
+                quantity_change: stockEditNewValue - stockEditItem.current_stock,
+                reason: 'Ajuste rápido desde POS'
+            }]);
+
+            if (logError) throw logError;
+
+            const { error: updateError } = await supabase
+                .from('inventory_levels')
+                .update({ current_stock: stockEditNewValue })
+                .eq('product_id', stockEditItem.product.id)
+                .eq('warehouse_id', stockEditItem.warehouse_id);
+
+            if (updateError) throw updateError;
+
+            alert('Inventario actualizado.');
+            setIsStockEditModalOpen(false);
+            // Optionally clear search to force refresh
+            setSearchQuery('');
+            setSearchResults([]);
+        } catch (err: any) {
+            alert(`Error actualizando stock: ${err.message}`);
+        } finally {
+            setIsSavingStock(false);
+        }
+    };
 
     // Derived State from Zustand
     const subtotal = getSubtotal();
@@ -680,6 +774,97 @@ const POS: React.FC = () => {
                 paymentAccounts={paymentAccounts}
                 onProcess={processCheckout}
             />
+
+            {/* Till Open Modal Blocking Overlay */}
+            {isTillModalOpen && !activeTill && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="bg-amber-100 p-3 rounded-full text-amber-600">
+                                <AlertTriangle size={28} />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-800">Caja Cerrada</h2>
+                                <p className="text-sm text-slate-500">Debes abrir una caja para iniciar ventas.</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Fecha de la Caja</label>
+                                <input
+                                    type="date"
+                                    value={tillDate}
+                                    onChange={(e) => setTillDate(e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-amber-500 transition-shadow"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Efectivo Inicial ($)</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={tillInitialCash}
+                                    onChange={(e) => setTillInitialCash(e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-amber-500 font-mono text-lg"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            
+                            <div className="pt-4 flex gap-3">
+                                <button 
+                                    onClick={handleExit}
+                                    className="flex-1 py-3 px-4 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                    Salir del POS
+                                </button>
+                                <button
+                                    onClick={handleOpenTill}
+                                    className="flex-1 py-3 px-4 bg-amber-600 hover:bg-amber-700 rounded-xl font-bold text-white shadow-md transition-colors"
+                                >
+                                    Abrir Caja
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Stock Edit Modal */}
+            {isStockEditModalOpen && stockEditItem && (
+                <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="font-bold text-slate-800 text-lg">Ajuste de Stock Rápido</h2>
+                            <button onClick={() => setIsStockEditModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                        </div>
+                        <div className="mb-4 text-sm text-slate-600">
+                            <strong>{stockEditItem.product.name}</strong><br />
+                            Bodega: {stockEditItem.warehouse_name}<br />
+                            Stock Actual: {stockEditItem.current_stock}
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nuevo Stock Real</label>
+                            <input
+                                type="number"
+                                min="0"
+                                autoFocus
+                                value={stockEditNewValue}
+                                onChange={e => setStockEditNewValue(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                                className="w-full border-2 border-blue-400 rounded-lg p-2 text-lg font-bold outline-none"
+                            />
+                        </div>
+                        <button
+                            onClick={handleSaveStockCorrection}
+                            disabled={isSavingStock || typeof stockEditNewValue !== 'number'}
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow flex items-center justify-center disabled:opacity-50"
+                        >
+                            {isSavingStock ? 'Guardando...' : 'Guardar Ajuste'}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Header */}
             <header className="bg-white px-4 md:px-6 py-3 shadow-md flex justify-between items-center z-20">
@@ -825,8 +1010,21 @@ const POS: React.FC = () => {
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <div className="font-bold text-blue-600 text-lg">
-                                                    ${result.product.price.toFixed(2)}
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <div className="font-bold text-blue-600 text-lg">
+                                                        ${result.product.price.toFixed(2)}
+                                                    </div>
+                                                    <button 
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setStockEditItem(result); 
+                                                            setStockEditNewValue(result.current_stock);
+                                                            setIsStockEditModalOpen(true); 
+                                                        }}
+                                                        className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors"
+                                                    >
+                                                        <Edit3 size={10} /> Corregir Stock
+                                                    </button>
                                                 </div>
                                             </li>
                                         ))}

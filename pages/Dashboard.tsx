@@ -36,6 +36,81 @@ const Dashboard: React.FC = () => {
         return new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' });
     });
 
+    // Till Management State
+    const [selectedTillDate, setSelectedTillDate] = useState(new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    const [selectedTill, setSelectedTill] = useState<any>(null);
+    const [isClosingTill, setIsClosingTill] = useState(false);
+    const [tillFinalActualCash, setTillFinalActualCash] = useState<number | ''>('');
+    const [tillNotes, setTillNotes] = useState('');
+    
+    // Edit Till State
+    const [isEditingTill, setIsEditingTill] = useState(false);
+    const [editTillData, setEditTillData] = useState<any>({});
+
+    const fetchTillData = useCallback(async (dateStr: string) => {
+        const { data, error } = await supabase
+            .from('daily_tills')
+            .select('*')
+            .eq('date', dateStr)
+            .maybeSingle();
+            
+        if (!error) {
+            setSelectedTill(data);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchTillData(selectedTillDate);
+    }, [selectedTillDate, fetchTillData]);
+
+    const handleCloseTill = async () => {
+        if (!selectedTill || typeof tillFinalActualCash !== 'number') return;
+        
+        // Final Expected Cash should ideally be calculated from Initial Cash + Sales (cash only). 
+        // For now, we rely on total sales or the user's manual input if they just count the till.
+        const expectedCash = Number(selectedTill.initial_cash) + myTodaySales; // simplified for now
+
+        const { error } = await supabase
+            .from('daily_tills')
+            .update({
+                status: 'closed',
+                final_expected_cash: expectedCash,
+                final_actual_cash: tillFinalActualCash,
+                notes: tillNotes
+            })
+            .eq('id', selectedTill.id);
+
+        if (error) {
+            alert('Error cerrando caja: ' + error.message);
+        } else {
+            alert('Caja cerrada con éxito.');
+            setIsClosingTill(false);
+            fetchTillData(selectedTillDate);
+        }
+    };
+
+    const handleSaveEditTill = async () => {
+        if (!selectedTill) return;
+        const { error } = await supabase
+            .from('daily_tills')
+            .update({
+                status: editTillData.status,
+                initial_cash: editTillData.initial_cash,
+                final_expected_cash: editTillData.final_expected_cash,
+                final_actual_cash: editTillData.final_actual_cash,
+                notes: editTillData.notes
+            })
+            .eq('id', selectedTill.id);
+
+        if (error) {
+            alert('Error editando caja: ' + error.message);
+        } else {
+            alert('Caja actualizada con éxito.');
+            setIsEditingTill(false);
+            fetchTillData(selectedTillDate);
+        }
+    };
+
     // ─── Core data fetch (memoised so Realtime can call it) ───────────────────
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -332,6 +407,84 @@ const Dashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* Till Management Widget */}
+            <div className="mb-8 p-6 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-amber-500 text-3xl">point_of_sale</span>
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800 dark:text-white uppercase tracking-wider">Control de Caja y Cuadre</h2>
+                            <p className="text-sm text-slate-500">Seleccione una fecha para revisar el estado de la caja de ese día.</p>
+                        </div>
+                    </div>
+                    <div>
+                        <input
+                            type="date"
+                            value={selectedTillDate}
+                            onChange={(e) => setSelectedTillDate(e.target.value)}
+                            className="w-48 border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/10 text-amber-900 dark:text-amber-500 rounded-lg p-2 font-bold outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-[#0d1117] p-5 rounded-lg border border-slate-200 dark:border-slate-800">
+                    {selectedTill ? (
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                    <span className="block text-xs font-semibold text-slate-500 uppercase">Estado</span>
+                                    <span className={`font-bold mt-1 inline-block px-2 py-0.5 rounded ${selectedTill.status === 'open' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'}`}>
+                                        {selectedTill.status === 'open' ? 'ABIERTA' : 'CERRADA'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="block text-xs font-semibold text-slate-500 uppercase">Fondo Inicial</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">${Number(selectedTill.initial_cash).toFixed(2)}</span>
+                                </div>
+                                {selectedTill.status === 'closed' && (
+                                    <>
+                                        <div>
+                                            <span className="block text-xs font-semibold text-slate-500 uppercase">Efectivo Cuadrado</span>
+                                            <span className="font-bold text-slate-900 dark:text-white">${Number(selectedTill.final_actual_cash).toFixed(2)}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-xs font-semibold text-slate-500 uppercase">Faltante/Sobrante</span>
+                                            <span className={`font-bold ${Number(selectedTill.final_actual_cash) - Number(selectedTill.final_expected_cash) < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                ${(Number(selectedTill.final_actual_cash) - Number(selectedTill.final_expected_cash)).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                            <div className="flex gap-2">
+                                {selectedTill.status === 'open' ? (
+                                    <button 
+                                        onClick={() => setIsClosingTill(true)}
+                                        className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded shadow transition-colors"
+                                    >
+                                        Cerrar Caja
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={() => {
+                                            setEditTillData({ ...selectedTill });
+                                            setIsEditingTill(true);
+                                        }}
+                                        className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold px-4 py-2 rounded transition-colors"
+                                    >
+                                        Modificar Cuadre Anterior
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-4 text-slate-500">
+                            No hay caja registrada para el día {selectedTillDate}. Debes abrirla en el POS.
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Main Operational Split */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -490,6 +643,147 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+            
+            {/* Close Till Modal */}
+            {isClosingTill && selectedTill && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">Cerrar Caja: {selectedTillDate}</h2>
+                        
+                        <div className="space-y-4">
+                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-sm">
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-slate-500">Efectivo Inicial:</span>
+                                    <span className="font-bold">${Number(selectedTill.initial_cash).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Total Ventas (Ref):</span>
+                                    <span className="font-bold text-blue-600">${myTodaySales.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Efectivo Físico Contado ($)</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={tillFinalActualCash}
+                                    onChange={(e) => setTillFinalActualCash(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                    className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-amber-500 font-mono text-lg"
+                                    placeholder="0.00"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Notas u Observaciones (Opcional)</label>
+                                <textarea
+                                    value={tillNotes}
+                                    onChange={(e) => setTillNotes(e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-amber-500 text-sm resize-none"
+                                    rows={3}
+                                />
+                            </div>
+                            
+                            <div className="pt-4 flex gap-3">
+                                <button 
+                                    onClick={() => setIsClosingTill(false)}
+                                    className="flex-1 py-3 px-4 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCloseTill}
+                                    className="flex-1 py-3 px-4 bg-amber-600 hover:bg-amber-700 rounded-xl font-bold text-white shadow-md transition-colors"
+                                >
+                                    Confirmar Cierre
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Till Modal */}
+            {isEditingTill && selectedTill && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200 my-8">
+                        <h2 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2 text-rose-600">Modo Administrador: Editar Caja</h2>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Estado</label>
+                                <select 
+                                    value={editTillData.status || 'closed'}
+                                    onChange={(e) => setEditTillData({...editTillData, status: e.target.value})}
+                                    className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none"
+                                >
+                                    <option value="open">ABIERTA</option>
+                                    <option value="closed">CERRADA</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Fondo Inicial</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editTillData.initial_cash || 0}
+                                    onChange={(e) => setEditTillData({...editTillData, initial_cash: parseFloat(e.target.value) || 0})}
+                                    className="w-full border border-slate-300 rounded-lg p-2 font-mono text-sm outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Efectivo Esperado (Sistema)</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editTillData.final_expected_cash || 0}
+                                    onChange={(e) => setEditTillData({...editTillData, final_expected_cash: parseFloat(e.target.value) || 0})}
+                                    className="w-full border border-slate-300 rounded-lg p-2 font-mono text-sm outline-none bg-rose-50"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Efectivo Físico Cuadrado</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editTillData.final_actual_cash || 0}
+                                    onChange={(e) => setEditTillData({...editTillData, final_actual_cash: parseFloat(e.target.value) || 0})}
+                                    className="w-full border border-slate-300 rounded-lg p-2 font-mono text-sm outline-none bg-rose-50"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Notas Administrativas</label>
+                                <textarea
+                                    value={editTillData.notes || ''}
+                                    onChange={(e) => setEditTillData({...editTillData, notes: e.target.value})}
+                                    className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none resize-none"
+                                    rows={2}
+                                />
+                            </div>
+                            
+                            <div className="pt-4 flex gap-3">
+                                <button 
+                                    onClick={() => setIsEditingTill(false)}
+                                    className="flex-1 py-2 border border-slate-300 rounded-lg font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveEditTill}
+                                    className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg font-bold text-white shadow-md transition-colors"
+                                >
+                                    Forzar Guardado
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
