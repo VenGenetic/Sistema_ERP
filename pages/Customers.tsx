@@ -230,7 +230,7 @@ export default function Customers() {
         // 1. Map POS Customers
         customers.forEach(c => {
             const np = normalizePhoneEC(c.phone);
-            const key = np || pos-;
+            const key = np || `pos-${c.id}`;
             unifiedMap.set(key, {
                 id: key,
                 phone: c.phone || '',
@@ -245,7 +245,7 @@ export default function Customers() {
         // 2. Map Product Demands (Waitlist)
         productDemands.forEach(d => {
             const np = normalizePhoneEC(d.phone_number);
-            const key = np || demand-;
+            const key = np || `demand-${d.id}`;
             let uc = unifiedMap.get(key);
             if (!uc) {
                 uc = {
@@ -267,7 +267,7 @@ export default function Customers() {
             const cust = customers.find(c => c.id === r.customer_id);
             if (cust) {
                 const np = normalizePhoneEC(cust.phone);
-                const key = np || pos-;
+                const key = np || `pos-${cust.id}`;
                 const uc = unifiedMap.get(key);
                 if (uc) {
                     uc.waitlistRequests.push({ ...r, _type: 'customer_request' });
