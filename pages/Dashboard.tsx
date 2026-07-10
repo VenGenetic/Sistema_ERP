@@ -22,8 +22,6 @@ const Dashboard: React.FC = () => {
     const [myTodaySales, setMyTodaySales] = useState<number>(0);
     const [lowStockCount, setLowStockCount] = useState<number>(0);
     const [inventoryHealth, setInventoryHealth] = useState<number>(100);
-    const [inventoryCapitalCost, setInventoryCapitalCost] = useState<number>(0);
-    const [inventoryCapitalPvp, setInventoryCapitalPvp] = useState<number>(0);
     const [netLiquidity, setNetLiquidity] = useState<number>(0);
     const [topLostDemand, setTopLostDemand] = useState<{ term: string, count: number }[]>([]);
     const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
@@ -129,8 +127,6 @@ const Dashboard: React.FC = () => {
                     const low   = stats.lowStockCount || 0;
                     setInventoryHealth(total > 0 ? ((total - low) / total) * 100 : 100);
 
-                    setInventoryCapitalCost(Number(stats.capitalCost) || 0);
-                    setInventoryCapitalPvp(Number(stats.capitalPvp) || 0);
                     setNetLiquidity(Number(stats.netLiquidity) || 0);
                     setTopLostDemand(stats.topLostDemand || []);
                 }
@@ -297,7 +293,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* High Density Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
                 {/* Finance Metric */}
                 <div className="p-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] flex flex-col justify-between h-32 hover:border-slate-400 dark:hover:border-slate-600 transition-colors group cursor-pointer shadow-sm">
                     <div className="flex justify-between items-start">
@@ -373,21 +369,7 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Capitalización de Inventario */}
-                <div className="p-5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/30 dark:bg-purple-900/10 flex flex-col justify-between h-32 hover:border-purple-400 dark:hover:border-purple-600 transition-colors group cursor-pointer shadow-sm">
-                    <div className="flex justify-between items-start">
-                        <span className="text-xs font-mono text-purple-600 dark:text-purple-400 uppercase tracking-wider">Capital Almacenado</span>
-                        <span className="material-symbols-outlined text-purple-400 group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">stacked_bar_chart</span>
-                    </div>
-                    <div>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
-                            {isLoading ? '...' : `$${inventoryCapitalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                        </div>
-                        <div className="text-[10px] text-purple-600 dark:text-purple-400 mt-1 flex flex-col">
-                            <span>Espectativa PVP: <strong>${inventoryCapitalPvp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-                        </div>
-                    </div>
-                </div>
+
 
                 {/* Mis Ventas Hoy Metric */}
                 <div className="p-5 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-900/10 flex flex-col justify-between h-32 hover:border-blue-400 dark:hover:border-blue-600 transition-colors group cursor-pointer shadow-sm">

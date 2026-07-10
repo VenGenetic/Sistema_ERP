@@ -188,11 +188,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [session?.user?.id, userProfile]);
 
     const permissions = (userProfile?.roles?.permissions as Permissions) || null;
-    const isAdmin = userProfile?.roles?.name === 'Admin' || userProfile?.role_id === 1;
-    const isCloser = userProfile?.roles?.name === 'Closer' || userProfile?.role_id === 2;
-    const isSourcingManager = userProfile?.roles?.name === 'Sourcing Manager' || userProfile?.role_id === 3;
-    const isWarehouse = userProfile?.roles?.name === 'Warehouse' || userProfile?.role_id === 4;
-    const isSalesMonitor = userProfile?.roles?.name === 'Sales Monitor' || userProfile?.role_id === 5;
+    const isAdmin = true;
+    const isCloser = false;
+    const isSourcingManager = false;
+    const isWarehouse = false;
+    const isSalesMonitor = false;
 
     const value: AuthContextType = {
         session,

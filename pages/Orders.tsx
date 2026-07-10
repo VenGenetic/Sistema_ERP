@@ -61,7 +61,7 @@ const Orders: React.FC = () => {
             if (!session) return;
 
             const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
-            const isAdmin = profile?.role_id === 1;
+            const isAdmin = true; // All users have admin access for orders
 
             // Fetch orders
             let query = supabase

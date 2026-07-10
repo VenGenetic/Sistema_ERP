@@ -21,11 +21,8 @@ const TestConnection = React.lazy(() => import('./pages/TestConnection'));
 const AuthConfirm = React.lazy(() => import('./pages/AuthConfirm'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
-const DispatchPipeline = React.lazy(() => import('./pages/DispatchPipeline'));
 const CommissionDashboard = React.lazy(() => import('./pages/CommissionDashboard'));
-const DataSteward = React.lazy(() => import('./pages/DataSteward'));
 const DailyRegistry = React.lazy(() => import('./pages/DailyRegistry'));
-const CapitalStats = React.lazy(() => import('./pages/CapitalStats'));
 const Tags = React.lazy(() => import('./pages/Tags'));
 const Replenishment = React.lazy(() => import('./pages/Replenishment'));
 const ProductDemands = React.lazy(() => import('./pages/ProductDemands'));
@@ -66,9 +63,6 @@ const App: React.FC = () => {
                 <Route path="product-demands" element={<ProductDemands />} />
                 <Route path="sourcing" element={<SourcingPipeline />} />
                 <Route path="orders/*" element={<Orders />} />
-                <Route path="dispatch" element={<DispatchPipeline />} />
-                <Route path="data-steward" element={<DataSteward />} />
-                <Route path="capital-stats" element={<CapitalStats />} />
                 <Route path="commissions" element={<CommissionDashboard />} />
                 <Route path="finance/*" element={<Finance />} />
                 <Route path="daily-registry" element={<DailyRegistry />} />
