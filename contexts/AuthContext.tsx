@@ -140,11 +140,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 if (!error && data) {
                     if (data.current_session_id && data.current_session_id !== localSessionId) {
-                        await handleSignOutAggressive();
+                        // The user requested that all devices can access the POS concurrently
+                        // and not be logged out. We disable the aggressive sign out here.
+                        // await handleSignOutAggressive();
+                        console.warn("Multiple sessions detected but aggressive sign-out is disabled.");
                     }
                 }
             } catch (err) {
-                console.error('Error in aggressive session check:', err);
+                console.error('Error in session check:', err);
             }
         };
 
@@ -159,10 +162,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     table: 'profiles',
                     filter: `id=eq.${session.user.id}`,
                 },
-                async (payload) => {
-                    const dbSessionId = payload.new.current_session_id;
-                    if (dbSessionId && dbSessionId !== localSessionId) {
-                        await handleSignOutAggressive();
+                (payload) => {
+                    const updatedSessionId = payload.new.current_session_id;
+                    if (updatedSessionId && updatedSessionId !== localSessionId) {
+                        // user requested multiple concurrent sessions
+                        // handleSignOutAggressive();
+                        console.warn("Multiple sessions detected via realtime but aggressive sign-out is disabled.");
                     }
                 }
             )
