@@ -23,6 +23,7 @@ const Dashboard: React.FC = () => {
     const [lowStockCount, setLowStockCount] = useState<number>(0);
     const [inventoryHealth, setInventoryHealth] = useState<number>(100);
     const [netLiquidity, setNetLiquidity] = useState<number>(0);
+    const [capitalCost, setCapitalCost] = useState<number>(0);
     const [topLostDemand, setTopLostDemand] = useState<{ term: string, count: number }[]>([]);
     const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
     const [counts, setCounts] = useState({ warehouses: 0, accounts: 0, users: 0 });
@@ -128,6 +129,7 @@ const Dashboard: React.FC = () => {
                     setInventoryHealth(total > 0 ? ((total - low) / total) * 100 : 100);
 
                     setNetLiquidity(Number(stats.netLiquidity) || 0);
+                    setCapitalCost(Number(stats.capitalCost) || 0);
                     setTopLostDemand(stats.topLostDemand || []);
                 }
             }
@@ -255,6 +257,18 @@ const Dashboard: React.FC = () => {
                     }, 800);
                 }
             )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'inventory_levels' },
+                () => {
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => {
+                        fetchDashboardData();
+                        setJustRefreshed(true);
+                        setTimeout(() => setJustRefreshed(false), 3000);
+                    }, 800);
+                }
+            )
             .subscribe();
 
         return () => {
@@ -365,6 +379,23 @@ const Dashboard: React.FC = () => {
                         <div className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                             Todas las ventas
+                        </div>
+                    </div>
+                </div>
+
+                {/* Capital del Inventario Metric */}
+                <div className="p-5 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/30 dark:bg-purple-900/10 flex flex-col justify-between h-32 hover:border-purple-400 dark:hover:border-purple-600 transition-colors group cursor-pointer shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-mono text-purple-600 dark:text-purple-400 uppercase tracking-wider">Capital de Inventario</span>
+                        <span className="material-symbols-outlined text-purple-400 group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">monetization_on</span>
+                    </div>
+                    <div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                            {isLoading ? '...' : `$${capitalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        </div>
+                        <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">sync</span>
+                            Actualizado al segundo
                         </div>
                     </div>
                 </div>
