@@ -8,7 +8,7 @@ const { Client } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const envPath = path.join(__dirname, '.env');
-const migrationPath = path.join(__dirname, 'supabase/migrations/20260709163500_product_media_gallery.sql');
+const migrationPath = path.join(__dirname, 'supabase/migrations/20260712120000_secure_order_modification.sql');
 
 async function main() {
     try {
