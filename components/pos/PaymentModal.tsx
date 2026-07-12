@@ -11,7 +11,7 @@ const todayEcuador = () => {
 interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onProcess: (paymentAccountId: number, saleDate?: string) => Promise<void>;
+    onProcess: (paymentAccountId: number, saleDate?: string, shippingAddress?: string, shippingCost?: number) => Promise<void>;
     paymentAccounts: { id: number, name: string }[];
 }
 
@@ -20,16 +20,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
     const [selectedAccount, setSelectedAccount] = useState<number>(paymentAccounts[0]?.id || 0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [saleDate, setSaleDate] = useState<string>(todayEcuador());
+    
+    const [isDelivery, setIsDelivery] = useState(false);
+    const [shippingAddress, setShippingAddress] = useState('');
+    const [shippingCost, setShippingCost] = useState(0);
 
     if (!isOpen) return null;
 
     const subtotal = getSubtotal();
-    const total = getTotal();
+    const total = getTotal() + (isDelivery ? shippingCost : 0);
 
     const handleConfirm = async () => {
         setIsProcessing(true);
         try {
-            await onProcess(selectedAccount, saleDate);
+            await onProcess(selectedAccount, saleDate, isDelivery ? shippingAddress : 'POS Walk-in', isDelivery ? shippingCost : 0);
             onClose(); // only close on success
         } catch (e) {
             // error handled by parent
@@ -91,6 +95,31 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
 
                     {/* Payment Form */}
                     <div className="space-y-4">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={isDelivery} 
+                                    onChange={(e) => setIsDelivery(e.target.checked)} 
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                                />
+                                <span className="font-bold text-slate-700">¿Es entrega a domicilio?</span>
+                            </label>
+                            
+                            {isDelivery && (
+                                <div className="mt-4 space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dirección / Detalles</label>
+                                        <input type="text" value={shippingAddress} onChange={e => setShippingAddress(e.target.value)} className="w-full border border-slate-300 rounded p-2 text-sm outline-none focus:border-blue-500" placeholder="Ej: Calle Principal 123" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Costo de Envío ($)</label>
+                                        <input type="number" step="0.01" min="0" value={shippingCost} onChange={e => setShippingCost(parseFloat(e.target.value) || 0)} className="w-full border border-slate-300 rounded p-2 text-sm outline-none focus:border-blue-500" placeholder="0.00" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <label className="block">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
                                 Método / Cuenta Múltiple

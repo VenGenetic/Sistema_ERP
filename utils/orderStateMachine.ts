@@ -50,17 +50,9 @@ export const STATUS_COLORS: Record<OrderStatus, { bg: string; text: string; bord
     Reembolsado:           { bg: 'bg-gray-100 dark:bg-gray-900/10',    text: 'text-gray-500 dark:text-gray-500',       border: 'border-gray-300 dark:border-gray-700' },
 };
 
-/**
- * Valid transitions map — mirrors the RPC logic.
- * Key = current status, Value = array of allowed next statuses.
- */
 export const VALID_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
-    Borrador:              ['Sourcing_Pendiente', 'Pendiente_Pago', 'Cancelado'],
-    Sourcing_Pendiente:    ['Confirmado_Proveedor', 'Borrador', 'Cancelado'],
-    Confirmado_Proveedor:  ['Pendiente_Pago', 'Sourcing_Pendiente', 'Borrador', 'Cancelado'],
-    Pendiente_Pago:        ['Listo_Cumplimiento', 'Confirmado_Proveedor', 'Borrador', 'Cancelado'],
-    Listo_Cumplimiento:    ['En_Transito', 'Pendiente_Pago', 'Borrador', 'Cancelado'],
-    En_Transito:           ['Entregado', 'RMA_Pendiente'],
+    Borrador:              ['Listo_Cumplimiento', 'Entregado', 'Cancelado'],
+    Listo_Cumplimiento:    ['Entregado', 'Borrador', 'Cancelado'],
     Entregado:             ['RMA_Pendiente', 'Reembolsado'],
 };
 
@@ -82,11 +74,9 @@ export function getNextStatuses(current: OrderStatus): OrderStatus[] {
  * Which role_id is responsible for acting on orders in a given status.
  */
 export const STATUS_RESPONSIBLE_ROLE: Partial<Record<OrderStatus, number[]>> = {
-    Sourcing_Pendiente:    [1, 3],       // Admin or Sourcing Manager
-    Confirmado_Proveedor:  [1, 2, 5],    // Admin, Closer, or Sales Monitor
-    Pendiente_Pago:        [1],          // Admin (Finance Audit)
+    Borrador:              [1, 2],       // Admin or Closer
     Listo_Cumplimiento:    [1, 4],       // Admin or Warehouse
-    En_Transito:           [1, 2, 5],    // Admin, Closer, or Sales Monitor
+    Entregado:             [1, 2, 5],    // Admin, Closer, or Sales Monitor
 };
 
 /**

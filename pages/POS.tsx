@@ -544,7 +544,7 @@ const POS: React.FC = () => {
         updateUnitPrice(itemId, newPrice);
     };
 
-    const processCheckout = async (paymentAccountId: number, saleDate?: string) => {
+    const processCheckout = async (paymentAccountId: number, saleDate?: string, shippingAddress?: string, shippingCost?: number) => {
         if (cartRef.current.length === 0) return;
 
         try {
@@ -559,9 +559,10 @@ const POS: React.FC = () => {
             const { data, error } = await supabase.rpc('process_pos_sale', {
                 p_customer_id: customer.id,
                 p_payment_account_id: paymentAccountId,
-                p_shipping_cost: 0,
+                p_shipping_cost: shippingCost || 0,
                 p_items: itemsPayload,
                 p_closer_id: customer.claimed_by || null,
+                p_shipping_address: shippingAddress || 'POS Walk-in',
                 p_shipping_expense_account_id: null,
                 p_draft_id: activeDraftId || null
             });
@@ -821,10 +822,18 @@ const POS: React.FC = () => {
             <header className="bg-white px-4 md:px-6 py-3 shadow-md flex justify-between items-center z-20">
                 <div className="flex items-center gap-2 md:gap-4">
                     {!isCashier ? (
-                        <button onClick={handleExit} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors">
-                            <ArrowLeft size={20} />
-                            <span className="font-medium text-sm hidden sm:inline">Volver</span>
-                        </button>
+                        <>
+                            <button onClick={handleExit} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors">
+                                <ArrowLeft size={20} />
+                                <span className="font-medium text-sm hidden sm:inline">Volver</span>
+                            </button>
+                            <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-md text-sm font-semibold">
+                                Dashboard
+                            </button>
+                            <button onClick={() => navigate('/orders')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-md text-sm font-semibold">
+                                Pipeline Pedidos
+                            </button>
+                        </>
                     ) : (
                         <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 md:px-3 md:py-1.5 rounded-md">
                             <LogOut size={18} />

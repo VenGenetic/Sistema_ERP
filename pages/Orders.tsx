@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone, Truck } from 'lucide-react';
+import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone, Truck, Lock, Unlock, Store } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { isTransitionAllowed } from '../utils/orderStateMachine';
@@ -24,11 +24,7 @@ interface Order {
 // Kanban Column Config based on strict pipeline
 const columns = [
     { id: 'Borrador', title: 'Borrador / Cotización', color: 'bg-gray-100', borderColor: 'border-gray-300', icon: <FileText size={18} className="text-gray-500" /> },
-    { id: 'Sourcing_Pendiente', title: 'Pendiente Proveedor', color: 'bg-orange-50', borderColor: 'border-orange-300', icon: <PackageSearch size={18} className="text-orange-500" /> },
-    { id: 'Confirmado_Proveedor', title: 'Confirmado (WhatsApp)', color: 'bg-green-50', borderColor: 'border-green-300', icon: <MessageCircle size={18} className="text-green-500" /> },
-    { id: 'Pendiente_Pago', title: 'Verificación de Pago', color: 'bg-yellow-50', borderColor: 'border-yellow-300', icon: <CheckCircle2 size={18} className="text-yellow-500" /> },
     { id: 'Listo_Cumplimiento', title: 'Listo para Despacho', color: 'bg-purple-50', borderColor: 'border-purple-300', icon: <div className="w-4 h-4 rounded-full bg-purple-500"></div> },
-    { id: 'En_Transito', title: 'En Tránsito', color: 'bg-indigo-50', borderColor: 'border-indigo-300', icon: <CheckCircle2 size={18} className="text-indigo-500" /> },
     { id: 'Entregado', title: 'Completado', color: 'bg-green-50', borderColor: 'border-green-300', icon: <CheckCircle2 size={18} className="text-green-500" /> },
 ];
 
@@ -49,10 +45,30 @@ const Orders: React.FC = () => {
     // Drag & Drop / Transition state
     const [draggedOrderId, setDraggedOrderId] = useState<number | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [tillStatus, setTillStatus] = useState<'open' | 'closed' | 'none'>('none');
 
     useEffect(() => {
         fetchOrders();
+        fetchTillStatus();
     }, []);
+
+    const fetchTillStatus = async () => {
+        try {
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' });
+            const { data, error } = await supabase.from('daily_tills').select('status').eq('date', today).single();
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    setTillStatus('none');
+                } else {
+                    console.error('Error fetching till:', error);
+                }
+            } else {
+                setTillStatus(data.status as 'open' | 'closed');
+            }
+        } catch (err) {
+            console.error('Error fetching till:', err);
+        }
+    };
 
     const fetchOrders = async () => {
         setLoading(true);
@@ -190,7 +206,7 @@ const Orders: React.FC = () => {
             const { error } = await supabase
                 .from('orders')
                 .update({
-                    status: 'Pendiente_Pago',
+                    status: 'Listo_Cumplimiento',
                     bank_reference_code: bankRef,
                     payment_receipt_url: receiptPreview,
                     shipping_address: shippingAddress,
@@ -269,16 +285,13 @@ const Orders: React.FC = () => {
             return;
         }
 
-        let extraFields = undefined;
-        if (targetColumnId === 'En_Transito') {
-            const tracking = window.prompt('Ingrese el código de rastreo o guía de despacho:');
-            if (!tracking) {
-                alert('Debe ingresar un código de rastreo para enviar a tránsito.');
-                setDraggedOrderId(null);
-                return;
-            }
-            extraFields = { tracking_number: tracking, carrier_name: 'Servientrega' };
+        if (targetColumnId === 'Entregado' && tillStatus !== 'open') {
+            alert('No se puede completar la orden. La caja de hoy está cerrada o no ha sido abierta.');
+            setDraggedOrderId(null);
+            return;
         }
+
+        let extraFields = undefined;
 
         await handleStatusTransition(draggedOrderId, targetColumnId, extraFields);
     };
@@ -292,7 +305,18 @@ const Orders: React.FC = () => {
             {/* Header */}
             <div className="flex justify-between items-center mb-6 z-10">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Pipeline de Órdenes</h1>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Pipeline de Órdenes</h1>
+                        {tillStatus === 'open' ? (
+                            <button onClick={() => navigate('/')} className="flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold shadow-sm hover:bg-green-200">
+                                <Unlock size={14} /> Caja Abierta (Arqueo)
+                            </button>
+                        ) : (
+                            <button onClick={() => navigate('/pos')} className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold shadow-sm hover:bg-red-200">
+                                <Lock size={14} /> Abrir Caja en POS
+                            </button>
+                        )}
+                    </div>
                     <p className="text-slate-500 text-sm mt-1">Gestión asíncrona, cotizaciones y verificación de cobros</p>
                 </div>
                 <button
@@ -499,14 +523,6 @@ const Orders: React.FC = () => {
                                         {selectedOrder?.status === 'Borrador' && (
                                             <>
                                                 <button
-                                                    onClick={() => handleStatusTransition(selectedOrder.id, 'Sourcing_Pendiente')}
-                                                    disabled={selectedOrder.items.length === 0 || isProcessing}
-                                                    className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 text-white py-2 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors text-sm"
-                                                >
-                                                    <PackageSearch size={16} />
-                                                    <span>{isProcessing ? 'Enviando...' : 'Solicitar a Sourcing (Pendiente Proveedor)'}</span>
-                                                </button>
-                                                <button
                                                     onClick={handleSendQuote}
                                                     disabled={selectedOrder.items.length === 0 || isProcessing}
                                                     className="w-full bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white py-2 rounded-lg font-bold shadow-md transition-colors text-sm"
@@ -521,24 +537,23 @@ const Orders: React.FC = () => {
                                                 disabled={selectedOrder.items.length === 0 || !bankRef || !receiptPreview || isProcessing}
                                                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white py-3 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors mt-2"
                                             >
-                                                <span>🔒 Cliente Aprobó (Verificar)</span>
+                                                <span>🔒 Cliente Aprobó (A Despacho)</span>
                                             </button>
                                         )}
                                         {selectedOrder?.status === 'Listo_Cumplimiento' && (
                                             <button
                                                 onClick={() => {
-                                                    const tracking = window.prompt('Ingrese el número de guía / rastreo para el despacho:');
-                                                    if (!tracking) {
-                                                        alert('Debe ingresar un código de rastreo para enviar a tránsito.');
+                                                    if (tillStatus !== 'open') {
+                                                        alert('No se puede completar la orden. La caja del día está cerrada.');
                                                         return;
                                                     }
-                                                    handleStatusTransition(selectedOrder.id, 'En_Transito', { tracking_number: tracking, carrier_name: 'Servientrega' });
+                                                    handleStatusTransition(selectedOrder.id, 'Entregado');
                                                 }}
                                                 disabled={isProcessing}
                                                 className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white py-2 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors text-sm mt-2"
                                             >
                                                 <Truck size={16} />
-                                                <span>{isProcessing ? 'Enviando...' : 'Despachar (Enviar a Tránsito)'}</span>
+                                                <span>{isProcessing ? 'Enviando...' : 'Despachar y Completar'}</span>
                                             </button>
                                         )}
                                         {!canConvert && selectedOrder?.status !== 'Listo_Cumplimiento' && selectedOrder?.status !== 'Borrador' && (

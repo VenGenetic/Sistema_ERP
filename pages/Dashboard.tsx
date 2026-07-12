@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-
 interface ActivityItem {
     type: string;
     id: string;
@@ -16,6 +16,7 @@ interface ActivityItem {
 const Dashboard: React.FC = () => {
     const { session } = useAuth();
     const currentUserId = session?.user?.id;
+    const navigate = useNavigate();
 
     // Dynamic State
     const [todaySales, setTodaySales] = useState<number>(0);
@@ -488,11 +489,25 @@ const Dashboard: React.FC = () => {
                                         Modificar Cuadre Anterior
                                     </button>
                                 )}
+                                <button onClick={() => navigate('/orders')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded shadow transition-colors flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[18px]">view_kanban</span> Pedidos
+                                </button>
+                                <button onClick={() => navigate('/pos')} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded shadow transition-colors flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[18px]">point_of_sale</span> POS
+                                </button>
                             </div>
                         </div>
                     ) : (
                         <div className="text-center py-4 text-slate-500">
                             No hay caja registrada para el día {selectedTillDate}. Debes abrirla en el POS.
+                            <div className="mt-4 flex justify-center gap-3">
+                                <button onClick={() => navigate('/orders')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded shadow transition-colors flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[18px]">view_kanban</span> Ver Pedidos
+                                </button>
+                                <button onClick={() => navigate('/pos')} className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded shadow transition-colors inline-flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[18px]">point_of_sale</span> Abrir Caja en POS
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
