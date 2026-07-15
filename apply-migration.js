@@ -8,7 +8,12 @@ const { Client } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const envPath = path.join(__dirname, '.env');
-const migrationPath = path.join(__dirname, 'supabase/migrations/20260712120000_secure_order_modification.sql');
+const migrationFile = process.argv[2];
+if (!migrationFile) {
+    console.error("Please provide the migration file path as an argument.");
+    process.exit(1);
+}
+const migrationPath = path.join(__dirname, migrationFile);
 
 async function main() {
     try {

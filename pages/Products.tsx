@@ -881,6 +881,12 @@ const Products: React.FC = () => {
                                     Equivalente
                                 </span>
                             )}
+                            {(prod.demand_count > 0) && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400 flex items-center gap-1" title={`${prod.demand_count} registros de demanda activos`}>
+                                    <span className="material-symbols-outlined text-[10px] animate-pulse">notifications_active</span>
+                                    {prod.demand_count} Demanda{prod.demand_count > 1 ? 's' : ''}
+                                </span>
+                            )}
                             {prod.investigation_status === 'en_consulta' && (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title="En consulta de sourcing">
                                     En Consulta
@@ -994,10 +1000,19 @@ const Products: React.FC = () => {
                         </button>
                         <button
                             onClick={() => { setDemandProduct(prod); setIsDemandModalOpen(true); }}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
-                            title="Registrar Demanda (Lista de Espera)"
+                            className={`p-1.5 rounded-lg transition-colors relative ${
+                                prod.demand_count > 0
+                                    ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 font-semibold'
+                                    : 'text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            }`}
+                            title="Registrar / Ver Demanda (Lista de Espera)"
                         >
                             <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+                            {prod.demand_count > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse">
+                                    {prod.demand_count}
+                                </span>
+                            )}
                         </button>
                         <button
                             onClick={() => handleDeleteProduct(prod)}
