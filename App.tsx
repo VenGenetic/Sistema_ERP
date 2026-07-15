@@ -23,10 +23,17 @@ const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
 const CommissionDashboard = React.lazy(() => import('./pages/CommissionDashboard'));
 const DailyRegistry = React.lazy(() => import('./pages/DailyRegistry'));
+const Expenses = React.lazy(() => import('./pages/Expenses'));
 const Tags = React.lazy(() => import('./pages/Tags'));
 const Replenishment = React.lazy(() => import('./pages/Replenishment'));
 const ProductDemands = React.lazy(() => import('./pages/ProductDemands'));
 const SourcingPipeline = React.lazy(() => import('./pages/SourcingPipeline'));
+
+// Lazy load mobile pages
+const MobileLayout = React.lazy(() => import('./components/mobile/MobileLayout'));
+const MobileDashboard = React.lazy(() => import('./pages/mobile/MobileDashboard'));
+const MobileCatalog = React.lazy(() => import('./pages/mobile/MobileCatalog'));
+const MobileInventory = React.lazy(() => import('./pages/mobile/MobileInventory'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -52,6 +59,14 @@ const App: React.FC = () => {
             <Route element={<ProtectedRoute />}>
               <Route path="/pos" element={<POS />} />
               <Route path="/rep-dashboard" element={<RepDashboard />} />
+              
+              {/* Mobile App Route */}
+              <Route path="/mobile" element={<MobileLayout />}>
+                <Route index element={<MobileDashboard />} />
+                <Route path="catalog" element={<MobileCatalog />} />
+                <Route path="inventory" element={<MobileInventory />} />
+              </Route>
+
               <Route path="/" element={<Layout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="team" element={<Team />} />
@@ -66,6 +81,7 @@ const App: React.FC = () => {
                 <Route path="commissions" element={<CommissionDashboard />} />
                 <Route path="finance/*" element={<Finance />} />
                 <Route path="daily-registry" element={<DailyRegistry />} />
+                <Route path="expenses" element={<Expenses />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Route>

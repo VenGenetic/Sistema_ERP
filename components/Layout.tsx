@@ -139,6 +139,13 @@ const Layout: React.FC = () => {
         )}
 
         {(isAdmin || permissions?.inventory?.read) && (
+          <Link to="/mobile" target="_blank" className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-l-2 border-transparent">
+            <span className="material-symbols-outlined text-[20px]">smartphone</span>
+            Modo Móvil (App)
+          </Link>
+        )}
+
+        {(isAdmin || permissions?.inventory?.read) && (
           <Link to="/replenishment" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('replenishment') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
             <span className="material-symbols-outlined text-[20px]">shopping_cart_checkout</span>
             Abastecimiento
@@ -167,6 +174,10 @@ const Layout: React.FC = () => {
             <Link to="/daily-registry" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('daily-registry') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
               <span className="material-symbols-outlined text-[20px]">point_of_sale</span>
               Cierre Diario
+            </Link>
+            <Link to="/expenses" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('expenses') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+              <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+              Registro de Gastos
             </Link>
           </>
         )}
@@ -203,7 +214,8 @@ const Layout: React.FC = () => {
               {location.pathname === '/' ? 'CENTRO_COMANDO' :
                 location.pathname.includes('partners') ? 'SOCIOS' :
                   location.pathname.includes('finance') ? 'FINANZAS' :
-                    location.pathname.includes('settings') ? 'CONFIGURACION' : ''}
+                    location.pathname.includes('expenses') ? 'GASTOS' :
+                      location.pathname.includes('settings') ? 'CONFIGURACION' : ''}
             </span>
           </div>
         </div>

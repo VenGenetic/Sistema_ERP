@@ -84,13 +84,13 @@ async function main() {
 
     // 3. Fetch existing product SKUs and their activation status from database
     console.log("🔍 Fetching existing products in Supabase...");
-    const dbProducts = new Map(); // Map<skuUpper, { is_active: boolean }>
+    const dbProducts = new Map(); // Map<skuUpper, { is_active: boolean, price: number }>
     let page = 0;
     const pageSize = 1000;
     while (true) {
         const { data, error } = await supabase
             .from('products')
-            .select('sku, is_active')
+            .select('sku, is_active, price')
             .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (error) {
@@ -103,7 +103,10 @@ async function main() {
                 const skuUpper = p.sku.trim().toUpperCase();
                 const existing = dbProducts.get(skuUpper);
                 if (!existing || p.is_active) {
-                    dbProducts.set(skuUpper, { is_active: !!p.is_active });
+                    dbProducts.set(skuUpper, { 
+                        is_active: !!p.is_active,
+                        price: parseFloat(p.price) || 0
+                    });
                 }
             }
         });
@@ -118,9 +121,10 @@ async function main() {
     const jsonProducts = JSON.parse(rawData);
     console.log(`📄 Found ${jsonProducts.length} products in data_costos.json`);
 
-    // 5. Filter and prepare products to insert or reactivate
+    // 5. Filter and prepare products to insert, reactivate or update price
     const productsToInsert = [];
     const productsToReactivate = [];
+    const productsToUpdate = [];
     const processedSkus = new Set();
 
     for (const item of jsonProducts) {
@@ -169,14 +173,41 @@ async function main() {
         };
 
         if (!existing) {
+            // Brand new product, insert it
             productsToInsert.push(productData);
-        } else if (!existing.is_active) {
-            productsToReactivate.push(productData);
+        } else {
+            const currentDbPrice = existing.price || 0;
+            
+            // Check if calculated price is higher than current database price
+            let finalPrice = calculated_pvp;
+            let priceHasIncreased = false;
+            
+            if (calculated_pvp > currentDbPrice) {
+                finalPrice = calculated_pvp;
+                priceHasIncreased = true;
+            } else {
+                // If it is lower or equal, keep the database price to avoid decreasing it
+                finalPrice = currentDbPrice;
+            }
+
+            const updatedProductData = {
+                ...productData,
+                price: finalPrice
+            };
+
+            if (!existing.is_active) {
+                // If it is inactive, reactivate it (preserving or increasing the price)
+                productsToReactivate.push(updatedProductData);
+            } else if (priceHasIncreased) {
+                // If it is active and the new price is higher, update it
+                productsToUpdate.push(updatedProductData);
+            }
         }
     }
 
     console.log(`📦 New products to import: ${productsToInsert.length}`);
     console.log(`📦 Inactive products to reactivate: ${productsToReactivate.length}`);
+    console.log(`📦 Active products to update (price increased): ${productsToUpdate.length}`);
 
     // 6. Perform DB insertion if needed
     if (productsToInsert.length > 0) {
@@ -199,7 +230,7 @@ async function main() {
             console.log(`✅ Database insertion completed successfully!`);
 
             // Add newly inserted products to dbProducts so they are recognized in the image upload phase
-            productsToInsert.forEach(p => dbProducts.set(p.sku.toUpperCase(), { is_active: true }));
+            productsToInsert.forEach(p => dbProducts.set(p.sku.toUpperCase(), { is_active: true, price: p.price }));
         }
     } else {
         console.log("ℹ️ No new products found to insert.");
@@ -247,6 +278,47 @@ async function main() {
         console.log("ℹ️ No inactive products to reactivate.");
     }
 
+    // 6c. Perform DB updates for active products whose price increased
+    if (productsToUpdate.length > 0) {
+        if (isDryRun) {
+            console.log(`[DRY-RUN] Simulating price update for ${productsToUpdate.length} active products...`);
+        } else {
+            console.log(`📥 Updating prices for ${productsToUpdate.length} active products in parallel batches...`);
+            const batchSize = 30;
+            let updatedCount = 0;
+            for (let i = 0; i < productsToUpdate.length; i += batchSize) {
+                const batch = productsToUpdate.slice(i, i + batchSize);
+                const promises = batch.map(async (item) => {
+                    const { error } = await supabase
+                        .from('products')
+                        .update({
+                            name: item.name,
+                            category: item.category,
+                            price: item.price,
+                            cost_without_vat: item.cost_without_vat,
+                            vat_percentage: item.vat_percentage,
+                            brand_id: item.brand_id,
+                            image_url: item.image_url,
+                            status: item.status,
+                            profit_margin: item.profit_margin,
+                            importer_stock: item.importer_stock
+                        })
+                        .eq('sku', item.sku);
+                    if (error) {
+                        console.warn(`   ⚠️ Failed to update SKU ${item.sku}:`, error.message);
+                    } else {
+                        updatedCount++;
+                    }
+                });
+                await Promise.all(promises);
+                console.log(`   Progress: Updated ${Math.min(i + batchSize, productsToUpdate.length)}/${productsToUpdate.length} products...`);
+            }
+            console.log(`✅ Updated ${updatedCount} products successfully.`);
+        }
+    } else {
+        console.log("ℹ️ No active products found needing a price increase.");
+    }
+
     // 7. Check and upload missing images to Storage
     console.log("\n🔍 Fetching list of existing images in Supabase Storage...");
     const existingStorageFiles = new Set();
@@ -270,9 +342,9 @@ async function main() {
     }
     console.log(`✅ Found ${existingStorageFiles.size} images in Supabase Storage products/ directory.`);
 
-    // Check which images are missing and exist locally ONLY for the newly inserted/reactivated products
+    // Check which images are missing and exist locally ONLY for the newly inserted/reactivated/updated products
     const imageUploadQueue = [];
-    for (const prod of [...productsToInsert, ...productsToReactivate]) {
+    for (const prod of [...productsToInsert, ...productsToReactivate, ...productsToUpdate]) {
         const sku = prod.sku;
         const targetFilename = `${sku}_cut.webp`;
         if (existingStorageFiles.has(targetFilename.toUpperCase())) continue; // already uploaded
@@ -341,6 +413,7 @@ async function main() {
     console.log(`🎉 SYNCHRONIZATION COMPLETED SUCCESSFULLY!`);
     console.log(`   New products inserted: ${isDryRun ? productsToInsert.length + ' (simulated)' : productsToInsert.length}`);
     console.log(`   Products reactivated:  ${isDryRun ? productsToReactivate.length + ' (simulated)' : productsToReactivate.length}`);
+    console.log(`   Products updated (price increase): ${isDryRun ? productsToUpdate.length + ' (simulated)' : productsToUpdate.length}`);
     console.log(`   New images uploaded:  ${isDryRun ? imageUploadQueue.length + ' (simulated)' : imageUploadQueue.length}`);
     console.log(`======================================================================`);
 }
