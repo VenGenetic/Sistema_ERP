@@ -499,6 +499,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         };
     }, [isOpen, formData.imageUrl, gallery.length]);
 
+    const handlePasteClick = async (target: 'main' | 'gallery') => {
+        try {
+            const clipboardItems = await navigator.clipboard.read();
+            for (const item of clipboardItems) {
+                const imageType = item.types.find(t => t.startsWith('image/'));
+                if (imageType) {
+                    const blob = await item.getType(imageType);
+                    const file = new File([blob], `pasted_${Date.now()}.png`, { type: imageType });
+                    if (target === 'main') {
+                        await uploadMainImageFile(file);
+                    } else {
+                        await uploadGalleryFile(file);
+                    }
+                    return;
+                }
+            }
+            alert("No se detectaron imágenes válidas en tu portapapeles.");
+        } catch (error) {
+            console.error('Clipboard API error:', error);
+            alert("Error accediendo al portapapeles. Asegúrate de conceder permisos al navegador o presiona Ctrl+V manualmente.");
+        }
+    };
+
     const handleRemoveGalleryItem = (index: number) => {
         if (window.confirm('¿Estás seguro de que deseas eliminar este elemento de la galería?')) {
             setGallery(prev => prev.filter((_, i) => i !== index));
@@ -824,8 +847,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 )}
                             </div>
                         ) : (
-                            <label className="flex flex-col items-center justify-center w-full h-full min-h-[128px] cursor-pointer">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+                            <div className="flex flex-col items-center justify-center w-full h-full min-h-[128px]">
+                                <div className="flex flex-col items-center justify-center pt-2 pb-4 text-center">
                                     {isUploading ? (
                                         <span className="material-symbols-outlined text-[32px] text-primary animate-spin">progress_activity</span>
                                     ) : (
@@ -833,15 +856,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             <span className="material-symbols-outlined text-[32px] text-slate-400 mb-2 group-hover:text-primary transition-colors">
                                                 {isDraggingMain ? 'download' : 'add_photo_alternate'}
                                             </span>
-                                            <p className="mb-1 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                                                {isDraggingMain ? 'Suelta la imagen aquí' : 'Click, arrastra o presiona Ctrl+V para pegar'}
+                                            <p className="mb-3 text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                                {isDraggingMain ? 'Suelta la imagen aquí' : 'Selecciona una opción para subir'}
                                             </p>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500">Solo imágenes (JPG, PNG, WEBP)</p>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePasteClick('main'); }}
+                                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-700 shadow-sm transition-colors z-10 relative"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">content_paste</span> Pegar
+                                                </button>
+                                                
+                                                <label className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded hover:bg-primary/90 shadow-sm transition-colors cursor-pointer z-10 relative">
+                                                    <span className="material-symbols-outlined text-[14px]">search</span> Examinar
+                                                    <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
+                                                </label>
+                                            </div>
+                                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">O arrastra el archivo aquí</p>
                                         </>
                                     )}
                                 </div>
-                                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
-                            </label>
+                            </div>
                         )}
                     </div>
 
@@ -905,14 +941,25 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             ))}
 
                             {gallery.length < 5 && (
-                                <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                    {isVideoUploading ? (
-                                        <span className="material-symbols-outlined text-[24px] text-primary animate-spin">progress_activity</span>
-                                    ) : (
-                                        <span className="material-symbols-outlined text-[24px] text-slate-400">add</span>
+                                <div className="flex flex-col gap-2">
+                                    <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                        {isVideoUploading ? (
+                                            <span className="material-symbols-outlined text-[24px] text-primary animate-spin">progress_activity</span>
+                                        ) : (
+                                            <span className="material-symbols-outlined text-[24px] text-slate-400">add</span>
+                                        )}
+                                        <input type="file" className="hidden" accept="image/*,video/*" onChange={handleGalleryUpload} disabled={isVideoUploading} />
+                                    </label>
+                                    {!isVideoUploading && (
+                                        <button 
+                                            type="button" 
+                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePasteClick('gallery'); }}
+                                            className="text-[10px] text-slate-500 hover:text-primary flex items-center justify-center gap-1 w-full bg-slate-100 dark:bg-slate-800 rounded py-1"
+                                        >
+                                            <span className="material-symbols-outlined text-[12px]">content_paste</span> Pegar
+                                        </button>
                                     )}
-                                    <input type="file" className="hidden" accept="image/*,video/*" onChange={handleGalleryUpload} disabled={isVideoUploading} />
-                                </label>
+                                </div>
                             )}
                         </div>
                     </div>
