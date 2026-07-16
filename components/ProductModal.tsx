@@ -50,6 +50,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const [loading, setLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isVideoUploading, setIsVideoUploading] = useState(false);
+    const [isDraggingMain, setIsDraggingMain] = useState(false);
+    const [isDraggingGallery, setIsDraggingGallery] = useState(false);
     const [entryByPrice, setEntryByPrice] = useState(false);
     
     const [activeTab, setActiveTab] = useState<'general' | 'related'>('general');
@@ -381,13 +383,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const costoConIva = costWithVat(formData.costWithoutVat, formData.vatPercentage);
     const gananciaAbsoluta = r(formData.price - costoConIva);
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) return;
-        const file = e.target.files[0];
-        
+    const uploadMainImageFile = async (file: File) => {
         setIsUploading(true);
         try {
-            const fileExt = file.name.split('.').pop();
+            const fileExt = file.name ? (file.name.split('.').pop() || 'png') : 'png';
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const filePath = `products/${fileName}`;
 
@@ -411,6 +410,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         }
     };
 
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        uploadMainImageFile(e.target.files[0]);
+    };
+
     const handleRemoveImage = () => {
         if (window.confirm('¿Estás seguro de que deseas eliminar permanentemente la foto central de este repuesto?')) {
             setFormData(prev => ({ ...prev, imageUrl: '' }));
@@ -418,22 +422,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         }
     };
 
-    const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) return;
-        
-        if (gallery.length >= 5) {
-            alert('Has alcanzado el límite máximo de 5 elementos en la galería.');
-            return;
-        }
-
-        const file = e.target.files[0];
+    const uploadGalleryFile = async (file: File) => {
         const isVideo = file.type.startsWith('video/');
-        
-        setIsVideoUploading(true); // Using this state to show a loader during gallery upload
+        setIsVideoUploading(true);
         try {
-            const fileExt = file.name.split('.').pop();
-            const index = gallery.length + 1;
-            const fileName = `${formData.sku || 'NUEVO'}_gallery_${Date.now()}_${index}.${fileExt}`;
+            const fileExt = file.name ? (file.name.split('.').pop() || (isVideo ? 'mp4' : 'png')) : (isVideo ? 'mp4' : 'png');
+            const fileName = `${formData.sku || 'NUEVO'}_gallery_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const bucket = isVideo ? 'product_videos' : 'product_images';
             const filePath = isVideo ? fileName : `products/${fileName}`;
 
@@ -448,7 +442,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
             
-            setGallery(prev => [...prev, { url: data.publicUrl, type: isVideo ? 'video' : 'image' }]);
+            setGallery(prev => {
+                if (prev.length >= 5) return prev;
+                return [...prev, { url: data.publicUrl, type: isVideo ? 'video' : 'image' }];
+            });
         } catch (error: any) {
             console.error('Error uploading to gallery:', error);
             alert('Error al subir a galería: ' + error.message);
@@ -456,6 +453,51 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             setIsVideoUploading(false);
         }
     };
+
+    const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        if (gallery.length >= 5) {
+            alert('Has alcanzado el límite máximo de 5 elementos en la galería.');
+            return;
+        }
+        uploadGalleryFile(e.target.files[0]);
+    };
+
+    // ─── Global Paste Handler ───
+    useEffect(() => {
+        const handleGlobalPaste = async (e: ClipboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+                return;
+            }
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const file = items[i].getAsFile();
+                    if (file) {
+                        e.preventDefault();
+                        if (!formData.imageUrl) {
+                            await uploadMainImageFile(file);
+                        } else if (gallery.length < 5) {
+                            await uploadGalleryFile(file);
+                        } else {
+                            alert('La galería está llena y la imagen principal ya está asignada.');
+                        }
+                        return;
+                    }
+                }
+            }
+        };
+
+        if (isOpen) {
+            window.addEventListener('paste', handleGlobalPaste);
+        }
+        return () => {
+            window.removeEventListener('paste', handleGlobalPaste);
+        };
+    }, [isOpen, formData.imageUrl, gallery.length]);
 
     const handleRemoveGalleryItem = (index: number) => {
         if (window.confirm('¿Estás seguro de que deseas eliminar este elemento de la galería?')) {
@@ -731,28 +773,70 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 <form onSubmit={handleSubmit} className="p-6">
                     <div className={activeTab === 'general' ? 'flex flex-col gap-5' : 'hidden'}>
                         {/* ═══ Image Upload ═══ */}
-                    <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative group">
+                    <div 
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingMain(true); }}
+                        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingMain(false); }}
+                        onDrop={async (e) => {
+                            e.preventDefault(); e.stopPropagation(); setIsDraggingMain(false);
+                            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                const file = e.dataTransfer.files[0];
+                                if (file.type.startsWith('image/')) {
+                                    await uploadMainImageFile(file);
+                                } else {
+                                    alert('Solo se admiten archivos de imagen para la foto central.');
+                                }
+                            }
+                        }}
+                        onPaste={async (e) => {
+                            const items = e.clipboardData.items;
+                            for (let i = 0; i < items.length; i++) {
+                                if (items[i].type.indexOf('image') !== -1) {
+                                    const file = items[i].getAsFile();
+                                    if (file) {
+                                        e.preventDefault(); e.stopPropagation();
+                                        await uploadMainImageFile(file);
+                                        return;
+                                    }
+                                }
+                            }
+                        }}
+                        tabIndex={0}
+                        className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl transition-all duration-200 relative group focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                            isDraggingMain 
+                                ? 'border-primary bg-primary/5 dark:bg-primary/10 scale-[1.02]' 
+                                : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                    >
                         {formData.imageUrl ? (
-                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-none">
                                 <img src={formData.imageUrl} alt="Product" className="w-full h-full object-cover" />
                                 <button
                                     type="button"
-                                    onClick={handleRemoveImage}
-                                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500 backdrop-blur-sm"
+                                    onClick={(e) => { e.stopPropagation(); handleRemoveImage(); }}
+                                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500 backdrop-blur-sm pointer-events-auto"
                                 >
                                     <span className="material-symbols-outlined text-[16px] leading-none">close</span>
                                 </button>
+                                {isDraggingMain && (
+                                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
+                                        <span className="text-white font-bold drop-shadow-md text-sm text-center">Reemplazar Imagen</span>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <label className="flex flex-col items-center justify-center w-full h-full min-h-[128px] cursor-pointer">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
                                     {isUploading ? (
                                         <span className="material-symbols-outlined text-[32px] text-primary animate-spin">progress_activity</span>
                                     ) : (
                                         <>
-                                            <span className="material-symbols-outlined text-[32px] text-slate-400 mb-2 group-hover:text-primary transition-colors">add_photo_alternate</span>
-                                            <p className="mb-1 text-sm text-slate-600 dark:text-slate-400 font-medium">Click para subir foto central</p>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500">JPG, PNG o WEBP</p>
+                                            <span className="material-symbols-outlined text-[32px] text-slate-400 mb-2 group-hover:text-primary transition-colors">
+                                                {isDraggingMain ? 'download' : 'add_photo_alternate'}
+                                            </span>
+                                            <p className="mb-1 text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                                {isDraggingMain ? 'Suelta la imagen aquí' : 'Click, arrastra o presiona Ctrl+V para pegar'}
+                                            </p>
+                                            <p className="text-xs text-slate-400 dark:text-slate-500">Solo imágenes (JPG, PNG, WEBP)</p>
                                         </>
                                     )}
                                 </div>
@@ -762,9 +846,41 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     </div>
 
                     {/* ═══ Gallery Section ═══ */}
-                    <div className="flex flex-col gap-2">
+                    <div 
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingGallery(true); }}
+                        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingGallery(false); }}
+                        onDrop={async (e) => {
+                            e.preventDefault(); e.stopPropagation(); setIsDraggingGallery(false);
+                            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                const files = Array.from(e.dataTransfer.files);
+                                for (const file of files) {
+                                    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+                                        await uploadGalleryFile(file);
+                                    } else {
+                                        alert(`El archivo "${file.name}" no es válido. Usa imágenes o videos.`);
+                                    }
+                                }
+                            }
+                        }}
+                        onPaste={async (e) => {
+                            const items = e.clipboardData.items;
+                            for (let i = 0; i < items.length; i++) {
+                                if (items[i].type.indexOf('image') !== -1 || items[i].type.indexOf('video') !== -1) {
+                                    const file = items[i].getAsFile();
+                                    if (file) {
+                                        e.preventDefault(); e.stopPropagation();
+                                        await uploadGalleryFile(file);
+                                    }
+                                }
+                            }
+                        }}
+                        tabIndex={0}
+                        className={`flex flex-col gap-2 p-3 -m-3 rounded-xl border-2 transition-all duration-200 relative focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                            isDraggingGallery ? 'border-primary bg-primary/5 dark:bg-primary/10 border-dashed' : 'border-transparent'
+                        }`}
+                    >
                         <label className={labelClass}>Galería (Max 5) - {gallery.length}/5</label>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-3 relative z-10">
                             {gallery.map((item, index) => (
                                 <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm group bg-black flex items-center justify-center">
                                     {item.type === 'video' ? (
