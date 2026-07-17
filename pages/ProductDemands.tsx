@@ -24,6 +24,7 @@ interface ProductDemand {
     approver_name?: string;
     approved_at?: string | null;
     notified_at?: string | null;
+    order_flag?: string | null;
     product: {
         id: number;
         name: string;
@@ -62,6 +63,11 @@ const ProductDemands: React.FC = () => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [discontinueDuration, setDiscontinueDuration] = useState<'3' | '6' | '12' | 'permanente'>('permanente');
     const [isDiscontinuing, setIsDiscontinuing] = useState(false);
+
+    // Order Flag State
+    const [availableOrderFlags, setAvailableOrderFlags] = useState<string[]>([]);
+    const [flagActionDemand, setFlagActionDemand] = useState<ProductDemand | null>(null);
+    const [flagInputValue, setFlagInputValue] = useState('');
 
     const fetchDemands = async () => {
         setLoading(true);
@@ -111,6 +117,13 @@ const ProductDemands: React.FC = () => {
                     approver_name: undefined
                 }));
             }
+
+            const uniqueFlags = Array.from(new Set(
+                mappedData
+                    .map((d: any) => d.order_flag)
+                    .filter((f: any) => f && typeof f === 'string' && f.trim() !== '')
+            )) as string[];
+            setAvailableOrderFlags(uniqueFlags.sort());
 
             setDemands(mappedData);
         } catch (error: any) {
@@ -291,6 +304,47 @@ const ProductDemands: React.FC = () => {
             } catch (error: any) {
                 alert(`Error al marcar como notificado: ${error.message}`);
             }
+        }
+    };
+
+    const handleOpenFlagPopover = (demand: ProductDemand, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setFlagActionDemand(demand);
+        setFlagInputValue(demand.order_flag || '');
+    };
+
+    const handleSaveFlag = async () => {
+        if (!flagActionDemand) return;
+        const valueToSave = flagInputValue.trim();
+        try {
+            const { error } = await supabase
+                .from('product_demands')
+                .update({ order_flag: valueToSave || null })
+                .eq('id', flagActionDemand.id);
+            if (error) throw error;
+            fetchDemands();
+        } catch (error: any) {
+            alert(`Error al guardar la bandera: ${error.message}`);
+        } finally {
+            setFlagActionDemand(null);
+            setFlagInputValue('');
+        }
+    };
+
+    const handleDeleteFlag = async () => {
+        if (!flagActionDemand) return;
+        try {
+            const { error } = await supabase
+                .from('product_demands')
+                .update({ order_flag: null })
+                .eq('id', flagActionDemand.id);
+            if (error) throw error;
+            fetchDemands();
+        } catch (error: any) {
+            alert(`Error al eliminar la bandera: ${error.message}`);
+        } finally {
+            setFlagActionDemand(null);
+            setFlagInputValue('');
         }
     };
 
@@ -478,6 +532,21 @@ const ProductDemands: React.FC = () => {
     }, [filteredAndSortedDemands]);
 
     // Components
+    const OrderFlag = ({ demand }: { demand: ProductDemand }) => (
+        <button
+            onClick={(e) => handleOpenFlagPopover(demand, e)}
+            className={`flex items-center justify-center px-1.5 py-0.5 rounded-md transition-colors border ${
+                demand.order_flag
+                    ? 'border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:border-indigo-800 dark:text-indigo-400 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50'
+                    : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-800'
+            }`}
+            title={demand.order_flag ? `Orden: ${demand.order_flag}` : 'Agregar Bandera/Orden'}
+        >
+            <span className="material-symbols-outlined text-[14px]">flag</span>
+            {demand.order_flag && <span className="text-[10px] font-bold ml-1">{demand.order_flag}</span>}
+        </button>
+    );
+
     const StatusBadge = ({ status }: { status: string }) => {
         if (status === 'pending_stock') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800"><span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>Esperando Stock</span>;
         if (status === 'stock_available') return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"><span className="material-symbols-outlined text-[14px]">check_circle</span>Listo para Notificar</span>;
@@ -666,7 +735,10 @@ const ProductDemands: React.FC = () => {
                                     <td className="px-6 py-4 align-top">
                                         <div className="flex flex-col">
                                             <span className="font-semibold text-slate-900 dark:text-white">{demand.customer_name || 'Sin Nombre'}</span>
-                                            <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit mt-1 mb-1">Ticket #{demand.id}</span>
+                                            <div className="flex items-center gap-2 mt-1 mb-1">
+                                                <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit">Ticket #{demand.id}</span>
+                                                <OrderFlag demand={demand} />
+                                            </div>
                                             <PhoneDisplay phone={demand.phone_number} />
                                             {demand.notes && <span className="text-xs text-slate-400 mt-1 italic max-w-[200px] truncate" title={demand.notes}>{demand.notes}</span>}
                                         </div>
@@ -744,7 +816,10 @@ const ProductDemands: React.FC = () => {
                         <div className="flex justify-between items-start">
                             <div>
                                 <h3 className="font-bold text-slate-900 dark:text-white">{demand.customer_name || 'Cliente Sin Nombre'}</h3>
-                                <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block mt-1 mb-1">Ticket #{demand.id}</span>
+                                <div className="flex items-center gap-2 mt-1 mb-1">
+                                    <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
+                                    <OrderFlag demand={demand} />
+                                </div>
                                 <PhoneDisplay phone={demand.phone_number} />
                             </div>
                             <div className="flex flex-col items-end gap-2">
@@ -853,7 +928,10 @@ const ProductDemands: React.FC = () => {
                                         <div className="flex justify-between items-start gap-1">
                                             <div>
                                                 <span className="font-semibold text-slate-900 dark:text-white block">{demand.customer_name || 'Sin Nombre'}</span>
-                                                <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block mt-1 mb-1">Ticket #{demand.id}</span>
+                                                <div className="flex items-center gap-2 mt-1 mb-1">
+                                                    <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
+                                                    <OrderFlag demand={demand} />
+                                                </div>
                                                 <PhoneDisplay phone={demand.phone_number} />
                                             </div>
                                             <div className="p-1 text-slate-300 dark:text-slate-600">
@@ -977,7 +1055,10 @@ const ProductDemands: React.FC = () => {
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <span className="font-semibold text-slate-900 dark:text-white block">{demand.customer_name || 'Sin Nombre'}</span>
-                                                        <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block mt-1 mb-1">Ticket #{demand.id}</span>
+                                                        <div className="flex items-center gap-2 mt-1 mb-1">
+                                                            <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
+                                                            <OrderFlag demand={demand} />
+                                                        </div>
                                                         <PhoneDisplay phone={demand.phone_number} />
                                                     </div>
                                                     <StatusBadge status={demand.status} />
@@ -1188,6 +1269,74 @@ const ProductDemands: React.FC = () => {
                     onClose={() => setSharingDemand(null)}
                     demand={sharingDemand}
                 />
+            )}
+
+            {flagActionDemand && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-indigo-500">flag</span>
+                                Asignar Orden
+                            </h3>
+                            <button onClick={() => setFlagActionDemand(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                        </div>
+                        <div className="p-6 flex flex-col gap-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-2">Ingresar Número de Orden</label>
+                                <input
+                                    type="text"
+                                    value={flagInputValue}
+                                    onChange={(e) => setFlagInputValue(e.target.value)}
+                                    placeholder="Ej: ORD-12345"
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white"
+                                />
+                            </div>
+                            
+                            {availableOrderFlags.length > 0 && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-500 mb-2">O seleccionar existente:</label>
+                                    <select
+                                        onChange={(e) => {
+                                            if (e.target.value) setFlagInputValue(e.target.value);
+                                        }}
+                                        value=""
+                                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-white"
+                                    >
+                                        <option value="">Seleccionar una orden...</option>
+                                        {availableOrderFlags.map(flag => (
+                                            <option key={flag} value={flag}>{flag}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between gap-3">
+                            <button
+                                onClick={handleDeleteFlag}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
+                            >
+                                Eliminar Bandera
+                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setFlagActionDemand(null)}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveFlag}
+                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-colors"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {discontinueProductId && (
