@@ -52,6 +52,7 @@ const ProductDemands: React.FC = () => {
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
     const [stockFilter, setStockFilter] = useState<'all' | 'importer_only' | 'local_only' | 'no_stock' | 'approved_only'>('all');
+    const [flagFilter, setFlagFilter] = useState<string>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
     const [ticketSearchTerm, setTicketSearchTerm] = useState('');
@@ -485,6 +486,17 @@ const ProductDemands: React.FC = () => {
                 if (stockFilter === 'no_stock' && (hasImporterStock || hasLocalStock)) return false;
                 if (stockFilter === 'approved_only' && !d.is_approved) return false;
             }
+
+            // Flag filter
+            if (flagFilter !== 'all') {
+                const hasFlag = d.order_flag && d.order_flag.trim() !== '';
+                if (flagFilter === 'with_flag' && !hasFlag) return false;
+                if (flagFilter === 'without_flag' && hasFlag) return false;
+                if (flagFilter !== 'with_flag' && flagFilter !== 'without_flag') {
+                    if (d.order_flag !== flagFilter) return false;
+                }
+            }
+
             return true;
         });
 
@@ -518,7 +530,7 @@ const ProductDemands: React.FC = () => {
         });
 
         return filtered;
-    }, [demands, statusFilter, stockFilter, searchTerm, ticketSearchTerm, sortBy, viewType]);
+    }, [demands, statusFilter, stockFilter, flagFilter, searchTerm, ticketSearchTerm, sortBy, viewType]);
 
     const grouped = useMemo(() => {
         const map = new Map<number, { productId: number; product: any; demands: ProductDemand[] }>();
@@ -1203,6 +1215,21 @@ const ProductDemands: React.FC = () => {
                         <option value="local_only">Con stock en local y no importadora</option>
                         <option value="no_stock">Sin stock completamente</option>
                         <option value="approved_only">Solo pedidos aprobados en espera</option>
+                    </select>
+
+                    <select
+                        value={flagFilter}
+                        onChange={(e) => setFlagFilter(e.target.value)}
+                        className="w-full md:w-auto bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                    >
+                        <option value="all">Bandera: Todas</option>
+                        <option value="with_flag">Con bandera</option>
+                        <option value="without_flag">Sin bandera</option>
+                        {availableOrderFlags.length > 0 && <optgroup label="Órdenes Específicas">
+                            {availableOrderFlags.map(f => (
+                                <option key={f} value={f}>Orden: {f}</option>
+                            ))}
+                        </optgroup>}
                     </select>
 
                     <select
