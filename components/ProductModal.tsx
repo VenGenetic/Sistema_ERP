@@ -381,7 +381,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     // ─── Computed display values ───
     const costoConIva = costWithVat(formData.costWithoutVat, formData.vatPercentage);
-    const gananciaAbsoluta = r(formData.price - costoConIva);
+    const precioSinIva = formData.price / (1 + (formData.vatPercentage / 100));
+    const gananciaAbsoluta = r(precioSinIva - formData.costWithoutVat);
 
     const uploadMainImageFile = async (file: File) => {
         setIsUploading(true);
