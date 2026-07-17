@@ -11,11 +11,11 @@ const __dirname = path.dirname(__filename);
 
 // Supabase configuration
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-// Hardcoded service_role key to bypass Row Level Security constraints
-const supabaseServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6c2RzbXNreW9zZXBlbWFsYWdlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTMzMTk4MywiZXhwIjoyMDg2OTA3OTgzfQ.XY-OoGMVyhCcJIbb2sq7VSGL1NnEzZszjs8a6BswizE";
+// Use service_role key from environment variable to bypass RLS securely
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl) {
-    console.error("Error: VITE_SUPABASE_URL is missing from environment.");
+if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("Error: VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing from environment.");
     process.exit(1);
 }
 
