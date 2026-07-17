@@ -20,6 +20,9 @@ interface ProductDemand {
     created_by?: string | null;
     creator_name?: string;
     is_approved?: boolean;
+    approved_by?: string | null;
+    approver_name?: string;
+    approved_at?: string | null;
     notified_at?: string | null;
     product: {
         id: number;
@@ -75,30 +78,37 @@ const ProductDemands: React.FC = () => {
 
             let mappedData = data || [];
 
-            // Client-side join with profiles to get creator name
-            const createdByIds = Array.from(new Set(mappedData.map(d => d.created_by).filter(Boolean)));
-            if (createdByIds.length > 0) {
+            // Client-side join with profiles to get creator and approver name
+            const userIdsToFetch = Array.from(new Set([
+                ...mappedData.map(d => d.created_by),
+                ...mappedData.map(d => d.approved_by)
+            ].filter(Boolean)));
+
+            if (userIdsToFetch.length > 0) {
                 const { data: profilesData, error: profilesError } = await supabase
                     .from('profiles')
                     .select('id, full_name')
-                    .in('id', createdByIds);
+                    .in('id', userIdsToFetch);
 
                 if (!profilesError && profilesData) {
                     const profilesMap = new Map(profilesData.map(p => [p.id, p.full_name]));
                     mappedData = mappedData.map(d => ({
                         ...d,
-                        creator_name: d.created_by ? (profilesMap.get(d.created_by) || 'Desconocido') : 'Sistema/Desconocido'
+                        creator_name: d.created_by ? (profilesMap.get(d.created_by) || 'Desconocido') : 'Sistema/Desconocido',
+                        approver_name: d.approved_by ? (profilesMap.get(d.approved_by) || 'Desconocido') : undefined
                     }));
                 } else {
                     mappedData = mappedData.map(d => ({
                         ...d,
-                        creator_name: 'Desconocido'
+                        creator_name: 'Desconocido',
+                        approver_name: undefined
                     }));
                 }
             } else {
                 mappedData = mappedData.map(d => ({
                     ...d,
-                    creator_name: 'Sistema/Desconocido'
+                    creator_name: 'Sistema/Desconocido',
+                    approver_name: undefined
                 }));
             }
 
@@ -374,7 +384,11 @@ const ProductDemands: React.FC = () => {
         try {
             const { error } = await supabase
                 .from('product_demands')
-                .update({ is_approved: !demand.is_approved })
+                .update({ 
+                    is_approved: !demand.is_approved,
+                    approved_by: !demand.is_approved ? user?.id : null,
+                    approved_at: !demand.is_approved ? new Date().toISOString() : null
+                })
                 .eq('id', demand.id);
 
             if (error) throw error;
@@ -689,9 +703,17 @@ const ProductDemands: React.FC = () => {
                                                 Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
                                                 <ExpirationDisplay createdAt={demand.created_at} status={demand.status} />
                                             </span>
-                                            <span className="text-xs text-slate-400 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[14px]">person</span>
-                                                {demand.creator_name || 'Desconocido'}
+                                            <span className="text-xs text-slate-400 flex flex-col gap-1 mt-1">
+                                                <span className="flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[14px]">person</span>
+                                                    Creado por {demand.creator_name || 'Desconocido'}
+                                                </span>
+                                                {demand.is_approved && (
+                                                    <span className="flex items-center gap-1 text-indigo-500 dark:text-indigo-400">
+                                                        <span className="material-symbols-outlined text-[14px]">verified</span>
+                                                        Aprobado por {demand.approver_name || 'Desconocido'} {demand.approved_at && `el ${new Date(demand.approved_at).toLocaleDateString()}`}
+                                                    </span>
+                                                )}
                                             </span>
                                             <StockDisplay prod={demand.product} />
                                             <PriceDisplay prod={demand.product} />
@@ -755,10 +777,18 @@ const ProductDemands: React.FC = () => {
                                     Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
                                     <ExpirationDisplay createdAt={demand.created_at} status={demand.status} />
                                 </span>
-                                <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
-                                    <span className="material-symbols-outlined text-[13px]">person</span>
-                                    {demand.creator_name || 'Desconocido'}
-                                </span>
+                                <div className="flex flex-col gap-1 mt-1">
+                                    <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
+                                        <span className="material-symbols-outlined text-[13px]">person</span>
+                                        Creado por {demand.creator_name || 'Desconocido'}
+                                    </span>
+                                    {demand.is_approved && (
+                                        <span className="flex items-center gap-1 font-medium text-indigo-500 dark:text-indigo-400">
+                                            <span className="material-symbols-outlined text-[13px]">verified</span>
+                                            Aprobado por {demand.approver_name || 'Desconocido'} {demand.approved_at && `el ${new Date(demand.approved_at).toLocaleDateString()}`}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             <div className="w-32"><ActionButtons demand={demand} /></div>
                         </div>
@@ -851,10 +881,18 @@ const ProductDemands: React.FC = () => {
                                                 {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
                                                 <ExpirationDisplay createdAt={demand.created_at} status={demand.status} />
                                             </span>
-                                            <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
-                                                <span className="material-symbols-outlined text-[11px]">person</span>
-                                                {demand.creator_name || 'Desconocido'}
-                                            </span>
+                                            <div className="flex flex-col gap-0.5 mt-0.5">
+                                                <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
+                                                    <span className="material-symbols-outlined text-[11px]">person</span>
+                                                    Creado por {demand.creator_name || 'Desconocido'}
+                                                </span>
+                                                {demand.is_approved && (
+                                                    <span className="flex items-center gap-1 font-medium text-indigo-500 dark:text-indigo-400">
+                                                        <span className="material-symbols-outlined text-[11px]">verified</span>
+                                                        Aprobado por {demand.approver_name || 'Desconocido'} {demand.approved_at && `el ${new Date(demand.approved_at).toLocaleDateString()}`}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         {demand.status === 'pending_stock' && (
                                             <div className="mt-1">
@@ -946,10 +984,18 @@ const ProductDemands: React.FC = () => {
                                                 </div>
                                                 <div className="text-xs text-slate-400 flex flex-col gap-0.5">
                                                     <span>Reg: {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
-                                                    <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-300">
-                                                        <span className="material-symbols-outlined text-[13px]">person</span>
-                                                        {demand.creator_name || 'Desconocido'}
-                                                    </span>
+                                                    <div className="flex flex-col gap-0.5 mt-0.5">
+                                                        <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-300">
+                                                            <span className="material-symbols-outlined text-[13px]">person</span>
+                                                            Creado por {demand.creator_name || 'Desconocido'}
+                                                        </span>
+                                                        {demand.is_approved && (
+                                                            <span className="flex items-center gap-1 font-medium text-indigo-500 dark:text-indigo-400">
+                                                                <span className="material-symbols-outlined text-[13px]">verified</span>
+                                                                Aprobado por {demand.approver_name || 'Desconocido'} {demand.approved_at && `el ${new Date(demand.approved_at).toLocaleDateString()}`}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <PriceDisplay prod={demand.product} />
                                                 </div>
                                                 <div className="mt-auto pt-2"><ActionButtons demand={demand} /></div>
