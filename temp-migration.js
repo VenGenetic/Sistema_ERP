@@ -8,12 +8,6 @@ const { Client } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const envPath = path.join(__dirname, '.env');
-const migrationFile = process.argv[2];
-if (!migrationFile) {
-    console.error("Please provide the migration file path as an argument.");
-    process.exit(1);
-}
-const migrationPath = path.join(__dirname, migrationFile);
 
 async function main() {
     try {
@@ -28,20 +22,18 @@ async function main() {
             }
         });
 
-        // Use the remote connection string from .env, or fallback to local
-        // Typically Supabase remote DB URL is postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres
-        // We will just read it from the supabase config or require user input if not available.
-        // For testing we assume the local or specific dev db is accessible.
-        // Actually, since this is a local Supabase, the default connection string is:
-        const dbUrl = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+        const dbUrl = envVars['DATABASE_URL'];
+        if (!dbUrl) {
+            console.error("DATABASE_URL not found in .env");
+            process.exit(1);
+        }
 
-        console.log('Connecting to', dbUrl);
-        const client = new Client({ connectionString: dbUrl });
+        console.log('Connecting to remote DB');
+        const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
         await client.connect();
 
-        console.log('Reading migration...');
-        const sql = fs.readFileSync(migrationPath, 'utf8');
-
+        const sql = `ALTER TABLE public.product_demands ADD COLUMN IF NOT EXISTS order_flag TEXT DEFAULT NULL;`;
+        
         console.log('Executing migration...');
         await client.query(sql);
 

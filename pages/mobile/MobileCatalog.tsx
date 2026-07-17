@@ -153,10 +153,18 @@ const MobileCatalog: React.FC = () => {
                             {/* Details */}
                             <div className="flex-1 min-w-0 py-1 flex flex-col justify-between">
                                 <div>
-                                    <div className="flex justify-between items-start mb-1">
-                                        <span className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-md">
-                                            {prod.sku}
-                                        </span>
+                                    <div className="flex justify-between items-start mb-1 flex-wrap gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-md">
+                                                {prod.sku}
+                                            </span>
+                                            {prod.demand_count > 0 && (
+                                                <span className="text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 border border-amber-200 dark:border-amber-800">
+                                                    <span className="material-symbols-outlined text-[10px] animate-pulse">notifications_active</span>
+                                                    {prod.demand_count}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <h3 className="font-semibold text-slate-800 dark:text-slate-100 text-sm leading-tight line-clamp-2">
                                         {prod.name}
