@@ -23,8 +23,8 @@ export default defineConfig(({ mode }) => {
         rollupOptions: {
           output: {
             manualChunks: {
-              vendor: ['react', 'react-dom', 'react-router-dom'],
-              ui: ['lucide-react', 'recharts', 'framer-motion'],
+              vendor: ['react', 'react-dom', 'react-router-dom', 'zustand'],
+              ui: ['lucide-react', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
               data: ['xlsx', '@supabase/supabase-js']
             }
           }
