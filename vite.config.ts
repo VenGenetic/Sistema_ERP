@@ -18,6 +18,21 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              vendor: ['react', 'react-dom', 'react-router-dom'],
+              ui: ['lucide-react', 'recharts', 'framer-motion'],
+              data: ['xlsx', '@supabase/supabase-js']
+            }
+          }
+        },
+        chunkSizeWarningLimit: 1000,
+      },
+      esbuild: {
+        drop: mode === 'production' ? ['console', 'debugger'] : [],
       }
     };
 });
