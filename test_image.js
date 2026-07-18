@@ -1,0 +1,1 @@
+import { createClient } from '@supabase/supabase-js'; import * as dotenv from 'dotenv'; dotenv.config(); const sb = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY); async function run() { const {data} = await sb.from('products').select('sku, image_url').limit(5); console.log(data); } run();
