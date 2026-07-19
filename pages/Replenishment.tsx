@@ -647,18 +647,18 @@ const Replenishment: React.FC = () => {
                                                             onClick={() => handleOpenLightbox(prod)}
                                                             className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-zoom-in group/img"
                                                         >
+                                                            <span className="material-symbols-outlined text-[16px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">image</span>
                                                             <img 
                                                                 src={prod.imagen} 
                                                                 alt="" 
                                                                 loading="lazy"
-                                                                className="h-full w-full object-cover group-hover/img:scale-110 transition-transform" 
+                                                                className="h-full w-full object-cover group-hover/img:scale-110 transition-all duration-300 relative z-10" 
                                                                 onError={(e) => {
                                                                     const target = e.currentTarget;
-                                                                    target.style.display = 'none';
-                                                                    if (target.parentElement) {
-                                                                        target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[16px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
-                                                                        target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative cursor-default";
-                                                                    }
+                                                                    target.style.opacity = '0';
+                                                                }}
+                                                                onLoad={(e) => {
+                                                                    e.currentTarget.style.opacity = '1';
                                                                 }}
                                                             />
                                                             <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors"></div>

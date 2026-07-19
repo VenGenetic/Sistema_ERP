@@ -956,23 +956,23 @@ const Inventory: React.FC = () => {
                                                         <div className="flex items-center gap-3">
                                                             {group.product?.image_url ? (
                                                                 <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative">
+                                                                    <span className="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">image</span>
                                                                     <img 
                                                                        src={getThumbnailUrl(group.product.image_url, 80, 80)} 
                                                                        alt="" 
                                                                        loading="lazy"
                                                                        decoding="async"
-                                                                       className="h-full w-full object-cover" 
+                                                                       className="h-full w-full object-cover relative z-10 transition-opacity duration-300" 
                                                                        onError={(e) => {
                                                                            const target = e.currentTarget;
                                                                            if (target.src.includes('render/image')) {
                                                                                target.src = group.product.image_url || '';
                                                                            } else {
-                                                                               target.style.display = 'none';
-                                                                               if (target.parentElement) {
-                                                                                   target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
-                                                                                   target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
-                                                                               }
+                                                                               target.style.opacity = '0';
                                                                            }
+                                                                       }}
+                                                                       onLoad={(e) => {
+                                                                           e.currentTarget.style.opacity = '1';
                                                                        }}
                                                                     />
                                                                 </div>

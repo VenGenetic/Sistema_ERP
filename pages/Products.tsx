@@ -809,12 +809,13 @@ const Products: React.FC = () => {
                                     onClick={() => handleOpenLightbox(prod, 'image', 0)}
                                     className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-pointer"
                                 >
+                                    <span className="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">image</span>
                                     <img 
                                        src={getThumbnailUrl(prod.image_url, 80, 80)} 
                                        alt="" 
                                        loading="lazy"
                                        decoding="async"
-                                       className="h-full w-full object-cover transition-transform" 
+                                       className="h-full w-full object-cover transition-opacity duration-300 relative z-10" 
                                        onError={(e) => {
                                            const target = e.currentTarget;
                                            if (target.src.includes('render/image')) {
