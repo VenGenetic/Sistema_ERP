@@ -444,7 +444,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
             
             setGallery(prev => {
-                if (prev.length >= 5) return prev;
+                if (prev.length >= 15) return prev;
                 return [...prev, { url: data.publicUrl, type: isVideo ? 'video' : 'image' }];
             });
         } catch (error: any) {
@@ -455,13 +455,26 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         }
     };
 
-    const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
-        if (gallery.length >= 5) {
-            alert('Has alcanzado el límite máximo de 5 elementos en la galería.');
+        
+        const files = Array.from(e.target.files);
+        const cantidad_anterior = gallery.length;
+        const cantidad_añadida = files.length;
+        const limite = 15;
+
+        if (cantidad_anterior + cantidad_añadida > limite) {
+            const permitidas = limite - cantidad_anterior;
+            alert(`Error: solo puedes añadir ${permitidas} imágenes, elimina imágenes para añadir las que quieres. Cada producto tiene un max de 15 imágenes.`);
+            e.target.value = '';
             return;
         }
-        uploadGalleryFile(e.target.files[0]);
+
+        for (const file of files) {
+            await uploadGalleryFile(file);
+        }
+        
+        e.target.value = '';
     };
 
     // ─── Global Paste Handler ───
@@ -481,7 +494,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                         e.preventDefault();
                         if (!formData.imageUrl) {
                             await uploadMainImageFile(file);
-                        } else if (gallery.length < 5) {
+                        } else if (gallery.length < 15) {
                             await uploadGalleryFile(file);
                         } else {
                             alert('La galería está llena y la imagen principal ya está asignada.');
@@ -890,12 +903,24 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             e.preventDefault(); e.stopPropagation(); setIsDraggingGallery(false);
                             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                                 const files = Array.from(e.dataTransfer.files);
-                                for (const file of files) {
-                                    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-                                        await uploadGalleryFile(file);
-                                    } else {
-                                        alert(`El archivo "${file.name}" no es válido. Usa imágenes o videos.`);
-                                    }
+                                const validFiles = files.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+                                
+                                const cantidad_anterior = gallery.length;
+                                const cantidad_añadida = validFiles.length;
+                                const limite = 15;
+
+                                if (cantidad_anterior + cantidad_añadida > limite) {
+                                    const permitidas = limite - cantidad_anterior;
+                                    alert(`Error: solo puedes añadir ${permitidas} imágenes, elimina imágenes para añadir las que quieres. Cada producto tiene un max de 15 imágenes.`);
+                                    return;
+                                }
+
+                                for (const file of validFiles) {
+                                    await uploadGalleryFile(file);
+                                }
+                                
+                                if (validFiles.length < files.length) {
+                                    alert(`Algunos archivos no eran imágenes o videos y fueron ignorados.`);
                                 }
                             }
                         }}
@@ -916,7 +941,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             isDraggingGallery ? 'border-primary bg-primary/5 dark:bg-primary/10 border-dashed' : 'border-transparent'
                         }`}
                     >
-                        <label className={labelClass}>Galería (Max 5) - {gallery.length}/5</label>
+                        <label className={labelClass}>Galería (Max 15) - {gallery.length}/15</label>
                         <div className="flex flex-wrap gap-3 relative z-10">
                             {gallery.map((item, index) => (
                                 <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm group bg-black flex items-center justify-center">
@@ -941,7 +966,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 </div>
                             ))}
 
-                            {gallery.length < 5 && (
+                            {gallery.length < 15 && (
                                 <div className="flex flex-col gap-2">
                                     <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                         {isVideoUploading ? (
@@ -949,7 +974,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         ) : (
                                             <span className="material-symbols-outlined text-[24px] text-slate-400">add</span>
                                         )}
-                                        <input type="file" className="hidden" accept="image/*,video/*" onChange={handleGalleryUpload} disabled={isVideoUploading} />
+                                        <input type="file" className="hidden" accept="image/*,video/*" onChange={handleGalleryUpload} disabled={isVideoUploading} multiple />
                                     </label>
                                     {!isVideoUploading && (
                                         <button 
