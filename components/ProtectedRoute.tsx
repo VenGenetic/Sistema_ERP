@@ -2,9 +2,10 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import SessionTimeoutHandler from './SessionTimeoutHandler';
+import { shouldRedirectToMobile } from '../utils/deviceDetection';
 
 const ProtectedRoute: React.FC = () => {
-    const { loading, authenticated, userProfile, isAdmin, permissions } = useAuth();
+    const { loading, authenticated } = useAuth();
     const location = useLocation();
 
     if (loading) {
@@ -23,8 +24,11 @@ const ProtectedRoute: React.FC = () => {
         return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
-    // Removed role fencing as per new requirements.
-
+    // Redirección automática a modo móvil (/mobile) si es un dispositivo móvil y no está en modo escritorio forzado
+    const isMobileRoute = location.pathname.startsWith('/mobile');
+    if (!isMobileRoute && shouldRedirectToMobile()) {
+        return <Navigate to="/mobile" replace />;
+    }
 
     return (
         <>

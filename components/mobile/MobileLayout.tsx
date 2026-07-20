@@ -1,10 +1,32 @@
 import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { setPreferredViewMode } from '../../utils/deviceDetection';
 
 const MobileLayout: React.FC = () => {
+    const navigate = useNavigate();
+
+    const handleSwitchToDesktop = () => {
+        setPreferredViewMode('desktop');
+        navigate('/', { replace: true });
+    };
+
     return (
         <div className="flex flex-col h-screen w-full bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans">
-            {/* Header / Top Bar (Optional, can be specific to each page) */}
+            {/* Header / Top Bar */}
+            <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2 flex items-center justify-between z-40">
+                <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-blue-400 text-xl">smartphone</span>
+                    <span className="text-xs font-semibold tracking-wide uppercase text-slate-300">Modo Móvil</span>
+                </div>
+                <button
+                    onClick={handleSwitchToDesktop}
+                    className="flex items-center gap-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-full border border-slate-700 transition-colors"
+                    title="Ver versión completa de escritorio"
+                >
+                    <span className="material-symbols-outlined text-sm">desktop_windows</span>
+                    <span>Escritorio</span>
+                </button>
+            </header>
             
             {/* Main Content Area */}
             <main className="flex-1 overflow-y-auto pb-[72px] hide-scrollbar scroll-smooth">
@@ -76,6 +98,17 @@ const MobileLayout: React.FC = () => {
                                     qr_code_scanner
                                 </span>
                             </NavLink>
+                        </li>
+                        <li>
+                            <button
+                                onClick={handleSwitchToDesktop}
+                                className="flex flex-col items-center justify-center p-2 min-w-[64px] rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 transition-all duration-300"
+                            >
+                                <span className="material-symbols-outlined text-[24px] mb-1">
+                                    desktop_windows
+                                </span>
+                                <span className="text-[10px] uppercase tracking-wider font-medium">Escritorio</span>
+                            </button>
                         </li>
                     </ul>
                 </div>

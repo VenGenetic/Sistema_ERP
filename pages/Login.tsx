@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { shouldRedirectToMobile } from '../utils/deviceDetection';
 
 type AuthMode = 'password' | 'forgot' | 'magic_link';
 
@@ -35,7 +36,10 @@ const Login: React.FC = () => {
                 .eq('id', data.session?.user.id)
                 .single();
 
-            if (profile && profile.role_id === 2) {
+            // Si es un dispositivo móvil y no tiene preferencia forzada de escritorio, redirigir a /mobile
+            if (shouldRedirectToMobile()) {
+                navigate('/mobile', { replace: true });
+            } else if (profile && profile.role_id === 2) {
                 // Vendedor / Cashier
                 navigate('/rep-dashboard', { replace: true });
             } else {

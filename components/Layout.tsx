@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import HeaderAccount from './HeaderAccount';
 import { useAuth } from '../contexts/AuthContext';
+import { setPreferredViewMode } from '../utils/deviceDetection';
 import {
   LayoutDashboard,
   Box,
@@ -21,6 +22,11 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchVal, setSearchVal] = useState('');
+
+  const handleSwitchToMobile = () => {
+    setPreferredViewMode('mobile');
+    navigate('/mobile', { replace: true });
+  };
 
   // Cerrar menú móvil al cambiar de ruta
   useEffect(() => {
@@ -86,6 +92,14 @@ const Layout: React.FC = () => {
           <span className="material-symbols-outlined text-[20px]">grid_view</span>
           Centro de Comando
         </Link>
+
+        <button
+          onClick={handleSwitchToMobile}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all text-left border-l-2 border-transparent"
+        >
+          <span className="material-symbols-outlined text-[20px]">smartphone</span>
+          Modo Móvil (App)
+        </button>
 
         {(isAdmin || permissions?.team?.read) && (
           <Link to="/team" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('team') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
@@ -221,6 +235,16 @@ const Layout: React.FC = () => {
         </div>
 
         <div className="flex flex-1 justify-end gap-3 md:gap-6 items-center">
+
+          {/* Mobile App Mode Button */}
+          <button
+            onClick={handleSwitchToMobile}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-md text-xs font-semibold transition-colors shadow-sm"
+            title="Ir a Modo Móvil (App)"
+          >
+            <span className="material-symbols-outlined text-[18px]">smartphone</span>
+            <span className="hidden sm:inline">Modo Móvil</span>
+          </button>
 
           {/* Admin POS Auto-Access Button */}
           {isAdmin && (
