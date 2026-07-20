@@ -222,9 +222,10 @@ const Dashboard: React.FC = () => {
                 { data: ordersData },
                 { data: logsData }
             ] = await Promise.all([
-                // 1. Sales (Income Real)
-                supabase.from('orders').select('created_at, final_total')
+                // 1. Sales (Income Real) - Use total_amount field
+                supabase.from('orders').select('created_at, total_amount, status')
                     .gte('created_at', startDate).lte('created_at', endDate)
+                    .neq('status', 'Cancelado')
                     .neq('status', 'Anulado')
                     .order('created_at', { ascending: true }),
                 // 2, 3, 4. Inventory logs for purchases and ghosts
@@ -232,6 +233,7 @@ const Dashboard: React.FC = () => {
                     created_at,
                     quantity_change,
                     reason,
+                    reference_type,
                     products ( cost_without_vat )
                 `)
                     .gte('created_at', startDate).lte('created_at', endDate)
@@ -243,12 +245,30 @@ const Dashboard: React.FC = () => {
                 { data: prevOrdersData },
                 { data: prevLogsData }
             ] = await Promise.all([
-                supabase.from('orders').select('final_total')
+                supabase.from('orders').select('total_amount, status')
                     .gte('created_at', prevStartISO).lt('created_at', startDate)
+                    .neq('status', 'Cancelado')
                     .neq('status', 'Anulado'),
-                supabase.from('inventory_logs').select(`quantity_change, reason, products ( cost_without_vat )`)
+                supabase.from('inventory_logs').select(`quantity_change, reason, reference_type, products ( cost_without_vat )`)
                     .gte('created_at', prevStartISO).lt('created_at', startDate)
             ]);
+
+            // Helper to check if an addition log represents a real purchase
+            const isRealPurchase = (reason: string, refType: string) => {
+                const r = (reason || '').toLowerCase();
+                const ref = (refType || '').toLowerCase();
+                return (
+                    r.includes('compra') ||
+                    r.includes('purchase') ||
+                    r.includes('importac') ||
+                    r.includes('proveedor') ||
+                    r.includes('factura') ||
+                    r.includes('ingreso de stock') ||
+                    r.includes('lote') ||
+                    ref.includes('purchase') ||
+                    ref.includes('compra')
+                );
+            };
 
             // Grouping logic for Current Period
             const groupedInc: Record<string, number> = {}; // Income Real
@@ -258,7 +278,7 @@ const Dashboard: React.FC = () => {
 
             (ordersData || []).forEach((o: any) => {
                 const day = o.created_at?.split('T')[0];
-                if (day) groupedInc[day] = (groupedInc[day] || 0) + Number(o.final_total || 0);
+                if (day) groupedInc[day] = (groupedInc[day] || 0) + Number(o.total_amount || 0);
             });
 
             (logsData || []).forEach((l: any) => {
@@ -266,18 +286,20 @@ const Dashboard: React.FC = () => {
                 if (!day) return;
                 const cost = Number(l.products?.cost_without_vat || 0);
                 const qty = Number(l.quantity_change);
-                const reason = (l.reason || '').toLowerCase();
+                const reason = l.reason || '';
+                const refType = l.reference_type || '';
                 const value = Math.abs(qty) * cost;
 
                 if (qty > 0) {
-                    if (reason.includes('compra') || reason.includes('purchase')) {
+                    if (isRealPurchase(reason, refType)) {
                         groupedExp[day] = (groupedExp[day] || 0) + value; // Blue
                     } else {
                         groupedGIn[day] = (groupedGIn[day] || 0) + value; // Yellow
                     }
                 } else if (qty < 0) {
+                    const rLower = reason.toLowerCase();
                     // Exclude POS sales because they are tracked in Income Real
-                    if (!reason.includes('venta') && !reason.includes('sale') && !reason.includes('pedido') && !reason.includes('order')) {
+                    if (!rLower.includes('venta') && !rLower.includes('sale') && !rLower.includes('pedido') && !rLower.includes('order')) {
                         groupedGOut[day] = (groupedGOut[day] || 0) + value; // Pink
                     }
                 }
@@ -285,18 +307,20 @@ const Dashboard: React.FC = () => {
 
             // Calculate totals for previous period
             let pInc = 0, pExp = 0, pGIn = 0, pGOut = 0;
-            (prevOrdersData || []).forEach((o: any) => pInc += Number(o.final_total || 0));
+            (prevOrdersData || []).forEach((o: any) => pInc += Number(o.total_amount || 0));
             (prevLogsData || []).forEach((l: any) => {
                 const cost = Number(l.products?.cost_without_vat || 0);
                 const qty = Number(l.quantity_change);
-                const reason = (l.reason || '').toLowerCase();
+                const reason = l.reason || '';
+                const refType = l.reference_type || '';
                 const value = Math.abs(qty) * cost;
 
                 if (qty > 0) {
-                    if (reason.includes('compra') || reason.includes('purchase')) pExp += value;
+                    if (isRealPurchase(reason, refType)) pExp += value;
                     else pGIn += value;
                 } else if (qty < 0) {
-                    if (!reason.includes('venta') && !reason.includes('sale') && !reason.includes('pedido') && !reason.includes('order')) pGOut += value;
+                    const rLower = reason.toLowerCase();
+                    if (!rLower.includes('venta') && !rLower.includes('sale') && !rLower.includes('pedido') && !rLower.includes('order')) pGOut += value;
                 }
             });
 
