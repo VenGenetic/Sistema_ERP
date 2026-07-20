@@ -226,7 +226,6 @@ const Dashboard: React.FC = () => {
                 supabase.from('orders').select('created_at, total_amount, status')
                     .gte('created_at', startDate).lte('created_at', endDate)
                     .neq('status', 'Cancelado')
-                    .neq('status', 'Anulado')
                     .order('created_at', { ascending: true }),
                 // 2, 3, 4. Inventory logs for purchases and ghosts
                 supabase.from('inventory_logs').select(`
@@ -247,8 +246,7 @@ const Dashboard: React.FC = () => {
             ] = await Promise.all([
                 supabase.from('orders').select('total_amount, status')
                     .gte('created_at', prevStartISO).lt('created_at', startDate)
-                    .neq('status', 'Cancelado')
-                    .neq('status', 'Anulado'),
+                    .neq('status', 'Cancelado'),
                 supabase.from('inventory_logs').select(`quantity_change, reason, reference_type, products ( cost_without_vat )`)
                     .gte('created_at', prevStartISO).lt('created_at', startDate)
             ]);
