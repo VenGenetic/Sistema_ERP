@@ -61,6 +61,26 @@ const Dashboard: React.FC = () => {
     const [showSalidos, setShowSalidos] = useState(true);
     const [chartHover, setChartHover] = useState<{x: number; date: string; countIn: number; countOut: number} | null>(null);
 
+    // ─── Financial Chart State ───
+    const [financeLoading, setFinanceLoading] = useState(false);
+    const [financeChartData, setFinanceChartData] = useState<{date: string; incomeReal: number; expenseReal: number; ghostIn: number; ghostOut: number}[]>([]);
+    // Visibility toggles for financial chart
+    const [showIncomeReal, setShowIncomeReal] = useState(true);
+    const [showExpenseReal, setShowExpenseReal] = useState(true);
+    const [showGhostIn, setShowGhostIn] = useState(true);
+    const [showGhostOut, setShowGhostOut] = useState(true);
+    const [financeChartHover, setFinanceChartHover] = useState<{x: number; date: string; incomeReal: number; expenseReal: number; ghostIn: number; ghostOut: number} | null>(null);
+    // Totals for metrics row
+    const [totalIncomeReal, setTotalIncomeReal] = useState(0);
+    const [totalExpenseReal, setTotalExpenseReal] = useState(0);
+    const [totalGhostIn, setTotalGhostIn] = useState(0);
+    const [totalGhostOut, setTotalGhostOut] = useState(0);
+    const [prevTotalIncomeReal, setPrevTotalIncomeReal] = useState(0);
+    const [prevTotalExpenseReal, setPrevTotalExpenseReal] = useState(0);
+    const [prevTotalGhostIn, setPrevTotalGhostIn] = useState(0);
+    const [prevTotalGhostOut, setPrevTotalGhostOut] = useState(0);
+
+
     // Compute the resolved date range from duration + anchor
     const resolvedRange = React.useMemo(() => {
         const anchor = new Date(anchorDate + 'T12:00:00');
@@ -190,11 +210,144 @@ const Dashboard: React.FC = () => {
         }
     }, []);
 
+    // ─── Financial Flow Fetch: 4 Series (Real Sales, Real Purchases, Ghost In, Ghost Out) ──
+    const fetchFinancialFlowData = useCallback(async (startDate: string, endDate: string) => {
+        setFinanceLoading(true);
+        try {
+            const periodMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+            const prevStartISO = new Date(new Date(startDate).getTime() - periodMs).toISOString();
+
+            // Fetch current period data
+            const [
+                { data: ordersData },
+                { data: logsData }
+            ] = await Promise.all([
+                // 1. Sales (Income Real)
+                supabase.from('orders').select('created_at, final_total')
+                    .gte('created_at', startDate).lte('created_at', endDate)
+                    .neq('status', 'Anulado')
+                    .order('created_at', { ascending: true }),
+                // 2, 3, 4. Inventory logs for purchases and ghosts
+                supabase.from('inventory_logs').select(`
+                    created_at,
+                    quantity_change,
+                    reason,
+                    products ( cost_without_vat )
+                `)
+                    .gte('created_at', startDate).lte('created_at', endDate)
+                    .order('created_at', { ascending: true })
+            ]);
+
+            // Fetch previous period data for comparisons
+            const [
+                { data: prevOrdersData },
+                { data: prevLogsData }
+            ] = await Promise.all([
+                supabase.from('orders').select('final_total')
+                    .gte('created_at', prevStartISO).lt('created_at', startDate)
+                    .neq('status', 'Anulado'),
+                supabase.from('inventory_logs').select(`quantity_change, reason, products ( cost_without_vat )`)
+                    .gte('created_at', prevStartISO).lt('created_at', startDate)
+            ]);
+
+            // Grouping logic for Current Period
+            const groupedInc: Record<string, number> = {}; // Income Real
+            const groupedExp: Record<string, number> = {}; // Expense Real (Purchases)
+            const groupedGIn: Record<string, number> = {}; // Ghost In
+            const groupedGOut: Record<string, number> = {}; // Ghost Out
+
+            (ordersData || []).forEach((o: any) => {
+                const day = o.created_at?.split('T')[0];
+                if (day) groupedInc[day] = (groupedInc[day] || 0) + Number(o.final_total || 0);
+            });
+
+            (logsData || []).forEach((l: any) => {
+                const day = l.created_at?.split('T')[0];
+                if (!day) return;
+                const cost = Number(l.products?.cost_without_vat || 0);
+                const qty = Number(l.quantity_change);
+                const reason = (l.reason || '').toLowerCase();
+                const value = Math.abs(qty) * cost;
+
+                if (qty > 0) {
+                    if (reason.includes('compra') || reason.includes('purchase')) {
+                        groupedExp[day] = (groupedExp[day] || 0) + value; // Blue
+                    } else {
+                        groupedGIn[day] = (groupedGIn[day] || 0) + value; // Yellow
+                    }
+                } else if (qty < 0) {
+                    // Exclude POS sales because they are tracked in Income Real
+                    if (!reason.includes('venta') && !reason.includes('sale') && !reason.includes('pedido') && !reason.includes('order')) {
+                        groupedGOut[day] = (groupedGOut[day] || 0) + value; // Pink
+                    }
+                }
+            });
+
+            // Calculate totals for previous period
+            let pInc = 0, pExp = 0, pGIn = 0, pGOut = 0;
+            (prevOrdersData || []).forEach((o: any) => pInc += Number(o.final_total || 0));
+            (prevLogsData || []).forEach((l: any) => {
+                const cost = Number(l.products?.cost_without_vat || 0);
+                const qty = Number(l.quantity_change);
+                const reason = (l.reason || '').toLowerCase();
+                const value = Math.abs(qty) * cost;
+
+                if (qty > 0) {
+                    if (reason.includes('compra') || reason.includes('purchase')) pExp += value;
+                    else pGIn += value;
+                } else if (qty < 0) {
+                    if (!reason.includes('venta') && !reason.includes('sale') && !reason.includes('pedido') && !reason.includes('order')) pGOut += value;
+                }
+            });
+
+            // Fill days array
+            const filled: {date: string; incomeReal: number; expenseReal: number; ghostIn: number; ghostOut: number}[] = [];
+            const cursor = new Date(startDate);
+            const end = new Date(endDate);
+            let safety = 0;
+            let tInc = 0, tExp = 0, tGIn = 0, tGOut = 0;
+
+            while (cursor <= end && safety < 730) {
+                const key = cursor.toISOString().split('T')[0];
+                const iR = groupedInc[key] || 0;
+                const eR = groupedExp[key] || 0;
+                const gI = groupedGIn[key] || 0;
+                const gO = groupedGOut[key] || 0;
+
+                tInc += iR;
+                tExp += eR;
+                tGIn += gI;
+                tGOut += gO;
+
+                filled.push({ date: key, incomeReal: iR, expenseReal: eR, ghostIn: gI, ghostOut: gO });
+                cursor.setDate(cursor.getDate() + 1);
+                safety++;
+            }
+
+            setFinanceChartData(filled);
+            setTotalIncomeReal(tInc);
+            setTotalExpenseReal(tExp);
+            setTotalGhostIn(tGIn);
+            setTotalGhostOut(tGOut);
+            
+            setPrevTotalIncomeReal(pInc);
+            setPrevTotalExpenseReal(pExp);
+            setPrevTotalGhostIn(pGIn);
+            setPrevTotalGhostOut(pGOut);
+
+        } catch (e) {
+            console.error('Error fetching financial flow data:', e);
+        } finally {
+            setFinanceLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (resolvedRange) {
             fetchEntriesData(resolvedRange.startISO, resolvedRange.endISO);
+            fetchFinancialFlowData(resolvedRange.startISO, resolvedRange.endISO);
         }
-    }, [resolvedRange, fetchEntriesData]);
+    }, [resolvedRange, fetchEntriesData, fetchFinancialFlowData]);
 
     const handleCloseTill = async () => {
         if (!selectedTill || typeof tillFinalActualCash !== 'number') return;
@@ -1105,7 +1258,379 @@ const Dashboard: React.FC = () => {
                         )}
                     </div>
                 </div>
+
+                {/* ─── NEW: Financial Chart (Real vs Ghost) ─── */}
+                <div className="flex items-center gap-2 px-6 pb-4 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="w-1.5 h-4 bg-primary rounded-full"></div>
+                    <h2 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider">Flujo Financiero (Real vs Fantasma)</h2>
+                </div>
+
+                {/* Financial Series Toggle Buttons */}
+                <div className="flex flex-wrap items-center gap-3 px-6 pb-2">
+                    <button
+                        onClick={() => setShowIncomeReal(v => !v)}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold border-2 transition-all duration-200 ${
+                            showIncomeReal
+                                ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-400 text-emerald-700 dark:text-emerald-300 shadow-sm'
+                                : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 line-through'
+                        }`}
+                    >
+                        <span className="inline-block w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span>
+                        Ventas Reales
+                    </button>
+                    <button
+                        onClick={() => setShowExpenseReal(v => !v)}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold border-2 transition-all duration-200 ${
+                            showExpenseReal
+                                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 text-blue-700 dark:text-blue-300 shadow-sm'
+                                : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 line-through'
+                        }`}
+                    >
+                        <span className="inline-block w-3 h-3 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
+                        Compras Reales
+                    </button>
+                    <button
+                        onClick={() => setShowGhostIn(v => !v)}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold border-2 transition-all duration-200 ${
+                            showGhostIn
+                                ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-400 text-amber-700 dark:text-amber-300 shadow-sm'
+                                : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 line-through'
+                        }`}
+                    >
+                        <span className="inline-block w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
+                        Valor Fantasma IN
+                    </button>
+                    <button
+                        onClick={() => setShowGhostOut(v => !v)}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold border-2 transition-all duration-200 ${
+                            showGhostOut
+                                ? 'bg-pink-50 dark:bg-pink-900/30 border-pink-400 text-pink-700 dark:text-pink-300 shadow-sm'
+                                : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 line-through'
+                        }`}
+                    >
+                        <span className="inline-block w-3 h-3 rounded-full bg-pink-500 shadow-sm shadow-pink-500/50"></span>
+                        Valor Fantasma OUT
+                    </button>
+                    {(!showIncomeReal || !showExpenseReal || !showGhostIn || !showGhostOut) && (
+                        <button
+                            onClick={() => { setShowIncomeReal(true); setShowExpenseReal(true); setShowGhostIn(true); setShowGhostOut(true); }}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline transition-colors"
+                        >
+                            Mostrar todo
+                        </button>
+                    )}
+                </div>
+
+                {/* Financial Metrics Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-6 pb-5">
+                    {/* Income Real */}
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showIncomeReal
+                            ? 'bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border-emerald-300 dark:border-emerald-800'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                            <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Ventas (Ingreso)</div>
+                        </div>
+                        <div className="text-2xl font-black text-emerald-700 dark:text-emerald-300 font-mono">
+                            {financeLoading ? <span className="animate-pulse">—</span> : `$${totalIncomeReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                        </div>
+                        {(() => {
+                            const pct = prevTotalIncomeReal > 0 ? Math.round(((totalIncomeReal - prevTotalIncomeReal) / prevTotalIncomeReal) * 100) : totalIncomeReal > 0 ? 100 : 0;
+                            const isUp = pct >= 0;
+                            return <div className={`text-[10px] font-bold mt-1.5 ${isUp ? 'text-emerald-500' : 'text-rose-500'}`}>{isUp ? '▲' : '▼'} {isUp ? '+' : ''}{pct}% vs ant.</div>;
+                        })()}
+                    </div>
+
+                    {/* Expense Real */}
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showExpenseReal
+                            ? 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-300 dark:border-blue-800'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Compras (Gasto)</div>
+                        </div>
+                        <div className="text-2xl font-black text-blue-700 dark:text-blue-300 font-mono">
+                            {financeLoading ? <span className="animate-pulse">—</span> : `$${totalExpenseReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                        </div>
+                        {(() => {
+                            const pct = prevTotalExpenseReal > 0 ? Math.round(((totalExpenseReal - prevTotalExpenseReal) / prevTotalExpenseReal) * 100) : totalExpenseReal > 0 ? 100 : 0;
+                            const isUp = pct >= 0;
+                            // For expenses, going down is usually "good" in retail, but we just show the raw trend
+                            return <div className={`text-[10px] font-bold mt-1.5 ${isUp ? 'text-blue-500' : 'text-emerald-500'}`}>{isUp ? '▲' : '▼'} {isUp ? '+' : ''}{pct}% vs ant.</div>;
+                        })()}
+                    </div>
+
+                    {/* Ghost In */}
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showGhostIn
+                            ? 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-300 dark:border-amber-800'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                            <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Ghost IN (Capital)</div>
+                        </div>
+                        <div className="text-2xl font-black text-amber-700 dark:text-amber-300 font-mono">
+                            {financeLoading ? <span className="animate-pulse">—</span> : `$${totalGhostIn.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                        </div>
+                        <div className="text-[10px] text-amber-500 mt-1.5">Capital añadido sin registro</div>
+                    </div>
+
+                    {/* Ghost Out */}
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showGhostOut
+                            ? 'bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border-pink-300 dark:border-pink-800'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-pink-500 inline-block"></span>
+                            <div className="text-[10px] font-bold text-pink-600 dark:text-pink-400 uppercase tracking-wider">Ghost OUT (Mermas)</div>
+                        </div>
+                        <div className="text-2xl font-black text-pink-700 dark:text-pink-300 font-mono">
+                            {financeLoading ? <span className="animate-pulse">—</span> : `$${totalGhostOut.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                        </div>
+                        <div className="text-[10px] text-pink-500 mt-1.5">Pérdidas de inventario</div>
+                    </div>
+                </div>
+
+                {/* SVG 4-Series Financial Area Chart */}
+                <div className="px-6 pb-6">
+                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl border border-slate-200 dark:border-slate-800 p-4 relative" onMouseLeave={() => setFinanceChartHover(null)}>
+                        {financeLoading ? (
+                            <div className="flex items-center justify-center h-[300px]">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-xs text-slate-400 font-mono">Calculando flujos...</span>
+                                </div>
+                            </div>
+                        ) : financeChartData.length === 0 ? (
+                            <div className="flex items-center justify-center h-[300px] text-slate-400">
+                                <div className="text-center">
+                                    <span className="material-symbols-outlined text-4xl mb-2 block">account_balance_wallet</span>
+                                    <p className="text-sm">No hay transacciones en este período</p>
+                                </div>
+                            </div>
+                        ) : (() => {
+                            const W = 900;
+                            const H = 300;
+                            const PAD_TOP = 20;
+                            const PAD_BOTTOM = 35;
+                            const PAD_LEFT = 60; // Wider for currency
+                            const PAD_RIGHT = 12;
+                            const chartW = W - PAD_LEFT - PAD_RIGHT;
+                            const chartH = H - PAD_TOP - PAD_BOTTOM;
+                            const data = financeChartData;
+                            const gap = chartW / Math.max(data.length, 1);
+                            const baseline = PAD_TOP + chartH;
+
+                            // Dynamic max
+                            const maxVal = Math.max(
+                                showIncomeReal ? Math.max(...data.map(d => d.incomeReal)) : 0,
+                                showExpenseReal ? Math.max(...data.map(d => d.expenseReal)) : 0,
+                                showGhostIn ? Math.max(...data.map(d => d.ghostIn)) : 0,
+                                showGhostOut ? Math.max(...data.map(d => d.ghostOut)) : 0,
+                                1
+                            );
+
+                            // Y grid
+                            const yTicks = 5;
+                            const yLines = Array.from({length: yTicks + 1}, (_, i) => {
+                                const val = (maxVal / yTicks) * i;
+                                const y = PAD_TOP + chartH - (chartH * (val / maxVal));
+                                return {val, y};
+                            });
+
+                            // Path generator
+                            const toPath = (getter: (d: any) => number) => {
+                                const pts = data.map((d, i) => {
+                                    const x = PAD_LEFT + (i * gap) + gap / 2;
+                                    const y = PAD_TOP + chartH - (chartH * (getter(d) / maxVal));
+                                    return `${x},${y}`;
+                                });
+                                const fx = PAD_LEFT + gap / 2;
+                                const lx = PAD_LEFT + ((data.length - 1) * gap) + gap / 2;
+                                return {
+                                    area: `M${fx},${baseline} L${pts.join(' L')} L${lx},${baseline} Z`,
+                                    line: `M${pts.join(' L')}`,
+                                    pts,
+                                };
+                            };
+
+                            const pInc = toPath(d => d.incomeReal);
+                            const pExp = toPath(d => d.expenseReal);
+                            const pGIn = toPath(d => d.ghostIn);
+                            const pGOut = toPath(d => d.ghostOut);
+                            const labelStep = Math.max(1, Math.floor(data.length / 8));
+
+                            return (
+                                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[300px]" preserveAspectRatio="xMidYMid meet">
+                                    <defs>
+                                        <linearGradient id="gradInc" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.40" />
+                                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.03" />
+                                        </linearGradient>
+                                        <linearGradient id="gradExp" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.40" />
+                                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.03" />
+                                        </linearGradient>
+                                        <linearGradient id="gradGIn" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.40" />
+                                            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.03" />
+                                        </linearGradient>
+                                        <linearGradient id="gradGOut" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#ec4899" stopOpacity="0.40" />
+                                            <stop offset="100%" stopColor="#ec4899" stopOpacity="0.03" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    {/* Y Grid */}
+                                    {yLines.map((tick, i) => (
+                                        <g key={`y-${i}`}>
+                                            <line x1={PAD_LEFT} y1={tick.y} x2={W - PAD_RIGHT} y2={tick.y}
+                                                stroke="currentColor" className="text-slate-200 dark:text-slate-800"
+                                                strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 4'} />
+                                            <text x={PAD_LEFT - 6} y={tick.y + 3} textAnchor="end"
+                                                className="fill-slate-400" style={{fontSize: 9, fontFamily: 'monospace'}}>
+                                                ${tick.val >= 1000 ? (tick.val / 1000).toFixed(1) + 'k' : Math.round(tick.val)}
+                                            </text>
+                                        </g>
+                                    ))}
+
+                                    {/* Series: Expense (Blue) */}
+                                    {showExpenseReal && (
+                                        <>
+                                            <path d={pExp.area} fill="url(#gradExp)" />
+                                            <path d={pExp.line} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </>
+                                    )}
+
+                                    {/* Series: Ghost In (Yellow) */}
+                                    {showGhostIn && (
+                                        <>
+                                            <path d={pGIn.area} fill="url(#gradGIn)" />
+                                            <path d={pGIn.line} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </>
+                                    )}
+
+                                    {/* Series: Ghost Out (Pink) */}
+                                    {showGhostOut && (
+                                        <>
+                                            <path d={pGOut.area} fill="url(#gradGOut)" />
+                                            <path d={pGOut.line} fill="none" stroke="#ec4899" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </>
+                                    )}
+
+                                    {/* Series: Income (Green) - Drawn last to be on top */}
+                                    {showIncomeReal && (
+                                        <>
+                                            <path d={pInc.area} fill="url(#gradInc)" />
+                                            <path d={pInc.line} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </>
+                                    )}
+
+                                    {/* Dots rendering */}
+                                    {data.map((d, i) => {
+                                        const x = PAD_LEFT + (i * gap) + gap / 2;
+                                        const isHov = financeChartHover?.date === d.date;
+                                        const r = data.length > 90 ? 0 : data.length > 45 ? 2 : 3.5;
+                                        return (
+                                            <g key={`dots-${i}`}>
+                                                {showExpenseReal && <circle cx={x} cy={PAD_TOP + chartH - (chartH * (d.expenseReal / maxVal))} r={r} fill="#3b82f6" stroke="white" strokeWidth="1.5" style={{opacity: isHov ? 1 : (d.expenseReal > 0 ? 0.75 : 0), transition: 'opacity 0.1s'}} />}
+                                                {showGhostIn && <circle cx={x} cy={PAD_TOP + chartH - (chartH * (d.ghostIn / maxVal))} r={r} fill="#f59e0b" stroke="white" strokeWidth="1.5" style={{opacity: isHov ? 1 : (d.ghostIn > 0 ? 0.75 : 0), transition: 'opacity 0.1s'}} />}
+                                                {showGhostOut && <circle cx={x} cy={PAD_TOP + chartH - (chartH * (d.ghostOut / maxVal))} r={r} fill="#ec4899" stroke="white" strokeWidth="1.5" style={{opacity: isHov ? 1 : (d.ghostOut > 0 ? 0.75 : 0), transition: 'opacity 0.1s'}} />}
+                                                {showIncomeReal && <circle cx={x} cy={PAD_TOP + chartH - (chartH * (d.incomeReal / maxVal))} r={r} fill="#10b981" stroke="white" strokeWidth="1.5" style={{opacity: isHov ? 1 : (d.incomeReal > 0 ? 0.75 : 0), transition: 'opacity 0.1s'}} />}
+                                            </g>
+                                        );
+                                    })}
+
+                                    {/* Invisible hover strips */}
+                                    {data.map((d, i) => {
+                                        const x = PAD_LEFT + (i * gap) + gap / 2;
+                                        return (
+                                            <rect key={`fhover-${i}`}
+                                                x={x - gap / 2} y={PAD_TOP} width={gap} height={chartH}
+                                                fill="transparent" className="cursor-pointer"
+                                                onMouseEnter={() => setFinanceChartHover({x, date: d.date, incomeReal: d.incomeReal, expenseReal: d.expenseReal, ghostIn: d.ghostIn, ghostOut: d.ghostOut})}
+                                            />
+                                        );
+                                    })}
+
+                                    {/* Hover crosshair */}
+                                    {financeChartHover && (
+                                        <line x1={financeChartHover.x} y1={PAD_TOP} x2={financeChartHover.x} y2={baseline}
+                                            stroke="#94a3b8" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" />
+                                    )}
+
+                                    {/* X axis labels */}
+                                    {data.map((d, i) => {
+                                        if (i % labelStep !== 0 && i !== data.length - 1) return null;
+                                        const x = PAD_LEFT + (i * gap) + gap / 2;
+                                        const parts = d.date.split('-');
+                                        return (
+                                            <text key={i} x={x} y={H - 8} textAnchor="middle"
+                                                className="fill-slate-400" style={{fontSize: 9, fontFamily: 'monospace'}}>
+                                                {`${parts[2]}/${parts[1]}`}
+                                            </text>
+                                        );
+                                    })}
+                                </svg>
+                            );
+                        })()}
+
+                        {/* ── Floating 4-Series Tooltip ── */}
+                        {financeChartHover && (
+                            <div
+                                className="absolute pointer-events-none bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-sm text-white text-xs font-bold px-3 py-2.5 rounded-xl shadow-2xl border border-slate-700 transition-all duration-75"
+                                style={{
+                                    left: `clamp(2%, ${(financeChartHover.x / 900) * 100}%, 88%)`,
+                                    top: '12px',
+                                    transform: 'translateX(-50%)',
+                                    minWidth: '160px',
+                                }}
+                            >
+                                <div className="text-slate-400 font-mono text-[10px] mb-1.5 pb-1.5 border-b border-slate-700">{financeChartHover.date}</div>
+                                {showIncomeReal && (
+                                    <div className="flex items-center justify-between gap-4 mb-1">
+                                        <span className="flex items-center gap-1.5 text-emerald-400">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Ventas Reales
+                                        </span>
+                                        <span className="font-black text-sm text-white">${financeChartHover.incomeReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                )}
+                                {showExpenseReal && (
+                                    <div className="flex items-center justify-between gap-4 mb-1">
+                                        <span className="flex items-center gap-1.5 text-blue-400">
+                                            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span> Compras Reales
+                                        </span>
+                                        <span className="font-black text-sm text-white">${financeChartHover.expenseReal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                )}
+                                {showGhostIn && (
+                                    <div className="flex items-center justify-between gap-4 mb-1">
+                                        <span className="flex items-center gap-1.5 text-amber-400">
+                                            <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> Ghost IN
+                                        </span>
+                                        <span className="font-black text-sm text-white">${financeChartHover.ghostIn.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                )}
+                                {showGhostOut && (
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="flex items-center gap-1.5 text-pink-400">
+                                            <span className="w-2 h-2 rounded-full bg-pink-500 inline-block"></span> Ghost OUT
+                                        </span>
+                                        <span className="font-black text-sm text-white">${financeChartHover.ghostOut.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
+
             
             {/* Close Till Modal */}
             {isClosingTill && selectedTill && (
