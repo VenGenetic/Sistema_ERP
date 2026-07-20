@@ -36,6 +36,14 @@ const Dashboard: React.FC = () => {
         return new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' });
     });
 
+    // Product Entries Tracker State
+    type EntriesPeriod = '1M' | '3M' | '6M' | '1Y' | 'custom';
+    const [entriesPeriod, setEntriesPeriod] = useState<EntriesPeriod>('1M');
+    const [entriesCount, setEntriesCount] = useState<number>(0);
+    const [entriesLoading, setEntriesLoading] = useState(false);
+    const [customFrom, setCustomFrom] = useState('');
+    const [customTo, setCustomTo] = useState('');
+
     // Till Management State
     const [selectedTillDate, setSelectedTillDate] = useState(new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]);
     const [selectedTill, setSelectedTill] = useState<any>(null);
@@ -62,6 +70,46 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         fetchTillData(selectedTillDate);
     }, [selectedTillDate, fetchTillData]);
+
+    // ─── Product entries by period ────────────────────────────────────────────
+    const fetchEntriesByPeriod = useCallback(async (period: EntriesPeriod, from?: string, to?: string) => {
+        setEntriesLoading(true);
+        try {
+            const now = new Date();
+            let startDate: string;
+            let endDate: string = now.toISOString();
+
+            if (period === 'custom' && from) {
+                startDate = new Date(from).toISOString();
+                endDate = to ? new Date(to + 'T23:59:59').toISOString() : endDate;
+            } else {
+                const d = new Date();
+                switch (period) {
+                    case '1M': d.setMonth(d.getMonth() - 1); break;
+                    case '3M': d.setMonth(d.getMonth() - 3); break;
+                    case '6M': d.setMonth(d.getMonth() - 6); break;
+                    case '1Y': d.setFullYear(d.getFullYear() - 1); break;
+                }
+                startDate = d.toISOString();
+            }
+
+            const { count, error } = await supabase
+                .from('products')
+                .select('*', { count: 'exact', head: true })
+                .gte('created_at', startDate)
+                .lte('created_at', endDate);
+
+            if (!error) setEntriesCount(count || 0);
+        } catch (e) {
+            console.error('Error fetching product entries:', e);
+        } finally {
+            setEntriesLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchEntriesByPeriod(entriesPeriod, customFrom, customTo);
+    }, [entriesPeriod, customFrom, customTo, fetchEntriesByPeriod]);
 
     const handleCloseTill = async () => {
         if (!selectedTill || typeof tillFinalActualCash !== 'number') return;
@@ -664,6 +712,72 @@ const Dashboard: React.FC = () => {
                                     </div>
                                 </div>
                                 <span className="text-xs text-slate-500">Listo</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Product Entries Tracker Widget */}
+                    <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-900/50 rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-4 text-teal-700 dark:text-teal-500">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined">local_shipping</span>
+                                <span className="text-sm font-bold uppercase tracking-wide">Productos Ingresados</span>
+                            </div>
+                        </div>
+
+                        {/* Period Buttons */}
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                            {(['1M', '3M', '6M', '1Y'] as EntriesPeriod[]).map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => setEntriesPeriod(p)}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                        entriesPeriod === p
+                                            ? 'bg-teal-600 text-white shadow-sm'
+                                            : 'bg-white dark:bg-[#161b22] text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800 hover:border-teal-400'
+                                    }`}
+                                >
+                                    {p === '1M' ? '1 Mes' : p === '3M' ? '3 Meses' : p === '6M' ? '6 Meses' : '1 Año'}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setEntriesPeriod('custom')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                    entriesPeriod === 'custom'
+                                        ? 'bg-teal-600 text-white shadow-sm'
+                                        : 'bg-white dark:bg-[#161b22] text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800 hover:border-teal-400'
+                                }`}
+                            >
+                                Personalizado
+                            </button>
+                        </div>
+
+                        {/* Custom Date Range */}
+                        {entriesPeriod === 'custom' && (
+                            <div className="flex gap-2 mb-4">
+                                <input
+                                    type="date"
+                                    value={customFrom}
+                                    onChange={(e) => setCustomFrom(e.target.value)}
+                                    className="flex-1 border border-teal-300 dark:border-teal-700 bg-white dark:bg-[#161b22] text-teal-800 dark:text-teal-300 rounded-md p-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                                <span className="text-teal-500 self-center text-xs">→</span>
+                                <input
+                                    type="date"
+                                    value={customTo}
+                                    onChange={(e) => setCustomTo(e.target.value)}
+                                    className="flex-1 border border-teal-300 dark:border-teal-700 bg-white dark:bg-[#161b22] text-teal-800 dark:text-teal-300 rounded-md p-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500"
+                                />
+                            </div>
+                        )}
+
+                        {/* Result */}
+                        <div className="bg-white dark:bg-[#161b22] border border-teal-100 dark:border-teal-900/30 rounded-lg p-4 text-center">
+                            <div className="text-3xl font-black text-teal-700 dark:text-teal-400 font-mono">
+                                {entriesLoading ? '...' : entriesCount.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-teal-600 dark:text-teal-500 mt-1 font-medium">
+                                productos creados en {entriesPeriod === '1M' ? 'el último mes' : entriesPeriod === '3M' ? 'los últimos 3 meses' : entriesPeriod === '6M' ? 'los últimos 6 meses' : entriesPeriod === '1Y' ? 'el último año' : 'el rango seleccionado'}
                             </div>
                         </div>
                     </div>
