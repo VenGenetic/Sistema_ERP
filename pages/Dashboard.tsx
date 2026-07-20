@@ -36,18 +36,41 @@ const Dashboard: React.FC = () => {
         return new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' });
     });
 
-    // Product Entries Tracker State
-    type EntriesPeriod = '7D' | '1M' | '3M' | '6M' | '1Y' | 'custom';
-    const [entriesPeriod, setEntriesPeriod] = useState<EntriesPeriod>('1M');
+    // Product Entries Tracker State — Flexible Duration System
+    type DurationUnit = 'days' | 'months' | 'years';
+    type AnchorSide = 'end' | 'start';
+    const [durationAmount, setDurationAmount] = useState<number>(1);
+    const [durationUnit, setDurationUnit] = useState<DurationUnit>('months');
+    const [anchorSide, setAnchorSide] = useState<AnchorSide>('end');
+    const [anchorDate, setAnchorDate] = useState<string>(() => new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]);
     const [entriesCount, setEntriesCount] = useState<number>(0);
     const [entriesLoading, setEntriesLoading] = useState(false);
-    const [customFrom, setCustomFrom] = useState('');
-    const [customTo, setCustomTo] = useState('');
     const [entriesChartData, setEntriesChartData] = useState<{date: string; count: number}[]>([]);
     const [entriesAvgDaily, setEntriesAvgDaily] = useState(0);
     const [entriesPeakDay, setEntriesPeakDay] = useState<{date: string; count: number}>({date: '', count: 0});
     const [entriesPrevCount, setEntriesPrevCount] = useState<number>(0);
     const [chartHover, setChartHover] = useState<{x: number; y: number; date: string; count: number} | null>(null);
+
+    // Compute the resolved date range from duration + anchor
+    const resolvedRange = React.useMemo(() => {
+        const anchor = new Date(anchorDate + 'T12:00:00');
+        if (isNaN(anchor.getTime())) return null;
+        const offset = new Date(anchor);
+        switch (durationUnit) {
+            case 'days': offset.setDate(offset.getDate() + (anchorSide === 'start' ? durationAmount : -durationAmount)); break;
+            case 'months': offset.setMonth(offset.getMonth() + (anchorSide === 'start' ? durationAmount : -durationAmount)); break;
+            case 'years': offset.setFullYear(offset.getFullYear() + (anchorSide === 'start' ? durationAmount : -durationAmount)); break;
+        }
+        const startD = anchorSide === 'start' ? anchor : offset;
+        const endD = anchorSide === 'start' ? offset : anchor;
+        if (startD > endD) return null;
+        return {
+            start: startD.toISOString().split('T')[0],
+            end: endD.toISOString().split('T')[0],
+            startISO: startD.toISOString(),
+            endISO: new Date(endD.getFullYear(), endD.getMonth(), endD.getDate(), 23, 59, 59).toISOString(),
+        };
+    }, [anchorDate, durationAmount, durationUnit, anchorSide]);
 
     // Till Management State
     const [selectedTillDate, setSelectedTillDate] = useState(new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]);
@@ -76,29 +99,10 @@ const Dashboard: React.FC = () => {
         fetchTillData(selectedTillDate);
     }, [selectedTillDate, fetchTillData]);
 
-    // ─── Product entries by period ────────────────────────────────────────────
-    const fetchEntriesByPeriod = useCallback(async (period: EntriesPeriod, from?: string, to?: string) => {
+    // ─── Product entries by resolved range ────────────────────────────────────
+    const fetchEntriesData = useCallback(async (startDate: string, endDate: string) => {
         setEntriesLoading(true);
         try {
-            const now = new Date();
-            let startDate: string;
-            let endDate: string = now.toISOString();
-
-            if (period === 'custom' && from) {
-                startDate = new Date(from).toISOString();
-                endDate = to ? new Date(to + 'T23:59:59').toISOString() : endDate;
-            } else {
-                const d = new Date();
-                switch (period) {
-                    case '7D': d.setDate(d.getDate() - 7); break;
-                    case '1M': d.setMonth(d.getMonth() - 1); break;
-                    case '3M': d.setMonth(d.getMonth() - 3); break;
-                    case '6M': d.setMonth(d.getMonth() - 6); break;
-                    case '1Y': d.setFullYear(d.getFullYear() - 1); break;
-                }
-                startDate = d.toISOString();
-            }
-
             // Fetch created_at dates for chart grouping
             const { data, error } = await supabase
                 .from('products')
@@ -117,15 +121,17 @@ const Dashboard: React.FC = () => {
                     if (day) grouped[day] = (grouped[day] || 0) + 1;
                 });
 
-                // Fill missing days
+                // Fill missing days (cap at 730 to prevent freezing)
                 const start = new Date(startDate);
                 const end = new Date(endDate);
                 const filled: {date: string; count: number}[] = [];
                 const cursor = new Date(start);
-                while (cursor <= end) {
+                let safety = 0;
+                while (cursor <= end && safety < 730) {
                     const key = cursor.toISOString().split('T')[0];
                     filled.push({ date: key, count: grouped[key] || 0 });
                     cursor.setDate(cursor.getDate() + 1);
+                    safety++;
                 }
                 setEntriesChartData(filled);
 
@@ -154,8 +160,10 @@ const Dashboard: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        fetchEntriesByPeriod(entriesPeriod, customFrom, customTo);
-    }, [entriesPeriod, customFrom, customTo, fetchEntriesByPeriod]);
+        if (resolvedRange) {
+            fetchEntriesData(resolvedRange.startISO, resolvedRange.endISO);
+        }
+    }, [resolvedRange, fetchEntriesData]);
 
     const handleCloseTill = async () => {
         if (!selectedTill || typeof tillFinalActualCash !== 'number') return;
@@ -651,64 +659,116 @@ const Dashboard: React.FC = () => {
                ═══════════════════════════════════════════════════════════════════ */}
             <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg overflow-hidden">
                 {/* Widget Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 pt-6 pb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/20">
-                            <span className="material-symbols-outlined text-[22px]">inventory_2</span>
+                <div className="flex flex-col gap-4 px-6 pt-6 pb-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/20">
+                                <span className="material-symbols-outlined text-[22px]">inventory_2</span>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Productos Ingresados</h3>
+                                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                                    {resolvedRange ? `${resolvedRange.start}  →  ${resolvedRange.end}` : 'Configurar rango'}
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Productos Ingresados</h3>
-                            <p className="text-xs text-slate-500 font-mono mt-0.5">
-                                {entriesPeriod === '7D' ? 'Últimos 7 días' : entriesPeriod === '1M' ? 'Último mes' : entriesPeriod === '3M' ? 'Últimos 3 meses' : entriesPeriod === '6M' ? 'Últimos 6 meses' : entriesPeriod === '1Y' ? 'Último año' : 'Rango personalizado'}
-                            </p>
+
+                        {/* Quick Presets */}
+                        <div className="flex bg-slate-100 dark:bg-[#0d1117] rounded-lg p-1 gap-0.5">
+                            {[
+                                {label: '7D', amt: 7, unit: 'days' as DurationUnit},
+                                {label: '1M', amt: 1, unit: 'months' as DurationUnit},
+                                {label: '3M', amt: 3, unit: 'months' as DurationUnit},
+                                {label: '6M', amt: 6, unit: 'months' as DurationUnit},
+                                {label: '1A', amt: 1, unit: 'years' as DurationUnit},
+                            ].map((preset) => {
+                                const isActive = durationAmount === preset.amt && durationUnit === preset.unit && anchorSide === 'end'
+                                    && anchorDate === new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0];
+                                return (
+                                    <button
+                                        key={preset.label}
+                                        onClick={() => {
+                                            setDurationAmount(preset.amt);
+                                            setDurationUnit(preset.unit);
+                                            setAnchorSide('end');
+                                            setAnchorDate(new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]);
+                                        }}
+                                        className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${
+                                            isActive
+                                                ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
+                                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
+                                        }`}
+                                    >
+                                        {preset.label}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
-                    {/* Period Selector Pills */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex bg-slate-100 dark:bg-[#0d1117] rounded-lg p-1 gap-0.5">
-                            {(['7D', '1M', '3M', '6M', '1Y'] as EntriesPeriod[]).map((p) => (
-                                <button
-                                    key={p}
-                                    onClick={() => setEntriesPeriod(p)}
-                                    className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${
-                                        entriesPeriod === p
-                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
-                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
-                                    }`}
-                                >
-                                    {p}
-                                </button>
-                            ))}
+                    {/* ── Flexible Duration Builder ── */}
+                    <div className="flex flex-wrap items-center gap-3 bg-slate-50 dark:bg-[#0d1117] rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                        {/* Duration Amount + Unit */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Duración:</span>
+                            <input
+                                type="number"
+                                min={1}
+                                max={999}
+                                value={durationAmount}
+                                onChange={(e) => setDurationAmount(Math.max(1, Math.min(999, parseInt(e.target.value) || 1)))}
+                                className="w-16 border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1.5 text-sm font-mono text-center outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            />
+                            <div className="flex bg-white dark:bg-[#161b22] border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden">
+                                {([{key: 'days', label: 'Días'}, {key: 'months', label: 'Meses'}, {key: 'years', label: 'Años'}] as {key: DurationUnit, label: string}[]).map((u) => (
+                                    <button
+                                        key={u.key}
+                                        onClick={() => setDurationUnit(u.key)}
+                                        className={`px-3 py-1.5 text-xs font-bold transition-all duration-150 ${
+                                            durationUnit === u.key
+                                                ? 'bg-teal-600 text-white'
+                                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                        }`}
+                                    >
+                                        {u.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        <button
-                            onClick={() => setEntriesPeriod('custom')}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 border ${
-                                entriesPeriod === 'custom'
-                                    ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-600/30'
-                                    : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-teal-400'
-                            }`}
-                        >
-                            <span className="material-symbols-outlined text-[14px] align-middle mr-1">date_range</span>
-                            Personalizado
-                        </button>
 
-                        {/* Custom Date Inputs */}
-                        {entriesPeriod === 'custom' && (
-                            <div className="flex items-center gap-2 ml-1">
-                                <input
-                                    type="date"
-                                    value={customFrom}
-                                    onChange={(e) => setCustomFrom(e.target.value)}
-                                    className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0d1117] text-slate-800 dark:text-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                                />
-                                <span className="text-slate-400 text-sm">→</span>
-                                <input
-                                    type="date"
-                                    value={customTo}
-                                    onChange={(e) => setCustomTo(e.target.value)}
-                                    className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0d1117] text-slate-800 dark:text-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                                />
+                        {/* Separator */}
+                        <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block"></div>
+
+                        {/* Anchor Toggle + Date */}
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={() => setAnchorSide(anchorSide === 'end' ? 'start' : 'end')}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161b22] text-slate-600 dark:text-slate-400 hover:border-teal-400 transition-all"
+                                title={anchorSide === 'end' ? 'La fecha seleccionada es el FINAL del rango' : 'La fecha seleccionada es el INICIO del rango'}
+                            >
+                                <span className="material-symbols-outlined text-[16px] text-teal-500">
+                                    {anchorSide === 'end' ? 'last_page' : 'first_page'}
+                                </span>
+                                {anchorSide === 'end' ? 'Hasta' : 'Desde'}
+                            </button>
+                            <input
+                                type="date"
+                                value={anchorDate}
+                                onChange={(e) => setAnchorDate(e.target.value)}
+                                className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                            />
+                        </div>
+
+                        {/* Resolved Range Display */}
+                        {resolvedRange && (
+                            <div className="flex items-center gap-2 ml-auto">
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                    {resolvedRange.start}
+                                </span>
+                                <span className="text-teal-500 text-sm">→</span>
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                    {resolvedRange.end}
+                                </span>
                             </div>
                         )}
                     </div>
