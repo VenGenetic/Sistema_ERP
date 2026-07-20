@@ -37,12 +37,17 @@ const Dashboard: React.FC = () => {
     });
 
     // Product Entries Tracker State
-    type EntriesPeriod = '1M' | '3M' | '6M' | '1Y' | 'custom';
+    type EntriesPeriod = '7D' | '1M' | '3M' | '6M' | '1Y' | 'custom';
     const [entriesPeriod, setEntriesPeriod] = useState<EntriesPeriod>('1M');
     const [entriesCount, setEntriesCount] = useState<number>(0);
     const [entriesLoading, setEntriesLoading] = useState(false);
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
+    const [entriesChartData, setEntriesChartData] = useState<{date: string; count: number}[]>([]);
+    const [entriesAvgDaily, setEntriesAvgDaily] = useState(0);
+    const [entriesPeakDay, setEntriesPeakDay] = useState<{date: string; count: number}>({date: '', count: 0});
+    const [entriesPrevCount, setEntriesPrevCount] = useState<number>(0);
+    const [chartHover, setChartHover] = useState<{x: number; y: number; date: string; count: number} | null>(null);
 
     // Till Management State
     const [selectedTillDate, setSelectedTillDate] = useState(new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]);
@@ -85,6 +90,7 @@ const Dashboard: React.FC = () => {
             } else {
                 const d = new Date();
                 switch (period) {
+                    case '7D': d.setDate(d.getDate() - 7); break;
                     case '1M': d.setMonth(d.getMonth() - 1); break;
                     case '3M': d.setMonth(d.getMonth() - 3); break;
                     case '6M': d.setMonth(d.getMonth() - 6); break;
@@ -93,13 +99,53 @@ const Dashboard: React.FC = () => {
                 startDate = d.toISOString();
             }
 
-            const { count, error } = await supabase
+            // Fetch created_at dates for chart grouping
+            const { data, error } = await supabase
+                .from('products')
+                .select('created_at')
+                .gte('created_at', startDate)
+                .lte('created_at', endDate)
+                .order('created_at', { ascending: true });
+
+            if (!error && data) {
+                setEntriesCount(data.length);
+
+                // Group by day
+                const grouped: Record<string, number> = {};
+                data.forEach((p: any) => {
+                    const day = p.created_at?.split('T')[0];
+                    if (day) grouped[day] = (grouped[day] || 0) + 1;
+                });
+
+                // Fill missing days
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const filled: {date: string; count: number}[] = [];
+                const cursor = new Date(start);
+                while (cursor <= end) {
+                    const key = cursor.toISOString().split('T')[0];
+                    filled.push({ date: key, count: grouped[key] || 0 });
+                    cursor.setDate(cursor.getDate() + 1);
+                }
+                setEntriesChartData(filled);
+
+                // Compute metrics
+                const totalDays = Math.max(filled.length, 1);
+                setEntriesAvgDaily(Math.round((data.length / totalDays) * 10) / 10);
+                const peak = filled.reduce((max, d) => d.count > max.count ? d : max, {date: '', count: 0});
+                setEntriesPeakDay(peak);
+            }
+
+            // Previous period comparison
+            const periodMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+            const prevStart = new Date(new Date(startDate).getTime() - periodMs).toISOString();
+            const { count: prevCount, error: prevErr } = await supabase
                 .from('products')
                 .select('*', { count: 'exact', head: true })
-                .gte('created_at', startDate)
-                .lte('created_at', endDate);
+                .gte('created_at', prevStart)
+                .lt('created_at', startDate);
+            if (!prevErr) setEntriesPrevCount(prevCount || 0);
 
-            if (!error) setEntriesCount(count || 0);
         } catch (e) {
             console.error('Error fetching product entries:', e);
         } finally {
@@ -356,6 +402,25 @@ const Dashboard: React.FC = () => {
                     </p>
                 </div>
 
+                {/* Compact Infrastructure Status */}
+                <div className="flex items-center gap-3 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 shadow-sm">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Infra</span>
+                    <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">Supabase</span>
+                    </div>
+                    <span className="text-slate-300 dark:text-slate-700">|</span>
+                    <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">Node.js</span>
+                    </div>
+                    <span className="text-slate-300 dark:text-slate-700">|</span>
+                    <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-mono">Edge</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono ml-1">{buildTime}</span>
+                </div>
             </div>
 
             {/* High Density Metrics Grid */}
@@ -581,126 +646,259 @@ const Dashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Main Operational Split */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-
-
-                {/* Right Col: Technical Status */}
-                <div className="flex flex-col gap-6">
-                    {/* Deployment Status */}
-                    <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Infraestructura</h3>
-                            <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+            {/* ═══════════════════════════════════════════════════════════════════
+                 PRODUCTOS INGRESADOS — Full Width Interactive Chart Widget
+               ═══════════════════════════════════════════════════════════════════ */}
+            <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg overflow-hidden">
+                {/* Widget Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 pt-6 pb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/20">
+                            <span className="material-symbols-outlined text-[22px]">inventory_2</span>
                         </div>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-1.5 rounded bg-slate-100 dark:bg-slate-800">
-                                        <span className="material-symbols-outlined text-[18px]">dns</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-slate-900 dark:text-white">Supabase DB</span>
-                                        <span className="text-[10px] text-slate-500 font-mono">us-east-1 • 24ms</span>
-                                    </div>
-                                </div>
-                                <span className="text-xs text-emerald-500 font-medium">Saludable</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-1.5 rounded bg-slate-100 dark:bg-slate-800">
-                                        <span className="material-symbols-outlined text-[18px]">javascript</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-slate-900 dark:text-white">Node.js Workers</span>
-                                        <span className="text-[10px] text-slate-500 font-mono">v18.x • 99.9% Uptime</span>
-                                    </div>
-                                </div>
-                                <span className="text-xs text-emerald-500 font-medium">Activo</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-1.5 rounded bg-slate-100 dark:bg-slate-800">
-                                        <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-slate-900 dark:text-white">Vercel Edge</span>
-                                        <span className="text-[10px] text-slate-500 font-mono">Cargado a las {buildTime}</span>
-                                    </div>
-                                </div>
-                                <span className="text-xs text-slate-500">Listo</span>
-                            </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Productos Ingresados</h3>
+                            <p className="text-xs text-slate-500 font-mono mt-0.5">
+                                {entriesPeriod === '7D' ? 'Últimos 7 días' : entriesPeriod === '1M' ? 'Último mes' : entriesPeriod === '3M' ? 'Últimos 3 meses' : entriesPeriod === '6M' ? 'Últimos 6 meses' : entriesPeriod === '1Y' ? 'Último año' : 'Rango personalizado'}
+                            </p>
                         </div>
                     </div>
 
-                    {/* Product Entries Tracker Widget */}
-                    <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-900/50 rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-4 text-teal-700 dark:text-teal-500">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined">local_shipping</span>
-                                <span className="text-sm font-bold uppercase tracking-wide">Productos Ingresados</span>
-                            </div>
-                        </div>
-
-                        {/* Period Buttons */}
-                        <div className="flex flex-wrap gap-1.5 mb-4">
-                            {(['1M', '3M', '6M', '1Y'] as EntriesPeriod[]).map((p) => (
+                    {/* Period Selector Pills */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex bg-slate-100 dark:bg-[#0d1117] rounded-lg p-1 gap-0.5">
+                            {(['7D', '1M', '3M', '6M', '1Y'] as EntriesPeriod[]).map((p) => (
                                 <button
                                     key={p}
                                     onClick={() => setEntriesPeriod(p)}
-                                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                                    className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${
                                         entriesPeriod === p
-                                            ? 'bg-teal-600 text-white shadow-sm'
-                                            : 'bg-white dark:bg-[#161b22] text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800 hover:border-teal-400'
+                                            ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
+                                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
                                     }`}
                                 >
-                                    {p === '1M' ? '1 Mes' : p === '3M' ? '3 Meses' : p === '6M' ? '6 Meses' : '1 Año'}
+                                    {p}
                                 </button>
                             ))}
-                            <button
-                                onClick={() => setEntriesPeriod('custom')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                                    entriesPeriod === 'custom'
-                                        ? 'bg-teal-600 text-white shadow-sm'
-                                        : 'bg-white dark:bg-[#161b22] text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800 hover:border-teal-400'
-                                }`}
-                            >
-                                Personalizado
-                            </button>
                         </div>
+                        <button
+                            onClick={() => setEntriesPeriod('custom')}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 border ${
+                                entriesPeriod === 'custom'
+                                    ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-600/30'
+                                    : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-teal-400'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[14px] align-middle mr-1">date_range</span>
+                            Personalizado
+                        </button>
 
-                        {/* Custom Date Range */}
+                        {/* Custom Date Inputs */}
                         {entriesPeriod === 'custom' && (
-                            <div className="flex gap-2 mb-4">
+                            <div className="flex items-center gap-2 ml-1">
                                 <input
                                     type="date"
                                     value={customFrom}
                                     onChange={(e) => setCustomFrom(e.target.value)}
-                                    className="flex-1 border border-teal-300 dark:border-teal-700 bg-white dark:bg-[#161b22] text-teal-800 dark:text-teal-300 rounded-md p-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0d1117] text-slate-800 dark:text-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                                 />
-                                <span className="text-teal-500 self-center text-xs">→</span>
+                                <span className="text-slate-400 text-sm">→</span>
                                 <input
                                     type="date"
                                     value={customTo}
                                     onChange={(e) => setCustomTo(e.target.value)}
-                                    className="flex-1 border border-teal-300 dark:border-teal-700 bg-white dark:bg-[#161b22] text-teal-800 dark:text-teal-300 rounded-md p-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0d1117] text-slate-800 dark:text-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                                 />
                             </div>
                         )}
-
-                        {/* Result */}
-                        <div className="bg-white dark:bg-[#161b22] border border-teal-100 dark:border-teal-900/30 rounded-lg p-4 text-center">
-                            <div className="text-3xl font-black text-teal-700 dark:text-teal-400 font-mono">
-                                {entriesLoading ? '...' : entriesCount.toLocaleString()}
-                            </div>
-                            <div className="text-xs text-teal-600 dark:text-teal-500 mt-1 font-medium">
-                                productos creados en {entriesPeriod === '1M' ? 'el último mes' : entriesPeriod === '3M' ? 'los últimos 3 meses' : entriesPeriod === '6M' ? 'los últimos 6 meses' : entriesPeriod === '1Y' ? 'el último año' : 'el rango seleccionado'}
-                            </div>
-                        </div>
                     </div>
+                </div>
 
+                {/* Metrics Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 pb-5">
+                    {/* Total */}
+                    <div className="bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-900/20 dark:to-emerald-900/20 rounded-xl p-4 border border-teal-100 dark:border-teal-900/30">
+                        <div className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider mb-1">Total Ingresados</div>
+                        <div className="text-3xl font-black text-teal-700 dark:text-teal-300 font-mono">
+                            {entriesLoading ? <span className="animate-pulse">—</span> : entriesCount.toLocaleString()}
+                        </div>
+                        <div className="text-[10px] text-teal-500 mt-1">productos en el período</div>
+                    </div>
+                    {/* Avg Daily */}
+                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Promedio Diario</div>
+                        <div className="text-3xl font-black text-slate-800 dark:text-white font-mono">
+                            {entriesLoading ? <span className="animate-pulse">—</span> : entriesAvgDaily}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">productos / día</div>
+                    </div>
+                    {/* Peak Day */}
+                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Día Pico</div>
+                        <div className="text-3xl font-black text-slate-800 dark:text-white font-mono">
+                            {entriesLoading ? <span className="animate-pulse">—</span> : entriesPeakDay.count}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1 font-mono">{entriesPeakDay.date || '—'}</div>
+                    </div>
+                    {/* Trend vs Previous */}
+                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">vs Período Anterior</div>
+                        {(() => {
+                            const pct = entriesPrevCount > 0 ? Math.round(((entriesCount - entriesPrevCount) / entriesPrevCount) * 100) : entriesCount > 0 ? 100 : 0;
+                            const isUp = pct >= 0;
+                            return (
+                                <>
+                                    <div className={`text-3xl font-black font-mono ${isUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                        {entriesLoading ? <span className="animate-pulse">—</span> : <>{isUp ? '+' : ''}{pct}%</>}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[12px]">{isUp ? 'trending_up' : 'trending_down'}</span>
+                                        {entriesPrevCount} en período previo
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
 
+                {/* ─── SVG Area Chart ─── */}
+                <div className="px-6 pb-6">
+                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl border border-slate-200 dark:border-slate-800 p-4 relative" onMouseLeave={() => setChartHover(null)}>
+                        {entriesLoading ? (
+                            <div className="flex items-center justify-center h-[280px]">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-8 h-8 border-3 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-xs text-slate-400 font-mono">Cargando datos...</span>
+                                </div>
+                            </div>
+                        ) : entriesChartData.length === 0 ? (
+                            <div className="flex items-center justify-center h-[280px] text-slate-400">
+                                <div className="text-center">
+                                    <span className="material-symbols-outlined text-4xl mb-2 block">bar_chart_off</span>
+                                    <p className="text-sm">No hay datos para este período</p>
+                                </div>
+                            </div>
+                        ) : (() => {
+                            const W = 900;
+                            const H = 260;
+                            const PAD_TOP = 20;
+                            const PAD_BOTTOM = 35;
+                            const PAD_LEFT = 40;
+                            const PAD_RIGHT = 10;
+                            const chartW = W - PAD_LEFT - PAD_RIGHT;
+                            const chartH = H - PAD_TOP - PAD_BOTTOM;
+                            const data = entriesChartData;
+                            const maxVal = Math.max(...data.map(d => d.count), 1);
+                            const barW = Math.max(2, Math.min(20, (chartW / data.length) * 0.7));
+                            const gap = chartW / data.length;
+
+                            // Y axis grid lines
+                            const yTicks = 5;
+                            const yLines = Array.from({length: yTicks + 1}, (_, i) => {
+                                const val = Math.round((maxVal / yTicks) * i);
+                                const y = PAD_TOP + chartH - (chartH * (val / maxVal));
+                                return {val, y};
+                            });
+
+                            // Area path
+                            const areaPoints = data.map((d, i) => {
+                                const x = PAD_LEFT + (i * gap) + gap / 2;
+                                const y = PAD_TOP + chartH - (chartH * (d.count / maxVal));
+                                return `${x},${y}`;
+                            });
+                            const firstX = PAD_LEFT + gap / 2;
+                            const lastX = PAD_LEFT + ((data.length - 1) * gap) + gap / 2;
+                            const baseline = PAD_TOP + chartH;
+                            const areaPath = `M${firstX},${baseline} L${areaPoints.join(' L')} L${lastX},${baseline} Z`;
+                            const linePath = `M${areaPoints.join(' L')}`;
+
+                            // X axis labels (show ~8 max)
+                            const labelStep = Math.max(1, Math.floor(data.length / 8));
+
+                            return (
+                                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[280px]" preserveAspectRatio="xMidYMid meet">
+                                    <defs>
+                                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.35" />
+                                            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.02" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    {/* Y grid lines */}
+                                    {yLines.map((tick, i) => (
+                                        <g key={i}>
+                                            <line x1={PAD_LEFT} y1={tick.y} x2={W - PAD_RIGHT} y2={tick.y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 4'} />
+                                            <text x={PAD_LEFT - 6} y={tick.y + 3} textAnchor="end" className="fill-slate-400 text-[10px] font-mono">{tick.val}</text>
+                                        </g>
+                                    ))}
+
+                                    {/* Area fill */}
+                                    <path d={areaPath} fill="url(#areaGrad)" />
+
+                                    {/* Line */}
+                                    <path d={linePath} fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                                    {/* Data points & invisible hover targets */}
+                                    {data.map((d, i) => {
+                                        const x = PAD_LEFT + (i * gap) + gap / 2;
+                                        const y = PAD_TOP + chartH - (chartH * (d.count / maxVal));
+                                        return (
+                                            <g key={i}>
+                                                {/* Invisible wide hover target */}
+                                                <rect
+                                                    x={x - gap / 2} y={PAD_TOP} width={gap} height={chartH}
+                                                    fill="transparent"
+                                                    className="cursor-pointer"
+                                                    onMouseEnter={() => setChartHover({x, y, date: d.date, count: d.count})}
+                                                />
+                                                {/* Visible dot */}
+                                                <circle
+                                                    cx={x} cy={y} r={data.length > 90 ? 0 : data.length > 45 ? 2 : 3.5}
+                                                    fill="#14b8a6" stroke="white" strokeWidth="1.5"
+                                                    className="transition-all duration-150"
+                                                    style={{opacity: chartHover?.date === d.date ? 1 : (d.count > 0 ? 0.7 : 0.2)}}
+                                                />
+                                            </g>
+                                        );
+                                    })}
+
+                                    {/* X axis labels */}
+                                    {data.map((d, i) => {
+                                        if (i % labelStep !== 0 && i !== data.length - 1) return null;
+                                        const x = PAD_LEFT + (i * gap) + gap / 2;
+                                        const parts = d.date.split('-');
+                                        const label = `${parts[2]}/${parts[1]}`;
+                                        return (
+                                            <text key={i} x={x} y={H - 8} textAnchor="middle" className="fill-slate-400 text-[9px] font-mono">{label}</text>
+                                        );
+                                    })}
+
+                                    {/* Hover indicator */}
+                                    {chartHover && (
+                                        <g>
+                                            <line x1={chartHover.x} y1={PAD_TOP} x2={chartHover.x} y2={baseline} stroke="#14b8a6" strokeWidth="1" strokeDasharray="4 3" opacity="0.6" />
+                                            <circle cx={chartHover.x} cy={chartHover.y} r="5" fill="#14b8a6" stroke="white" strokeWidth="2" />
+                                        </g>
+                                    )}
+                                </svg>
+                            );
+                        })()}
+
+                        {/* Floating Tooltip */}
+                        {chartHover && (
+                            <div
+                                className="absolute pointer-events-none bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold px-3 py-2 rounded-lg shadow-xl border border-slate-700 dark:border-slate-200 transition-all duration-100"
+                                style={{
+                                    left: `clamp(10%, ${(chartHover.x / 900) * 100}%, 85%)`,
+                                    top: '16px',
+                                    transform: 'translateX(-50%)',
+                                }}
+                            >
+                                <div className="text-teal-400 dark:text-teal-600 font-mono text-[10px]">{chartHover.date}</div>
+                                <div className="text-base font-black">{chartHover.count} productos</div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
             
