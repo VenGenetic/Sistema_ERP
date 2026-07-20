@@ -27,7 +27,7 @@ const Dashboard: React.FC = () => {
     const [capitalCost, setCapitalCost] = useState<number>(0);
     const [topLostDemand, setTopLostDemand] = useState<{ term: string, count: number }[]>([]);
     const [activityStream, setActivityStream] = useState<ActivityItem[]>([]);
-    const [counts, setCounts] = useState({ warehouses: 0, accounts: 0, users: 0 });
+    const [counts, setCounts] = useState({ warehouses: 0, accounts: 0, users: 0, products: 0, items: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [justRefreshed, setJustRefreshed] = useState(false);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -215,16 +215,28 @@ const Dashboard: React.FC = () => {
 
     const fetchStaticCounts = useCallback(async () => {
         try {
-            const [{ count: wCount }, { count: aCount }, { count: uCount }] = await Promise.all([
+            const [
+                { count: wCount },
+                { count: aCount },
+                { count: uCount },
+                { count: pCount },
+                { data: invData }
+            ] = await Promise.all([
                 supabase.from('warehouses').select('*', { count: 'exact', head: true }),
                 supabase.from('accounts').select('*', { count: 'exact', head: true }),
-                supabase.from('profiles').select('*', { count: 'exact', head: true })
+                supabase.from('profiles').select('*', { count: 'exact', head: true }),
+                supabase.from('products').select('*', { count: 'exact', head: true }),
+                supabase.from('inventory_levels').select('current_stock')
             ]);
+
+            const totalItems = invData?.reduce((acc, curr) => acc + (Number(curr.current_stock) || 0), 0) || 0;
 
             setCounts({
                 warehouses: wCount || 0,
                 accounts:   aCount || 0,
-                users:      uCount || 0
+                users:      uCount || 0,
+                products:   pCount || 0,
+                items:      totalItems
             });
         } catch (error) {
             console.error('Error fetching static counts:', error);
@@ -363,6 +375,23 @@ const Dashboard: React.FC = () => {
                                     Niveles Óptimos
                                 </>
                             )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Total Productos / Items Metric */}
+                <div className="p-5 rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-900/10 flex flex-col justify-between h-32 hover:border-indigo-400 dark:hover:border-indigo-600 transition-colors group cursor-pointer shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Inventario Físico</span>
+                        <span className="material-symbols-outlined text-indigo-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">category</span>
+                    </div>
+                    <div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+                            {isLoading ? '...' : `${counts.items} Items`}
+                        </div>
+                        <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">view_in_ar</span>
+                            En {counts.products} Productos
                         </div>
                     </div>
                 </div>
