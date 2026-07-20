@@ -355,16 +355,7 @@ const Dashboard: React.FC = () => {
                         )}
                     </p>
                 </div>
-                <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-[#161b22] border border-slate-700 hover:border-slate-500 rounded text-slate-300 text-sm font-medium transition-all">
-                        <span className="material-symbols-outlined text-[18px]">terminal</span>
-                        Ejecutar Script
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded text-sm font-bold shadow-lg shadow-primary/20 transition-all">
-                        <span className="material-symbols-outlined text-[18px]">add</span>
-                        Crear Pedido
-                    </button>
-                </div>
+
             </div>
 
             {/* High Density Metrics Grid */}
@@ -593,80 +584,7 @@ const Dashboard: React.FC = () => {
             {/* Main Operational Split */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* Left Col: Live Operations Feed */}
-                <div className="lg:col-span-2 flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Flujo de Operaciones Unificado</h3>
-                        <div className="flex gap-2">
-                            <span className="px-2 py-1 rounded bg-slate-200 dark:bg-[#161b22] text-[10px] font-mono text-slate-500 border border-slate-300 dark:border-slate-800">TIEMPO REAL</span>
-                        </div>
-                    </div>
 
-                    <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 dark:bg-[#0d1117] border-b border-slate-200 dark:border-slate-800">
-                                <tr>
-                                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Hora</th>
-                                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Tipo</th>
-                                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Detalles</th>
-                                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">Usuario/Actor</th>
-                                    <th className="px-6 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono text-right">Estado</th>
-                                </tr>
-                            </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                                {isLoading ? (
-                                    [...Array(4)].map((_, i) => (
-                                        <tr key={i} className="animate-pulse">
-                                            <td className="px-6 py-4"><div className="h-3 w-12 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
-                                            <td className="px-6 py-4"><div className="h-5 w-16 bg-slate-200 dark:bg-slate-700 rounded-md"></div></td>
-                                            <td className="px-6 py-4"><div className="h-3 w-40 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
-                                            <td className="px-6 py-4"><div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded"></div></td>
-                                            <td className="px-6 py-4 text-right"><div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded ml-auto"></div></td>
-                                        </tr>
-                                    ))
-                                ) : activityStream.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-10 text-center text-slate-400">
-                                            <span className="material-symbols-outlined text-3xl text-slate-300 block mb-2">inbox</span>
-                                            <p className="text-sm">No hay actividad reciente registrada.</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    activityStream.map((item, idx) => (
-                                        <tr key={idx} className="group hover:bg-slate-50 dark:hover:bg-[#1c2128] transition-colors cursor-pointer">
-                                            <td className="px-6 py-4 text-xs font-mono text-slate-500">{item.time}</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold border
-                                                    ${item.type === 'PEDIDO' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : ''}
-                                                    ${item.type === 'STOCK' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : ''}
-                                                    ${item.type === 'FINANZAS' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : ''}
-                                                    ${item.type === 'ALERTA' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : ''}
-                                                `}>
-                                                    {item.type}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm text-slate-900 dark:text-slate-200 font-medium">{item.detail}</span>
-                                                    <span className="text-xs text-slate-400 font-mono mt-0.5">{item.id} {item.amount && `• ${item.amount}`}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-xs text-slate-500">{item.user}</td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className={`text-xs font-medium 
-                                                    ${item.status === 'Advertencia' ? 'text-rose-500' : item.status === 'Pendiente' ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}
-                                                `}>{item.status}</span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                        <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0d1117] text-center">
-                            <button className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">Ver registro de auditoría completo</button>
-                        </div>
-                    </div>
-                </div>
 
                 {/* Right Col: Technical Status */}
                 <div className="flex flex-col gap-6">
@@ -782,36 +700,7 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Lost Demand Widget */}
-                    <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/50 rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-4 text-amber-700 dark:text-amber-500">
-                            <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined">radar</span>
-                                <span className="text-sm font-bold uppercase tracking-wide">Demanda Perdida</span>
-                            </div>
-                            <span className="text-[10px] font-mono bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded">TOP 5</span>
-                        </div>
-                        <div className="space-y-3">
-                            {isLoading ? (
-                                <div className="text-center text-xs text-amber-600 py-4">Cargando radar...</div>
-                            ) : topLostDemand.length === 0 ? (
-                                <div className="text-center text-xs text-amber-600 py-4">No hay demanda registrada.</div>
-                            ) : (
-                                topLostDemand.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center bg-white dark:bg-[#161b22] px-3 py-2 border border-amber-100 dark:border-amber-900/30 rounded">
-                                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.term}</span>
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-sm font-black text-amber-600">{item.count}</span>
-                                            <span className="text-[10px] text-amber-500 uppercase">req</span>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                            <button className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2 rounded shadow-sm mt-2 transition-colors">
-                                Revisar en Compras
-                            </button>
-                        </div>
-                    </div>
+
                 </div>
             </div>
             
