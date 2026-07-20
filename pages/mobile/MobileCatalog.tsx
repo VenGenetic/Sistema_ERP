@@ -70,19 +70,16 @@ const MobileCatalog: React.FC = () => {
         setFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    // Debounce effects
+    // Search effects
     const searchTermsString = useMemo(() => JSON.stringify(searchTerms), [searchTerms]);
     const [debouncedSearchTermsString, setDebouncedSearchTermsString] = useState(searchTermsString);
     const [debouncedFilters, setDebouncedFilters] = useState(filters);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearchTermsString(searchTermsString);
-            setDebouncedFilters(filters);
-            setPage(1);
-            setHasMore(true);
-        }, 150);
-        return () => clearTimeout(timer);
+    const handleSearch = useCallback(() => {
+        setDebouncedSearchTermsString(searchTermsString);
+        setDebouncedFilters(filters);
+        setPage(1);
+        setHasMore(true);
     }, [searchTermsString, filters]);
 
     // ──────────────────────────────────────────────
@@ -407,6 +404,7 @@ const MobileCatalog: React.FC = () => {
                             placeholder="Buscar SKU o nombre..."
                             value={searchTerms[0] || ''}
                             onChange={(e) => updateSearchTerm(0, e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
                             className="w-full h-12 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl pl-10 pr-10 text-sm focus:ring-2 focus:ring-primary/50 text-slate-900 dark:text-white placeholder-slate-400 shadow-inner"
                         />
                         {(searchTerms[0] || '') && (
@@ -419,8 +417,14 @@ const MobileCatalog: React.FC = () => {
                         )}
                     </div>
                     <button
-                        onClick={addSearchFilter}
+                        onClick={handleSearch}
                         className="h-12 w-12 rounded-2xl bg-primary text-white flex items-center justify-center shadow-md active:scale-90 transition-transform flex-shrink-0"
+                    >
+                        <span className="material-symbols-outlined font-bold">search</span>
+                    </button>
+                    <button
+                        onClick={addSearchFilter}
+                        className="h-12 w-12 rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shadow-sm active:scale-90 transition-transform flex-shrink-0"
                     >
                         <span className="material-symbols-outlined font-bold">add</span>
                     </button>
@@ -457,6 +461,7 @@ const MobileCatalog: React.FC = () => {
                                         placeholder="Palabra..."
                                         value={cleanTerm}
                                         onChange={(e) => updateSearchTerm(actualIdx, isExclude ? `-${e.target.value}` : e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
                                         className="w-24 px-2 py-2 text-xs bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-300 outline-none"
                                     />
                                     <button
@@ -729,7 +734,7 @@ const MobileCatalog: React.FC = () => {
                         </div>
 
                         <button 
-                            onClick={() => setIsFiltersOpen(false)}
+                            onClick={() => { handleSearch(); setIsFiltersOpen(false); }}
                             className="w-full mt-6 h-14 bg-primary text-white rounded-2xl font-bold text-lg shadow-lg shadow-primary/30 active:scale-95 transition-transform"
                         >
                             Aplicar Filtros
