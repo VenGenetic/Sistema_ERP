@@ -43,13 +43,23 @@ const Dashboard: React.FC = () => {
     const [durationUnit, setDurationUnit] = useState<DurationUnit>('months');
     const [anchorSide, setAnchorSide] = useState<AnchorSide>('end');
     const [anchorDate, setAnchorDate] = useState<string>(() => new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().split('T')[0]);
-    const [entriesCount, setEntriesCount] = useState<number>(0);
     const [entriesLoading, setEntriesLoading] = useState(false);
-    const [entriesChartData, setEntriesChartData] = useState<{date: string; count: number}[]>([]);
-    const [entriesAvgDaily, setEntriesAvgDaily] = useState(0);
-    const [entriesPeakDay, setEntriesPeakDay] = useState<{date: string; count: number}>({date: '', count: 0});
-    const [entriesPrevCount, setEntriesPrevCount] = useState<number>(0);
-    const [chartHover, setChartHover] = useState<{x: number; y: number; date: string; count: number} | null>(null);
+    // Dual-series chart data: countIn = Ingresados (new SKUs), countOut = Salidos (inventory_logs negative)
+    const [entriesChartData, setEntriesChartData] = useState<{date: string; countIn: number; countOut: number}[]>([]);
+    // Ingresados metrics
+    const [inCount, setInCount] = useState(0);
+    const [inAvgDaily, setInAvgDaily] = useState(0);
+    const [inPeakDay, setInPeakDay] = useState<{date: string; count: number}>({date: '', count: 0});
+    const [inPrevCount, setInPrevCount] = useState(0);
+    // Salidos metrics
+    const [outCount, setOutCount] = useState(0);
+    const [outAvgDaily, setOutAvgDaily] = useState(0);
+    const [outPeakDay, setOutPeakDay] = useState<{date: string; count: number}>({date: '', count: 0});
+    const [outPrevCount, setOutPrevCount] = useState(0);
+    // Visibility toggles
+    const [showIngresados, setShowIngresados] = useState(true);
+    const [showSalidos, setShowSalidos] = useState(true);
+    const [chartHover, setChartHover] = useState<{x: number; date: string; countIn: number; countOut: number} | null>(null);
 
     // Compute the resolved date range from duration + anchor
     const resolvedRange = React.useMemo(() => {
@@ -99,61 +109,82 @@ const Dashboard: React.FC = () => {
         fetchTillData(selectedTillDate);
     }, [selectedTillDate, fetchTillData]);
 
-    // ─── Product entries by resolved range ────────────────────────────────────
+    // ─── Dual-series fetch: Ingresados (new SKUs) + Salidos (inventory_logs) ──
     const fetchEntriesData = useCallback(async (startDate: string, endDate: string) => {
         setEntriesLoading(true);
         try {
-            // Fetch created_at dates for chart grouping
-            const { data, error } = await supabase
-                .from('products')
-                .select('created_at')
-                .gte('created_at', startDate)
-                .lte('created_at', endDate)
-                .order('created_at', { ascending: true });
-
-            if (!error && data) {
-                setEntriesCount(data.length);
-
-                // Group by day
-                const grouped: Record<string, number> = {};
-                data.forEach((p: any) => {
-                    const day = p.created_at?.split('T')[0];
-                    if (day) grouped[day] = (grouped[day] || 0) + 1;
-                });
-
-                // Fill missing days (cap at 730 to prevent freezing)
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                const filled: {date: string; count: number}[] = [];
-                const cursor = new Date(start);
-                let safety = 0;
-                while (cursor <= end && safety < 730) {
-                    const key = cursor.toISOString().split('T')[0];
-                    filled.push({ date: key, count: grouped[key] || 0 });
-                    cursor.setDate(cursor.getDate() + 1);
-                    safety++;
-                }
-                setEntriesChartData(filled);
-
-                // Compute metrics
-                const totalDays = Math.max(filled.length, 1);
-                setEntriesAvgDaily(Math.round((data.length / totalDays) * 10) / 10);
-                const peak = filled.reduce((max, d) => d.count > max.count ? d : max, {date: '', count: 0});
-                setEntriesPeakDay(peak);
-            }
-
-            // Previous period comparison
             const periodMs = new Date(endDate).getTime() - new Date(startDate).getTime();
-            const prevStart = new Date(new Date(startDate).getTime() - periodMs).toISOString();
-            const { count: prevCount, error: prevErr } = await supabase
-                .from('products')
-                .select('*', { count: 'exact', head: true })
-                .gte('created_at', prevStart)
-                .lt('created_at', startDate);
-            if (!prevErr) setEntriesPrevCount(prevCount || 0);
+            const prevStartISO = new Date(new Date(startDate).getTime() - periodMs).toISOString();
+
+            // ── Fetch in parallel ──
+            const [
+                { data: inData },
+                { data: outData },
+                { count: inPrev },
+                { count: outPrev },
+            ] = await Promise.all([
+                // Ingresados: new products created in catalog
+                supabase.from('products').select('created_at')
+                    .gte('created_at', startDate).lte('created_at', endDate)
+                    .order('created_at', { ascending: true }),
+                // Salidos: inventory_logs entries with quantity_change < 0 (dispatched/sold)
+                supabase.from('inventory_logs').select('created_at, quantity_change')
+                    .gte('created_at', startDate).lte('created_at', endDate)
+                    .lt('quantity_change', 0)
+                    .order('created_at', { ascending: true }),
+                // Previous period: Ingresados
+                supabase.from('products').select('*', { count: 'exact', head: true })
+                    .gte('created_at', prevStartISO).lt('created_at', startDate),
+                // Previous period: Salidos
+                supabase.from('inventory_logs').select('*', { count: 'exact', head: true })
+                    .gte('created_at', prevStartISO).lt('created_at', startDate)
+                    .lt('quantity_change', 0),
+            ]);
+
+            // ── Group both by day ──
+            const groupedIn: Record<string, number> = {};
+            (inData || []).forEach((p: any) => {
+                const day = p.created_at?.split('T')[0];
+                if (day) groupedIn[day] = (groupedIn[day] || 0) + 1;
+            });
+            const groupedOut: Record<string, number> = {};
+            (outData || []).forEach((l: any) => {
+                const day = l.created_at?.split('T')[0];
+                if (day) groupedOut[day] = (groupedOut[day] || 0) + Math.abs(Number(l.quantity_change));
+            });
+
+            // ── Fill all days (cap at 730) ──
+            const filled: {date: string; countIn: number; countOut: number}[] = [];
+            const cursor = new Date(startDate);
+            const end = new Date(endDate);
+            let safety = 0;
+            while (cursor <= end && safety < 730) {
+                const key = cursor.toISOString().split('T')[0];
+                filled.push({ date: key, countIn: groupedIn[key] || 0, countOut: groupedOut[key] || 0 });
+                cursor.setDate(cursor.getDate() + 1);
+                safety++;
+            }
+            setEntriesChartData(filled);
+
+            // ── Metrics: Ingresados ──
+            const totalIn = (inData || []).length;
+            const totalOut = (outData || []).reduce((s: number, l: any) => s + Math.abs(Number(l.quantity_change)), 0);
+            const totalDays = Math.max(filled.length, 1);
+            setInCount(totalIn);
+            setInAvgDaily(Math.round((totalIn / totalDays) * 10) / 10);
+            const peakIn = filled.reduce((max, d) => d.countIn > max.count ? {date: d.date, count: d.countIn} : max, {date: '', count: 0});
+            setInPeakDay(peakIn);
+            setInPrevCount(inPrev || 0);
+
+            // ── Metrics: Salidos ──
+            setOutCount(totalOut);
+            setOutAvgDaily(Math.round((totalOut / totalDays) * 10) / 10);
+            const peakOut = filled.reduce((max, d) => d.countOut > max.count ? {date: d.date, count: d.countOut} : max, {date: '', count: 0});
+            setOutPeakDay(peakOut);
+            setOutPrevCount(outPrev || 0);
 
         } catch (e) {
-            console.error('Error fetching product entries:', e);
+            console.error('Error fetching dual entries data:', e);
         } finally {
             setEntriesLoading(false);
         }
@@ -774,65 +805,125 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Metrics Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 pb-5">
-                    {/* Total */}
-                    <div className="bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-900/20 dark:to-emerald-900/20 rounded-xl p-4 border border-teal-100 dark:border-teal-900/30">
-                        <div className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider mb-1">Total Ingresados</div>
+                {/* ─── Series Toggle Buttons ─── */}
+                <div className="flex items-center gap-3 px-6 pb-2">
+                    <button
+                        onClick={() => setShowIngresados(v => !v)}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold border-2 transition-all duration-200 ${
+                            showIngresados
+                                ? 'bg-teal-50 dark:bg-teal-900/30 border-teal-400 text-teal-700 dark:text-teal-300 shadow-sm'
+                                : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 line-through'
+                        }`}
+                    >
+                        <span className="inline-block w-3 h-3 rounded-full bg-teal-500 shadow-sm shadow-teal-500/50"></span>
+                        Ingresados
+                    </button>
+                    <button
+                        onClick={() => setShowSalidos(v => !v)}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold border-2 transition-all duration-200 ${
+                            showSalidos
+                                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 text-blue-700 dark:text-blue-300 shadow-sm'
+                                : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 line-through'
+                        }`}
+                    >
+                        <span className="inline-block w-3 h-3 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
+                        Salidos
+                    </button>
+                    {(!showIngresados || !showSalidos) && (
+                        <button
+                            onClick={() => { setShowIngresados(true); setShowSalidos(true); }}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline transition-colors"
+                        >
+                            Mostrar ambos
+                        </button>
+                    )}
+                </div>
+
+                {/* ─── Metrics Row (dual: Ingresados + Salidos) ─── */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-6 pb-5">
+                    {/* ── Ingresados metrics ── */}
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showIngresados
+                            ? 'bg-gradient-to-br from-teal-50 to-emerald-50 dark:from-teal-900/20 dark:to-emerald-900/20 border-teal-300 dark:border-teal-800'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-teal-500 inline-block"></span>
+                            <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Total Ingresados</div>
+                        </div>
                         <div className="text-3xl font-black text-teal-700 dark:text-teal-300 font-mono">
-                            {entriesLoading ? <span className="animate-pulse">—</span> : entriesCount.toLocaleString()}
+                            {entriesLoading ? <span className="animate-pulse">—</span> : inCount.toLocaleString()}
                         </div>
-                        <div className="text-[10px] text-teal-500 mt-1">productos en el período</div>
+                        <div className="text-[10px] text-teal-500 mt-1">nuevos SKUs en catálogo</div>
                     </div>
-                    {/* Avg Daily */}
-                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl p-4 border border-slate-200 dark:border-slate-800">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Promedio Diario</div>
-                        <div className="text-3xl font-black text-slate-800 dark:text-white font-mono">
-                            {entriesLoading ? <span className="animate-pulse">—</span> : entriesAvgDaily}
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showIngresados
+                            ? 'bg-slate-50 dark:bg-[#0d1117] border-teal-200 dark:border-teal-900/50'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>
+                            <div className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Pico / Tendencia</div>
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-1">productos / día</div>
-                    </div>
-                    {/* Peak Day */}
-                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl p-4 border border-slate-200 dark:border-slate-800">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Día Pico</div>
-                        <div className="text-3xl font-black text-slate-800 dark:text-white font-mono">
-                            {entriesLoading ? <span className="animate-pulse">—</span> : entriesPeakDay.count}
+                        <div className="text-2xl font-black text-slate-800 dark:text-white font-mono">
+                            {entriesLoading ? <span className="animate-pulse">—</span> : inPeakDay.count}
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-1 font-mono">{entriesPeakDay.date || '—'}</div>
-                    </div>
-                    {/* Trend vs Previous */}
-                    <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl p-4 border border-slate-200 dark:border-slate-800">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">vs Período Anterior</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 font-mono">{inPeakDay.date || '—'}</div>
                         {(() => {
-                            const pct = entriesPrevCount > 0 ? Math.round(((entriesCount - entriesPrevCount) / entriesPrevCount) * 100) : entriesCount > 0 ? 100 : 0;
+                            const pct = inPrevCount > 0 ? Math.round(((inCount - inPrevCount) / inPrevCount) * 100) : inCount > 0 ? 100 : 0;
                             const isUp = pct >= 0;
-                            return (
-                                <>
-                                    <div className={`text-3xl font-black font-mono ${isUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                        {entriesLoading ? <span className="animate-pulse">—</span> : <>{isUp ? '+' : ''}{pct}%</>}
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[12px]">{isUp ? 'trending_up' : 'trending_down'}</span>
-                                        {entriesPrevCount} en período previo
-                                    </div>
-                                </>
-                            );
+                            return <div className={`text-xs font-bold mt-1 ${isUp ? 'text-emerald-500' : 'text-rose-500'}`}>{isUp ? '▲' : '▼'} {isUp ? '+' : ''}{pct}% vs anterior</div>;
+                        })()}
+                    </div>
+
+                    {/* ── Salidos metrics ── */}
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showSalidos
+                            ? 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-300 dark:border-blue-800'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Total Salidos</div>
+                        </div>
+                        <div className="text-3xl font-black text-blue-700 dark:text-blue-300 font-mono">
+                            {entriesLoading ? <span className="animate-pulse">—</span> : outCount.toLocaleString()}
+                        </div>
+                        <div className="text-[10px] text-blue-500 mt-1">unidades despachadas</div>
+                    </div>
+                    <div className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                        showSalidos
+                            ? 'bg-slate-50 dark:bg-[#0d1117] border-blue-200 dark:border-blue-900/50'
+                            : 'bg-slate-50 dark:bg-[#0d1117] border-slate-200 dark:border-slate-800 opacity-40'
+                    }`}>
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>
+                            <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Pico / Tendencia</div>
+                        </div>
+                        <div className="text-2xl font-black text-slate-800 dark:text-white font-mono">
+                            {entriesLoading ? <span className="animate-pulse">—</span> : outPeakDay.count}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 font-mono">{outPeakDay.date || '—'}</div>
+                        {(() => {
+                            const pct = outPrevCount > 0 ? Math.round(((outCount - outPrevCount) / outPrevCount) * 100) : outCount > 0 ? 100 : 0;
+                            const isUp = pct >= 0;
+                            return <div className={`text-xs font-bold mt-1 ${isUp ? 'text-emerald-500' : 'text-rose-500'}`}>{isUp ? '▲' : '▼'} {isUp ? '+' : ''}{pct}% vs anterior</div>;
                         })()}
                     </div>
                 </div>
 
-                {/* ─── SVG Area Chart ─── */}
+                {/* ─── SVG Dual-Series Area Chart ─── */}
                 <div className="px-6 pb-6">
                     <div className="bg-slate-50 dark:bg-[#0d1117] rounded-xl border border-slate-200 dark:border-slate-800 p-4 relative" onMouseLeave={() => setChartHover(null)}>
                         {entriesLoading ? (
-                            <div className="flex items-center justify-center h-[280px]">
+                            <div className="flex items-center justify-center h-[300px]">
                                 <div className="flex flex-col items-center gap-3">
-                                    <div className="w-8 h-8 border-3 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin"></div>
                                     <span className="text-xs text-slate-400 font-mono">Cargando datos...</span>
                                 </div>
                             </div>
                         ) : entriesChartData.length === 0 ? (
-                            <div className="flex items-center justify-center h-[280px] text-slate-400">
+                            <div className="flex items-center justify-center h-[300px] text-slate-400">
                                 <div className="text-center">
                                     <span className="material-symbols-outlined text-4xl mb-2 block">bar_chart_off</span>
                                     <p className="text-sm">No hay datos para este período</p>
@@ -840,19 +931,25 @@ const Dashboard: React.FC = () => {
                             </div>
                         ) : (() => {
                             const W = 900;
-                            const H = 260;
+                            const H = 280;
                             const PAD_TOP = 20;
                             const PAD_BOTTOM = 35;
-                            const PAD_LEFT = 40;
-                            const PAD_RIGHT = 10;
+                            const PAD_LEFT = 48;
+                            const PAD_RIGHT = 12;
                             const chartW = W - PAD_LEFT - PAD_RIGHT;
                             const chartH = H - PAD_TOP - PAD_BOTTOM;
                             const data = entriesChartData;
-                            const maxVal = Math.max(...data.map(d => d.count), 1);
-                            const barW = Math.max(2, Math.min(20, (chartW / data.length) * 0.7));
-                            const gap = chartW / data.length;
+                            const gap = chartW / Math.max(data.length, 1);
+                            const baseline = PAD_TOP + chartH;
 
-                            // Y axis grid lines
+                            // Dynamic max based on which series are visible
+                            const maxVal = Math.max(
+                                showIngresados ? Math.max(...data.map(d => d.countIn)) : 0,
+                                showSalidos    ? Math.max(...data.map(d => d.countOut)) : 0,
+                                1
+                            );
+
+                            // Y axis grid
                             const yTicks = 5;
                             const yLines = Array.from({length: yTicks + 1}, (_, i) => {
                                 const val = Math.round((maxVal / yTicks) * i);
@@ -860,102 +957,150 @@ const Dashboard: React.FC = () => {
                                 return {val, y};
                             });
 
-                            // Area path
-                            const areaPoints = data.map((d, i) => {
-                                const x = PAD_LEFT + (i * gap) + gap / 2;
-                                const y = PAD_TOP + chartH - (chartH * (d.count / maxVal));
-                                return `${x},${y}`;
-                            });
-                            const firstX = PAD_LEFT + gap / 2;
-                            const lastX = PAD_LEFT + ((data.length - 1) * gap) + gap / 2;
-                            const baseline = PAD_TOP + chartH;
-                            const areaPath = `M${firstX},${baseline} L${areaPoints.join(' L')} L${lastX},${baseline} Z`;
-                            const linePath = `M${areaPoints.join(' L')}`;
+                            // Build SVG path helpers
+                            const toPath = (getter: (d: {date:string;countIn:number;countOut:number}) => number) => {
+                                const pts = data.map((d, i) => {
+                                    const x = PAD_LEFT + (i * gap) + gap / 2;
+                                    const y = PAD_TOP + chartH - (chartH * (getter(d) / maxVal));
+                                    return `${x},${y}`;
+                                });
+                                const fx = PAD_LEFT + gap / 2;
+                                const lx = PAD_LEFT + ((data.length - 1) * gap) + gap / 2;
+                                return {
+                                    area: `M${fx},${baseline} L${pts.join(' L')} L${lx},${baseline} Z`,
+                                    line: `M${pts.join(' L')}`,
+                                    pts,
+                                };
+                            };
 
-                            // X axis labels (show ~8 max)
+                            const inPaths  = toPath(d => d.countIn);
+                            const outPaths = toPath(d => d.countOut);
                             const labelStep = Math.max(1, Math.floor(data.length / 8));
 
                             return (
-                                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[280px]" preserveAspectRatio="xMidYMid meet">
+                                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[300px]" preserveAspectRatio="xMidYMid meet">
                                     <defs>
-                                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.35" />
-                                            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.02" />
+                                        <linearGradient id="gradIn" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.40" />
+                                            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.03" />
+                                        </linearGradient>
+                                        <linearGradient id="gradOut" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
+                                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.03" />
                                         </linearGradient>
                                     </defs>
 
                                     {/* Y grid lines */}
                                     {yLines.map((tick, i) => (
                                         <g key={i}>
-                                            <line x1={PAD_LEFT} y1={tick.y} x2={W - PAD_RIGHT} y2={tick.y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 4'} />
-                                            <text x={PAD_LEFT - 6} y={tick.y + 3} textAnchor="end" className="fill-slate-400 text-[10px] font-mono">{tick.val}</text>
+                                            <line x1={PAD_LEFT} y1={tick.y} x2={W - PAD_RIGHT} y2={tick.y}
+                                                stroke="currentColor" className="text-slate-200 dark:text-slate-800"
+                                                strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 4'} />
+                                            <text x={PAD_LEFT - 6} y={tick.y + 4} textAnchor="end"
+                                                className="fill-slate-400" style={{fontSize: 10, fontFamily: 'monospace'}}>{tick.val}</text>
                                         </g>
                                     ))}
 
-                                    {/* Area fill */}
-                                    <path d={areaPath} fill="url(#areaGrad)" />
+                                    {/* ── Ingresados (Teal) ── */}
+                                    {showIngresados && (
+                                        <>
+                                            <path d={inPaths.area} fill="url(#gradIn)" />
+                                            <path d={inPaths.line} fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                            {data.map((d, i) => {
+                                                const x = PAD_LEFT + (i * gap) + gap / 2;
+                                                const y = PAD_TOP + chartH - (chartH * (d.countIn / maxVal));
+                                                const isHov = chartHover?.date === d.date;
+                                                return (
+                                                    <circle key={`in-${i}`} cx={x} cy={y}
+                                                        r={data.length > 90 ? 0 : data.length > 45 ? 2 : 3.5}
+                                                        fill="#14b8a6" stroke="white" strokeWidth="1.5"
+                                                        style={{opacity: isHov ? 1 : (d.countIn > 0 ? 0.75 : 0.15), transition: 'opacity 0.1s'}} />
+                                                );
+                                            })}
+                                        </>
+                                    )}
 
-                                    {/* Line */}
-                                    <path d={linePath} fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    {/* ── Salidos (Blue) ── */}
+                                    {showSalidos && (
+                                        <>
+                                            <path d={outPaths.area} fill="url(#gradOut)" />
+                                            <path d={outPaths.line} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                            {data.map((d, i) => {
+                                                const x = PAD_LEFT + (i * gap) + gap / 2;
+                                                const y = PAD_TOP + chartH - (chartH * (d.countOut / maxVal));
+                                                const isHov = chartHover?.date === d.date;
+                                                return (
+                                                    <circle key={`out-${i}`} cx={x} cy={y}
+                                                        r={data.length > 90 ? 0 : data.length > 45 ? 2 : 3.5}
+                                                        fill="#3b82f6" stroke="white" strokeWidth="1.5"
+                                                        style={{opacity: isHov ? 1 : (d.countOut > 0 ? 0.75 : 0.15), transition: 'opacity 0.1s'}} />
+                                                );
+                                            })}
+                                        </>
+                                    )}
 
-                                    {/* Data points & invisible hover targets */}
+                                    {/* Invisible hover strips */}
                                     {data.map((d, i) => {
                                         const x = PAD_LEFT + (i * gap) + gap / 2;
-                                        const y = PAD_TOP + chartH - (chartH * (d.count / maxVal));
                                         return (
-                                            <g key={i}>
-                                                {/* Invisible wide hover target */}
-                                                <rect
-                                                    x={x - gap / 2} y={PAD_TOP} width={gap} height={chartH}
-                                                    fill="transparent"
-                                                    className="cursor-pointer"
-                                                    onMouseEnter={() => setChartHover({x, y, date: d.date, count: d.count})}
-                                                />
-                                                {/* Visible dot */}
-                                                <circle
-                                                    cx={x} cy={y} r={data.length > 90 ? 0 : data.length > 45 ? 2 : 3.5}
-                                                    fill="#14b8a6" stroke="white" strokeWidth="1.5"
-                                                    className="transition-all duration-150"
-                                                    style={{opacity: chartHover?.date === d.date ? 1 : (d.count > 0 ? 0.7 : 0.2)}}
-                                                />
-                                            </g>
+                                            <rect key={`hover-${i}`}
+                                                x={x - gap / 2} y={PAD_TOP} width={gap} height={chartH}
+                                                fill="transparent" className="cursor-pointer"
+                                                onMouseEnter={() => setChartHover({x, date: d.date, countIn: d.countIn, countOut: d.countOut})}
+                                            />
                                         );
                                     })}
+
+                                    {/* Hover crosshair */}
+                                    {chartHover && (
+                                        <line x1={chartHover.x} y1={PAD_TOP} x2={chartHover.x} y2={baseline}
+                                            stroke="#94a3b8" strokeWidth="1" strokeDasharray="4 3" opacity="0.7" />
+                                    )}
 
                                     {/* X axis labels */}
                                     {data.map((d, i) => {
                                         if (i % labelStep !== 0 && i !== data.length - 1) return null;
                                         const x = PAD_LEFT + (i * gap) + gap / 2;
                                         const parts = d.date.split('-');
-                                        const label = `${parts[2]}/${parts[1]}`;
                                         return (
-                                            <text key={i} x={x} y={H - 8} textAnchor="middle" className="fill-slate-400 text-[9px] font-mono">{label}</text>
+                                            <text key={i} x={x} y={H - 8} textAnchor="middle"
+                                                className="fill-slate-400" style={{fontSize: 9, fontFamily: 'monospace'}}>
+                                                {`${parts[2]}/${parts[1]}`}
+                                            </text>
                                         );
                                     })}
-
-                                    {/* Hover indicator */}
-                                    {chartHover && (
-                                        <g>
-                                            <line x1={chartHover.x} y1={PAD_TOP} x2={chartHover.x} y2={baseline} stroke="#14b8a6" strokeWidth="1" strokeDasharray="4 3" opacity="0.6" />
-                                            <circle cx={chartHover.x} cy={chartHover.y} r="5" fill="#14b8a6" stroke="white" strokeWidth="2" />
-                                        </g>
-                                    )}
                                 </svg>
                             );
                         })()}
 
-                        {/* Floating Tooltip */}
+                        {/* ── Floating Dual Tooltip ── */}
                         {chartHover && (
                             <div
-                                className="absolute pointer-events-none bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold px-3 py-2 rounded-lg shadow-xl border border-slate-700 dark:border-slate-200 transition-all duration-100"
+                                className="absolute pointer-events-none bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-sm text-white text-xs font-bold px-3 py-2.5 rounded-xl shadow-2xl border border-slate-700 transition-all duration-75"
                                 style={{
-                                    left: `clamp(10%, ${(chartHover.x / 900) * 100}%, 85%)`,
-                                    top: '16px',
+                                    left: `clamp(2%, ${(chartHover.x / 900) * 100}%, 88%)`,
+                                    top: '12px',
                                     transform: 'translateX(-50%)',
+                                    minWidth: '130px',
                                 }}
                             >
-                                <div className="text-teal-400 dark:text-teal-600 font-mono text-[10px]">{chartHover.date}</div>
-                                <div className="text-base font-black">{chartHover.count} productos</div>
+                                <div className="text-slate-400 font-mono text-[10px] mb-1.5 pb-1.5 border-b border-slate-700">{chartHover.date}</div>
+                                {showIngresados && (
+                                    <div className="flex items-center justify-between gap-4 mb-1">
+                                        <span className="flex items-center gap-1.5 text-teal-400">
+                                            <span className="w-2 h-2 rounded-full bg-teal-500 inline-block"></span> Ingresados
+                                        </span>
+                                        <span className="font-black text-sm text-white">{chartHover.countIn}</span>
+                                    </div>
+                                )}
+                                {showSalidos && (
+                                    <div className="flex items-center justify-between gap-4">
+                                        <span className="flex items-center gap-1.5 text-blue-400">
+                                            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span> Salidos
+                                        </span>
+                                        <span className="font-black text-sm text-white">{chartHover.countOut}</span>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
