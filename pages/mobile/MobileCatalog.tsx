@@ -68,7 +68,6 @@ const MobileCatalog: React.FC = () => {
 
     const handleFilterChange = (key: string, value: string) => {
         setFilters(prev => ({ ...prev, [key]: value }));
-        setPage(1); // Reset pagination on filter change
     };
 
     // Debounce effects
@@ -82,7 +81,7 @@ const MobileCatalog: React.FC = () => {
             setDebouncedFilters(filters);
             setPage(1);
             setHasMore(true);
-        }, 400);
+        }, 150);
         return () => clearTimeout(timer);
     }, [searchTermsString, filters]);
 
@@ -122,14 +121,14 @@ const MobileCatalog: React.FC = () => {
             else if (debouncedFilters.imageStatus === 'sin_imagen') query = query.is('image_url', null);
 
             if (debouncedFilters.videoStatus === 'con_video') query = query.contains('gallery', '[{"type": "video"}]');
-            else if (debouncedFilters.videoStatus === 'sin_video') query = query.not('gallery', 'cs', '[{"type": "video"}]');
+            else if (debouncedFilters.videoStatus === 'sin_video') query = query.or('gallery.is.null,gallery.not.cs.[{"type": "video"}]');
 
             if (debouncedFilters.stockStatus === 'disponibles_importadora') query = query.gt('importer_stock', 0);
-            else if (debouncedFilters.stockStatus === 'solo_local') query = query.gt('local_stock', 0).eq('importer_stock', 0);
+            else if (debouncedFilters.stockStatus === 'solo_local') query = query.gt('local_stock', 0).or('importer_stock.eq.0,importer_stock.is.null');
             else if (debouncedFilters.stockStatus === 'disponibles_local') query = query.gt('local_stock', 0);
-            else if (debouncedFilters.stockStatus === 'solo_importadora') query = query.eq('local_stock', 0).gt('importer_stock', 0);
+            else if (debouncedFilters.stockStatus === 'solo_importadora') query = query.or('local_stock.eq.0,local_stock.is.null').gt('importer_stock', 0);
             else if (debouncedFilters.stockStatus === 'disponibles_cualquiera') query = query.or('local_stock.gt.0,importer_stock.gt.0');
-            else if (debouncedFilters.stockStatus === 'agotados') query = query.eq('local_stock', 0).eq('importer_stock', 0);
+            else if (debouncedFilters.stockStatus === 'agotados') query = query.or('local_stock.eq.0,local_stock.is.null').or('importer_stock.eq.0,importer_stock.is.null');
 
             if (debouncedFilters.discontinuedStatus === 'descontinuados') query = query.eq('is_discontinued', true);
             else if (debouncedFilters.discontinuedStatus === 'activos') query = query.or('is_discontinued.is.null,is_discontinued.eq.false');
@@ -673,7 +672,7 @@ const MobileCatalog: React.FC = () => {
                             <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="material-symbols-outlined">tune</span> Filtros Avanzados
                             </h2>
-                            <button onClick={() => { setFilters({}); setPage(1); }} className="text-sm font-bold text-primary active:opacity-70">
+                            <button onClick={() => { setFilters({}); }} className="text-sm font-bold text-primary active:opacity-70">
                                 Limpiar
                             </button>
                         </div>

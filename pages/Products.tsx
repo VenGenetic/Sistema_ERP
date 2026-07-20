@@ -204,20 +204,16 @@ const Products: React.FC = () => {
         const delayDebounceFn = setTimeout(() => {
             setDebouncedSearchTermsString(searchTermsString);
             setDebouncedFilters(filters);
+            setPagination(prev => {
+                if (prev.page === 1) return prev;
+                return { ...prev, page: 1 };
+            });
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
     }, [searchTermsString, filters]);
 
     const debouncedSearchTerms = useMemo(() => JSON.parse(debouncedSearchTermsString) as string[], [debouncedSearchTermsString]);
-
-    // Separate effect to reset page to 1 on search/filter changes
-    useEffect(() => {
-        setPagination(prev => {
-            if (prev.page === 1) return prev;
-            return { ...prev, page: 1 };
-        });
-    }, [searchTermsString, filters]);
 
     // Sync state changes to the URL (using replace navigation to avoid polluting history on typing)
     useEffect(() => {
@@ -361,22 +357,22 @@ const Products: React.FC = () => {
             if (debouncedFilters.videoStatus === 'con_video') {
                 query = query.contains('gallery', '[{"type": "video"}]');
             } else if (debouncedFilters.videoStatus === 'sin_video') {
-                query = query.not('gallery', 'cs', '[{"type": "video"}]');
+                query = query.or('gallery.is.null,gallery.not.cs.[{"type": "video"}]');
             }
 
             // Stock Status Filter
             if (debouncedFilters.stockStatus === 'disponibles_importadora') {
                 query = query.gt('importer_stock', 0);
             } else if (debouncedFilters.stockStatus === 'solo_local') {
-                query = query.gt('local_stock', 0).eq('importer_stock', 0);
+                query = query.gt('local_stock', 0).or('importer_stock.eq.0,importer_stock.is.null');
             } else if (debouncedFilters.stockStatus === 'disponibles_local') {
                 query = query.gt('local_stock', 0);
             } else if (debouncedFilters.stockStatus === 'solo_importadora') {
-                query = query.eq('local_stock', 0).gt('importer_stock', 0);
+                query = query.or('local_stock.eq.0,local_stock.is.null').gt('importer_stock', 0);
             } else if (debouncedFilters.stockStatus === 'disponibles_cualquiera') {
                 query = query.or('local_stock.gt.0,importer_stock.gt.0');
             } else if (debouncedFilters.stockStatus === 'agotados') {
-                query = query.eq('local_stock', 0).eq('importer_stock', 0);
+                query = query.or('local_stock.eq.0,local_stock.is.null').or('importer_stock.eq.0,importer_stock.is.null');
             }
 
             // Discontinued Status Filter
