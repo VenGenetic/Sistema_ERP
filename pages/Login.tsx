@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
+type AuthMode = 'password' | 'forgot' | 'magic_link';
+
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isForgotPassword, setIsForgotPassword] = useState(false);
+    const [authMode, setAuthMode] = useState<AuthMode>('password');
     const [resetMessage, setResetMessage] = useState<string | null>(null);
     const navigate = useNavigate();
 
@@ -76,19 +78,62 @@ const Login: React.FC = () => {
         }
     };
 
+    const handleMagicLink = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        setResetMessage(null);
+
+        if (!email) {
+            setError('Por favor, ingresa tu correo electrónico.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const redirectUrl = `${window.location.origin}${window.location.pathname}#/auth/confirm`;
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    emailRedirectTo: redirectUrl,
+                },
+            });
+
+            if (error) throw error;
+
+            setResetMessage('¡Enlace mágico enviado! Revisa tu bandeja de entrada para ingresar directamente sin contraseña.');
+        } catch (err: any) {
+            setError(err.message || 'Error al enviar el enlace mágico');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        if (authMode === 'password') handleLogin(e);
+        else if (authMode === 'forgot') handleForgotPassword(e);
+        else if (authMode === 'magic_link') handleMagicLink(e);
+    };
+
     return (
         <div className="bg-dark-bg font-display antialiased text-slate-100 min-h-screen flex flex-col">
             <div className="flex flex-1 flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
                 <div className="w-full max-w-md bg-dark-card shadow-glow rounded-xl overflow-hidden border border-white/10">
                     <div className="px-8 pt-10 pb-6 flex flex-col items-center">
                         <div className="h-16 w-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-6 border border-blue-500/20 shadow-[0_0_15px_rgba(24,119,242,0.15)]">
-                            <span className="material-symbols-outlined text-4xl text-primary drop-shadow-md">inventory_2</span>
+                            <span className="material-symbols-outlined text-4xl text-primary drop-shadow-md">
+                                {authMode === 'magic_link' ? 'auto_awesome' : 'inventory_2'}
+                            </span>
                         </div>
                         <h2 className="text-2xl font-bold tracking-tight text-center text-white">
-                            Iniciar Sesión en el Sistema ERP
+                            {authMode === 'password' && 'Iniciar Sesión en el Sistema ERP'}
+                            {authMode === 'forgot' && 'Recuperar Contraseña'}
+                            {authMode === 'magic_link' && 'Acceso con Enlace Mágico'}
                         </h2>
                         <p className="mt-2 text-sm text-gray-400 text-center">
-                            Centro de Control de Inventario y Dropshipping
+                            {authMode === 'password' && 'Centro de Control de Inventario y Dropshipping'}
+                            {authMode === 'forgot' && 'Ingresa tu correo para enviarte las instrucciones'}
+                            {authMode === 'magic_link' && 'Ingresa sin contraseña directamente desde tu correo'}
                         </p>
                     </div>
                     <div className="px-8 pb-10">
@@ -102,7 +147,7 @@ const Login: React.FC = () => {
                                 {resetMessage}
                             </div>
                         )}
-                        <form onSubmit={isForgotPassword ? handleForgotPassword : handleLogin} className="space-y-6">
+                        <form onSubmit={handleSubmit} className="space-y-6">
                             <div>
                                 <label className="block text-sm font-medium leading-6 text-gray-300" htmlFor="email">
                                     Correo electrónico
@@ -124,7 +169,7 @@ const Login: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {!isForgotPassword && (
+                            {authMode === 'password' && (
                                 <div>
                                     <div className="flex items-center justify-between">
                                         <label className="block text-sm font-medium leading-6 text-gray-300" htmlFor="password">
@@ -167,23 +212,58 @@ const Login: React.FC = () => {
                                     type="submit"
                                 >
                                     {loading 
-                                        ? (isForgotPassword ? 'Enviando...' : 'Iniciando...') 
-                                        : (isForgotPassword ? 'Enviar enlace de recuperación' : 'Iniciar Sesión')}
+                                        ? 'Procesando...' 
+                                        : authMode === 'password' 
+                                            ? 'Iniciar Sesión' 
+                                            : authMode === 'forgot' 
+                                                ? 'Enviar enlace de recuperación' 
+                                                : 'Enviar Enlace Mágico ✨'}
                                 </button>
                             </div>
                         </form>
-                        <div className="mt-6 text-center">
-                            <button 
-                                type="button"
-                                onClick={() => {
-                                    setIsForgotPassword(!isForgotPassword);
-                                    setError(null);
-                                    setResetMessage(null);
-                                }}
-                                className="text-sm font-medium text-gray-400 hover:text-primary transition-colors"
-                            >
-                                {isForgotPassword ? 'Volver al inicio de sesión' : '¿Olvidaste tu contraseña?'}
-                            </button>
+
+                        <div className="mt-6 flex flex-col gap-2 text-center text-sm">
+                            {authMode === 'password' && (
+                                <>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setAuthMode('magic_link');
+                                            setError(null);
+                                            setResetMessage(null);
+                                        }}
+                                        className="font-medium text-emerald-400 hover:text-emerald-300 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                                        Ingresar con Enlace Mágico (Sin contraseña)
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setAuthMode('forgot');
+                                            setError(null);
+                                            setResetMessage(null);
+                                        }}
+                                        className="font-medium text-gray-400 hover:text-primary transition-colors mt-1"
+                                    >
+                                        ¿Olvidaste tu contraseña?
+                                    </button>
+                                </>
+                            )}
+
+                            {(authMode === 'forgot' || authMode === 'magic_link') && (
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        setAuthMode('password');
+                                        setError(null);
+                                        setResetMessage(null);
+                                    }}
+                                    className="font-medium text-gray-400 hover:text-primary transition-colors"
+                                >
+                                    ← Volver al inicio de sesión con contraseña
+                                </button>
+                            )}
                         </div>
                     </div>
                     <div className="border-t border-white/5 bg-[#1a1a1a] py-4 px-8 flex items-center justify-between text-xs text-gray-500">
