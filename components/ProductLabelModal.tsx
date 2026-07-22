@@ -234,6 +234,15 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                 const x = startX + (col * LABEL_W);
                 const y = startY + (row * LABEL_H);
 
+                // Draw cutting border (dashed light gray)
+                pdf.setDrawColor(180, 180, 180);
+                pdf.setLineWidth(0.1);
+                pdf.setLineDashPattern([1, 1], 0);
+                pdf.rect(x, y, LABEL_W, LABEL_H);
+                
+                // Reset dash pattern for other potential drawings (good practice)
+                pdf.setLineDashPattern([], 0);
+
                 pdf.addImage(imgData, 'PNG', x, y, LABEL_W, LABEL_H);
                 
                 currentItem++;
