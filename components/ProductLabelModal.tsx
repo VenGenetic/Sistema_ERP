@@ -153,9 +153,9 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
             const x = startX + (col * LABEL_W);
             const y = startY + (row * LABEL_H);
 
-            pdf.setDrawColor(180, 180, 180);
-            pdf.setLineWidth(0.1);
-            pdf.setLineDashPattern([1, 1], 0);
+            pdf.setDrawColor(0, 0, 0); // Black for high visibility
+            pdf.setLineWidth(0.2); // Thicker line
+            pdf.setLineDashPattern([2, 1.5], 0); // Clearer dash pattern
             pdf.rect(x, y, LABEL_W, LABEL_H);
             pdf.setLineDashPattern([], 0);
 
