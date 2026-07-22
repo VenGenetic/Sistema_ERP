@@ -11,12 +11,12 @@ interface ProductLabelModalProps {
 // Renders the label to an offscreen canvas and returns it.
 // Layout is fully canvas-based so nothing can get clipped.
 const renderLabelToCanvas = (product: any): HTMLCanvasElement => {
-    // --- Dimensions: 6cm x 4cm at 300 DPI ---
+    // --- Dimensions: ~6.66cm x 4.1cm at 300 DPI to fill A4 with 5mm margins ---
     const DPI = 300;
-    const CM_TO_INCH = 1 / 2.54;
-    const W = Math.round(6 * CM_TO_INCH * DPI); // 709px
-    const H = Math.round(4 * CM_TO_INCH * DPI); // 472px
-    const PAD = Math.round(W * 0.065); // ~46px padding on each side
+    const MM_TO_INCH = 1 / 25.4;
+    const W = Math.round(66.66 * MM_TO_INCH * DPI); // ~787px
+    const H = Math.round(41 * MM_TO_INCH * DPI); // ~484px
+    const PAD = Math.round(W * 0.04); // Reducir padding interno a ~4% para aprovechar mejor el espacio
 
     const canvas = document.createElement('canvas');
     canvas.width = W;
@@ -205,18 +205,16 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
             // Generate Data URI from canvas (high res)
             const imgData = labelCanvasRef.current.toDataURL('image/png', 1.0);
 
-            const LABEL_W = 60;
-            const LABEL_H = 40;
-            
+            // Reduce margins to 5mm to minimize wasted space and cutting
+            const startX = 5;
+            const startY = 5;
+
             // Calculate grid (3 columns x 7 rows = 21 labels per page)
             const cols = 3;
             const rows = 7;
             
-            // Center the grid on the page
-            const totalGridW = cols * LABEL_W; // 180mm
-            const totalGridH = rows * LABEL_H; // 280mm
-            const startX = (210 - totalGridW) / 2; // ~15mm margins
-            const startY = (297 - totalGridH) / 2; // ~8.5mm margins
+            const LABEL_W = (210 - (startX * 2)) / cols; // ~66.66 mm
+            const LABEL_H = (297 - (startY * 2)) / rows; // 41 mm
 
             let currentItem = 0;
             
@@ -264,7 +262,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <span className="material-symbols-outlined">label</span>
-                        Etiqueta de Producto — 6×4 cm / 300 DPI
+                        Etiqueta de Producto — Optimizada para A4
                     </h2>
                     <button
                         onClick={onClose}
@@ -280,7 +278,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                         {/* Left: Preview */}
                         <div className="flex flex-col items-center w-full lg:w-1/2">
                             <p className="text-sm text-slate-500 mb-4 text-center">
-                                Vista previa — 6x4 cm (709×472 px, 300 DPI)
+                                Vista previa — Alta resolución (300 DPI)
                             </p>
                             <div className="shadow-2xl ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm">
                                 <canvas
