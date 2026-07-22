@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.96.0",
     "html2canvas": "^1.4.1",
     "jsbarcode": "^3.12.3",
+    "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.574.0",
     "pg": "^8.20.0",

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import JsBarcode from 'jsbarcode';
+import { jsPDF } from 'jspdf';
 
 interface ProductLabelModalProps {
     isOpen: boolean;
@@ -119,6 +120,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const labelCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [printQuantity, setPrintQuantity] = useState(1);
 
     const renderPreview = useCallback(() => {
         if (!product) return;
@@ -166,13 +168,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                         setTimeout(() => setCopied(false), 3000);
                     } catch (err) {
                         console.error('Error al copiar al portapapeles: ', err);
-                        // Fallback: trigger download
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `etiqueta_${product.sku}.png`;
-                        a.click();
-                        URL.revokeObjectURL(url);
+                        alert('No se pudo copiar al portapapeles. Prueba usar el botón de Descargar.');
                     }
                 }
                 setIsGenerating(false);
@@ -180,6 +176,74 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
         } catch (error) {
             console.error('Error generating image:', error);
             alert('Error al generar la imagen.');
+            setIsGenerating(false);
+        }
+    };
+
+    const handleDownloadImage = () => {
+        if (!labelCanvasRef.current) return;
+        labelCanvasRef.current.toBlob((blob) => {
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `etiqueta_${product.sku}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        }, 'image/png', 1.0);
+    };
+
+    const handleGeneratePDF = () => {
+        if (!labelCanvasRef.current || printQuantity < 1) return;
+        setIsGenerating(true);
+        try {
+            // A4 size: 210 x 297 mm
+            // Label size: 60 x 40 mm
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            
+            // Generate Data URI from canvas (high res)
+            const imgData = labelCanvasRef.current.toDataURL('image/png', 1.0);
+
+            const LABEL_W = 60;
+            const LABEL_H = 40;
+            
+            // Calculate grid (3 columns x 7 rows = 21 labels per page)
+            const cols = 3;
+            const rows = 7;
+            
+            // Center the grid on the page
+            const totalGridW = cols * LABEL_W; // 180mm
+            const totalGridH = rows * LABEL_H; // 280mm
+            const startX = (210 - totalGridW) / 2; // ~15mm margins
+            const startY = (297 - totalGridH) / 2; // ~8.5mm margins
+
+            let currentItem = 0;
+            
+            while (currentItem < printQuantity) {
+                // If we need a new page and it's not the first item
+                if (currentItem > 0 && currentItem % (cols * rows) === 0) {
+                    pdf.addPage();
+                }
+
+                // Calculate position on current page
+                const indexOnPage = currentItem % (cols * rows);
+                const col = indexOnPage % cols;
+                const row = Math.floor(indexOnPage / cols);
+
+                const x = startX + (col * LABEL_W);
+                const y = startY + (row * LABEL_H);
+
+                pdf.addImage(imgData, 'PNG', x, y, LABEL_W, LABEL_H);
+                
+                currentItem++;
+            }
+
+            pdf.save(`etiquetas_${product.sku}_qty${printQuantity}.pdf`);
+        } catch (error) {
+            console.error('Error al generar PDF: ', error);
+            alert('Ocurrió un error al generar el PDF.');
+        } finally {
             setIsGenerating(false);
         }
     };
@@ -201,27 +265,79 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                     </button>
                 </div>
 
-                {/* Preview */}
+                {/* Content */}
                 <div className="p-6 flex flex-col items-center bg-slate-50 dark:bg-slate-950/50 overflow-y-auto">
-                    <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
-                        Vista previa — la imagen copiada tendrá alta resolución (709×472 px, 300 DPI).
-                    </p>
-                    <div className="shadow-2xl ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm">
-                        <canvas
-                            ref={previewCanvasRef}
-                            style={{ display: 'block', maxWidth: '100%' }}
-                        />
+                    <div className="flex flex-col lg:flex-row gap-8 w-full items-start justify-center">
+                        {/* Left: Preview */}
+                        <div className="flex flex-col items-center w-full lg:w-1/2">
+                            <p className="text-sm text-slate-500 mb-4 text-center">
+                                Vista previa — 6x4 cm (709×472 px, 300 DPI)
+                            </p>
+                            <div className="shadow-2xl ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm">
+                                <canvas
+                                    ref={previewCanvasRef}
+                                    style={{ display: 'block', maxWidth: '100%' }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Right: PDF Controls */}
+                        <div className="flex flex-col gap-6 w-full lg:w-1/2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                <span className="material-symbols-outlined">print</span>
+                                Impresión en PDF (Hoja A4)
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                Genera un archivo PDF tamaño A4 listo para imprimir. Las etiquetas se organizarán automáticamente (hasta 21 por página).
+                            </p>
+                            
+                            <div className="flex flex-col gap-2">
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cantidad de etiquetas a imprimir:</label>
+                                <div className="flex items-center gap-3">
+                                    <input 
+                                        type="number" 
+                                        min="1" 
+                                        max="500"
+                                        value={printQuantity} 
+                                        onChange={(e) => setPrintQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                    />
+                                    <span className="text-sm text-slate-500">etiquetas</span>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleGeneratePDF}
+                                disabled={isGenerating || printQuantity < 1}
+                                className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                <span className={`material-symbols-outlined ${isGenerating ? 'animate-spin' : ''}`}>
+                                    {isGenerating ? 'progress_activity' : 'picture_as_pdf'}
+                                </span>
+                                {isGenerating ? 'Generando...' : 'Generar PDF A4'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 bg-white dark:bg-slate-900 shrink-0">
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap justify-end gap-3 bg-white dark:bg-slate-900 shrink-0">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                        className="px-4 py-2 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mr-auto"
                     >
                         Cerrar
                     </button>
+                    
+                    <button
+                        onClick={handleDownloadImage}
+                        className="px-4 py-2 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700"
+                        title="Descargar imagen PNG"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">download</span>
+                        Descargar Imagen
+                    </button>
+
                     <button
                         onClick={handleCopyImage}
                         disabled={isGenerating}
@@ -231,10 +347,10 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                 : 'bg-primary hover:bg-primary/90 shadow-primary/30'
                         } disabled:opacity-70 disabled:cursor-not-allowed`}
                     >
-                        <span className={`material-symbols-outlined text-[20px] ${isGenerating ? 'animate-spin' : ''}`}>
-                            {isGenerating ? 'progress_activity' : copied ? 'check' : 'content_copy'}
+                        <span className="material-symbols-outlined text-[20px]">
+                            {copied ? 'check' : 'content_copy'}
                         </span>
-                        {isGenerating ? 'Generando...' : copied ? '¡Copiado!' : 'Copiar Imagen'}
+                        {copied ? '¡Copiado!' : 'Copiar Imagen'}
                     </button>
                 </div>
             </div>
