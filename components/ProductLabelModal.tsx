@@ -11,11 +11,11 @@ interface ProductLabelModalProps {
 // Renders the label to an offscreen canvas and returns it.
 // Layout is fully canvas-based so nothing can get clipped.
 const renderLabelToCanvas = (product: any): HTMLCanvasElement => {
-    // --- Dimensions: ~6.66cm x 4.1cm at 300 DPI to fill A4 with 5mm margins ---
+    // --- Dimensions: 7cm x 4.24cm at 300 DPI to fill A4 with 0 margins ---
     const DPI = 300;
     const MM_TO_INCH = 1 / 25.4;
-    const W = Math.round(66.66 * MM_TO_INCH * DPI); // ~787px
-    const H = Math.round(41 * MM_TO_INCH * DPI); // ~484px
+    const W = Math.round((210 / 3) * MM_TO_INCH * DPI); // ~827px
+    const H = Math.round((297 / 7) * MM_TO_INCH * DPI); // ~501px
     const PAD = Math.round(W * 0.04); // Reducir padding interno a ~4% para aprovechar mejor el espacio
 
     const canvas = document.createElement('canvas');
@@ -121,6 +121,72 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
     const [printQuantity, setPrintQuantity] = useState(1);
+    const [activeTab, setActiveTab] = useState<'image' | 'pdf'>('image');
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+
+    const createPDF = useCallback(() => {
+        if (!labelCanvasRef.current) return null;
+        
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const imgData = labelCanvasRef.current.toDataURL('image/png', 1.0);
+
+        // 0 margins to completely eliminate wasted space at borders
+        const startX = 0;
+        const startY = 0;
+        const cols = 3;
+        const rows = 7;
+        
+        const LABEL_W = 210 / cols; // 70 mm
+        const LABEL_H = 297 / rows; // 42.428 mm
+
+        let currentItem = 0;
+        
+        while (currentItem < printQuantity) {
+            if (currentItem > 0 && currentItem % (cols * rows) === 0) {
+                pdf.addPage();
+            }
+
+            const indexOnPage = currentItem % (cols * rows);
+            const col = indexOnPage % cols;
+            const row = Math.floor(indexOnPage / cols);
+
+            const x = startX + (col * LABEL_W);
+            const y = startY + (row * LABEL_H);
+
+            pdf.setDrawColor(180, 180, 180);
+            pdf.setLineWidth(0.1);
+            pdf.setLineDashPattern([1, 1], 0);
+            pdf.rect(x, y, LABEL_W, LABEL_H);
+            pdf.setLineDashPattern([], 0);
+
+            pdf.addImage(imgData, 'PNG', x, y, LABEL_W, LABEL_H);
+            
+            currentItem++;
+        }
+        return pdf;
+    }, [printQuantity]);
+
+    // Update PDF preview URL when tab changes to pdf or quantity changes
+    useEffect(() => {
+        if (activeTab === 'pdf') {
+            const timer = setTimeout(() => {
+                const pdf = createPDF();
+                if (pdf) {
+                    const blob = pdf.output('blob');
+                    const url = URL.createObjectURL(blob);
+                    setPdfPreviewUrl(url);
+                }
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [activeTab, printQuantity, createPDF]);
+
+    // Cleanup object URL
+    useEffect(() => {
+        return () => {
+            if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+        };
+    }, [pdfPreviewUrl]);
 
     const renderPreview = useCallback(() => {
         if (!product) return;
@@ -198,55 +264,10 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
         if (!labelCanvasRef.current || printQuantity < 1) return;
         setIsGenerating(true);
         try {
-            // A4 size: 210 x 297 mm
-            // Label size: 60 x 40 mm
-            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-            
-            // Generate Data URI from canvas (high res)
-            const imgData = labelCanvasRef.current.toDataURL('image/png', 1.0);
-
-            // Reduce margins to 5mm to minimize wasted space and cutting
-            const startX = 5;
-            const startY = 5;
-
-            // Calculate grid (3 columns x 7 rows = 21 labels per page)
-            const cols = 3;
-            const rows = 7;
-            
-            const LABEL_W = (210 - (startX * 2)) / cols; // ~66.66 mm
-            const LABEL_H = (297 - (startY * 2)) / rows; // 41 mm
-
-            let currentItem = 0;
-            
-            while (currentItem < printQuantity) {
-                // If we need a new page and it's not the first item
-                if (currentItem > 0 && currentItem % (cols * rows) === 0) {
-                    pdf.addPage();
-                }
-
-                // Calculate position on current page
-                const indexOnPage = currentItem % (cols * rows);
-                const col = indexOnPage % cols;
-                const row = Math.floor(indexOnPage / cols);
-
-                const x = startX + (col * LABEL_W);
-                const y = startY + (row * LABEL_H);
-
-                // Draw cutting border (dashed light gray)
-                pdf.setDrawColor(180, 180, 180);
-                pdf.setLineWidth(0.1);
-                pdf.setLineDashPattern([1, 1], 0);
-                pdf.rect(x, y, LABEL_W, LABEL_H);
-                
-                // Reset dash pattern for other potential drawings (good practice)
-                pdf.setLineDashPattern([], 0);
-
-                pdf.addImage(imgData, 'PNG', x, y, LABEL_W, LABEL_H);
-                
-                currentItem++;
+            const pdf = createPDF();
+            if (pdf) {
+                pdf.save(`etiquetas_${product.sku}_qty${printQuantity}.pdf`);
             }
-
-            pdf.save(`etiquetas_${product.sku}_qty${printQuantity}.pdf`);
         } catch (error) {
             console.error('Error al generar PDF: ', error);
             alert('Ocurrió un error al generar el PDF.');
@@ -277,15 +298,52 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                     <div className="flex flex-col lg:flex-row gap-8 w-full items-start justify-center">
                         {/* Left: Preview */}
                         <div className="flex flex-col items-center w-full lg:w-1/2">
-                            <p className="text-sm text-slate-500 mb-4 text-center">
-                                Vista previa — Alta resolución (300 DPI)
-                            </p>
-                            <div className="shadow-2xl ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm">
-                                <canvas
-                                    ref={previewCanvasRef}
-                                    style={{ display: 'block', maxWidth: '100%' }}
-                                />
+                            <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg mb-4 w-full max-w-sm">
+                                <button
+                                    onClick={() => setActiveTab('image')}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                        activeTab === 'image' 
+                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                    }`}
+                                >
+                                    Etiqueta Sola
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('pdf')}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                        activeTab === 'pdf' 
+                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                    }`}
+                                >
+                                    Vista Previa PDF
+                                </button>
                             </div>
+                            
+                            {activeTab === 'image' ? (
+                                <div className="shadow-2xl ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm">
+                                    <canvas
+                                        ref={previewCanvasRef}
+                                        style={{ display: 'block', maxWidth: '100%' }}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="w-full h-[400px] border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                    {pdfPreviewUrl ? (
+                                        <iframe 
+                                            src={pdfPreviewUrl} 
+                                            className="w-full h-full"
+                                            title="PDF Preview"
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                                            <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+                                            <span className="text-sm">Generando vista previa...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Right: PDF Controls */}
