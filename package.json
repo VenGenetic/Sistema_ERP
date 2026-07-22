@@ -16,6 +16,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@supabase/supabase-js": "^2.96.0",
     "html2canvas": "^1.4.1",
+    "jsbarcode": "^3.12.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.574.0",
     "pg": "^8.20.0",

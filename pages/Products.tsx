@@ -14,6 +14,7 @@ import { getThumbnailUrl } from '../utils/image';
 import { ProductDemandModal } from '../components/ProductDemandModal';
 import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
+import { ProductLabelModal } from '../components/ProductLabelModal';
 
 // Helper to parse query parameters from the hash or query string
 const getInitialParams = () => {
@@ -49,6 +50,9 @@ const Products: React.FC = () => {
     const [isBulkMediaOpen, setIsBulkMediaOpen] = useState(false);
     const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
     const [demandProduct, setDemandProduct] = useState<any>(null);
+
+    const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+    const [labelProduct, setLabelProduct] = useState<any>(null);
 
     const [isSourcingModalOpen, setIsSourcingModalOpen] = useState(false);
     const [sourcingProduct, setSourcingProduct] = useState<any>(null);
@@ -1012,6 +1016,13 @@ const Products: React.FC = () => {
                             )}
                         </button>
                         <button
+                            onClick={() => { setLabelProduct(prod); setIsLabelModalOpen(true); }}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                            title="Generar Etiqueta (Código de Barras)"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">barcode_scanner</span>
+                        </button>
+                        <button
                             onClick={() => handleDeleteProduct(prod)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
                             title="Eliminar Producto"
@@ -1512,6 +1523,16 @@ const Products: React.FC = () => {
                         <span className="material-symbols-outlined text-[18px]">close</span>
                     </button>
                 </div>
+            )}
+            {isLabelModalOpen && (
+                <ProductLabelModal
+                    isOpen={isLabelModalOpen}
+                    onClose={() => {
+                        setIsLabelModalOpen(false);
+                        setLabelProduct(null);
+                    }}
+                    product={labelProduct}
+                />
             )}
         </div>
     );
