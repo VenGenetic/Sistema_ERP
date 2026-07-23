@@ -8,6 +8,7 @@ interface GroupItem {
     product_id: number;
     counted_stock: number;
     is_manually_added: boolean;
+    last_updated?: number; // local timestamp for sorting
     product: {
         sku: string;
         name: string;
@@ -71,7 +72,11 @@ export const InventorySession: React.FC = () => {
                 .eq('group_id', id);
 
             if (itemsError) throw itemsError;
-            setItems(itemsData as unknown as GroupItem[] || []);
+            const mappedItems = (itemsData || []).map((i: any) => ({
+                ...i,
+                last_updated: 0
+            }));
+            setItems(mappedItems as unknown as GroupItem[] || []);
         } catch (error: any) {
             console.error('Error fetching session:', error);
             alert('Error al cargar la sesión: ' + error.message);
@@ -121,7 +126,7 @@ export const InventorySession: React.FC = () => {
 
         if (existingItem) {
             // Functional state update to avoid closure staleness (Race condition fix)
-            setItems(prev => prev.map(i => i.id === existingItem.id ? { ...i, counted_stock: i.counted_stock + 1 } : i));
+            setItems(prev => prev.map(i => i.id === existingItem.id ? { ...i, counted_stock: i.counted_stock + 1, last_updated: Date.now() } : i));
             
             // Increment natively in the database via RPC (fire and forget)
             supabase.rpc('increment_inventory_group_item', {
@@ -173,9 +178,9 @@ export const InventorySession: React.FC = () => {
                 setItems(prev => {
                     // Double check if another scan inserted it locally while we were awaiting
                     if (prev.some(i => i.product_id === prodData.id)) {
-                        return prev.map(i => i.product_id === prodData.id ? { ...i, counted_stock: newItem.counted_stock } : i);
+                        return prev.map(i => i.product_id === prodData.id ? { ...i, counted_stock: newItem.counted_stock, last_updated: Date.now() } : i);
                     }
-                    return [...prev, newItem as unknown as GroupItem];
+                    return [...prev, { ...newItem, last_updated: Date.now() } as unknown as GroupItem];
                 });
 
             } catch (err) {
@@ -198,7 +203,7 @@ export const InventorySession: React.FC = () => {
             const item = prev.find(i => i.id === itemId);
             if (!item) return prev;
             const newCount = Math.max(0, item.counted_stock + amountChange);
-            return prev.map(i => i.id === itemId ? { ...i, counted_stock: newCount } : i);
+            return prev.map(i => i.id === itemId ? { ...i, counted_stock: newCount, last_updated: Date.now() } : i);
         });
         
         // Let DB handle atomic increment
@@ -261,7 +266,7 @@ export const InventorySession: React.FC = () => {
                 .single();
                 
             if (insertError) throw insertError;
-            setItems(prev => [...prev, newItem as unknown as GroupItem]);
+            setItems(prev => [...prev, { ...newItem, last_updated: Date.now() } as unknown as GroupItem]);
             setSearchResults([]);
             setSearchQuery('');
         } catch (error) {
@@ -353,7 +358,7 @@ export const InventorySession: React.FC = () => {
                 theoretical,
                 diff: item.counted_stock - theoretical
             };
-        });
+        }).sort((a, b) => (b.last_updated || 0) - (a.last_updated || 0));
     }, [items, group]);
 
     const faltantes = processedItems.filter(i => i.diff < 0);
