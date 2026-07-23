@@ -181,7 +181,7 @@ export default function Customers() {
     const refreshRequestsData = async () => {
         await fetchRequests();
         if (selectedCustomerForDrawer) {
-            await fetchDrawerRequests(selectedCustomerForDrawer.id);
+            await fetchDrawerRequests(Number(selectedCustomerForDrawer.id));
         }
     };
 
@@ -600,7 +600,7 @@ const handleAddRequest = async (e: React.FormEvent) => {
         try {
             // Reset the POS cart to load the client and the item context
             clearCart();
-            setCustomer(selectedCustomerForDrawer);
+            setCustomer(selectedCustomerForDrawer as any);
 
             if (request.product) {
                 // Preload cataloged product

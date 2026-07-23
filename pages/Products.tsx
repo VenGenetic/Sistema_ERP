@@ -742,6 +742,49 @@ const Products: React.FC = () => {
         fetchCatalogData(pagination.page);
     };
 
+    const handleCreateInventoryGroup = async () => {
+        const name = prompt('Ingresa un nombre para el nuevo grupo de inventario:');
+        if (!name) return;
+
+        setLoading(true);
+        try {
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            if (userError) throw userError;
+
+            // 1. Create Group
+            const { data: groupData, error: groupError } = await supabase
+                .from('inventory_groups')
+                .insert([{ name, created_by: userData.user.id }])
+                .select()
+                .single();
+
+            if (groupError) throw groupError;
+
+            // 2. Insert Items
+            const itemsToInsert = Array.from(selectedIds).map(productId => ({
+                group_id: groupData.id,
+                product_id: productId,
+                counted_stock: 0,
+                is_manually_added: false
+            }));
+
+            const { error: itemsError } = await supabase
+                .from('inventory_group_items')
+                .insert(itemsToInsert);
+
+            if (itemsError) throw itemsError;
+
+            setSelectedIds(new Set());
+            alert('Grupo creado exitosamente');
+            navigate(`/inventory-mode/${groupData.id}`);
+        } catch (error: any) {
+            console.error('Error creating inventory group:', error);
+            alert('Error al crear el grupo de inventario: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // ──────────────────────────────────────────────
     // PAGINATION HELPERS
     // ──────────────────────────────────────────────
@@ -1501,6 +1544,13 @@ const Products: React.FC = () => {
                         <span className="text-slate-300">seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="w-px h-6 bg-slate-600"></div>
+                    <button
+                        onClick={handleCreateInventoryGroup}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">inventory</span>
+                        Crear Grupo Inventario
+                    </button>
                     <button
                         onClick={() => setIsBulkEditOpen(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-sm font-semibold transition-colors"

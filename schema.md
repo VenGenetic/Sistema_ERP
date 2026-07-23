@@ -94,6 +94,24 @@ erDiagram
     PRODUCTS ||--o{ LOST_DEMAND : "missed_sales"
     WAREHOUSES ||--o{ ORDERS : "fulfills"
 
+    INVENTORY_GROUPS {
+        uuid id PK
+        text name
+        integer warehouse_id FK
+        uuid created_by FK "refs AUTH_USERS"
+    }
+
+    INVENTORY_GROUP_ITEMS {
+        uuid id PK
+        uuid group_id FK
+        integer product_id FK
+        integer counted_stock
+    }
+
+    INVENTORY_GROUPS ||--|{ INVENTORY_GROUP_ITEMS : "contains"
+    WAREHOUSES ||--o{ INVENTORY_GROUPS : "stores"
+    PRODUCTS ||--o{ INVENTORY_GROUP_ITEMS : "counted_in"
+
     %% ==========================================
     %% 3. FINANCIAL ENGINE
     %% ==========================================

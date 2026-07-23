@@ -153,6 +153,13 @@ const Layout: React.FC = () => {
         )}
 
         {(isAdmin || permissions?.inventory?.read) && (
+          <Link to="/inventory-mode" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('inventory-mode') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+            <span className="material-symbols-outlined text-[20px]">barcode_scanner</span>
+            Modo Inventario
+          </Link>
+        )}
+
+        {(isAdmin || permissions?.inventory?.read) && (
           <Link to="/mobile" target="_blank" className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-l-2 border-transparent">
             <span className="material-symbols-outlined text-[20px]">smartphone</span>
             Modo Móvil (App)

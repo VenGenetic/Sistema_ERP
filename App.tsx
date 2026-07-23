@@ -28,6 +28,8 @@ const Tags = React.lazy(() => import('./pages/Tags'));
 const Replenishment = React.lazy(() => import('./pages/Replenishment'));
 const ProductDemands = React.lazy(() => import('./pages/ProductDemands'));
 const SourcingPipeline = React.lazy(() => import('./pages/SourcingPipeline'));
+const InventoryMode = React.lazy(() => import('./pages/InventoryMode').then(module => ({ default: module.InventoryMode })));
+const InventorySession = React.lazy(() => import('./pages/InventorySession').then(module => ({ default: module.InventorySession })));
 
 // Lazy load mobile pages
 const MobileLayout = React.lazy(() => import('./components/mobile/MobileLayout'));
@@ -74,6 +76,8 @@ const App: React.FC = () => {
                 <Route path="products" element={<Products />} />
                 <Route path="tags" element={<Tags />} />
                 <Route path="inventory" element={<Inventory />} />
+                <Route path="inventory-mode" element={<InventoryMode />} />
+                <Route path="inventory-mode/:id" element={<InventorySession />} />
                 <Route path="replenishment" element={<Replenishment />} />
                 <Route path="product-demands" element={<ProductDemands />} />
                 <Route path="sourcing" element={<SourcingPipeline />} />
