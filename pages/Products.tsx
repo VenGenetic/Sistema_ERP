@@ -680,11 +680,18 @@ const Products: React.FC = () => {
 
     // ── Selection handlers ──
     const toggleSelectAll = () => {
-        if (selectedIds.size === products.length) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(products.map(p => p.id)));
-        }
+        const currentPageIds = products.map(p => p.id);
+        const allSelectedOnPage = currentPageIds.length > 0 && currentPageIds.every(id => selectedIds.has(id));
+
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (allSelectedOnPage) {
+                currentPageIds.forEach(id => next.delete(id));
+            } else {
+                currentPageIds.forEach(id => next.add(id));
+            }
+            return next;
+        });
     };
 
     const toggleSelectRow = async (id: number) => {
@@ -1351,7 +1358,7 @@ const Products: React.FC = () => {
                                 <th className="px-3 py-3 w-10">
                                     <input
                                         type="checkbox"
-                                        checked={products.length > 0 && selectedIds.size === products.length}
+                                        checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
                                         onChange={toggleSelectAll}
                                         className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                                     />
