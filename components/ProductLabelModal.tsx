@@ -120,7 +120,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const labelCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [printQuantity, setPrintQuantity] = useState(1);
+    const [printQuantity, setPrintQuantity] = useState(3);
     const [activeTab, setActiveTab] = useState<'image' | 'pdf'>('image');
     const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
@@ -361,10 +361,14 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                 <div className="flex items-center gap-3">
                                     <input 
                                         type="number" 
-                                        min="1" 
+                                        min="3" 
+                                        step="3"
                                         max="500"
                                         value={printQuantity} 
-                                        onChange={(e) => setPrintQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || 3;
+                                            setPrintQuantity(Math.max(3, Math.ceil(val / 3) * 3));
+                                        }}
                                         className="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                                     />
                                     <span className="text-sm text-slate-500">etiquetas</span>
