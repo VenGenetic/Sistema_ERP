@@ -121,8 +121,8 @@ export const InventorySession: React.FC = () => {
         if (!skuToFind) return;
         setScanSku('');
 
-        // 1. Check local state to see if it's already there
-        const existingItem = items.find(i => i.product.sku === skuToFind);
+        // 1. Check local state to see if it's already there (case-insensitive)
+        const existingItem = items.find(i => i.product.sku.toLowerCase() === skuToFind.toLowerCase());
 
         if (existingItem) {
             // Functional state update to avoid closure staleness (Race condition fix)
@@ -140,7 +140,7 @@ export const InventorySession: React.FC = () => {
                 const { data: prodData, error: prodError } = await supabase
                     .from('products')
                     .select('id, sku, name, inventory_levels(current_stock, warehouse_id)')
-                    .eq('sku', skuToFind)
+                    .ilike('sku', skuToFind)
                     .single();
                 
                 if (prodError || !prodData) {
