@@ -276,6 +276,48 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
         }
     };
 
+    const handlePrintImage = () => {
+        if (!labelCanvasRef.current) return;
+        const imgData = labelCanvasRef.current.toDataURL('image/png', 1.0);
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        
+        iframe.contentDocument?.write(`
+            <html>
+                <head><title>Imprimir Etiqueta</title></head>
+                <body style="margin: 0; padding: 0;">
+                    <img src="${imgData}" style="width: 100%; display: block;" onload="window.print();" />
+                </body>
+            </html>
+        `);
+        iframe.contentDocument?.close();
+        
+        setTimeout(() => {
+            if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+            }
+        }, 2000);
+    };
+
+    const handleOpenPDF = () => {
+        if (!labelCanvasRef.current || printQuantity < 1) return;
+        setIsGenerating(true);
+        try {
+            const pdf = createPDF();
+            if (pdf) {
+                const blob = pdf.output('blob');
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+            }
+        } catch (error) {
+            console.error('Error al abrir PDF: ', error);
+            alert('Ocurrió un error al abrir el PDF.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -375,16 +417,26 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                 </div>
                             </div>
 
-                            <button
-                                onClick={handleGeneratePDF}
-                                disabled={isGenerating || printQuantity < 1}
-                                className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-                            >
-                                <span className={`material-symbols-outlined ${isGenerating ? 'animate-spin' : ''}`}>
-                                    {isGenerating ? 'progress_activity' : 'picture_as_pdf'}
-                                </span>
-                                {isGenerating ? 'Generando...' : 'Generar PDF A4'}
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                                <button
+                                    onClick={handleGeneratePDF}
+                                    disabled={isGenerating || printQuantity < 1}
+                                    className="flex-1 py-3 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 dark:border-violet-800 dark:text-violet-300 font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">download</span>
+                                    Descargar
+                                </button>
+                                <button
+                                    onClick={handleOpenPDF}
+                                    disabled={isGenerating || printQuantity < 1}
+                                    className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    <span className={`material-symbols-outlined ${isGenerating ? 'animate-spin' : ''}`}>
+                                        {isGenerating ? 'progress_activity' : 'print'}
+                                    </span>
+                                    {isGenerating ? 'Generando...' : 'Imprimir PDF'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -404,7 +456,16 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                         title="Descargar imagen PNG"
                     >
                         <span className="material-symbols-outlined text-[20px]">download</span>
-                        Descargar Imagen
+                        Descargar
+                    </button>
+
+                    <button
+                        onClick={handlePrintImage}
+                        className="px-4 py-2 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700"
+                        title="Imprimir Directamente"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">print</span>
+                        Imprimir
                     </button>
 
                     <button
