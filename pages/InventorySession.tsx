@@ -339,7 +339,7 @@ export const InventorySession: React.FC = () => {
             await supabase.from('inventory_groups').update({ last_counted_at: new Date().toISOString() }).eq('id', id);
             
             alert('Inventario actualizado correctamente. Los conteos del grupo han sido encerados.');
-            fetchSessionData();
+            navigate('/inventory-mode');
 
         } catch (error: any) {
             console.error('Error finalizando:', error);

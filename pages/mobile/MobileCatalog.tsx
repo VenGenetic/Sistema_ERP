@@ -14,6 +14,7 @@ import { MediaLightbox } from '../../components/MediaLightbox';
 import { QuickTagAssignModal } from '../../components/QuickTagAssignModal';
 import { ProductDemandModal } from '../../components/ProductDemandModal';
 import { SourcingQuickEditModal } from '../../components/SourcingQuickEditModal';
+import { ProductLabelModal } from '../../components/ProductLabelModal';
 
 const MobileCatalog: React.FC = () => {
     // ──────────────────────────────────────────────
@@ -58,6 +59,8 @@ const MobileCatalog: React.FC = () => {
     const [groupModalProduct, setGroupModalProduct] = useState<any>(null);
     const [lightbox, setLightbox] = useState<{ isOpen: boolean, media: any[], initialIndex: number, product?: any }>({ isOpen: false, media: [], initialIndex: 0 });
     const [selectedProductForTags, setSelectedProductForTags] = useState<any | null>(null);
+    const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+    const [labelProduct, setLabelProduct] = useState<any>(null);
 
     // ──────────────────────────────────────────────
     // 2. SEARCH & FILTER HANDLERS
@@ -635,6 +638,9 @@ const MobileCatalog: React.FC = () => {
                                     <button onClick={() => { setDemandProduct(prod); setIsDemandModalOpen(true); }} className="flex-1 py-3 flex items-center justify-center text-amber-500 active:bg-amber-50 transition-colors dark:active:bg-amber-900/20" title="Demanda">
                                         <span className="material-symbols-outlined text-[20px]">notifications_active</span>
                                     </button>
+                                    <button onClick={() => { setLabelProduct(prod); setIsLabelModalOpen(true); }} className="flex-1 py-3 flex items-center justify-center text-emerald-500 active:bg-emerald-50 transition-colors dark:active:bg-emerald-900/20" title="Generar Etiqueta">
+                                        <span className="material-symbols-outlined text-[20px]">barcode_scanner</span>
+                                    </button>
                                     <button onClick={() => handleDeleteProduct(prod)} className="flex-1 py-3 flex items-center justify-center text-rose-500 active:bg-rose-50 transition-colors dark:active:bg-rose-900/20" title="Eliminar">
                                         <span className="material-symbols-outlined text-[20px]">delete</span>
                                     </button>
@@ -826,6 +832,9 @@ const MobileCatalog: React.FC = () => {
             )}
             {lightbox.isOpen && (
                 <MediaLightbox isOpen={lightbox.isOpen} media={lightbox.media} initialIndex={lightbox.initialIndex} onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))} onAddMedia={() => { setLightbox(prev => ({ ...prev, isOpen: false })); if (lightbox.product) { setProductToEdit(lightbox.product); setIsModalOpen(true); } }} />
+            )}
+            {isLabelModalOpen && (
+                <ProductLabelModal isOpen={isLabelModalOpen} onClose={() => { setIsLabelModalOpen(false); setLabelProduct(null); }} product={labelProduct} />
             )}
 
             {/* --- STYLES --- */}
