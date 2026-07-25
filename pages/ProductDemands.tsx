@@ -511,12 +511,28 @@ const ProductDemands: React.FC = () => {
         // Search Term
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
-            filtered = filtered.filter(d => 
-                (d.phone_number && d.phone_number.includes(lowerTerm)) ||
-                (d.customer_name && d.customer_name.toLowerCase().includes(lowerTerm)) ||
-                (d.product?.name && d.product.name.toLowerCase().includes(lowerTerm)) ||
-                (d.product?.sku && d.product.sku.toLowerCase().includes(lowerTerm))
-            );
+            const normalizePhone = (num: string) => {
+                let cleaned = num.replace(/\D/g, '');
+                if (cleaned.startsWith('593')) cleaned = cleaned.substring(3);
+                if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+                return cleaned;
+            };
+            const normalizedTerm = normalizePhone(searchTerm);
+
+            filtered = filtered.filter(d => {
+                if (d.phone_number) {
+                    if (d.phone_number.toLowerCase().includes(lowerTerm)) return true;
+                    if (normalizedTerm.length > 0) {
+                        const normalizedDb = normalizePhone(d.phone_number);
+                        if (normalizedDb.includes(normalizedTerm)) return true;
+                    }
+                }
+                return (
+                    (d.customer_name && d.customer_name.toLowerCase().includes(lowerTerm)) ||
+                    (d.product?.name && d.product.name.toLowerCase().includes(lowerTerm)) ||
+                    (d.product?.sku && d.product.sku.toLowerCase().includes(lowerTerm))
+                );
+            });
         }
 
         // Sort
