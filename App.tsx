@@ -36,6 +36,7 @@ const MobileLayout = React.lazy(() => import('./components/mobile/MobileLayout')
 const MobileDashboard = React.lazy(() => import('./pages/mobile/MobileDashboard'));
 const MobileCatalog = React.lazy(() => import('./pages/mobile/MobileCatalog'));
 const MobileInventory = React.lazy(() => import('./pages/mobile/MobileInventory'));
+const MobileLabels = React.lazy(() => import('./pages/mobile/MobileLabels'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -66,6 +67,7 @@ const App: React.FC = () => {
               <Route path="/mobile" element={<MobileLayout />}>
                 <Route index element={<MobileDashboard />} />
                 <Route path="catalog" element={<MobileCatalog />} />
+                <Route path="labels" element={<MobileLabels />} />
                 <Route path="inventory" element={<MobileInventory />} />
               </Route>
 
