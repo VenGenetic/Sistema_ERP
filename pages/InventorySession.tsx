@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus, Loader2, X, Package } from 'lucide-react';
 
 interface GroupItem {
     id: string;
@@ -24,7 +24,7 @@ export const InventorySession: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [scanSku, setScanSku] = useState('');
     const scanInputRef = useRef<HTMLInputElement>(null);
-    const [activeTab, setActiveTab] = useState<'faltantes' | 'sobrantes' | 'cuadrados'>('faltantes');
+    const [lastInteractedId, setLastInteractedId] = useState<string | null>(null);
     
     // Add product state
     const [searchQuery, setSearchQuery] = useState('');
@@ -125,6 +125,7 @@ export const InventorySession: React.FC = () => {
         const existingItem = items.find(i => i.product.sku.toLowerCase() === skuToFind.toLowerCase());
 
         if (existingItem) {
+            setLastInteractedId(existingItem.id);
             // Functional state update to avoid closure staleness (Race condition fix)
             setItems(prev => prev.map(i => i.id === existingItem.id ? { ...i, counted_stock: i.counted_stock + 1, last_updated: Date.now() } : i));
             
@@ -175,6 +176,7 @@ export const InventorySession: React.FC = () => {
                 
                 if (fetchError) throw fetchError;
                 
+                setLastInteractedId(newItem.id);
                 setItems(prev => {
                     // Double check if another scan inserted it locally while we were awaiting
                     if (prev.some(i => i.product_id === prodData.id)) {
@@ -198,6 +200,7 @@ export const InventorySession: React.FC = () => {
     const updateItemCount = async (itemId: string, productId: number, amountChange: number) => {
         if (amountChange === 0) return;
         
+        setLastInteractedId(itemId);
         // Functional state update
         setItems(prev => {
             const item = prev.find(i => i.id === itemId);
@@ -216,19 +219,50 @@ export const InventorySession: React.FC = () => {
 
     const handleRemoveItem = async (itemId: string) => {
         if(!window.confirm("¿Quitar producto del grupo?")) return;
+        if (lastInteractedId === itemId) setLastInteractedId(null);
         setItems(prev => prev.filter(i => i.id !== itemId));
         await supabase.from('inventory_group_items').delete().eq('id', itemId);
     };
 
+    useEffect(() => {
+        const query = searchQuery.trim();
+        if (query.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+        const timer = setTimeout(() => {
+            const executeSearch = async () => {
+                setIsSearching(true);
+                try {
+                    const { data, error } = await supabase
+                        .from('products')
+                        .select('id, sku, name')
+                        .or(`sku.ilike.%${query}%,name.ilike.%${query}%`)
+                        .limit(20);
+                    if (error) throw error;
+                    setSearchResults(data || []);
+                } catch (err) {
+                    console.error('Error in interactive search:', err);
+                } finally {
+                    setIsSearching(false);
+                }
+            };
+            executeSearch();
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     const handleSearchAdd = async () => {
-        if (!searchQuery.trim()) return;
+        const query = searchQuery.trim();
+        if (!query) return;
         setIsSearching(true);
         try {
             const { data, error } = await supabase
                 .from('products')
                 .select('id, sku, name')
-                .ilike('name', `%${searchQuery}%`)
-                .limit(10);
+                .or(`sku.ilike.%${query}%,name.ilike.%${query}%`)
+                .limit(20);
             if (error) throw error;
             setSearchResults(data || []);
         } catch (error) {
@@ -239,18 +273,12 @@ export const InventorySession: React.FC = () => {
     };
 
     const handleAddProductFromSearch = async (product: any) => {
-        if (items.some(i => i.product_id === product.id)) {
-            alert('El producto ya está en el grupo.');
+        if (items.some(i => String(i.product_id) === String(product.id) || i.product?.sku?.trim().toLowerCase() === product.sku?.trim().toLowerCase())) {
+            alert('El repuesto ya está en este grupo de inventario.');
             return;
         }
 
         try {
-            const { data: prodData } = await supabase
-                .from('products')
-                .select('id, sku, name, inventory_levels(current_stock, warehouse_id)')
-                .eq('id', product.id)
-                .single();
-
             const { data: newItem, error: insertError } = await supabase
                 .from('inventory_group_items')
                 .insert({
@@ -266,11 +294,11 @@ export const InventorySession: React.FC = () => {
                 .single();
                 
             if (insertError) throw insertError;
+            setLastInteractedId(newItem.id);
             setItems(prev => [...prev, { ...newItem, last_updated: Date.now() } as unknown as GroupItem]);
-            setSearchResults([]);
-            setSearchQuery('');
-        } catch (error) {
-            console.error(error);
+        } catch (error: any) {
+            console.error('Error al añadir repuesto:', error);
+            alert('No se pudo añadir el repuesto: ' + error.message);
         }
     };
 
@@ -365,12 +393,152 @@ export const InventorySession: React.FC = () => {
     const sobrantes = processedItems.filter(i => i.diff > 0);
     const cuadrados = processedItems.filter(i => i.diff === 0);
 
-    const activeList = activeTab === 'faltantes' ? faltantes : activeTab === 'sobrantes' ? sobrantes : cuadrados;
+    const renderColumn = (
+        title: string, 
+        list: typeof processedItems, 
+        type: 'faltantes' | 'sobrantes' | 'cuadrados'
+    ) => {
+        const themeConfig = {
+            faltantes: {
+                border: 'border-rose-500',
+                headerBg: 'bg-rose-50/80 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/80',
+                icon: <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />,
+                badge: 'bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300'
+            },
+            sobrantes: {
+                border: 'border-amber-500',
+                headerBg: 'bg-amber-50/80 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/80',
+                icon: <Plus className="w-5 h-5 text-amber-500 shrink-0" />,
+                badge: 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
+            },
+            cuadrados: {
+                border: 'border-emerald-500',
+                headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/80',
+                icon: <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />,
+                badge: 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300'
+            }
+        }[type];
+
+        return (
+            <div className="flex flex-col h-[740px] bg-slate-100/70 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                {/* Column Header */}
+                <div className={`flex items-center justify-between px-4 py-3.5 border-b border-t-4 ${themeConfig.border} ${themeConfig.headerBg} shrink-0`}>
+                    <div className="flex items-center gap-2.5 font-extrabold text-sm md:text-base">
+                        {themeConfig.icon}
+                        <span>{title}</span>
+                    </div>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${themeConfig.badge}`}>
+                        {list.length}
+                    </span>
+                </div>
+
+                {/* Items List */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                    {list.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-sm p-6 text-center italic">
+                            No hay repuestos en esta categoría.
+                        </div>
+                    ) : (
+                        list.map(item => {
+                            const isLastInteracted = item.id === lastInteractedId;
+                            return (
+                                <div
+                                    key={item.id}
+                                    className={`rounded-xl transition-all duration-300 ${
+                                        isLastInteracted
+                                            ? 'bg-cyan-50/90 dark:bg-cyan-950/60 border-2 border-cyan-500 dark:border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.4)] ring-2 ring-cyan-400/80'
+                                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 shadow-xs'
+                                    } overflow-hidden`}
+                                >
+                                    {isLastInteracted && (
+                                        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-500 dark:to-blue-500 text-white px-3 py-1 text-[11px] font-black tracking-wider uppercase flex items-center justify-between shadow-sm">
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-white animate-pulse shadow-sm" />
+                                                ⭐ ÚLTIMO ESCANEADO / AÑADIDO
+                                            </span>
+                                            <span className="text-[10px] font-semibold bg-black/20 px-2 py-0.5 rounded">Activo</span>
+                                        </div>
+                                    )}
+                                    <div className="p-3.5">
+                                        {/* Top: Description with wrap and Delete button */}
+                                        <div className="flex items-start justify-between gap-2 mb-2.5">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-extrabold text-slate-800 dark:text-slate-100 text-xs md:text-sm whitespace-normal break-words leading-tight">
+                                                    {item.product.name}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                    <span className="text-slate-600 dark:text-slate-300 font-mono font-bold text-xs bg-slate-100 dark:bg-slate-700/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">
+                                                        {item.product.sku}
+                                                    </span>
+                                                    {item.is_manually_added && (
+                                                        <span className="bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                            Manual
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleRemoveItem(item.id)}
+                                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors shrink-0"
+                                                title="Quitar del grupo"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Bottom: Controls & Metrics */}
+                                        <div className="pt-2.5 border-t border-slate-100 dark:border-slate-700/60 grid grid-cols-3 gap-2 items-center text-center">
+                                            <div className="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900/50 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Teórico</span>
+                                                <span className="font-extrabold text-sm text-slate-700 dark:text-slate-300 font-mono">
+                                                    {item.theoretical}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">Contado</span>
+                                                <div className="flex items-center bg-slate-100 dark:bg-slate-900 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                                                    <button
+                                                        onClick={() => updateItemCount(item.id, item.product_id, item.counted_stock > 0 ? -1 : 0)}
+                                                        className="w-6 h-6 flex items-center justify-center hover:bg-white dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-300 transition-all font-bold active:scale-95"
+                                                        title="Disminuir conteo"
+                                                    >
+                                                        <Minus className="w-3 h-3" />
+                                                    </button>
+                                                    <span className="font-black text-sm w-7 text-center text-slate-900 dark:text-white font-mono">
+                                                        {item.counted_stock}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => updateItemCount(item.id, item.product_id, 1)}
+                                                        className="w-6 h-6 flex items-center justify-center hover:bg-white dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-300 transition-all font-bold active:scale-95"
+                                                        title="Aumentar conteo"
+                                                    >
+                                                        <Plus className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900/50 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Diferencia</span>
+                                                <span className={`font-black text-sm font-mono ${item.diff < 0 ? 'text-rose-500' : item.diff > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                                    {item.diff > 0 ? '+' : ''}{item.diff}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     if (loading && !group) return <div className="p-12 text-center text-slate-500">Cargando sesión...</div>;
 
     return (
-        <div className="p-6 max-w-7xl mx-auto flex flex-col h-[calc(100vh-6rem)]">
+        <div className="p-4 md:p-6 w-full max-w-[1700px] mx-auto flex flex-col min-h-[calc(100vh-6rem)]">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex items-center gap-4">
                     <button onClick={() => navigate('/inventory-mode')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-600 dark:text-slate-300">
@@ -410,138 +578,88 @@ export const InventorySession: React.FC = () => {
                 </form>
 
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-3">Añadir producto manualmente al grupo:</h3>
-                    <div className="flex gap-2">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <Package className="w-4 h-4 text-primary" />
+                            Añadir repuestos del catálogo al grupo
+                        </h3>
+                        <span className="text-xs text-slate-500">Búsqueda en tiempo real por Código o Nombre</span>
+                    </div>
+                    <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleSearchAdd()}
-                            placeholder="Buscar por nombre..."
-                            className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-primary outline-none dark:text-white"
+                            placeholder="Escribe el código (SKU) o nombre de repuesto..."
+                            className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none dark:text-white text-sm transition-all placeholder:text-slate-400"
                         />
-                        <button onClick={handleSearchAdd} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
-                            <Search className="w-5 h-5" />
-                        </button>
+                        {isSearching ? (
+                            <Loader2 className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
+                        ) : searchQuery ? (
+                            <button
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setSearchResults([]);
+                                }}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors"
+                                title="Limpiar búsqueda"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        ) : null}
                     </div>
                     {searchResults.length > 0 && (
-                        <div className="mt-2 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 max-h-40 overflow-y-auto">
-                            {searchResults.map(res => (
-                                <div key={res.id} className="flex justify-between items-center p-3 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                    <div>
-                                        <div className="font-medium text-sm dark:text-slate-200">{res.name}</div>
-                                        <div className="text-xs text-slate-500 font-mono">{res.sku}</div>
+                        <div className="mt-3 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 max-h-60 overflow-y-auto bg-white dark:bg-slate-900/90 shadow-sm">
+                            {searchResults.map(res => {
+                                const existingItem = items.find(i => String(i.product_id) === String(res.id) || i.product?.sku?.trim().toLowerCase() === res.sku?.trim().toLowerCase());
+                                return (
+                                    <div key={res.id} className="flex justify-between items-center p-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-semibold px-2 py-0.5 rounded text-xs border border-slate-200 dark:border-slate-700 shrink-0">
+                                                    {res.sku}
+                                                </span>
+                                                <span className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">
+                                                    {res.name}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="shrink-0">
+                                            {existingItem ? (
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 font-medium text-xs">
+                                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                                    <span>Ya en grupo ({existingItem.counted_stock} contados)</span>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleAddProductFromSearch(res)}
+                                                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-semibold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                    <span>Añadir al grupo</span>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                    <button onClick={() => handleAddProductFromSearch(res)} className="p-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg transition-colors">
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
+                                );
+                            })}
+                        </div>
+                    )}
+                    {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
+                        <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-xs text-slate-500 dark:text-slate-400">
+                            No se encontraron repuestos con código o nombre "{searchQuery.trim()}" en el catálogo.
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* TABS */}
-            <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6">
-                <button
-                    onClick={() => setActiveTab('faltantes')}
-                    className={`flex items-center gap-2 pb-4 px-6 font-medium text-sm transition-colors relative ${activeTab === 'faltantes' ? 'text-rose-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                >
-                    <AlertTriangle className="w-4 h-4" />
-                    Faltantes ({faltantes.length})
-                    {activeTab === 'faltantes' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-rose-500 rounded-t-full"></div>}
-                </button>
-                <button
-                    onClick={() => setActiveTab('sobrantes')}
-                    className={`flex items-center gap-2 pb-4 px-6 font-medium text-sm transition-colors relative ${activeTab === 'sobrantes' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                >
-                    <Plus className="w-4 h-4" />
-                    Sobrantes ({sobrantes.length})
-                    {activeTab === 'sobrantes' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-amber-500 rounded-t-full"></div>}
-                </button>
-                <button
-                    onClick={() => setActiveTab('cuadrados')}
-                    className={`flex items-center gap-2 pb-4 px-6 font-medium text-sm transition-colors relative ${activeTab === 'cuadrados' ? 'text-emerald-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                >
-                    <CheckCircle className="w-4 h-4" />
-                    Cuadrados ({cuadrados.length})
-                    {activeTab === 'cuadrados' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500 rounded-t-full"></div>}
-                </button>
-            </div>
-
-            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
-                <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/90 backdrop-blur z-10">
-                            <tr className="text-slate-500 dark:text-slate-400 text-sm tracking-wider">
-                                <th className="px-6 py-4 font-medium uppercase">Producto</th>
-                                <th className="px-6 py-4 font-medium uppercase text-center">Teórico</th>
-                                <th className="px-6 py-4 font-medium uppercase text-center">Contado</th>
-                                <th className="px-6 py-4 font-medium uppercase text-center">Diferencia</th>
-                                <th className="px-6 py-4 font-medium uppercase text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {activeList.map(item => (
-                                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="font-medium text-slate-800 dark:text-slate-200">{item.product.name}</div>
-                                        <div className="text-xs text-slate-500 font-mono mt-1">{item.product.sku}</div>
-                                        {item.is_manually_added && (
-                                            <span className="inline-block mt-1 bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                                AÑADIDO MANUALMENTE
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-center font-medium text-slate-600 dark:text-slate-400">
-                                        {item.theoretical}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center justify-center gap-3">
-                                            <button 
-                                                onClick={() => updateItemCount(item.id, item.product_id, item.counted_stock > 0 ? -1 : 0)}
-                                                className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full transition-colors text-slate-600 dark:text-slate-300"
-                                            >
-                                                <Minus className="w-4 h-4" />
-                                            </button>
-                                            <span className="font-bold text-lg w-8 text-center text-slate-800 dark:text-slate-200">
-                                                {item.counted_stock}
-                                            </span>
-                                            <button 
-                                                onClick={() => updateItemCount(item.id, item.product_id, 1)}
-                                                className="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full transition-colors text-slate-600 dark:text-slate-300"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center font-bold">
-                                        <span className={item.diff < 0 ? 'text-rose-500' : item.diff > 0 ? 'text-amber-500' : 'text-emerald-500'}>
-                                            {item.diff > 0 ? '+' : ''}{item.diff}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleRemoveItem(item.id)}
-                                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors inline-flex"
-                                            title="Quitar del grupo"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {activeList.length === 0 && (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
-                                        No hay productos en esta sección.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+            {/* 3-COLUMN GRID DISPLAY (FALTANTES, SOBRANTES, CUADRADOS) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                {renderColumn('Faltantes', faltantes, 'faltantes')}
+                {renderColumn('Sobrantes', sobrantes, 'sobrantes')}
+                {renderColumn('Cuadrados', cuadrados, 'cuadrados')}
             </div>
         </div>
     );
