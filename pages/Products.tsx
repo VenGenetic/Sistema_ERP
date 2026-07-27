@@ -16,6 +16,7 @@ import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
 import { ProductLabelModal } from '../components/ProductLabelModal';
 import { InventoryGroupSelectModal } from '../components/InventoryGroupSelectModal';
+import { addToQueue, getPrintQueue, clearQueue, removeFromQueue, updateQueueItemQty, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF, PrintQueueItem } from '../utils/mobilePrintQueue';
 
 // Helper to parse query parameters from the hash or query string
 const getInitialParams = () => {
@@ -58,6 +59,13 @@ const Products: React.FC = () => {
 
     const [isSourcingModalOpen, setIsSourcingModalOpen] = useState(false);
     const [sourcingProduct, setSourcingProduct] = useState<any>(null);
+
+    // Print Queue States
+    const [queueToast, setQueueToast] = useState<string | null>(null);
+    const [isQueuePanelOpen, setIsQueuePanelOpen] = useState(false);
+    const [printQueue, setPrintQueue] = useState<PrintQueueItem[]>([]);
+    const [isQueueGenerating, setIsQueueGenerating] = useState(false);
+    const [showQueueClearConfirm, setShowQueueClearConfirm] = useState(false);
 
     // Export ZIP
     const [isExporting, setIsExporting] = useState(false);
@@ -1034,6 +1042,18 @@ const Products: React.FC = () => {
                             <span className="material-symbols-outlined text-[18px]">barcode_scanner</span>
                         </button>
                         <button
+                            onClick={() => {
+                                addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+                                setPrintQueue(getPrintQueue());
+                                setQueueToast(`✓ 1 etiqueta de ${prod.sku} agregada a la cola`);
+                                setTimeout(() => setQueueToast(null), 2000);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                            title="Agregar 1 etiqueta a la cola de impresión"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">playlist_add</span>
+                        </button>
+                        <button
                             onClick={() => handleDeleteProduct(prod)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
                             title="Eliminar Producto"
@@ -1527,6 +1547,22 @@ const Products: React.FC = () => {
                         Edición Rápida
                     </button>
                     <button
+                        onClick={() => {
+                            const selectedProds = products.filter(p => selectedIds.has(p.id));
+                            selectedProds.forEach(prod => {
+                                addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+                            });
+                            setPrintQueue(getPrintQueue());
+                            setQueueToast(`✓ ${selectedProds.length} repuesto(s) agregados a la cola`);
+                            setTimeout(() => setQueueToast(null), 2200);
+                            setSelectedIds(new Set());
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">playlist_add</span>
+                        Cola Impresión
+                    </button>
+                    <button
                         onClick={handleBulkDelete}
                         className="flex items-center gap-2 px-4 py-2 bg-rose-500 hover:bg-rose-400 text-white rounded-xl text-sm font-semibold transition-colors ml-2"
                     >
@@ -1560,6 +1596,125 @@ const Products: React.FC = () => {
                     selectedIds={selectedIds}
                 />
             )}
+
+            {/* ═══════ QUEUE TOAST ═══════ */}
+            {queueToast && (
+                <div className="fixed top-6 right-6 z-50 bg-amber-500 text-white py-3 px-5 rounded-xl shadow-2xl flex items-center gap-2 font-semibold text-sm animate-in slide-in-from-top-2">
+                    <span className="material-symbols-outlined text-lg">playlist_add_check</span>
+                    {queueToast}
+                </div>
+            )}
+
+            {/* ═══════ PRINT QUEUE FLOATING INDICATOR ═══════ */}
+            {(() => {
+                const q = printQueue.length > 0 ? printQueue : getPrintQueue();
+                if (q.length === 0) return null;
+                const totalLabels = getQueueTotalLabels(q);
+                const totalPages = getQueuePageCount(q);
+                return (
+                    <>
+                        {/* Collapsed FAB */}
+                        {!isQueuePanelOpen && (
+                            <button
+                                onClick={() => { setPrintQueue(getPrintQueue()); setIsQueuePanelOpen(true); }}
+                                className="fixed bottom-6 right-6 z-40 bg-amber-500 hover:bg-amber-600 text-white w-14 h-14 rounded-full shadow-2xl shadow-amber-500/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                                title="Ver cola de impresión"
+                            >
+                                <span className="material-symbols-outlined text-2xl">print</span>
+                                <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] flex items-center justify-center bg-white text-amber-600 text-[11px] font-black rounded-full shadow-md border-2 border-amber-500">
+                                    {q.length}
+                                </span>
+                            </button>
+                        )}
+
+                        {/* Expanded Queue Panel */}
+                        {isQueuePanelOpen && (
+                            <div className="fixed bottom-6 right-6 z-40 w-[380px] max-h-[70vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+                                {/* Panel Header */}
+                                <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/10">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">print</span>
+                                        <h3 className="font-bold text-slate-900 dark:text-white text-sm">Cola de Impresión</h3>
+                                        <span className="text-xs font-bold bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full">
+                                            {totalLabels} etiq · {totalPages} hoja{totalPages !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    <button onClick={() => setIsQueuePanelOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                                        <span className="material-symbols-outlined text-lg">close</span>
+                                    </button>
+                                </div>
+
+                                {/* Queue Items */}
+                                <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 max-h-[45vh]">
+                                    {printQueue.map((item) => (
+                                        <div key={item.sku} className="flex items-center gap-2.5 p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-750">
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-[11px] font-mono font-extrabold text-blue-700 dark:text-blue-300">{item.sku}</span>
+                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{item.name}</p>
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button onClick={() => { const updated = updateQueueItemQty(item.sku, item.quantity - 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">−</button>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={item.quantity}
+                                                    onChange={(e) => { const updated = updateQueueItemQty(item.sku, parseInt(e.target.value) || 1); setPrintQueue(updated); }}
+                                                    className="w-10 h-6 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-slate-800 dark:text-white p-0 focus:ring-0"
+                                                />
+                                                <button onClick={() => { const updated = updateQueueItemQty(item.sku, item.quantity + 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">+</button>
+                                            </div>
+                                            <button onClick={() => { const updated = removeFromQueue(item.sku); setPrintQueue(updated); }} className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Eliminar">
+                                                <span className="material-symbols-outlined text-[16px]">close</span>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Panel Footer */}
+                                <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+                                    {!showQueueClearConfirm ? (
+                                        <button
+                                            onClick={() => setShowQueueClearConfirm(true)}
+                                            className="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors flex items-center gap-1"
+                                        >
+                                            <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
+                                            Vaciar
+                                        </button>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[11px] text-rose-500 font-bold">¿Seguro?</span>
+                                            <button onClick={() => { clearQueue(); setPrintQueue([]); setShowQueueClearConfirm(false); setIsQueuePanelOpen(false); }} className="text-[11px] font-bold text-white bg-rose-500 px-2 py-1 rounded">Sí</button>
+                                            <button onClick={() => setShowQueueClearConfirm(false)} className="text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">No</button>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setIsQueueGenerating(true);
+                                            try {
+                                                downloadQueuePDF(printQueue);
+                                                setQueueToast(`✓ PDF con ${totalLabels} etiquetas descargado`);
+                                                setTimeout(() => setQueueToast(null), 2500);
+                                            } catch (err: any) {
+                                                alert('Error: ' + err.message);
+                                            } finally {
+                                                setIsQueueGenerating(false);
+                                            }
+                                        }}
+                                        disabled={isQueueGenerating}
+                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                                    >
+                                        {isQueueGenerating ? (
+                                            <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>Generando...</>
+                                        ) : (
+                                            <><span className="material-symbols-outlined text-lg">picture_as_pdf</span>Generar PDF ({totalLabels})</>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                );
+            })()}
         </div>
     );
 };

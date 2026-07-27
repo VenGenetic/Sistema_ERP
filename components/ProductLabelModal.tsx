@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import JsBarcode from 'jsbarcode';
 import { jsPDF } from 'jspdf';
+import { addToQueue } from '../utils/mobilePrintQueue';
 
 interface ProductLabelModalProps {
     isOpen: boolean;
@@ -123,6 +124,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const [printQuantity, setPrintQuantity] = useState(3);
     const [activeTab, setActiveTab] = useState<'image' | 'pdf'>('image');
     const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+    const [queueAdded, setQueueAdded] = useState(false);
 
     const createPDF = useCallback(() => {
         if (!labelCanvasRef.current) return null;
@@ -403,13 +405,13 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                 <div className="flex items-center gap-3">
                                     <input 
                                         type="number" 
-                                        min="3" 
-                                        step="3"
+                                        min="1" 
+                                        step="1"
                                         max="500"
                                         value={printQuantity} 
                                         onChange={(e) => {
-                                            const val = parseInt(e.target.value) || 3;
-                                            setPrintQuantity(Math.max(3, Math.ceil(val / 3) * 3));
+                                            const val = parseInt(e.target.value) || 1;
+                                            setPrintQuantity(Math.max(1, val));
                                         }}
                                         className="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                                     />
@@ -448,6 +450,29 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                         className="px-4 py-2 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mr-auto"
                     >
                         Cerrar
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            addToQueue(
+                                { id: product.id, sku: product.sku, name: product.name, image_url: product.image_url },
+                                printQuantity
+                            );
+                            setQueueAdded(true);
+                            if (navigator.vibrate) navigator.vibrate(50);
+                            setTimeout(() => setQueueAdded(false), 2500);
+                        }}
+                        className={`px-4 py-2 font-medium rounded-lg transition-colors flex items-center gap-2 border ${
+                            queueAdded
+                                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                                : 'text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 border-amber-200 dark:border-amber-700'
+                        }`}
+                        title="Agregar estas etiquetas a la cola de impresión"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">
+                            {queueAdded ? 'check' : 'playlist_add'}
+                        </span>
+                        {queueAdded ? `¡${printQuantity} agregadas a la cola!` : `Agregar ${printQuantity} a Cola`}
                     </button>
                     
                     <button

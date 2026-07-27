@@ -1,9 +1,31 @@
-import React from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { setPreferredViewMode } from '../../utils/deviceDetection';
+import { getPrintQueue } from '../../utils/mobilePrintQueue';
 
 const MobileLayout: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const [queueCount, setQueueCount] = useState(0);
+
+    const refreshQueueCount = useCallback(() => {
+        setQueueCount(getPrintQueue().length);
+    }, []);
+
+    useEffect(() => {
+        refreshQueueCount();
+        // Re-check queue count on route changes and storage events
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === 'mobile_print_queue') refreshQueueCount();
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, [refreshQueueCount]);
+
+    // Refresh queue badge whenever the route changes (e.g., after adding from catalog)
+    useEffect(() => {
+        refreshQueueCount();
+    }, [location.pathname, refreshQueueCount]);
 
     const handleSwitchToDesktop = () => {
         setPreferredViewMode('desktop');
@@ -97,6 +119,11 @@ const MobileLayout: React.FC = () => {
                                 <span className="material-symbols-outlined text-[26px]">
                                     print
                                 </span>
+                                {queueCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-amber-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-slate-900 shadow-md">
+                                        {queueCount}
+                                    </span>
+                                )}
                             </NavLink>
                         </li>
                         <li>

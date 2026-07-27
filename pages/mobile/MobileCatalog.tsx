@@ -13,6 +13,7 @@ import { QuickTagAssignModal } from '../../components/QuickTagAssignModal';
 import { ProductLabelModal } from '../../components/ProductLabelModal';
 
 import { printLabelsQuick, addToPrintHistory } from '../../utils/mobileLabelPrinter';
+import { addToQueue } from '../../utils/mobilePrintQueue';
 
 const MobileCatalog: React.FC = () => {
     // ──────────────────────────────────────────────
@@ -46,6 +47,10 @@ const MobileCatalog: React.FC = () => {
     const [selectedProductForTags, setSelectedProductForTags] = useState<any | null>(null);
     const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
     const [labelProduct, setLabelProduct] = useState<any>(null);
+
+    // Queue bottom-sheet
+    const [queueSheetProduct, setQueueSheetProduct] = useState<any>(null);
+    const [queueSheetQty, setQueueSheetQty] = useState(1);
 
     // ──────────────────────────────────────────────
     // 2. FILTRADO Y BÚSQUEDA INTELIGENTE
@@ -232,6 +237,24 @@ const MobileCatalog: React.FC = () => {
     };
 
     const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
+    const handleOpenQueueSheet = (prod: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setQueueSheetProduct(prod);
+        setQueueSheetQty(1);
+    };
+
+    const handleAddToQueueConfirm = () => {
+        if (!queueSheetProduct) return;
+        addToQueue(
+            { id: queueSheetProduct.id, sku: queueSheetProduct.sku, name: queueSheetProduct.name, image_url: queueSheetProduct.image_url },
+            queueSheetQty
+        );
+        if (navigator.vibrate) navigator.vibrate(50);
+        setPrintToast(`✓ ${queueSheetQty} etiqueta(s) de ${queueSheetProduct.sku} agregadas a la cola`);
+        setTimeout(() => setPrintToast(null), 2200);
+        setQueueSheetProduct(null);
+    };
 
     // ──────────────────────────────────────────────
     // 4. RENDER
@@ -452,6 +475,9 @@ const MobileCatalog: React.FC = () => {
                                             <button onClick={(e) => { e.stopPropagation(); setProductToEdit(prod); setIsModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 active:bg-slate-100 transition-colors" title="Editar">
                                                 <span className="material-symbols-outlined text-[22px]">edit</span>
                                             </button>
+                                            <button onClick={(e) => handleOpenQueueSheet(prod, e)} className="flex-1 py-3.5 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 active:bg-amber-100 transition-colors" title="Agregar a cola de impresión">
+                                                <span className="material-symbols-outlined text-[22px]">playlist_add</span>
+                                            </button>
                                             <button onClick={(e) => { e.stopPropagation(); setLabelProduct(prod); setIsLabelModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 active:bg-indigo-100 transition-colors" title="Ajuste Avanzado de Etiqueta">
                                                 <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
                                             </button>
@@ -577,6 +603,83 @@ const MobileCatalog: React.FC = () => {
             {lightbox.isOpen && <MediaLightbox isOpen={lightbox.isOpen} media={lightbox.media} initialIndex={lightbox.initialIndex} onClose={() => setLightbox(prev => ({ ...prev, isOpen: false }))} onAddMedia={() => { setLightbox(prev => ({ ...prev, isOpen: false })); if (lightbox.product) { setProductToEdit(lightbox.product); setIsModalOpen(true); } }} />}
             {selectedProductForTags && <QuickTagAssignModal isOpen={!!selectedProductForTags} onClose={() => setSelectedProductForTags(null)} onSuccess={handleRefresh} productId={selectedProductForTags.id} productName={selectedProductForTags.name} />}
             {isLabelModalOpen && <ProductLabelModal isOpen={isLabelModalOpen} onClose={() => { setIsLabelModalOpen(false); setLabelProduct(null); }} product={labelProduct} />}
+
+            {/* Queue Bottom Sheet */}
+            {queueSheetProduct && (
+                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs animate-fade-in" onClick={() => setQueueSheetProduct(null)}></div>
+                    <div className="relative bg-white dark:bg-slate-900 rounded-t-[32px] p-5 pt-2 pb-8 shadow-2xl animate-slide-up border-t border-amber-400/40 dark:border-amber-700/40">
+                        <div className="w-10 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-4 mt-2"></div>
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 mb-1">
+                            <span className="material-symbols-outlined text-amber-500">playlist_add</span>
+                            Agregar a Cola
+                        </h3>
+                        <p className="text-xs text-slate-500 mb-4">Se acumulará en tu borrador de impresión</p>
+
+                        <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl mb-4 border border-slate-200/60 dark:border-slate-750">
+                            {queueSheetProduct.image_url ? (
+                                <img src={getThumbnailUrl(queueSheetProduct.image_url, 200)} alt={queueSheetProduct.name} className="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
+                            ) : (
+                                <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+                                    <span className="material-symbols-outlined">image</span>
+                                </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <span className="text-xs font-mono font-extrabold text-blue-700 dark:text-blue-300">{queueSheetProduct.sku}</span>
+                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{queueSheetProduct.name}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-amber-50/70 dark:bg-amber-900/15 p-3 px-4 rounded-2xl border border-amber-200/60 dark:border-amber-800/40 mb-5">
+                            <span className="text-sm font-bold text-amber-800 dark:text-amber-300">Cantidad de etiquetas:</span>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center border border-amber-300/60 dark:border-amber-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-inner h-10">
+                                    <button
+                                        type="button"
+                                        className="px-3 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold text-lg"
+                                        onClick={() => setQueueSheetQty(Math.max(1, queueSheetQty - 1))}
+                                    >
+                                        −
+                                    </button>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        value={queueSheetQty}
+                                        onChange={(e) => setQueueSheetQty(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-14 text-center bg-transparent border-none focus:ring-0 text-slate-800 dark:text-white font-black text-lg p-0"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="px-3 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold text-lg"
+                                        onClick={() => setQueueSheetQty(queueSheetQty + 1)}
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setQueueSheetProduct(null)}
+                                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-2xl font-extrabold text-sm active:scale-95 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleAddToQueueConfirm}
+                                className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-extrabold text-sm shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-lg">add</span>
+                                Agregar {queueSheetQty}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
