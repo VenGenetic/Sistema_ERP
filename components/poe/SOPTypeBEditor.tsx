@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SOPDecisionNode, SOPNodeType } from '../../types/poe';
 import { 
   GitBranch, 
@@ -6,15 +6,12 @@ import {
   Trash2, 
   Check, 
   X, 
-  ArrowRight, 
   RotateCcw, 
   HelpCircle, 
   CheckCircle2, 
-  AlertTriangle, 
   Map, 
   Compass, 
-  ArrowLeft, 
-  CornerDownRight,
+  ArrowLeft,
   Sparkles
 } from 'lucide-react';
 
@@ -24,14 +21,29 @@ interface Props {
   isEditing: boolean;
 }
 
-export const SOPTypeBEditor: React.FC<Props> = ({ nodes = [], onUpdateNodes, isEditing }) => {
+export const SOPTypeBEditor: React.FC<Props> = ({ nodes: externalNodes = [], onUpdateNodes, isEditing }) => {
+  // LOCAL state to avoid losing focus on every keystroke
+  const [localNodes, setLocalNodes] = useState<SOPDecisionNode[]>([]);
+  const isFirstMount = useRef(true);
+
+  useEffect(() => {
+    const externalIds = externalNodes.map(n => n.id).join(',');
+    const localIds = localNodes.map(n => n.id).join(',');
+    if (isFirstMount.current || externalIds !== localIds) {
+      setLocalNodes(externalNodes);
+      isFirstMount.current = false;
+    }
+  }, [externalNodes]);
+
   const [viewMode, setViewMode] = useState<'WIZARD' | 'MAP'>('WIZARD');
-  const [currentNodeId, setCurrentNodeId] = useState<string | null>(nodes[0]?.id || null);
+  const [currentNodeId, setCurrentNodeId] = useState<string | null>(externalNodes[0]?.id || null);
   const [history, setHistory] = useState<{ nodeId: string; answer: 'YES' | 'NO' | 'START' }[]>([]);
 
-  // Si no hay nodos precargados o está vacío, creamos nodo raíz inicial
-  const ensureRootNode = () => {
-    if (nodes.length === 0) {
+  const nodes = localNodes;
+
+  // If no nodes, initialize root
+  useEffect(() => {
+    if (externalNodes.length === 0) {
       const root: SOPDecisionNode = {
         id: crypto.randomUUID(),
         node_type: 'QUESTION',
@@ -44,18 +56,25 @@ export const SOPTypeBEditor: React.FC<Props> = ({ nodes = [], onUpdateNodes, isE
       onUpdateNodes([root]);
       setCurrentNodeId(root.id);
     }
-  };
-
-  React.useEffect(() => {
-    ensureRootNode();
   }, []);
 
   const getNodeById = (id: string | null | undefined) => nodes.find(n => n.id === id);
   const rootNode = nodes[0];
 
-  // ACCIONES EN MODO EDICIÓN
+  // Update local only, persist to store on blur
+  const handleLocalUpdate = (id: string, updates: Partial<SOPDecisionNode>) => {
+    setLocalNodes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
+  };
+
+  const handleBlurSave = () => {
+    onUpdateNodes(localNodes);
+  };
+
+  // Structural changes (linking nodes, type change, add/delete) go directly to store
   const handleUpdateNode = (id: string, updates: Partial<SOPDecisionNode>) => {
-    onUpdateNodes(nodes.map(n => n.id === id ? { ...n, ...updates } : n));
+    const next = nodes.map(n => n.id === id ? { ...n, ...updates } : n);
+    setLocalNodes(next);
+    onUpdateNodes(next);
   };
 
   const handleCreateAndLinkNode = (parentId: string, branch: 'YES' | 'NO', type: SOPNodeType) => {
@@ -429,7 +448,8 @@ export const SOPTypeBEditor: React.FC<Props> = ({ nodes = [], onUpdateNodes, isE
                   <input
                     type="text"
                     value={node.question_or_action}
-                    onChange={(e) => handleUpdateNode(node.id, { question_or_action: e.target.value })}
+                    onChange={(e) => handleLocalUpdate(node.id, { question_or_action: e.target.value })}
+                    onBlur={handleBlurSave}
                     placeholder="Escribe la pregunta o acción aquí..."
                     className="w-full font-bold text-sm px-3 py-2 bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   />
@@ -438,7 +458,8 @@ export const SOPTypeBEditor: React.FC<Props> = ({ nodes = [], onUpdateNodes, isE
                 <div>
                   <textarea
                     value={node.detail_text || ''}
-                    onChange={(e) => handleUpdateNode(node.id, { detail_text: e.target.value })}
+                    onChange={(e) => handleLocalUpdate(node.id, { detail_text: e.target.value })}
+                    onBlur={handleBlurSave}
                     placeholder="Explicación adicional de apoyo al trabajador (opcional)..."
                     rows={2}
                     className="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-purple-500 custom-scrollbar resize-none"

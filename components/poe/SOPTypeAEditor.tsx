@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SOPListStep } from '../../types/poe';
-import { Plus, Trash2, ArrowUp, ArrowDown, CheckCircle2, Circle, RotateCcw, ListCheck, Sparkles, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, CheckCircle2, Circle, RotateCcw, ListCheck, Sparkles } from 'lucide-react';
 
 interface Props {
   steps: SOPListStep[];
@@ -8,55 +8,82 @@ interface Props {
   isEditing: boolean;
 }
 
-export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isEditing }) => {
-  // Estado local para marcar checks terminados durante la consulta/ejecución
+export const SOPTypeAEditor: React.FC<Props> = ({ steps: externalSteps = [], onUpdateSteps, isEditing }) => {
+  // Estado LOCAL de los pasos - protegido de re-renders externos mientras el usuario edita
+  const [localSteps, setLocalSteps] = useState<SOPListStep[]>([]);
+  const isFirstMount = useRef(true);
+
+  // Sync only on initial load or when steps structure changes (different IDs, not content)
+  useEffect(() => {
+    const externalIds = externalSteps.map(s => s.id).join(',');
+    const localIds = localSteps.map(s => s.id).join(',');
+    if (isFirstMount.current || externalIds !== localIds) {
+      setLocalSteps(externalSteps);
+      isFirstMount.current = false;
+    }
+  }, [externalSteps]);
+
+  // Estado local para marcar checks terminados durante la ejecución
   const [completedIds, setCompletedIds] = useState<string[]>([]);
+
+  // Actualizar localmente e inmediatamente, guardar al perder foco (onBlur)
+  const handleLocalUpdate = (id: string, updates: Partial<SOPListStep>) => {
+    setLocalSteps(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  };
+
+  // Persistir al store al perder foco en un campo
+  const handleBlurSave = () => {
+    onUpdateSteps(localSteps);
+  };
 
   const handleAddStep = () => {
     const newStep: SOPListStep = {
       id: crypto.randomUUID(),
-      title: `Nuevo Paso ${steps.length + 1}`,
-      description: 'Describe brevemente la instrucción...',
-      order_index: steps.length
+      title: '',
+      description: '',
+      order_index: localSteps.length
     };
-    onUpdateSteps([...steps, newStep]);
-  };
-
-  const handleUpdateStep = (id: string, updates: Partial<SOPListStep>) => {
-    onUpdateSteps(steps.map(s => s.id === id ? { ...s, ...updates } : s));
+    const next = [...localSteps, newStep];
+    setLocalSteps(next);
+    onUpdateSteps(next);
   };
 
   const handleDeleteStep = (id: string) => {
-    if (steps.length <= 1) {
+    if (localSteps.length <= 1) {
       alert("Una guía tipo Lista debe tener al menos 1 paso.");
       return;
     }
-    onUpdateSteps(steps.filter(s => s.id !== id).map((s, idx) => ({ ...s, order_index: idx })));
+    const next = localSteps.filter(s => s.id !== id).map((s, idx) => ({ ...s, order_index: idx }));
+    setLocalSteps(next);
+    onUpdateSteps(next);
   };
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
     const nextIdx = direction === 'up' ? index - 1 : index + 1;
-    if (nextIdx < 0 || nextIdx >= steps.length) return;
+    if (nextIdx < 0 || nextIdx >= localSteps.length) return;
 
-    const copy = [...steps];
+    const copy = [...localSteps];
     const temp = copy[index];
     copy[index] = copy[nextIdx];
     copy[nextIdx] = temp;
 
-    onUpdateSteps(copy.map((s, i) => ({ ...s, order_index: i })));
+    const next = copy.map((s, i) => ({ ...s, order_index: i }));
+    setLocalSteps(next);
+    onUpdateSteps(next);
   };
 
   const toggleCheck = (id: string) => {
-    setCompletedIds(prev => 
+    setCompletedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
 
   const resetChecks = () => setCompletedIds([]);
 
+  const steps = localSteps;
   const progress = steps.length > 0 ? Math.round((completedIds.length / steps.length) * 100) : 0;
 
-  // MODO LECTURA / EJECUCIÓN OPERATIVA
+  // ── MODO LECTURA / EJECUCIÓN OPERATIVA ──────────────────────────────────
   if (!isEditing) {
     return (
       <div className="space-y-6 max-w-3xl mx-auto py-4">
@@ -76,7 +103,7 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
                 {completedIds.length} / {steps.length} ({progress}%)
               </div>
               <div className="w-28 h-2 bg-slate-200 dark:bg-slate-800 rounded-full mt-1 overflow-hidden">
-                <div 
+                <div
                   className="h-full bg-blue-500 rounded-full transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
@@ -95,7 +122,6 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
           </div>
         </div>
 
-        {/* Banner de felicitación si terminó al 100% */}
         {progress === 100 && (
           <div className="p-4 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl flex items-center gap-3 text-emerald-600 dark:text-emerald-400 animate-in fade-in zoom-in-95 duration-200">
             <Sparkles className="w-6 h-6 shrink-0 text-emerald-500 animate-bounce" />
@@ -106,7 +132,6 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
           </div>
         )}
 
-        {/* Lista interactiva de Check */}
         <div className="space-y-3">
           {steps.map((step, idx) => {
             const isDone = completedIds.includes(step.id);
@@ -115,8 +140,8 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
                 key={step.id}
                 onClick={() => toggleCheck(step.id)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3.5 ${
-                  isDone 
-                    ? 'bg-slate-50/50 dark:bg-slate-900/40 border-emerald-500/40 shadow-xs opacity-75' 
+                  isDone
+                    ? 'bg-slate-50/50 dark:bg-slate-900/40 border-emerald-500/40 shadow-xs opacity-75'
                     : 'bg-white dark:bg-[#161b22] border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md'
                 }`}
               >
@@ -124,7 +149,7 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
                   {isDone ? (
                     <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-500/10" />
                   ) : (
-                    <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-blue-500" />
+                    <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600" />
                   )}
                 </div>
 
@@ -140,7 +165,7 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
                     )}
                   </div>
                   <h5 className={`font-semibold text-sm ${isDone ? 'line-through text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                    {step.title}
+                    {step.title || <span className="italic text-slate-400">Sin título</span>}
                   </h5>
                   {step.description && (
                     <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">
@@ -156,7 +181,7 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
     );
   }
 
-  // MODO EDICIÓN
+  // ── MODO EDICIÓN ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-4 max-w-3xl mx-auto py-4">
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -222,7 +247,8 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
               <input
                 type="text"
                 value={step.title}
-                onChange={(e) => handleUpdateStep(step.id, { title: e.target.value })}
+                onChange={(e) => handleLocalUpdate(step.id, { title: e.target.value })}
+                onBlur={handleBlurSave}
                 placeholder="Título del paso (Ej. Revisar código de barra)"
                 className="w-full font-semibold text-sm px-3 py-2 bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
@@ -231,7 +257,8 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
             <div>
               <textarea
                 value={step.description || ''}
-                onChange={(e) => handleUpdateStep(step.id, { description: e.target.value })}
+                onChange={(e) => handleLocalUpdate(step.id, { description: e.target.value })}
+                onBlur={handleBlurSave}
                 placeholder="Instrucciones detalladas de qué revisar o hacer en este paso..."
                 rows={2}
                 className="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 custom-scrollbar resize-none"
@@ -240,6 +267,14 @@ export const SOPTypeAEditor: React.FC<Props> = ({ steps = [], onUpdateSteps, isE
           </div>
         ))}
       </div>
+
+      {steps.length === 0 && (
+        <div className="text-center py-10 text-slate-400">
+          <ListCheck className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm font-medium">No hay pasos aún.</p>
+          <p className="text-xs">Usa el botón "Agregar Paso" para comenzar a construir tu checklist.</p>
+        </div>
+      )}
 
       <div className="pt-3 flex justify-center">
         <button

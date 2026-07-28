@@ -33,18 +33,29 @@ export const POEModal: React.FC = () => {
   const [description, setDescription] = useState('');
   const [selectedType, setSelectedType] = useState<SOPType>('A_LIST');
   const [isEditing, setIsEditing] = useState(false);
+  // Track which proc ID is currently open so we only reset state when it truly changes
+  const [openProcId, setOpenProcId] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedProcedureForModal) {
-      setTitle(selectedProcedureForModal.title || '');
-      setDescription(selectedProcedureForModal.description || '');
-      setIsEditing(false); // Por defecto se abre en modo Lectura/Operativo
+      // Only reset state when opening a *different* procedure
+      if (selectedProcedureForModal.id !== openProcId) {
+        setTitle(selectedProcedureForModal.title || '');
+        setDescription(selectedProcedureForModal.description || '');
+        setIsEditing(false);
+        setOpenProcId(selectedProcedureForModal.id);
+      }
     } else if (isCreatingNewProcedureModal) {
       setTitle('');
       setDescription('');
       setSelectedType(newProcedureTypePreset || 'A_LIST');
+      setOpenProcId(null);
+    } else {
+      // Modal closed
+      setOpenProcId(null);
+      setIsEditing(false);
     }
-  }, [selectedProcedureForModal, isCreatingNewProcedureModal, newProcedureTypePreset]);
+  }, [selectedProcedureForModal?.id, isCreatingNewProcedureModal, newProcedureTypePreset]);
 
   if (!selectedProcedureForModal && !isCreatingNewProcedureModal) return null;
 
