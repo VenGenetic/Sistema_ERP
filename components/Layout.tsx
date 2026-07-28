@@ -203,6 +203,12 @@ const Layout: React.FC = () => {
           </>
         )}
 
+        <p className="px-3 text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2 mt-4">Estándares & POE</p>
+        <Link to="/poe" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('poe') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+          <span className="material-symbols-outlined text-[20px]">account_tree</span>
+          Estándares (SOPs)
+        </Link>
+
       </nav>
 
       {/* System Status Footer */}
@@ -236,7 +242,8 @@ const Layout: React.FC = () => {
                 location.pathname.includes('partners') ? 'SOCIOS' :
                   location.pathname.includes('finance') ? 'FINANZAS' :
                     location.pathname.includes('expenses') ? 'GASTOS' :
-                      location.pathname.includes('settings') ? 'CONFIGURACION' : ''}
+                      location.pathname.includes('poe') ? 'ESTANDARES_POE' :
+                        location.pathname.includes('settings') ? 'CONFIGURACION' : ''}
             </span>
           </div>
         </div>

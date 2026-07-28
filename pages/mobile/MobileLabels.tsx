@@ -9,6 +9,7 @@ import {
     clearQueue, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF,
     PrintQueueItem
 } from '../../utils/mobilePrintQueue';
+import { PrintQueuePreviewModal } from '../../components/PrintQueuePreviewModal';
 
 const MobileLabels: React.FC = () => {
     const { products: allProducts, loading: catalogLoading } = useMobileProducts();
@@ -28,6 +29,7 @@ const MobileLabels: React.FC = () => {
     const [queueQtyMap, setQueueQtyMap] = useState<Record<string, number>>({});
     const [isGenerating, setIsGenerating] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     const queueDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Debounce queue search
@@ -722,30 +724,27 @@ const MobileLabels: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Generate PDF button */}
+                                    {/* Generate PDF / Preview button */}
                                     <button
                                         type="button"
-                                        onClick={handleGeneratePDF}
-                                        disabled={isGenerating}
-                                        className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl font-extrabold text-sm shadow-lg shadow-emerald-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                                        onClick={() => setIsPreviewModalOpen(true)}
+                                        className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-xl font-extrabold text-sm shadow-lg shadow-emerald-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                                     >
-                                        {isGenerating ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                                Generando...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
-                                                Generar PDF ({totalLabels} etiquetas)
-                                            </>
-                                        )}
+                                        <span className="material-symbols-outlined text-lg">visibility</span>
+                                        Vista Previa e Imprimir ({totalLabels} etiq.)
                                     </button>
                                 </div>
                             </div>
                         )}
                     </>
                 )}
+
+                <PrintQueuePreviewModal
+                    isOpen={isPreviewModalOpen}
+                    onClose={() => setIsPreviewModalOpen(false)}
+                    onQueueUpdated={(updated) => setQueue(updated)}
+                    isMobile={true}
+                />
             </div>
         </div>
     );
