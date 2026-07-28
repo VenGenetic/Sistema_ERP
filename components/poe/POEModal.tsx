@@ -203,6 +203,71 @@ export const POEModal: React.FC = () => {
     updateProcedure(proc.id, { content_json: newContent });
   };
 
+  const handleToggleSopType = (newType: SOPType) => {
+    if (newType === proc.sop_type) return;
+
+    if (!confirm(`¿Estás seguro de cambiar el tipo de SOP a ${newType === 'A_LIST' ? 'Lista Rápida' : 'Flowchart'}? Intentaremos convertir tu contenido actual para que no lo pierdas.`)) {
+      return;
+    }
+
+    let newContent: any[] = [];
+    if (newType === 'B_DECISION') {
+      // Convert A_LIST (SOPListStep[]) to B_DECISION (SOPDecisionNode[])
+      const listSteps = (proc.content_json || []) as any[];
+      if (listSteps.length === 0) {
+        newContent = [{
+          id: crypto.randomUUID(),
+          node_type: 'QUESTION',
+          question_or_action: '¿Se cumple la condición principal?',
+          detail_text: '',
+          yes_next_id: null,
+          no_next_id: null,
+          color_tag: 'blue'
+        }];
+      } else {
+        // Convert list to a linear decision flow
+        newContent = listSteps.map((step, idx) => {
+          const isLast = idx === listSteps.length - 1;
+          const nextId = isLast ? null : (listSteps[idx + 1].id || crypto.randomUUID());
+          return {
+            id: step.id || crypto.randomUUID(),
+            node_type: isLast ? 'ACTION' : 'QUESTION',
+            question_or_action: step.title || `Paso ${idx + 1}`,
+            detail_text: step.description || '',
+            yes_next_id: nextId,
+            no_next_id: null,
+            color_tag: 'blue'
+          };
+        });
+      }
+    } else {
+      // Convert B_DECISION (SOPDecisionNode[]) to A_LIST (SOPListStep[])
+      const decisionNodes = (proc.content_json || []) as any[];
+      if (decisionNodes.length === 0) {
+        newContent = [{
+          id: crypto.randomUUID(),
+          title: 'Paso 1: Procedimiento iniciado',
+          description: '',
+          order_index: 0
+        }];
+      } else {
+        // Just flatten all nodes sequentially
+        newContent = decisionNodes.map((node, idx) => ({
+          id: node.id || crypto.randomUUID(),
+          title: node.question_or_action || `Paso ${idx + 1}`,
+          description: node.detail_text || '',
+          order_index: idx
+        }));
+      }
+    }
+
+    // Update procedure with new type and converted content
+    updateProcedure(proc.id, {
+      sop_type: newType,
+      content_json: newContent
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 md:p-6 animate-in fade-in duration-150 overflow-y-auto">
       <div className="bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -210,16 +275,27 @@ export const POEModal: React.FC = () => {
         {/* BARRA SUPERIOR DEL MODAL */}
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 bg-slate-50/70 dark:bg-[#111720]/80">
           <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-            {proc.sop_type === 'A_LIST' ? (
-              <span className="px-3 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-extrabold rounded-xl text-xs flex items-center gap-1.5 border border-blue-200 dark:border-blue-800/60 shadow-xs shrink-0">
-                <ListCheck className="w-4 h-4 text-blue-500" />
-                Lista Rápida (Tipo A)
-              </span>
+            {isEditing ? (
+              <select
+                value={proc.sop_type}
+                onChange={(e) => handleToggleSopType(e.target.value as SOPType)}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+              >
+                <option value="A_LIST">📋 Lista Rápida (Tipo A)</option>
+                <option value="B_DECISION">🌿 Flowchart Sí/No (Tipo B)</option>
+              </select>
             ) : (
-              <span className="px-3 py-1 bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-extrabold rounded-xl text-xs flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/60 shadow-xs shrink-0">
-                <GitBranch className="w-4 h-4 text-purple-500" />
-                Flowchart Sí/No (Tipo B)
-              </span>
+              proc.sop_type === 'A_LIST' ? (
+                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-extrabold rounded-xl text-xs flex items-center gap-1.5 border border-blue-200 dark:border-blue-800/60 shadow-xs shrink-0">
+                  <ListCheck className="w-4 h-4 text-blue-500" />
+                  Lista Rápida (Tipo A)
+                </span>
+              ) : (
+                <span className="px-3 py-1 bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-extrabold rounded-xl text-xs flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/60 shadow-xs shrink-0">
+                  <GitBranch className="w-4 h-4 text-purple-500" />
+                  Flowchart Sí/No (Tipo B)
+                </span>
+              )
             )}
 
             <div className="flex-1 min-w-0">
