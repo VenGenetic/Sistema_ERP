@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { supabase } from '../supabaseClient';
 import { 
   POEProcedure, 
@@ -60,404 +61,263 @@ const DEFAULT_LOCAL_TAGS: POETag[] = [
   { id: 'tag-almacen', column_id: 'col-area', name: 'Almacén y Logística', color: '#3B82F6', order_index: 0 },
   { id: 'tag-ventas', column_id: 'col-area', name: 'Ventas y Mostrador', color: '#10B981', order_index: 1 },
   { id: 'tag-admin', column_id: 'col-area', name: 'Administración y Finanzas', color: '#8B5CF6', order_index: 2 },
-  
   { id: 'tag-supervisor', column_id: 'col-roles', name: 'Supervisor', color: '#F59E0B', order_index: 0 },
   { id: 'tag-operario', column_id: 'col-roles', name: 'Operario', color: '#06B6D4', order_index: 1 },
-
   { id: 'tag-activo', column_id: 'col-estado', name: 'Vigente', color: '#10B981', order_index: 0 },
   { id: 'tag-revision', column_id: 'col-estado', name: 'En Revisión', color: '#F97316', order_index: 1 }
 ];
 
-// Helper functions for offline localStorage cache fallback
-const loadLocalData = () => {
-  try {
-    const cols = localStorage.getItem('poe_local_columns');
-    const tags = localStorage.getItem('poe_local_tags');
-    const procs = localStorage.getItem('poe_local_procedures');
-    return {
-      columns: cols ? JSON.parse(cols) : null,
-      tags: tags ? JSON.parse(tags) : null,
-      procedures: procs ? JSON.parse(procs) : null
-    };
-  } catch (e) {
-    console.error("Error loading POE local data:", e);
-    return { columns: null, tags: null, procedures: null };
-  }
-};
+export const usePOEStore = create<POEStoreState>()(
+  persist(
+    (set, get) => ({
+      procedures: [],
+      columns: DEFAULT_LOCAL_COLUMNS,
+      tags: DEFAULT_LOCAL_TAGS,
+      loading: false,
+      error: null,
+      searchQuery: '',
+      selectedSopTypeFilter: 'ALL',
+      sortColumnId: 'title',
+      sortDirection: 'asc',
+      activeSidePeekColumnId: null,
+      columnFilters: {},
+      selectedProcedureForModal: null,
+      isCreatingNewProcedureModal: false,
+      newProcedureTypePreset: 'A_LIST',
 
-const saveLocalData = (key: 'columns' | 'tags' | 'procedures', data: any) => {
-  try {
-    localStorage.setItem(`poe_local_${key}`, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Error saving POE local ${key}:`, e);
-  }
-};
+      fetchPOEData: async () => {
+        set({ loading: true, error: null });
+        try {
+          const { data: colsData, error: colsErr } = await supabase
+            .from('poe_columns')
+            .select('*')
+            .order('order_index', { ascending: true });
 
-export const usePOEStore = create<POEStoreState>((set, get) => ({
-  procedures: [],
-  columns: [],
-  tags: [],
-  loading: false,
-  error: null,
-  searchQuery: '',
-  selectedSopTypeFilter: 'ALL',
-  sortColumnId: 'title',
-  sortDirection: 'asc',
-  activeSidePeekColumnId: null,
-  columnFilters: {},
-  selectedProcedureForModal: null,
-  isCreatingNewProcedureModal: false,
-  newProcedureTypePreset: 'A_LIST',
+          if (colsErr) {
+            // Any Supabase error (table missing, network, etc.) -> keep existing persisted state
+            console.warn("[POE]: Supabase unavailable, keeping local persisted data.", colsErr.message);
+            set({ loading: false });
+            return;
+          }
 
-  fetchPOEData: async () => {
-    set({ loading: true, error: null });
-    try {
-      // 1. Obtener columnas
-      const { data: colsData, error: colsErr } = await supabase
-        .from('poe_columns')
-        .select('*')
-        .order('order_index', { ascending: true });
+          const { data: tagsData } = await supabase
+            .from('poe_tags')
+            .select('*')
+            .order('order_index', { ascending: true });
 
-      if (colsErr && colsErr.code === '42P01') {
-        // La tabla aún no existe en Supabase -> usamos localStorage fallback
-        console.warn("[POE Module]: Tablas POE aún no creadas en Supabase. Cargando datos desde localStorage.");
-        const local = loadLocalData();
-        set({
-          columns: local.columns || DEFAULT_LOCAL_COLUMNS,
-          tags: local.tags || DEFAULT_LOCAL_TAGS,
-          procedures: local.procedures || [],
-          loading: false
-        });
-        return;
-      }
+          const { data: procsData } = await supabase
+            .from('poe_procedures')
+            .select('*')
+            .order('updated_at', { ascending: false });
 
-      // 2. Obtener tags
-      const { data: tagsData } = await supabase
-        .from('poe_tags')
-        .select('*')
-        .order('order_index', { ascending: true });
+          // Only update from Supabase if it actually has data OR if we have no local data
+          const currentProcs = get().procedures;
+          set({
+            columns: (colsData && colsData.length > 0) ? colsData : get().columns,
+            tags: (tagsData && tagsData.length > 0) ? tagsData : get().tags,
+            // If Supabase has procedures, use them. If empty but we have local ones, keep local
+            procedures: (procsData && procsData.length > 0) 
+              ? procsData 
+              : (currentProcs.length > 0 ? currentProcs : []),
+            loading: false
+          });
+        } catch (e: any) {
+          console.warn("[POE]: Network error, keeping local persisted data.", e?.message);
+          set({ loading: false });
+        }
+      },
 
-      // 3. Obtener procedimientos
-      const { data: procsData } = await supabase
-        .from('poe_procedures')
-        .select('*')
-        .order('updated_at', { ascending: false });
+      createProcedure: async (title, sop_type, description = '') => {
+        const defaultContent = sop_type === 'A_LIST'
+          ? [{ id: crypto.randomUUID(), title: 'Paso inicial 1: Verificar requerimientos', order_index: 0 }]
+          : [{ id: crypto.randomUUID(), node_type: 'QUESTION', question_or_action: '¿Se cumplen las condiciones básicas del proceso?', yes_next_id: null, no_next_id: null, color_tag: 'blue' }];
 
-      set({
-        columns: colsData || DEFAULT_LOCAL_COLUMNS,
-        tags: tagsData || DEFAULT_LOCAL_TAGS,
-        procedures: procsData || [],
-        loading: false
-      });
-    } catch (e: any) {
-      console.warn("[POE Module]: Error conectando a base de datos. Cargando datos de respaldo local.", e);
-      const local = loadLocalData();
-      set({
-        columns: local.columns || DEFAULT_LOCAL_COLUMNS,
-        tags: local.tags || DEFAULT_LOCAL_TAGS,
-        procedures: local.procedures || [],
-        loading: false
-      });
+        const newProc: Omit<POEProcedure, 'id'> = {
+          title: title || 'Nuevo Procedimiento Estándar (SOP)',
+          description,
+          sop_type,
+          content_json: defaultContent as any,
+          custom_values: {},
+          status: 'active',
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        };
+
+        try {
+          const { data, error } = await supabase
+            .from('poe_procedures')
+            .insert(newProc)
+            .select()
+            .single();
+
+          if (error || !data) {
+            // Supabase unavailable → save locally with a local ID
+            const localProc = { ...newProc, id: crypto.randomUUID() } as POEProcedure;
+            set(state => ({ procedures: [localProc, ...state.procedures] }));
+            return localProc;
+          }
+
+          set(state => ({ procedures: [data, ...state.procedures] }));
+          return data;
+        } catch (e) {
+          const localProc = { ...newProc, id: crypto.randomUUID() } as POEProcedure;
+          set(state => ({ procedures: [localProc, ...state.procedures] }));
+          return localProc;
+        }
+      },
+
+      updateProcedure: async (id, updates) => {
+        const payload = { ...updates, updated_at: new Date().toISOString() };
+
+        // Optimistic update — persisted immediately by zustand/persist
+        set(state => ({
+          procedures: state.procedures.map(p => p.id === id ? { ...p, ...payload } : p),
+          selectedProcedureForModal: state.selectedProcedureForModal?.id === id
+            ? { ...state.selectedProcedureForModal, ...payload }
+            : state.selectedProcedureForModal
+        }));
+
+        try {
+          await supabase.from('poe_procedures').update(payload).eq('id', id);
+        } catch (e) {
+          console.warn("Supabase update failed, changes saved locally.", e);
+        }
+      },
+
+      deleteProcedure: async (id) => {
+        set(state => ({
+          procedures: state.procedures.filter(p => p.id !== id),
+          selectedProcedureForModal: state.selectedProcedureForModal?.id === id ? null : state.selectedProcedureForModal
+        }));
+
+        try {
+          await supabase.from('poe_procedures').delete().eq('id', id);
+        } catch (e) {
+          console.warn("Supabase delete failed, removed locally.", e);
+        }
+      },
+
+      updateCellCustomValue: async (procedureId, columnId, value) => {
+        const proc = get().procedures.find(p => p.id === procedureId);
+        if (!proc) return;
+        const newCustomValues = { ...(proc.custom_values || {}), [columnId]: value };
+        await get().updateProcedure(procedureId, { custom_values: newCustomValues });
+      },
+
+      createColumn: async (name, type) => {
+        const columns = get().columns;
+        const newCol: Omit<POEColumn, 'id'> = {
+          name: name || 'Nueva Columna',
+          type,
+          order_index: columns.length,
+          width: type === 'text' ? 220 : 180,
+          is_system: false,
+          created_at: new Date().toISOString()
+        };
+
+        try {
+          const { data, error } = await supabase.from('poe_columns').insert(newCol).select().single();
+          if (error || !data) {
+            const localCol = { ...newCol, id: `col-${Date.now()}` } as POEColumn;
+            set(state => ({ columns: [...state.columns, localCol] }));
+            return localCol;
+          }
+          set(state => ({ columns: [...state.columns, data] }));
+          return data;
+        } catch (e) {
+          const localCol = { ...newCol, id: `col-${Date.now()}` } as POEColumn;
+          set(state => ({ columns: [...state.columns, localCol] }));
+          return localCol;
+        }
+      },
+
+      updateColumn: async (id, updates) => {
+        set(state => ({ columns: state.columns.map(c => c.id === id ? { ...c, ...updates } : c) }));
+        try { await supabase.from('poe_columns').update(updates).eq('id', id); } catch (e) {}
+      },
+
+      deleteColumn: async (id) => {
+        set(state => ({
+          columns: state.columns.filter(c => c.id !== id),
+          tags: state.tags.filter(t => t.column_id !== id),
+          activeSidePeekColumnId: state.activeSidePeekColumnId === id ? null : state.activeSidePeekColumnId
+        }));
+        try { await supabase.from('poe_columns').delete().eq('id', id); } catch (e) {}
+      },
+
+      createTag: async (column_id, name, color) => {
+        const existingTags = get().tags.filter(t => t.column_id === column_id);
+        const assignedColor = color || DEFAULT_TAG_COLORS[existingTags.length % DEFAULT_TAG_COLORS.length];
+        const newTag: Omit<POETag, 'id'> = {
+          column_id, name, color: assignedColor,
+          order_index: existingTags.length,
+          created_at: new Date().toISOString()
+        };
+
+        try {
+          const { data, error } = await supabase.from('poe_tags').insert(newTag).select().single();
+          if (error || !data) {
+            const localTag = { ...newTag, id: `tag-${Date.now()}` } as POETag;
+            set(state => ({ tags: [...state.tags, localTag] }));
+            return localTag;
+          }
+          set(state => ({ tags: [...state.tags, data] }));
+          return data;
+        } catch (e) {
+          const localTag = { ...newTag, id: `tag-${Date.now()}` } as POETag;
+          set(state => ({ tags: [...state.tags, localTag] }));
+          return localTag;
+        }
+      },
+
+      updateTag: async (id, updates) => {
+        set(state => ({ tags: state.tags.map(t => t.id === id ? { ...t, ...updates } : t) }));
+        try { await supabase.from('poe_tags').update(updates).eq('id', id); } catch (e) {}
+      },
+
+      deleteTag: async (id) => {
+        set(state => ({ tags: state.tags.filter(t => t.id !== id) }));
+        try { await supabase.from('poe_tags').delete().eq('id', id); } catch (e) {}
+      },
+
+      setSearchQuery: (query) => set({ searchQuery: query }),
+      setSelectedSopTypeFilter: (filter) => set({ selectedSopTypeFilter: filter }),
+      setSort: (columnId, direction) => {
+        const { sortColumnId, sortDirection } = get();
+        let nextDir = direction;
+        if (!nextDir) {
+          nextDir = sortColumnId === columnId
+            ? (sortDirection === 'asc' ? 'desc' : 'asc')
+            : 'asc';
+        }
+        set({ sortColumnId: columnId, sortDirection: nextDir });
+      },
+      setActiveSidePeekColumnId: (columnId) => set({ activeSidePeekColumnId: columnId }),
+      setColumnFilter: (columnId, value) => set(state => {
+        const nextFilters = { ...state.columnFilters };
+        if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) {
+          delete nextFilters[columnId];
+        } else {
+          nextFilters[columnId] = value;
+        }
+        return { columnFilters: nextFilters };
+      }),
+      clearAllFilters: () => set({ columnFilters: {}, selectedSopTypeFilter: 'ALL', searchQuery: '' }),
+      setSelectedProcedureForModal: (proc) => set({ selectedProcedureForModal: proc }),
+      setIsCreatingNewProcedureModal: (isOpen, presetType = 'A_LIST') => set({
+        isCreatingNewProcedureModal: isOpen,
+        newProcedureTypePreset: presetType
+      })
+    }),
+    {
+      name: 'poe-store-v1', // localStorage key
+      storage: createJSONStorage(() => localStorage),
+      // Only persist the data that must survive page refreshes
+      partialize: (state) => ({
+        procedures: state.procedures,
+        columns: state.columns,
+        tags: state.tags,
+      }),
     }
-  },
-
-  createProcedure: async (title, sop_type, description = '') => {
-    const defaultContent = sop_type === 'A_LIST' 
-      ? [{ id: crypto.randomUUID(), title: 'Paso inicial 1: Verificar requerimientos', order_index: 0 }] 
-      : [{ id: crypto.randomUUID(), node_type: 'QUESTION', question_or_action: '¿Se cumplen las condiciones básicas del proceso?', yes_next_id: null, no_next_id: null, color_tag: 'blue' }];
-
-    const newProc: Omit<POEProcedure, 'id'> = {
-      title: title || 'Nuevo Procedimiento Estándar (SOP)',
-      description,
-      sop_type,
-      content_json: defaultContent as any,
-      custom_values: {},
-      status: 'active',
-      updated_at: new Date().toISOString(),
-      created_at: new Date().toISOString()
-    };
-
-    try {
-      const { data, error } = await supabase
-        .from('poe_procedures')
-        .insert(newProc)
-        .select()
-        .single();
-
-      if (error) {
-        // Fallback local
-        const localId = crypto.randomUUID();
-        const localProc = { ...newProc, id: localId } as POEProcedure;
-        set(state => {
-          const nextProcs = [localProc, ...state.procedures];
-          saveLocalData('procedures', nextProcs);
-          return { procedures: nextProcs };
-        });
-        return localProc;
-      }
-
-      if (data) {
-        set(state => {
-          const nextProcs = [data, ...state.procedures];
-          saveLocalData('procedures', nextProcs); // Sync local storage also
-          return { procedures: nextProcs };
-        });
-        return data;
-      }
-    } catch (e) {
-      const localProc = { ...newProc, id: crypto.randomUUID() } as POEProcedure;
-      set(state => {
-        const nextProcs = [localProc, ...state.procedures];
-        saveLocalData('procedures', nextProcs);
-        return { procedures: nextProcs };
-      });
-      return localProc;
-    }
-    return null;
-  },
-
-  updateProcedure: async (id, updates) => {
-    const payload = { ...updates, updated_at: new Date().toISOString() };
-    
-    // Optimistic update
-    set(state => {
-      const nextProcs = state.procedures.map(p => p.id === id ? { ...p, ...payload } : p);
-      saveLocalData('procedures', nextProcs);
-      return {
-        procedures: nextProcs,
-        selectedProcedureForModal: state.selectedProcedureForModal?.id === id 
-          ? { ...state.selectedProcedureForModal, ...payload } 
-          : state.selectedProcedureForModal
-      };
-    });
-
-    try {
-      await supabase
-        .from('poe_procedures')
-        .update(payload)
-        .eq('id', id);
-    } catch (e) {
-      console.error("Error al actualizar procedimiento en Supabase:", e);
-    }
-  },
-
-  deleteProcedure: async (id) => {
-    set(state => {
-      const nextProcs = state.procedures.filter(p => p.id !== id);
-      saveLocalData('procedures', nextProcs);
-      return {
-        procedures: nextProcs,
-        selectedProcedureForModal: state.selectedProcedureForModal?.id === id ? null : state.selectedProcedureForModal
-      };
-    });
-
-    try {
-      await supabase.from('poe_procedures').delete().eq('id', id);
-    } catch (e) {
-      console.error("Error al eliminar procedimiento:", e);
-    }
-  },
-
-  updateCellCustomValue: async (procedureId, columnId, value) => {
-    const proc = get().procedures.find(p => p.id === procedureId);
-    if (!proc) return;
-
-    const newCustomValues = {
-      ...(proc.custom_values || {}),
-      [columnId]: value
-    };
-
-    await get().updateProcedure(procedureId, { custom_values: newCustomValues });
-  },
-
-  createColumn: async (name, type) => {
-    const columns = get().columns;
-    const newCol: Omit<POEColumn, 'id'> = {
-      name: name || 'Nueva Columna',
-      type,
-      order_index: columns.length,
-      width: type === 'text' ? 220 : 180,
-      is_system: false,
-      created_at: new Date().toISOString()
-    };
-
-    try {
-      const { data, error } = await supabase
-        .from('poe_columns')
-        .insert(newCol)
-        .select()
-        .single();
-
-      if (error) {
-        const localCol = { ...newCol, id: `col-${Date.now()}` } as POEColumn;
-        set(state => {
-          const nextCols = [...state.columns, localCol];
-          saveLocalData('columns', nextCols);
-          return { columns: nextCols };
-        });
-        return localCol;
-      }
-
-      if (data) {
-        set(state => {
-          const nextCols = [...state.columns, data];
-          saveLocalData('columns', nextCols);
-          return { columns: nextCols };
-        });
-        return data;
-      }
-    } catch (e) {
-      const localCol = { ...newCol, id: `col-${Date.now()}` } as POEColumn;
-      set(state => {
-        const nextCols = [...state.columns, localCol];
-        saveLocalData('columns', nextCols);
-        return { columns: nextCols };
-      });
-      return localCol;
-    }
-    return null;
-  },
-
-  updateColumn: async (id, updates) => {
-    set(state => {
-      const nextCols = state.columns.map(c => c.id === id ? { ...c, ...updates } : c);
-      saveLocalData('columns', nextCols);
-      return { columns: nextCols };
-    });
-
-    try {
-      await supabase.from('poe_columns').update(updates).eq('id', id);
-    } catch (e) {
-      console.error("Error al actualizar columna en Supabase:", e);
-    }
-  },
-
-  deleteColumn: async (id) => {
-    set(state => {
-      const nextCols = state.columns.filter(c => c.id !== id);
-      const nextTags = state.tags.filter(t => t.column_id !== id);
-      saveLocalData('columns', nextCols);
-      saveLocalData('tags', nextTags);
-      return {
-        columns: nextCols,
-        tags: nextTags,
-        activeSidePeekColumnId: state.activeSidePeekColumnId === id ? null : state.activeSidePeekColumnId
-      };
-    });
-
-    try {
-      await supabase.from('poe_columns').delete().eq('id', id);
-    } catch (e) {
-      console.error("Error al eliminar columna en Supabase:", e);
-    }
-  },
-
-  createTag: async (column_id, name, color) => {
-    const existingTags = get().tags.filter(t => t.column_id === column_id);
-    const assignedColor = color || DEFAULT_TAG_COLORS[existingTags.length % DEFAULT_TAG_COLORS.length];
-    
-    const newTag: Omit<POETag, 'id'> = {
-      column_id,
-      name,
-      color: assignedColor,
-      order_index: existingTags.length,
-      created_at: new Date().toISOString()
-    };
-
-    try {
-      const { data, error } = await supabase
-        .from('poe_tags')
-        .insert(newTag)
-        .select()
-        .single();
-
-      if (error) {
-        const localTag = { ...newTag, id: `tag-${Date.now()}-${Math.random().toString(36).substring(2, 6)}` } as POETag;
-        set(state => {
-          const nextTags = [...state.tags, localTag];
-          saveLocalData('tags', nextTags);
-          return { tags: nextTags };
-        });
-        return localTag;
-      }
-
-      if (data) {
-        set(state => {
-          const nextTags = [...state.tags, data];
-          saveLocalData('tags', nextTags);
-          return { tags: nextTags };
-        });
-        return data;
-      }
-    } catch (e) {
-      const localTag = { ...newTag, id: `tag-${Date.now()}-${Math.random().toString(36).substring(2, 6)}` } as POETag;
-      set(state => {
-        const nextTags = [...state.tags, localTag];
-        saveLocalData('tags', nextTags);
-        return { tags: nextTags };
-      });
-      return localTag;
-    }
-    return null;
-  },
-
-  updateTag: async (id, updates) => {
-    set(state => {
-      const nextTags = state.tags.map(t => t.id === id ? { ...t, ...updates } : t);
-      saveLocalData('tags', nextTags);
-      return { tags: nextTags };
-    });
-
-    try {
-      await supabase.from('poe_tags').update(updates).eq('id', id);
-    } catch (e) {
-      console.error("Error updating tag:", e);
-    }
-  },
-
-  deleteTag: async (id) => {
-    set(state => {
-      const nextTags = state.tags.filter(t => t.id !== id);
-      saveLocalData('tags', nextTags);
-      return { tags: nextTags };
-    });
-
-    try {
-      await supabase.from('poe_tags').delete().eq('id', id);
-    } catch (e) {
-      console.error("Error deleting tag:", e);
-    }
-  },
-
-  setSearchQuery: (query) => set({ searchQuery: query }),
-  setSelectedSopTypeFilter: (filter) => set({ selectedSopTypeFilter: filter }),
-  setSort: (columnId, direction) => {
-    const currentSort = get().sortColumnId;
-    const currentDir = get().sortDirection;
-    let nextDir = direction;
-    if (!nextDir) {
-      if (currentSort === columnId) {
-        nextDir = currentDir === 'asc' ? 'desc' : 'asc';
-      } else {
-        nextDir = 'asc';
-      }
-    }
-    set({ sortColumnId: columnId, sortDirection: nextDir });
-  },
-  setActiveSidePeekColumnId: (columnId) => set({ activeSidePeekColumnId: columnId }),
-  setColumnFilter: (columnId, value) => set(state => {
-    const nextFilters = { ...state.columnFilters };
-    if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) {
-      delete nextFilters[columnId];
-    } else {
-      nextFilters[columnId] = value;
-    }
-    return { columnFilters: nextFilters };
-  }),
-  clearAllFilters: () => set({ columnFilters: {}, selectedSopTypeFilter: 'ALL', searchQuery: '' }),
-  setSelectedProcedureForModal: (proc) => set({ selectedProcedureForModal: proc }),
-  setIsCreatingNewProcedureModal: (isOpen, presetType = 'A_LIST') => set({ 
-    isCreatingNewProcedureModal: isOpen, 
-    newProcedureTypePreset: presetType 
-  })
-}));
+  )
+);
