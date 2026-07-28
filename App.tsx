@@ -30,6 +30,7 @@ const ProductDemands = React.lazy(() => import('./pages/ProductDemands'));
 const SourcingPipeline = React.lazy(() => import('./pages/SourcingPipeline'));
 const InventoryMode = React.lazy(() => import('./pages/InventoryMode').then(module => ({ default: module.InventoryMode })));
 const InventorySession = React.lazy(() => import('./pages/InventorySession').then(module => ({ default: module.InventorySession })));
+const POE = React.lazy(() => import('./pages/POE'));
 
 // Lazy load mobile pages
 const MobileLayout = React.lazy(() => import('./components/mobile/MobileLayout'));
@@ -88,6 +89,7 @@ const App: React.FC = () => {
                 <Route path="finance/*" element={<Finance />} />
                 <Route path="daily-registry" element={<DailyRegistry />} />
                 <Route path="expenses" element={<Expenses />} />
+                <Route path="poe" element={<POE />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Route>
