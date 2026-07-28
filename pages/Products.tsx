@@ -16,6 +16,7 @@ import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
 import { ProductLabelModal } from '../components/ProductLabelModal';
 import { InventoryGroupSelectModal } from '../components/InventoryGroupSelectModal';
+import { PrintQueuePreviewModal } from '../components/PrintQueuePreviewModal';
 import { addToQueue, getPrintQueue, clearQueue, removeFromQueue, updateQueueItemQty, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF, PrintQueueItem } from '../utils/mobilePrintQueue';
 
 // Helper to parse query parameters from the hash or query string
@@ -63,6 +64,7 @@ const Products: React.FC = () => {
     // Print Queue States
     const [queueToast, setQueueToast] = useState<string | null>(null);
     const [isQueuePanelOpen, setIsQueuePanelOpen] = useState(false);
+    const [isQueuePreviewOpen, setIsQueuePreviewOpen] = useState(false);
     const [printQueue, setPrintQueue] = useState<PrintQueueItem[]>([]);
     const [isQueueGenerating, setIsQueueGenerating] = useState(false);
     const [showQueueClearConfirm, setShowQueueClearConfirm] = useState(false);
@@ -1689,25 +1691,13 @@ const Products: React.FC = () => {
                                     )}
                                     <button
                                         onClick={() => {
-                                            setIsQueueGenerating(true);
-                                            try {
-                                                downloadQueuePDF(printQueue);
-                                                setQueueToast(`✓ PDF con ${totalLabels} etiquetas descargado`);
-                                                setTimeout(() => setQueueToast(null), 2500);
-                                            } catch (err: any) {
-                                                alert('Error: ' + err.message);
-                                            } finally {
-                                                setIsQueueGenerating(false);
-                                            }
+                                            setIsQueuePanelOpen(false);
+                                            setIsQueuePreviewOpen(true);
                                         }}
-                                        disabled={isQueueGenerating}
-                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                                        className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
                                     >
-                                        {isQueueGenerating ? (
-                                            <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>Generando...</>
-                                        ) : (
-                                            <><span className="material-symbols-outlined text-lg">picture_as_pdf</span>Generar PDF ({totalLabels})</>
-                                        )}
+                                        <span className="material-symbols-outlined text-lg">visibility</span>
+                                        Vista Previa e Imprimir ({totalLabels})
                                     </button>
                                 </div>
                             </div>
@@ -1715,6 +1705,14 @@ const Products: React.FC = () => {
                     </>
                 );
             })()}
+
+            {/* Print Queue Preview Interactive Modal */}
+            <PrintQueuePreviewModal
+                isOpen={isQueuePreviewOpen}
+                onClose={() => setIsQueuePreviewOpen(false)}
+                onQueueUpdated={(updatedQueue) => setPrintQueue(updatedQueue)}
+                isMobile={false}
+            />
         </div>
     );
 };
