@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus, Loader2, X, Package } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus, Loader2, X, Package, ShieldCheck, AlertCircle, Clock, Calendar, Check, SaveAll, Info } from 'lucide-react';
 
 interface GroupItem {
     id: string;
@@ -21,11 +21,19 @@ export const InventorySession: React.FC = () => {
     const navigate = useNavigate();
     const [group, setGroup] = useState<any>(null);
     const [items, setItems] = useState<GroupItem[]>([]);
+    const [deletedIds, setDeletedIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [savingWithoutApply, setSavingWithoutApply] = useState(false);
     const [scanSku, setScanSku] = useState('');
     const scanInputRef = useRef<HTMLInputElement>(null);
     const [lastInteractedId, setLastInteractedId] = useState<string | null>(null);
     
+    // Unsaved changes tracking & UI feedbacks
+    const [isDirty, setIsDirty] = useState(false);
+    const [showExitModal, setShowExitModal] = useState(false);
+    const [savedToast, setSavedToast] = useState(false);
+    const [sessionExpiredWarning, setSessionExpiredWarning] = useState(false);
+
     // Add product state
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -37,8 +45,10 @@ export const InventorySession: React.FC = () => {
 
     const fetchSessionData = async () => {
         setLoading(true);
+        setIsDirty(false);
+        setDeletedIds([]);
         try {
-            // 1. Fetch Group
+            // 1. Fetch Group with interval and session timestamps
             const { data: groupData, error: groupError } = await supabase
                 .from('inventory_groups')
                 .select('*')
@@ -46,11 +56,14 @@ export const InventorySession: React.FC = () => {
                 .single();
             if (groupError) throw groupError;
 
-            // Rule of 24 hours
-            const lastCounted = new Date(groupData.last_counted_at).getTime();
+            // Rule of 24 hours (check from session_started_at, fallback to last_counted_at)
+            const refTime = groupData.session_started_at ? new Date(groupData.session_started_at).getTime() : new Date(groupData.last_counted_at).getTime();
             const now = new Date().getTime();
-            if (now - lastCounted > 24 * 60 * 60 * 1000) {
-                alert("Han pasado más de 24 horas desde el último conteo. Se recomienda resetear el grupo para asegurar que la comparativa con el stock teórico sea válida.");
+            const isExpired = (now - refTime) > (24 * 60 * 60 * 1000);
+            if (isExpired) {
+                setSessionExpiredWarning(true);
+            } else {
+                setSessionExpiredWarning(false);
             }
 
             setGroup(groupData);
@@ -107,10 +120,21 @@ export const InventorySession: React.FC = () => {
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, []);
 
+    // Prevent accidental unload if dirty
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
+
     // Calculate theoretical stock
     const getTheoreticalStock = (product: any, warehouseId: number) => {
         if (!product?.inventory_levels) return 0;
-        // If warehouse_id is set in group, filter by it, else sum all (assuming single global for now if not set)
         const levels = warehouseId ? product.inventory_levels.filter((l: any) => l.warehouse_id === warehouseId) : product.inventory_levels;
         return levels.reduce((sum: number, l: any) => sum + (l.current_stock || 0), 0);
     };
@@ -126,17 +150,10 @@ export const InventorySession: React.FC = () => {
 
         if (existingItem) {
             setLastInteractedId(existingItem.id);
-            // Functional state update to avoid closure staleness (Race condition fix)
             setItems(prev => prev.map(i => i.id === existingItem.id ? { ...i, counted_stock: i.counted_stock + 1, last_updated: Date.now() } : i));
-            
-            // Increment natively in the database via RPC (fire and forget)
-            supabase.rpc('increment_inventory_group_item', {
-                p_group_id: id,
-                p_product_id: existingItem.product_id,
-                p_amount: 1
-            }).then();
+            setIsDirty(true);
         } else {
-            // Not in group, check if exists in DB
+            // Not in group state yet, check if exists in DB products table
             try {
                 const { data: prodData, error: prodError } = await supabase
                     .from('products')
@@ -149,79 +166,56 @@ export const InventorySession: React.FC = () => {
                     return;
                 }
 
-                // Add to DB using the RPC which inserts securely (handles ON CONFLICT)
-                await supabase.rpc('increment_inventory_group_item', {
-                    p_group_id: id,
-                    p_product_id: prodData.id,
-                    p_amount: 1
-                });
+                const tempId = `temp-${Date.now()}-${Math.random()}`;
+                const newItem: GroupItem = {
+                    id: tempId,
+                    product_id: prodData.id,
+                    counted_stock: 1,
+                    is_manually_added: true,
+                    last_updated: Date.now(),
+                    product: prodData
+                };
                 
-                // Fetch the new/updated item back
-                const { data: newItem, error: fetchError } = await supabase
-                    .from('inventory_group_items')
-                    .select(`
-                        id, 
-                        product_id, 
-                        counted_stock, 
-                        is_manually_added,
-                        product:products (
-                            sku, 
-                            name,
-                            inventory_levels (current_stock, warehouse_id)
-                        )
-                    `)
-                    .eq('group_id', id)
-                    .eq('product_id', prodData.id)
-                    .single();
-                
-                if (fetchError) throw fetchError;
-                
-                setLastInteractedId(newItem.id);
+                setLastInteractedId(tempId);
                 setItems(prev => {
-                    // Double check if another scan inserted it locally while we were awaiting
                     if (prev.some(i => i.product_id === prodData.id)) {
-                        return prev.map(i => i.product_id === prodData.id ? { ...i, counted_stock: newItem.counted_stock, last_updated: Date.now() } : i);
+                        return prev.map(i => i.product_id === prodData.id ? { ...i, counted_stock: i.counted_stock + 1, last_updated: Date.now() } : i);
                     }
-                    return [...prev, { ...newItem, last_updated: Date.now() } as unknown as GroupItem];
+                    return [...prev, newItem];
                 });
-
+                setIsDirty(true);
             } catch (err) {
                 console.error(err);
                 alert('Error al buscar el producto.');
             }
         }
         
-        // Force focus back
         if (scanInputRef.current) {
             scanInputRef.current.focus();
         }
     };
 
-    const updateItemCount = async (itemId: string, productId: number, amountChange: number) => {
+    const updateItemCount = (itemId: string, amountChange: number) => {
         if (amountChange === 0) return;
         
         setLastInteractedId(itemId);
-        // Functional state update
         setItems(prev => {
             const item = prev.find(i => i.id === itemId);
             if (!item) return prev;
             const newCount = Math.max(0, item.counted_stock + amountChange);
             return prev.map(i => i.id === itemId ? { ...i, counted_stock: newCount, last_updated: Date.now() } : i);
         });
-        
-        // Let DB handle atomic increment
-        await supabase.rpc('increment_inventory_group_item', {
-            p_group_id: id,
-            p_product_id: productId,
-            p_amount: amountChange
-        });
+        setIsDirty(true);
     };
 
-    const handleRemoveItem = async (itemId: string) => {
-        if(!window.confirm("¿Quitar producto del grupo?")) return;
+    const handleRemoveItem = (itemId: string) => {
+        if(!window.confirm("¿Quitar producto de la sesión actual de conteo?")) return;
         if (lastInteractedId === itemId) setLastInteractedId(null);
+        if (!itemId.startsWith('temp-')) {
+            setDeletedIds(prev => [...prev, itemId]);
+        }
         setItems(prev => prev.filter(i => i.id !== itemId));
-        await supabase.from('inventory_group_items').delete().eq('id', itemId);
+        setIsDirty(true);
     };
 
     useEffect(() => {
@@ -236,7 +230,7 @@ export const InventorySession: React.FC = () => {
                 try {
                     const { data, error } = await supabase
                         .from('products')
-                        .select('id, sku, name')
+                        .select('id, sku, name, inventory_levels(current_stock, warehouse_id)')
                         .or(`sku.ilike.%${query}%,name.ilike.%${query}%`)
                         .limit(20);
                     if (error) throw error;
@@ -260,7 +254,7 @@ export const InventorySession: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('products')
-                .select('id, sku, name')
+                .select('id, sku, name, inventory_levels(current_stock, warehouse_id)')
                 .or(`sku.ilike.%${query}%,name.ilike.%${query}%`)
                 .limit(20);
             if (error) throw error;
@@ -272,72 +266,134 @@ export const InventorySession: React.FC = () => {
         }
     };
 
-    const handleAddProductFromSearch = async (product: any) => {
+    const handleAddProductFromSearch = (product: any) => {
         if (items.some(i => String(i.product_id) === String(product.id) || i.product?.sku?.trim().toLowerCase() === product.sku?.trim().toLowerCase())) {
             alert('El repuesto ya está en este grupo de inventario.');
             return;
         }
 
+        const tempId = `temp-${Date.now()}-${Math.random()}`;
+        const newItem: GroupItem = {
+            id: tempId,
+            product_id: product.id,
+            counted_stock: 0,
+            is_manually_added: true,
+            last_updated: Date.now(),
+            product: product
+        };
+
+        setLastInteractedId(tempId);
+        setItems(prev => [...prev, newItem]);
+        setIsDirty(true);
+    };
+
+    // BOTÓN 1: GUARDAR SIN APLICAR (Almacena progreso sin alterar stock real ni last_counted_at)
+    const handleSaveWithoutApplying = async (shouldNavigateBack = false) => {
         try {
-            const { data: newItem, error: insertError } = await supabase
-                .from('inventory_group_items')
-                .insert({
-                    group_id: id,
-                    product_id: product.id,
-                    counted_stock: 0,
-                    is_manually_added: true
-                })
-                .select(`
-                    id, product_id, counted_stock, is_manually_added,
-                    product:products (sku, name, inventory_levels (current_stock, warehouse_id))
-                `)
-                .single();
-                
-            if (insertError) throw insertError;
-            setLastInteractedId(newItem.id);
-            setItems(prev => [...prev, { ...newItem, last_updated: Date.now() } as unknown as GroupItem]);
-        } catch (error: any) {
-            console.error('Error al añadir repuesto:', error);
-            alert('No se pudo añadir el repuesto: ' + error.message);
+            setSavingWithoutApply(true);
+
+            // 1. Process deletions
+            if (deletedIds.length > 0) {
+                const validDbIds = deletedIds.filter(dId => !dId.startsWith('temp-'));
+                if (validDbIds.length > 0) {
+                    const { error: delErr } = await supabase
+                        .from('inventory_group_items')
+                        .delete()
+                        .in('id', validDbIds);
+                    if (delErr) throw delErr;
+                }
+            }
+
+            // 2. Process upserts of active items
+            if (items.length > 0) {
+                const upsertRows = items.map(i => {
+                    const row: any = {
+                        group_id: id,
+                        product_id: i.product_id,
+                        counted_stock: i.counted_stock,
+                        is_manually_added: i.is_manually_added
+                    };
+                    if (!i.id.startsWith('temp-')) {
+                        row.id = i.id;
+                    }
+                    return row;
+                });
+
+                const { error: upsertErr } = await supabase
+                    .from('inventory_group_items')
+                    .upsert(upsertRows, { onConflict: 'group_id,product_id' });
+                if (upsertErr) throw upsertErr;
+            }
+
+            // 3. Ensure session_started_at is initialized if it was null, WITHOUT touching last_counted_at
+            if (!group?.session_started_at) {
+                const nowIso = new Date().toISOString();
+                await supabase
+                    .from('inventory_groups')
+                    .update({ session_started_at: nowIso })
+                    .eq('id', id);
+                setGroup((prev: any) => ({ ...prev, session_started_at: nowIso }));
+            }
+
+            setIsDirty(false);
+            setDeletedIds([]);
+
+            if (shouldNavigateBack) {
+                navigate('/inventory-mode');
+            } else {
+                // Trigger visual Toast notification & re-fetch to get official IDs
+                await fetchSessionData();
+                setSavedToast(true);
+                setTimeout(() => setSavedToast(false), 4500);
+            }
+        } catch (err: any) {
+            console.error('Error al guardar sin aplicar:', err);
+            alert('Error al guardar los cambios: ' + err.message);
+        } finally {
+            setSavingWithoutApply(false);
         }
     };
 
-    const handleFinalize = async () => {
-        if(!window.confirm("¿Finalizar conteo y ajustar el inventario en el sistema? Esto aplicará los cambios al stock real.")) return;
-        
+    // BOTÓN 2: FINALIZAR Y APLICAR (Ajusta stock real en sistema y renueva estado)
+    const handleFinalizeAndApply = async () => {
+        if (!window.confirm("¿Finalizar conteo y aplicar el ajuste de inventario al sistema? Esto actualizará el stock real en almacenes.")) return;
+
         try {
             setLoading(true);
             const { data: userData } = await supabase.auth.getUser();
             const userId = userData.user?.id;
 
-            // Iterate items and adjust
+            // 1. Process deletions first
+            if (deletedIds.length > 0) {
+                const validDbIds = deletedIds.filter(dId => !dId.startsWith('temp-'));
+                if (validDbIds.length > 0) {
+                    await supabase.from('inventory_group_items').delete().in('id', validDbIds);
+                }
+            }
+
+            // 2. Iterate items and adjust actual inventory
             for (const item of items) {
-                const theoretical = getTheoreticalStock(item.product, group.warehouse_id);
+                const theoretical = getTheoreticalStock(item.product, group?.warehouse_id);
                 const diff = item.counted_stock - theoretical;
-                
+
                 if (diff !== 0) {
-                    // Update inventory_levels
-                    // Fetch existing level
                     const { data: levelData } = await supabase
                         .from('inventory_levels')
                         .select('id, current_stock')
                         .eq('product_id', item.product_id)
-                        // Note: If warehouse_id is null on group, we assume a default warehouse, but for now we take the first or null.
-                        // In a real scenario, warehouse_id should be required on the group.
                         .limit(1)
-                        .single();
-                    
+                        .maybeSingle();
+
                     if (levelData) {
                         await supabase
                             .from('inventory_levels')
-                            .update({ 
+                            .update({
                                 current_stock: item.counted_stock,
                                 last_updated: new Date().toISOString()
                             })
                             .eq('id', levelData.id);
                     } else {
-                        // Create level if didn't exist
-                        const defaultWarehouseId = group.warehouse_id || 1; // Fallback
+                        const defaultWarehouseId = group?.warehouse_id || 1;
                         await supabase
                             .from('inventory_levels')
                             .insert({
@@ -347,14 +403,13 @@ export const InventorySession: React.FC = () => {
                             });
                     }
 
-                    // Insert log
                     await supabase
                         .from('inventory_logs')
                         .insert({
                             product_id: item.product_id,
-                            warehouse_id: group.warehouse_id || 1,
+                            warehouse_id: group?.warehouse_id || 1,
                             quantity_change: diff,
-                            reason: `Ajuste Modo Inventario - Grupo: ${group.name}`,
+                            reason: `Ajuste Modo Inventario - Grupo: ${group?.name}`,
                             user_id: userId,
                             reference_type: 'inventory_mode',
                             reference_id: id
@@ -362,20 +417,72 @@ export const InventorySession: React.FC = () => {
                 }
             }
 
-            // Reset counted stock in group
-            await supabase.from('inventory_group_items').update({ counted_stock: 0 }).eq('group_id', id);
-            await supabase.from('inventory_groups').update({ last_counted_at: new Date().toISOString() }).eq('id', id);
-            
-            alert('Inventario actualizado correctamente. Los conteos del grupo han sido encerados.');
-            navigate('/inventory-mode');
+            // 3. Ensure items exist in group and reset counted_stock to 0
+            const resetRows = items.map(i => ({
+                group_id: id,
+                product_id: i.product_id,
+                counted_stock: 0,
+                is_manually_added: i.is_manually_added,
+                ...(i.id.startsWith('temp-') ? {} : { id: i.id })
+            }));
+            if (resetRows.length > 0) {
+                await supabase.from('inventory_group_items').upsert(resetRows, { onConflict: 'group_id,product_id' });
+            }
 
+            // 4. Update group last_counted_at and clear session_started_at
+            const nowIso = new Date().toISOString();
+            await supabase
+                .from('inventory_groups')
+                .update({
+                    last_counted_at: nowIso,
+                    session_started_at: null // Resets 24-hour clock for next session
+                })
+                .eq('id', id);
+
+            setIsDirty(false);
+            alert('Inventario actualizado y aplicado correctamente. Los conteos en sesión del grupo han sido encerados y el estado renovado.');
+            navigate('/inventory-mode');
         } catch (error: any) {
             console.error('Error finalizando:', error);
-            alert('Error: ' + error.message);
+            alert('Error al finalizar y aplicar: ' + error.message);
         } finally {
             setLoading(false);
         }
     };
+
+    const handleBackNavigation = () => {
+        if (isDirty) {
+            setShowExitModal(true);
+        } else {
+            navigate('/inventory-mode');
+        }
+    };
+
+    // Calculate Status Badge based on interval and last_counted_at
+    const statusInfo = useMemo(() => {
+        if (!group) return { status: 'Por inventariar' as const, nextDateStr: 'Pendiente' };
+        const val = group.interval_value || 0;
+        const unit = group.interval_unit || 'days';
+        
+        if (!group.last_counted_at || val <= 0) {
+            return { status: 'Por inventariar' as const, nextDateStr: 'Sin intervalo programado' };
+        }
+
+        const nextDate = new Date(group.last_counted_at);
+        if (unit === 'months') {
+            nextDate.setMonth(nextDate.getMonth() + val);
+        } else if (unit === 'weeks') {
+            nextDate.setDate(nextDate.getDate() + (val * 7));
+        } else {
+            nextDate.setDate(nextDate.getDate() + val);
+        }
+
+        const isUpToDate = nextDate.getTime() > new Date().getTime();
+        return {
+            status: (isUpToDate ? 'Al día' : 'Por inventariar') as ('Al día' | 'Por inventariar'),
+            nextDateStr: nextDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        };
+    }, [group]);
 
     // Derived state for tabs
     const processedItems = useMemo(() => {
@@ -421,7 +528,6 @@ export const InventorySession: React.FC = () => {
 
         return (
             <div className="flex flex-col h-[740px] bg-slate-100/70 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                {/* Column Header */}
                 <div className={`flex items-center justify-between px-4 py-3.5 border-b border-t-4 ${themeConfig.border} ${themeConfig.headerBg} shrink-0`}>
                     <div className="flex items-center gap-2.5 font-extrabold text-sm md:text-base">
                         {themeConfig.icon}
@@ -432,7 +538,6 @@ export const InventorySession: React.FC = () => {
                     </span>
                 </div>
 
-                {/* Items List */}
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
                     {list.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-sm p-6 text-center italic">
@@ -460,7 +565,6 @@ export const InventorySession: React.FC = () => {
                                         </div>
                                     )}
                                     <div className="p-3.5">
-                                        {/* Top: Description with wrap and Delete button */}
                                         <div className="flex items-start justify-between gap-2 mb-2.5">
                                             <div className="min-w-0 flex-1">
                                                 <div className="font-extrabold text-slate-800 dark:text-slate-100 text-xs md:text-sm whitespace-normal break-words leading-tight">
@@ -486,7 +590,6 @@ export const InventorySession: React.FC = () => {
                                             </button>
                                         </div>
 
-                                        {/* Bottom: Controls & Metrics */}
                                         <div className="pt-2.5 border-t border-slate-100 dark:border-slate-700/60 grid grid-cols-3 gap-2 items-center text-center">
                                             <div className="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900/50 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Teórico</span>
@@ -499,7 +602,7 @@ export const InventorySession: React.FC = () => {
                                                 <span className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">Contado</span>
                                                 <div className="flex items-center bg-slate-100 dark:bg-slate-900 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 shadow-2xs">
                                                     <button
-                                                        onClick={() => updateItemCount(item.id, item.product_id, item.counted_stock > 0 ? -1 : 0)}
+                                                        onClick={() => updateItemCount(item.id, item.counted_stock > 0 ? -1 : 0)}
                                                         className="w-6 h-6 flex items-center justify-center hover:bg-white dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-300 transition-all font-bold active:scale-95"
                                                         title="Disminuir conteo"
                                                     >
@@ -509,7 +612,7 @@ export const InventorySession: React.FC = () => {
                                                         {item.counted_stock}
                                                     </span>
                                                     <button
-                                                        onClick={() => updateItemCount(item.id, item.product_id, 1)}
+                                                        onClick={() => updateItemCount(item.id, 1)}
                                                         className="w-6 h-6 flex items-center justify-center hover:bg-white dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-300 transition-all font-bold active:scale-95"
                                                         title="Aumentar conteo"
                                                     >
@@ -535,27 +638,153 @@ export const InventorySession: React.FC = () => {
         );
     };
 
-    if (loading && !group) return <div className="p-12 text-center text-slate-500">Cargando sesión...</div>;
+    if (loading && !group) return <div className="p-12 text-center text-slate-500 font-medium">Cargando datos de sesión...</div>;
 
     return (
-        <div className="p-4 md:p-6 w-full max-w-[1700px] mx-auto flex flex-col min-h-[calc(100vh-6rem)]">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="p-4 md:p-6 w-full max-w-[1700px] mx-auto flex flex-col min-h-[calc(100vh-6rem)] relative">
+            {/* TOAST DE GUARDADO SIN APLICAR */}
+            {savedToast && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-5 duration-300 border border-emerald-400/30">
+                    <CheckCircle className="w-6 h-6 shrink-0 animate-bounce" />
+                    <div>
+                        <h4 className="font-extrabold text-sm">¡Cambios guardados sin aplicar!</h4>
+                        <p className="text-xs text-emerald-100 mt-0.5">El conteo activo se salvaguardó en el sistema sin alterar el stock real.</p>
+                    </div>
+                    <button onClick={() => setSavedToast(false)} className="p-1 hover:bg-white/20 rounded-lg ml-2">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
+            {/* MODAL DE CONFIRMACIÓN DE SALIDA SEGURA */}
+            {showExitModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200 text-center">
+                        <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertTriangle className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">
+                            Tienes cambios sin guardar
+                        </h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
+                            Has realizado modificaciones en el conteo actual que no se han guardado aún. Si sales sin guardar, se volverá a la <strong>última versión guardada</strong> en la base de datos (preservando el reloj de las 24 horas).
+                        </p>
+                        <div className="flex flex-col gap-2.5">
+                            <button
+                                onClick={() => {
+                                    setShowExitModal(false);
+                                    handleSaveWithoutApplying(true);
+                                }}
+                                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-sm shadow-lg shadow-blue-600/20 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <SaveAll className="w-4 h-4" />
+                                Guardar cambios y salir
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowExitModal(false);
+                                    navigate('/inventory-mode');
+                                }}
+                                className="w-full py-3 px-4 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 font-extrabold rounded-xl text-sm transition-colors border border-rose-200 dark:border-rose-800"
+                            >
+                                Salir sin guardar (Descartar)
+                            </button>
+                            <button
+                                onClick={() => setShowExitModal(false)}
+                                className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-sm transition-colors mt-1"
+                            >
+                                Cancelar y quedarme en la sesión
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ADVERTENCIA 24 HORAS EXPIRADA */}
+            {sessionExpiredWarning && (
+                <div className="mb-4 p-4 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 rounded-2xl flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle className="w-6 h-6 text-rose-600 dark:text-rose-400 shrink-0 animate-pulse" />
+                        <div className="text-sm">
+                            <strong className="font-bold block">¡Advertencia de Sesión Prolongada (Más de 24 Horas)!</strong>
+                            <span>Han transcurrido más de 24 horas desde que se inició este conteo. Te recomendamos encerar o finalizar la sesión para evitar disparidades con el stock teórico actual de almacén.</span>
+                        </div>
+                    </div>
+                    <button onClick={() => setSessionExpiredWarning(false)} className="text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/50 p-1.5 rounded-lg transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+            )}
+
+            {/* HEADER & CONTROLES TÉCNICOS */}
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-6 bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/inventory-mode')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-600 dark:text-slate-300">
+                    <button 
+                        onClick={handleBackNavigation} 
+                        className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-700 rounded-xl transition-colors text-slate-700 dark:text-slate-200 shadow-2xs"
+                        title="Volver al listado"
+                    >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{group?.name}</h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Total ítems: {items.length}</p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-2xl font-black text-slate-900 dark:text-white">{group?.name}</h1>
+                            {/* BADGE DE ESTADO */}
+                            {statusInfo.status === 'Al día' ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 rounded-full text-xs font-black border border-emerald-300 dark:border-emerald-800">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                    Al día
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 rounded-full text-xs font-black border border-amber-300 dark:border-amber-800">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    Por inventariar
+                                </span>
+                            )}
+                            {isDirty && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold border border-blue-200 dark:border-blue-800">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
+                                    Cambios pendientes
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-4 flex-wrap">
+                            <span>Total repuestos: <strong className="text-slate-800 dark:text-slate-200">{items.length}</strong></span>
+                            <span>•</span>
+                            <span>Próximo conteo límite: <strong className="text-slate-800 dark:text-slate-200">{statusInfo.nextDateStr}</strong></span>
+                            <span>•</span>
+                            <span>Sesión iniciada: <strong className="text-slate-800 dark:text-slate-200">{group?.session_started_at ? new Date(group.session_started_at).toLocaleString() : group?.last_counted_at ? new Date(group.last_counted_at).toLocaleString() : 'Recién iniciada'}</strong></span>
+                        </p>
                     </div>
                 </div>
-                <button
-                    onClick={handleFinalize}
-                    className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-lg shadow-emerald-500/25"
-                >
-                    <Save className="w-5 h-5" />
-                    Finalizar y Aplicar
-                </button>
+
+                {/* BOTONES DE GUARDADO Y FINALIZADO SEPARADOS */}
+                <div className="flex items-center gap-3 w-full xl:w-auto justify-end flex-wrap sm:flex-nowrap">
+                    <button
+                        onClick={() => handleSaveWithoutApplying(false)}
+                        disabled={savingWithoutApply || !isDirty}
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md ${
+                            isDirty 
+                                ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/25 active:scale-95 cursor-pointer' 
+                                : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-600 shadow-none'
+                        }`}
+                        title="Guardar el conteo en progreso sin alterar el stock real de almacenes"
+                    >
+                        {savingWithoutApply ? <Loader2 className="w-4 h-4 animate-spin" /> : <SaveAll className="w-4 h-4" />}
+                        <span>Guardar sin Aplicar</span>
+                    </button>
+                    
+                    <button
+                        onClick={handleFinalizeAndApply}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-black text-sm transition-all shadow-lg shadow-emerald-600/30 active:scale-95"
+                        title="Aplicar conteos al stock real del inventario, renovar fecha y encerar sesión"
+                    >
+                        <Save className="w-4 h-4" />
+                        <span>Finalizar y Aplicar</span>
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 mb-6">
@@ -572,7 +801,7 @@ export const InventorySession: React.FC = () => {
                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all dark:text-white font-mono text-lg"
                         />
                     </div>
-                    <button type="submit" className="self-end px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors">
+                    <button type="submit" className="self-end px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 active:scale-95">
                         Escanear
                     </button>
                 </form>
@@ -598,68 +827,42 @@ export const InventorySession: React.FC = () => {
                         {isSearching ? (
                             <Loader2 className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
                         ) : searchQuery ? (
-                            <button
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setSearchResults([]);
-                                }}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors"
-                                title="Limpiar búsqueda"
-                            >
+                            <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white">
                                 <X className="w-4 h-4" />
                             </button>
                         ) : null}
                     </div>
+
                     {searchResults.length > 0 && (
-                        <div className="mt-3 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 max-h-60 overflow-y-auto bg-white dark:bg-slate-900/90 shadow-sm">
-                            {searchResults.map(res => {
-                                const existingItem = items.find(i => String(i.product_id) === String(res.id) || i.product?.sku?.trim().toLowerCase() === res.sku?.trim().toLowerCase());
-                                return (
-                                    <div key={res.id} className="flex justify-between items-center p-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors gap-3">
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2 mb-0.5">
-                                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-semibold px-2 py-0.5 rounded text-xs border border-slate-200 dark:border-slate-700 shrink-0">
-                                                    {res.sku}
-                                                </span>
-                                                <span className="font-semibold text-sm text-slate-800 dark:text-slate-200 truncate">
-                                                    {res.name}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="shrink-0">
-                                            {existingItem ? (
-                                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 font-medium text-xs">
-                                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                                                    <span>Ya en grupo ({existingItem.counted_stock} contados)</span>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => handleAddProductFromSearch(res)}
-                                                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-semibold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
-                                                >
-                                                    <Plus className="w-3.5 h-3.5" />
-                                                    <span>Añadir al grupo</span>
-                                                </button>
-                                            )}
-                                        </div>
+                        <div className="mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 z-10 relative">
+                            {searchResults.map(prod => (
+                                <div key={prod.id} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between transition-colors">
+                                    <div>
+                                        <div className="font-bold text-sm text-slate-800 dark:text-slate-200">{prod.name}</div>
+                                        <div className="text-xs font-mono text-slate-500">{prod.sku} • Teórico actual: {getTheoreticalStock(prod, group?.warehouse_id)}</div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
-                        <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-xs text-slate-500 dark:text-slate-400">
-                            No se encontraron repuestos con código o nombre "{searchQuery.trim()}" en el catálogo.
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            handleAddProductFromSearch(prod);
+                                            setSearchResults([]);
+                                            setSearchQuery('');
+                                        }}
+                                        className="px-3 py-1 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-xs font-bold transition-colors"
+                                    >
+                                        + Añadir a sesión
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* 3-COLUMN GRID DISPLAY (FALTANTES, SOBRANTES, CUADRADOS) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {renderColumn('Faltantes', faltantes, 'faltantes')}
-                {renderColumn('Sobrantes', sobrantes, 'sobrantes')}
-                {renderColumn('Cuadrados', cuadrados, 'cuadrados')}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {renderColumn("Faltantes", faltantes, 'faltantes')}
+                {renderColumn("Sobrantes", sobrantes, 'sobrantes')}
+                {renderColumn("Cuadran Expresos", cuadrados, 'cuadrados')}
             </div>
         </div>
     );
