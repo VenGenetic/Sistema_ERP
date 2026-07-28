@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 
 // ─────────────────────────────────────────────────────────────
@@ -11,60 +11,91 @@ export const limpiarTexto = (texto: any): string => {
 
 // ─────────────────────────────────────────────────────────────
 // 2. HELPER: EXPANSIÓN DE SINÓNIMOS (Repuestos de motos / ERP)
+//    OPTIMIZADO: Lookup table pre-indexada por cada sinónimo
 // ─────────────────────────────────────────────────────────────
-export const expandirTerminos = (terminos: string[]): string[] => {
-    const sinonimos: Record<string, string[]> = {
-        'freno': ['frenos', 'frenado', 'pastilla', 'pastillas', 'disco', 'tambor', 'caliper', 'mordaza'],
-        'pastilla': ['pastillas', 'freno', 'frenos', 'block', 'balata', 'balatas'],
-        'balata': ['balatas', 'pastilla', 'pastillas', 'freno'],
-        'filtro': ['filtros', 'filtrante'],
-        'aceite': ['aceites', 'lubricante', 'lubricantes', '2t', '4t'],
-        'cadena': ['cadenas', 'transmisión', 'transmision', 'piñón', 'piñon', 'corona', 'arrastre', 'kit arrastre'],
-        'arrastre': ['tracción', 'traccion', 'cadena', 'piñon', 'corona', 'kit'],
-        'amortiguador': ['amortiguadores', 'suspensión', 'suspension', 'monoshock', 'shock'],
-        'llanta': ['llantas', 'neumático', 'neumaticos', 'rueda', 'ruedas', 'caucho', 'cauchos', 'cubierta'],
-        'faro': ['faros', 'luz', 'luces', 'farolo', 'faroloa', 'optica', 'óptica', 'foco', 'focos', 'bombillo', 'led'],
-        'escape': ['escapes', 'silenciador', 'tubo', 'caño', 'exhosto', 'muffler'],
-        'motor': ['motores', 'cilindro', 'cilindros', 'piston', 'pistones', 'cabezal'],
-        'velocimento': ['velocímetro', 'velocímetros', 'velocimetro', 'velocimetros', 'instrumentos', 'panel', 'tablero', 'tacometro', 'tacómetro', 'reloj'],
-        'carburador': ['carburadores', 'inyección', 'inyector', 'admision'],
-        'arranque': ['starter', 'partida', 'marcha', 'bendix'],
-        'electrico': ['eléctrico', 'eléctrica', 'eléctricos', 'eléctricas', 'electricidad', 'ramal'],
-        'telescopica': ['telescopicas', 'telescópica', 'telescópicas', 'barra', 'barras', 'suspensión delantera', 'telescopio', 'amortiguador delantero', 'amortiguadores delanteros'],
-        'monoshock': ['monoshocks', 'amortiguador trasero', 'suspensión trasera', 'shock'],
-        'ramal': ['arnés', 'arnes', 'cableado', 'instalación eléctrica', 'instalacion electrica', 'cable'],
-        'mesa': ['mesas', 'araña', 'arañas', 'castillo', 'tija', 'yugo'],
-        'bujia': ['bujia', 'bujias', 'bujías', 'bujía', 'spark'],
-        'placa': ['placa', 'placas', 'plastico', 'plasticos', 'plástico', 'carenado', 'pasta', 'pastas', 'tapa', 'tapas', 'cubierta'],
-        'del': ['delantero', 'delant', 'delantera', 'delanteros', 'delanteras', 'front'],
-        'delantero': ['del', 'delant', 'delantera', 'delanteros', 'delanteras'],
-        'post': ['posterior', 'posteriores', 'trasero', 'trasera', 'traseros', 'traseras', 'rear'],
-        'trasero': ['post', 'posterior', 'posteriores', 'trasera', 'traseros', 'traseras'],
-        'der': ['derecho', 'derecha', 'derechos', 'derechas', 'rh', 'right'],
-        'derecho': ['der', 'derecha', 'derechos', 'derechas'],
-        'izq': ['izquierdo', 'izquierda', 'izquierdos', 'izquierdas', 'lh', 'left'],
-        'izquierdo': ['izq', 'izquierda', 'izquierdos', 'izquierdas'],
-        'protec': ['protector', 'protectores', 'defensa', 'defensas', 'guardabierres', 'guardabarros', 'salpicadera'],
-        'espejo': ['espejos', 'retrovisor', 'retrovisores', 'mirror'],
-        'manubrio': ['manubrio', 'timón', 'timon', 'manillar', 'handlebar'],
-        'comando': ['comandos', 'switch', 'switche', 'botonera', 'interruptor', 'piña'],
-        'manzana': ['manzana', 'manzanas', 'carrete', 'buje', 'hub'],
-        'disco': ['discos', 'rotor', 'discodel', 'freno disco', 'rotores'],
-        'kit': ['juego', 'set', 'combo', 'pack']
-    };
+const sinonimosBase: Record<string, string[]> = {
+    'freno': ['frenos', 'frenado', 'pastilla', 'pastillas', 'disco', 'tambor', 'caliper', 'mordaza'],
+    'pastilla': ['pastillas', 'freno', 'frenos', 'block', 'balata', 'balatas'],
+    'balata': ['balatas', 'pastilla', 'pastillas', 'freno'],
+    'filtro': ['filtros', 'filtrante'],
+    'aceite': ['aceites', 'lubricante', 'lubricantes', '2t', '4t'],
+    'cadena': ['cadenas', 'transmision', 'pinon', 'corona', 'arrastre', 'kit arrastre'],
+    'arrastre': ['traccion', 'cadena', 'pinon', 'corona', 'kit'],
+    'amortiguador': ['amortiguadores', 'suspension', 'monoshock', 'shock'],
+    'llanta': ['llantas', 'neumatico', 'neumaticos', 'rueda', 'ruedas', 'caucho', 'cauchos', 'cubierta'],
+    'faro': ['faros', 'luz', 'luces', 'farolo', 'faroloa', 'optica', 'foco', 'focos', 'bombillo', 'led'],
+    'escape': ['escapes', 'silenciador', 'tubo', 'cano', 'exhosto', 'muffler'],
+    'motor': ['motores', 'cilindro', 'cilindros', 'piston', 'pistones', 'cabezal'],
+    'velocimento': ['velocimetro', 'velocimetros', 'instrumentos', 'panel', 'tablero', 'tacometro', 'reloj'],
+    'carburador': ['carburadores', 'inyeccion', 'inyector', 'admision'],
+    'arranque': ['starter', 'partida', 'marcha', 'bendix'],
+    'electrico': ['electrica', 'electricos', 'electricidad', 'ramal'],
+    'telescopica': ['telescopicas', 'barra', 'barras', 'suspension delantera', 'telescopio', 'amortiguador delantero', 'amortiguadores delanteros'],
+    'monoshock': ['monoshocks', 'amortiguador trasero', 'suspension trasera', 'shock'],
+    'ramal': ['arnes', 'cableado', 'instalacion electrica', 'cable'],
+    'mesa': ['mesas', 'arana', 'aranas', 'castillo', 'tija', 'yugo'],
+    'bujia': ['bujias', 'spark'],
+    'placa': ['placas', 'plastico', 'plasticos', 'carenado', 'pasta', 'pastas', 'tapa', 'tapas', 'cubierta'],
+    'del': ['delantero', 'delant', 'delantera', 'delanteros', 'delanteras', 'front'],
+    'delantero': ['del', 'delant', 'delantera', 'delanteros', 'delanteras'],
+    'post': ['posterior', 'posteriores', 'trasero', 'trasera', 'traseros', 'traseras', 'rear'],
+    'trasero': ['post', 'posterior', 'posteriores', 'trasera', 'traseros', 'traseras'],
+    'der': ['derecho', 'derecha', 'derechos', 'derechas', 'rh', 'right'],
+    'derecho': ['der', 'derecha', 'derechos', 'derechas'],
+    'izq': ['izquierdo', 'izquierda', 'izquierdos', 'izquierdas', 'lh', 'left'],
+    'izquierdo': ['izq', 'izquierda', 'izquierdos', 'izquierdas'],
+    'protec': ['protector', 'protectores', 'defensa', 'defensas', 'guardabierres', 'guardabarros', 'salpicadera'],
+    'espejo': ['espejos', 'retrovisor', 'retrovisores', 'mirror'],
+    'manubrio': ['timon', 'manillar', 'handlebar'],
+    'comando': ['comandos', 'switch', 'switche', 'botonera', 'interruptor', 'pina'],
+    'manzana': ['manzanas', 'carrete', 'buje', 'hub'],
+    'disco': ['discos', 'rotor', 'discodel', 'freno disco', 'rotores'],
+    'kit': ['juego', 'set', 'combo', 'pack']
+};
 
+// Pre-build a reverse lookup: word -> group of all related words
+const synonymLookup = new Map<string, string[]>();
+(() => {
+    const groupMap = new Map<string, Set<string>>();
+    for (const [key, values] of Object.entries(sinonimosBase)) {
+        const allWords = [key, ...values];
+        const group = new Set(allWords);
+        for (const w of allWords) {
+            if (!groupMap.has(w)) groupMap.set(w, new Set());
+            group.forEach(g => groupMap.get(w)!.add(g));
+        }
+    }
+    groupMap.forEach((set, key) => {
+        synonymLookup.set(key, Array.from(set));
+    });
+})();
+
+// Cached expansion results (very hot path)
+const expansionCache = new Map<string, string[]>();
+
+export const expandirTerminos = (terminos: string[]): string[] => {
     const expandidos = new Set<string>();
 
-    terminos.forEach(termino => {
+    for (const termino of terminos) {
         const tLower = termino.toLowerCase();
         expandidos.add(tLower);
-        Object.entries(sinonimos).forEach(([clave, valores]) => {
-            if (clave === tLower || clave.includes(tLower) || valores.some(v => v.includes(tLower))) {
-                expandidos.add(clave);
-                valores.forEach(s => expandidos.add(s));
-            }
-        });
-    });
+
+        // Check cache first
+        const cached = expansionCache.get(tLower);
+        if (cached) {
+            for (const w of cached) expandidos.add(w);
+            continue;
+        }
+
+        const related: string[] = [];
+        // Direct O(1) lookup
+        const directMatch = synonymLookup.get(tLower);
+        if (directMatch) {
+            for (const w of directMatch) { related.push(w); expandidos.add(w); }
+        }
+
+        expansionCache.set(tLower, related);
+    }
 
     return Array.from(expandidos);
 };
@@ -77,7 +108,7 @@ export const isFuzzyMatch = (text: string, term: string): boolean => {
     if (text.includes(term)) return true;
     if (term.length <= 3) return false;
 
-    const words = text.split(/[\s-_/]+/);
+    const words = text.split(/[\s\-_/]+/);
     for (const w of words) {
         if (Math.abs(w.length - term.length) <= 1) {
             let mismatches = 0;
@@ -101,44 +132,91 @@ export const isFuzzyMatch = (text: string, term: string): boolean => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// 4. ALGORITMO DE CÁLCULO DE RELEVANCIA ("DOBLE FILTRO")
+// PRE-INDEXED PRODUCT FIELDS (WeakMap cache per product object)
+// Avoids re-normalizing text on every single keystroke
 // ─────────────────────────────────────────────────────────────
-export const calcularRelevancia = (producto: any, terminos: string[]): number => {
-    if (!terminos || terminos.length === 0) return 0;
+interface NormalizedProduct {
+    nombre: string;
+    codigo: string;
+    marca: string;
+    categoria: string;
+    descripcion: string;
+    tagsTexto: string;
+    textoGlobal: string;
+    hasStock: boolean;
+}
+
+const normalizedCache = new WeakMap<any, NormalizedProduct>();
+
+function getNormalized(producto: any): NormalizedProduct {
+    const cached = normalizedCache.get(producto);
+    if (cached) return cached;
 
     const nombre = limpiarTexto(producto.name || '');
     const codigo = limpiarTexto(producto.sku || '');
     const marca = limpiarTexto(producto.brands?.name || '');
     const categoria = limpiarTexto(producto.category || '');
     const descripcion = limpiarTexto(producto.description || '');
-    
-    // Extraer etiquetas si existen
+
     let tagsTexto = '';
     if (Array.isArray(producto.product_tags)) {
         tagsTexto = producto.product_tags
             .map((pt: any) => limpiarTexto(pt?.tags?.name || ''))
             .join(' ');
     }
-    const textoGlobal = `${nombre} ${codigo} ${marca} ${categoria} ${tagsTexto} ${descripcion}`;
+
+    const globalStock = producto.inventory_levels?.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) || 0;
+
+    const norm: NormalizedProduct = {
+        nombre,
+        codigo,
+        marca,
+        categoria,
+        descripcion,
+        tagsTexto,
+        textoGlobal: `${nombre} ${codigo} ${marca} ${categoria} ${tagsTexto} ${descripcion}`,
+        hasStock: globalStock > 0
+    };
+
+    normalizedCache.set(producto, norm);
+    return norm;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. ALGORITMO DE CÁLCULO DE RELEVANCIA (OPTIMIZADO)
+//    - No crea RegExp por cada expansión
+//    - Usa campos pre-normalizados (WeakMap)
+//    - Early exit para SKU exacto
+// ─────────────────────────────────────────────────────────────
+// Fast word-boundary match without creating a RegExp object
+function isWordBoundaryMatch(text: string, word: string): boolean {
+    let pos = 0;
+    while (true) {
+        const idx = text.indexOf(word, pos);
+        if (idx === -1) return false;
+        const before = idx === 0 || ' -_/'.includes(text[idx - 1]);
+        const after = idx + word.length >= text.length || ' -_/'.includes(text[idx + word.length]);
+        if (before && after) return true;
+        pos = idx + 1;
+    }
+}
+
+export const calcularRelevancia = (producto: any, terminos: string[]): number => {
+    if (!terminos || terminos.length === 0) return 0;
+
+    const norm = getNormalized(producto);
+    const { nombre, codigo, marca, categoria, descripcion, tagsTexto } = norm;
 
     let puntuacion = 0;
     let terminosEncontrados = 0;
 
-    // Coincidencia exacta de SKU al inicio o completa (Para escaneo QR o tipeo exacto)
+    // SKU exacto -> maxima prioridad (early exit)
     const queryCompleta = terminos.join(' ');
-    if (codigo === queryCompleta) {
-        return 2000; // Máxima prioridad posible (código exacto)
-    }
-    if (codigo.startsWith(queryCompleta)) {
-        puntuacion += 500;
-    } else if (codigo.includes(queryCompleta)) {
-        puntuacion += 300;
-    }
-    if (nombre.includes(queryCompleta)) {
-        puntuacion += 250;
-    }
+    if (codigo === queryCompleta) return 2000;
+    if (codigo.startsWith(queryCompleta)) puntuacion += 500;
+    else if (codigo.includes(queryCompleta)) puntuacion += 300;
+    if (nombre.includes(queryCompleta)) puntuacion += 250;
 
-    // Análisis término por término (Doble Filtro)
     for (const term of terminos) {
         const termLower = term.toLowerCase();
         const expansions = expandirTerminos([termLower]);
@@ -150,38 +228,34 @@ export const calcularRelevancia = (producto: any, terminos: string[]): number =>
             let currentScore = 0;
             let matchedInExp = false;
 
-            // Coincidencia en SKU / Código
+            // SKU
             if (codigo === exp) { currentScore += 250; matchedInExp = true; }
             else if (codigo.includes(exp)) { currentScore += 120; matchedInExp = true; }
-            else if (isFuzzyMatch(codigo, exp)) { currentScore += 90; matchedInExp = true; }
+            else if (exp.length > 3 && isFuzzyMatch(codigo, exp)) { currentScore += 90; matchedInExp = true; }
 
-            // Coincidencia en Nombre del producto
-            const wordRegex = new RegExp(`\\b${exp}\\b`, 'i');
-            if (nombre === exp) { currentScore += 180; matchedInExp = true; }
-            else if (wordRegex.test(nombre)) {
-                if (nombre.startsWith(exp)) { currentScore += 120; matchedInExp = true; }
-                else { currentScore += 90; matchedInExp = true; }
+            // Nombre (sin RegExp)
+            if (!matchedInExp || currentScore < 180) {
+                if (nombre === exp) { currentScore += 180; matchedInExp = true; }
+                else if (isWordBoundaryMatch(nombre, exp)) {
+                    currentScore += nombre.startsWith(exp) ? 120 : 90;
+                    matchedInExp = true;
+                }
+                else if (nombre.startsWith(exp)) { currentScore += 70; matchedInExp = true; }
+                else if (nombre.includes(exp)) { currentScore += 45; matchedInExp = true; }
+                else if (exp.length > 3 && isFuzzyMatch(nombre, exp)) { currentScore += 30; matchedInExp = true; }
             }
-            else if (nombre.startsWith(exp)) { currentScore += 70; matchedInExp = true; }
-            else if (nombre.includes(exp)) { currentScore += 45; matchedInExp = true; }
-            else if (isFuzzyMatch(nombre, exp)) { currentScore += 30; matchedInExp = true; }
 
-            // Coincidencia en Marca, Categoría o Tags
-            if (marca.includes(exp) || wordRegex.test(marca)) { currentScore += 40; matchedInExp = true; }
+            // Marca, categoría, tags, descripción
+            if (marca.includes(exp)) { currentScore += 40; matchedInExp = true; }
             if (categoria.includes(exp)) { currentScore += 25; matchedInExp = true; }
             if (tagsTexto.includes(exp)) { currentScore += 35; matchedInExp = true; }
             if (descripcion.includes(exp)) { currentScore += 15; matchedInExp = true; }
 
-            // Si es la palabra original exacta que escribió el usuario, tiene bonus sobre sinónimos
-            if (matchedInExp && isOriginal) {
-                currentScore += 60;
-            }
+            if (matchedInExp && isOriginal) currentScore += 60;
 
             if (matchedInExp) {
                 termFound = true;
-                if (currentScore > maxTermScore) {
-                    maxTermScore = currentScore;
-                }
+                if (currentScore > maxTermScore) maxTermScore = currentScore;
             }
         }
 
@@ -191,28 +265,21 @@ export const calcularRelevancia = (producto: any, terminos: string[]): number =>
         }
     }
 
-    // ⚡ REQUISITO DE DOBLE FILTRO:
-    // Si el usuario busca múltiples palabras (ej: "pastilla freno del"), 
-    // todas las palabras originales (o sus sinónimos) DEBEN encontrarse.
-    // Si faltan palabras, castigamos severamente la puntuación para eliminar falsos positivos.
+    // Doble filtro
     if (terminosEncontrados < terminos.length) {
-        if (terminos.length >= 2) {
-            return 0; // Excluir si tiene 2 o más palabras y no coincidieron todas
-        }
+        if (terminos.length >= 2) return 0;
         puntuacion = puntuacion / 10;
     }
 
-    // Pequeño bono si tiene stock en cualquier almacén
-    const globalStock = producto.inventory_levels?.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) || 0;
-    if (globalStock > 0) {
-        puntuacion += 10;
-    }
+    if (norm.hasStock) puntuacion += 10;
 
     return puntuacion;
 };
 
 // ─────────────────────────────────────────────────────────────
-// 5. EJECUTAR BÚSQUEDA Y ORDENAMIENTO EN LA LISTA DE PRODUCTOS
+// 5. EJECUTAR BÚSQUEDA (OPTIMIZADA)
+//    - Avoids spreading every product (major GC savings)
+//    - Uses pre-normalized cache
 // ─────────────────────────────────────────────────────────────
 export const searchProducts = (products: any[], query: string, minScore = 5): any[] => {
     if (!query || !query.trim()) {
@@ -226,54 +293,77 @@ export const searchProducts = (products: any[], query: string, minScore = 5): an
 
     if (terminos.length === 0) return products;
 
-    return products
-        .map(p => ({
-            ...p,
-            _relevancia: calcularRelevancia(p, terminos)
-        }))
-        .filter(p => p._relevancia >= minScore)
-        .sort((a, b) => b._relevancia - a._relevancia);
+    const results: Array<[any, number]> = [];
+
+    for (let i = 0; i < products.length; i++) {
+        const p = products[i];
+        const score = calcularRelevancia(p, terminos);
+        if (score >= minScore) {
+            results.push([p, score]);
+        }
+    }
+
+    // Sort by score descending
+    results.sort((a, b) => b[1] - a[1]);
+
+    // Attach score without spreading
+    return results.map(([p, score]) => {
+        p._relevancia = score;
+        return p;
+    });
 };
 
 // ─────────────────────────────────────────────────────────────
-// 6. GENERAR SUGERENCIAS AUTORECOMPLETADO PARA EL SEARCH BAR
+// 6. GENERAR SUGERENCIAS (OPTIMIZADO — early exit + scan cap)
 // ─────────────────────────────────────────────────────────────
 export const getSuggestions = (products: any[], query: string, limit = 6): string[] => {
     if (!query || !query.trim()) return [];
     
     const terminoClean = limpiarTexto(query);
+    if (terminoClean.length < 1) return [];
+
     const esCorto = terminoClean.length < 3;
     const sugerenciasSet = new Set<string>();
+    const maxScan = Math.min(products.length, 500); // Cap scan to keep it fast
 
-    // Si coincide con SKU
-    for (const prod of products) {
-        if (sugerenciasSet.size >= limit * 2) break;
+    for (let i = 0; i < maxScan; i++) {
+        if (sugerenciasSet.size >= limit) break; // EARLY EXIT
+
+        const prod = products[i];
+
+        // SKU match
         const sku = (prod.sku || '').toUpperCase();
         if (limpiarTexto(sku).includes(terminoClean)) {
             sugerenciasSet.add(`"${sku}"`);
+            if (sugerenciasSet.size >= limit) break;
         }
         
-        // Palabras del nombre
+        // Name words
         const nombre = (prod.name || '');
-        const palabras = nombre.split(/[\s-_/]+/).filter((p: string) => p.length > (esCorto ? 1 : 2));
+        const palabras = nombre.split(/[\s\-_/]+/).filter((p: string) => p.length > (esCorto ? 1 : 2));
         for (const pal of palabras) {
             if (limpiarTexto(pal).includes(terminoClean)) {
-                // Capitalizar primera letra para presentación limpia
                 const cap = pal.charAt(0).toUpperCase() + pal.slice(1).toLowerCase();
                 sugerenciasSet.add(cap);
+                if (sugerenciasSet.size >= limit) break;
             }
         }
+        if (sugerenciasSet.size >= limit) break;
         
-        // Marca
+        // Brand
         if (prod.brands?.name && limpiarTexto(prod.brands.name).includes(terminoClean)) {
             sugerenciasSet.add(prod.brands.name);
+            if (sugerenciasSet.size >= limit) break;
         }
 
-        // Modelos o cilindradas extraídos por Regex (ej: 150cc, 250, RX150)
-        const modelos = nombre.match(/\b[A-Z0-9]{2,}[\d-]+\b/gi) || [];
-        for (const mod of modelos) {
-            if (limpiarTexto(mod).includes(terminoClean)) {
-                sugerenciasSet.add(mod.toUpperCase());
+        // Models/displacements
+        const modelos = nombre.match(/\b[A-Z0-9]{2,}[\d-]+\b/gi);
+        if (modelos) {
+            for (const mod of modelos) {
+                if (limpiarTexto(mod).includes(terminoClean)) {
+                    sugerenciasSet.add(mod.toUpperCase());
+                    if (sugerenciasSet.size >= limit) break;
+                }
             }
         }
     }

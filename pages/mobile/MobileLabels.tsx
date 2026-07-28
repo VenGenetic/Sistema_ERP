@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
 import { printLabelsQuick, addToPrintHistory, getPrintHistory, PrintHistoryItem } from '../../utils/mobileLabelPrinter';
@@ -24,9 +24,20 @@ const MobileLabels: React.FC = () => {
     // ── Queue State ────────────────────────────────────
     const [queue, setQueue] = useState<PrintQueueItem[]>([]);
     const [queueSearchTerm, setQueueSearchTerm] = useState('');
+    const [debouncedQueueSearch, setDebouncedQueueSearch] = useState('');
     const [queueQtyMap, setQueueQtyMap] = useState<Record<string, number>>({});
     const [isGenerating, setIsGenerating] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const queueDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Debounce queue search
+    useEffect(() => {
+        if (queueDebounceRef.current) clearTimeout(queueDebounceRef.current);
+        queueDebounceRef.current = setTimeout(() => {
+            setDebouncedQueueSearch(queueSearchTerm);
+        }, 250);
+        return () => { if (queueDebounceRef.current) clearTimeout(queueDebounceRef.current); };
+    }, [queueSearchTerm]);
 
     useEffect(() => {
         loadHistory();
@@ -117,9 +128,9 @@ const MobileLabels: React.FC = () => {
 
     // ── Queue Logic ────────────────────────────────────
     const queueMatchedProducts = useMemo(() => {
-        if (!queueSearchTerm || queueSearchTerm.trim().length < 2) return [];
-        return searchProducts(allProducts, queueSearchTerm.trim(), 2).slice(0, 10);
-    }, [allProducts, queueSearchTerm]);
+        if (!debouncedQueueSearch || debouncedQueueSearch.trim().length < 2) return [];
+        return searchProducts(allProducts, debouncedQueueSearch.trim(), 2).slice(0, 10);
+    }, [allProducts, debouncedQueueSearch]);
 
     const getQueueQty = (id: string) => queueQtyMap[id] || 1;
     const setQueueProductQty = (id: string, val: number) => {
