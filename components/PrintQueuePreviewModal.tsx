@@ -35,9 +35,12 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
     // Cargar cola cuando se abre el modal
     useEffect(() => {
         if (isOpen) {
-            const items = getPrintQueue();
-            setQueue(items);
-            setShowClearConfirm(false);
+            const loadQueue = async () => {
+                const items = await getPrintQueue();
+                setQueue(items);
+                setShowClearConfirm(false);
+            };
+            loadQueue();
         }
     }, [isOpen]);
 
@@ -90,20 +93,20 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
     const totalPages = getQueuePageCount(queue);
 
     // Acciones de edición de cola
-    const handleQtyChange = useCallback((sku: string, newQty: number) => {
-        const updated = updateQueueItemQty(sku, Math.max(1, newQty));
+    const handleQtyChange = useCallback(async (id: number, newQty: number) => {
+        const updated = await updateQueueItemQty(id, Math.max(1, newQty));
         setQueue(updated);
         onQueueUpdated?.(updated);
     }, [onQueueUpdated]);
 
-    const handleRemoveItem = useCallback((sku: string) => {
-        const updated = removeFromQueue(sku);
+    const handleRemoveItem = useCallback(async (id: number) => {
+        const updated = await removeFromQueue(id);
         setQueue(updated);
         onQueueUpdated?.(updated);
     }, [onQueueUpdated]);
 
-    const handleClearQueue = useCallback(() => {
-        clearQueue();
+    const handleClearQueue = useCallback(async () => {
+        await clearQueue();
         setQueue([]);
         setShowClearConfirm(false);
         onQueueUpdated?.([]);
@@ -296,7 +299,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                         <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs shrink-0">
                                             <button 
                                                 type="button"
-                                                onClick={() => handleQtyChange(item.sku, item.quantity - 1)} 
+                                                onClick={() => handleQtyChange(item.id, item.quantity - 1)} 
                                                 className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center text-xs font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                                                 title="Disminuir cantidad"
                                             >
@@ -307,12 +310,12 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                                 min="1"
                                                 step="1"
                                                 value={item.quantity}
-                                                onChange={(e) => handleQtyChange(item.sku, parseInt(e.target.value) || 1)}
+                                                onChange={(e) => handleQtyChange(item.id, parseInt(e.target.value) || 1)}
                                                 className="w-9 h-6 text-center bg-transparent border-none text-xs font-black text-slate-900 dark:text-white p-0 focus:ring-0"
                                             />
                                             <button 
                                                 type="button"
-                                                onClick={() => handleQtyChange(item.sku, item.quantity + 1)} 
+                                                onClick={() => handleQtyChange(item.id, item.quantity + 1)} 
                                                 className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center text-xs font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                                                 title="Aumentar cantidad"
                                             >
@@ -323,7 +326,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                         {/* Delete */}
                                         <button 
                                             type="button"
-                                            onClick={() => handleRemoveItem(item.sku)} 
+                                            onClick={() => handleRemoveItem(item.id)} 
                                             className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-colors shrink-0" 
                                             title="Eliminar de la cola"
                                         >

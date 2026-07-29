@@ -69,6 +69,16 @@ const Products: React.FC = () => {
     const [isQueueGenerating, setIsQueueGenerating] = useState(false);
     const [showQueueClearConfirm, setShowQueueClearConfirm] = useState(false);
 
+    const loadQueue = useCallback(async () => {
+        const q = await getPrintQueue();
+        setPrintQueue(q);
+    }, []);
+
+    useEffect(() => {
+        loadQueue();
+    }, [loadQueue]);
+
+
     // Export ZIP
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState({ current: 0, total: 0 });
@@ -1044,9 +1054,9 @@ const Products: React.FC = () => {
                             <span className="material-symbols-outlined text-[18px]">barcode_scanner</span>
                         </button>
                         <button
-                            onClick={() => {
-                                addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
-                                setPrintQueue(getPrintQueue());
+                            onClick={async () => {
+                                await addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+                                await loadQueue();
                                 setQueueToast(`✓ 1 etiqueta de ${prod.sku} agregada a la cola`);
                                 setTimeout(() => setQueueToast(null), 2000);
                             }}
@@ -1609,7 +1619,7 @@ const Products: React.FC = () => {
 
             {/* ═══════ PRINT QUEUE FLOATING INDICATOR ═══════ */}
             {(() => {
-                const q = printQueue.length > 0 ? printQueue : getPrintQueue();
+                const q = printQueue;
                 if (q.length === 0) return null;
                 const totalLabels = getQueueTotalLabels(q);
                 const totalPages = getQueuePageCount(q);
@@ -1618,7 +1628,7 @@ const Products: React.FC = () => {
                         {/* Collapsed FAB */}
                         {!isQueuePanelOpen && (
                             <button
-                                onClick={() => { setPrintQueue(getPrintQueue()); setIsQueuePanelOpen(true); }}
+                                onClick={() => { loadQueue(); setIsQueuePanelOpen(true); }}
                                 className="fixed bottom-6 right-6 z-40 bg-amber-500 hover:bg-amber-600 text-white w-14 h-14 rounded-full shadow-2xl shadow-amber-500/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
                                 title="Ver cola de impresión"
                             >
@@ -1655,17 +1665,17 @@ const Products: React.FC = () => {
                                                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{item.name}</p>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
-                                                <button onClick={() => { const updated = updateQueueItemQty(item.sku, item.quantity - 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">−</button>
+                                                <button onClick={async () => { const updated = await updateQueueItemQty(item.id, item.quantity - 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">−</button>
                                                 <input
                                                     type="number"
                                                     min="1"
                                                     value={item.quantity}
-                                                    onChange={(e) => { const updated = updateQueueItemQty(item.sku, parseInt(e.target.value) || 1); setPrintQueue(updated); }}
+                                                    onChange={async (e) => { const updated = await updateQueueItemQty(item.id, parseInt(e.target.value) || 1); setPrintQueue(updated); }}
                                                     className="w-10 h-6 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-slate-800 dark:text-white p-0 focus:ring-0"
                                                 />
-                                                <button onClick={() => { const updated = updateQueueItemQty(item.sku, item.quantity + 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">+</button>
+                                                <button onClick={async () => { const updated = await updateQueueItemQty(item.id, item.quantity + 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">+</button>
                                             </div>
-                                            <button onClick={() => { const updated = removeFromQueue(item.sku); setPrintQueue(updated); }} className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Eliminar">
+                                            <button onClick={async () => { const updated = await removeFromQueue(item.id); setPrintQueue(updated); }} className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Eliminar">
                                                 <span className="material-symbols-outlined text-[16px]">close</span>
                                             </button>
                                         </div>
@@ -1685,7 +1695,7 @@ const Products: React.FC = () => {
                                     ) : (
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-[11px] text-rose-500 font-bold">¿Seguro?</span>
-                                            <button onClick={() => { clearQueue(); setPrintQueue([]); setShowQueueClearConfirm(false); setIsQueuePanelOpen(false); }} className="text-[11px] font-bold text-white bg-rose-500 px-2 py-1 rounded">Sí</button>
+                                            <button onClick={async () => { await clearQueue(); setPrintQueue([]); setShowQueueClearConfirm(false); setIsQueuePanelOpen(false); }} className="text-[11px] font-bold text-white bg-rose-500 px-2 py-1 rounded">Sí</button>
                                             <button onClick={() => setShowQueueClearConfirm(false)} className="text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">No</button>
                                         </div>
                                     )}
