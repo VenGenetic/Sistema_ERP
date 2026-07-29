@@ -43,7 +43,11 @@ const MobileLabels: React.FC = () => {
 
     useEffect(() => {
         loadHistory();
-        setQueue(getPrintQueue());
+        const loadQueue = async () => {
+            const q = await getPrintQueue();
+            setQueue(q);
+        };
+        loadQueue();
     }, []);
 
     const loadHistory = () => {
@@ -139,9 +143,9 @@ const MobileLabels: React.FC = () => {
         setQueueQtyMap(prev => ({ ...prev, [id]: Math.max(1, val) }));
     };
 
-    const handleAddToQueue = (prod: any) => {
+    const handleAddToQueue = async (prod: any) => {
         const qty = getQueueQty(String(prod.id));
-        const updated = addToQueue(
+        const updated = await addToQueue(
             { id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url },
             qty
         );
@@ -153,19 +157,19 @@ const MobileLabels: React.FC = () => {
         setQueueQtyMap(prev => { const n = { ...prev }; delete n[String(prod.id)]; return n; });
     };
 
-    const handleRemoveFromQueue = (sku: string) => {
-        const updated = removeFromQueue(sku);
+    const handleRemoveFromQueue = async (id: number) => {
+        const updated = await removeFromQueue(id);
         setQueue(updated);
         if (navigator.vibrate) navigator.vibrate(30);
     };
 
-    const handleUpdateQueueQty = (sku: string, newQty: number) => {
-        const updated = updateQueueItemQty(sku, newQty);
+    const handleUpdateQueueQty = async (id: number, newQty: number) => {
+        const updated = await updateQueueItemQty(id, newQty);
         setQueue(updated);
     };
 
-    const handleClearQueue = () => {
-        clearQueue();
+    const handleClearQueue = async () => {
+        await clearQueue();
         setQueue([]);
         setShowClearConfirm(false);
         if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
@@ -189,7 +193,7 @@ const MobileLabels: React.FC = () => {
     const totalPages = getQueuePageCount(queue);
 
     return (
-        <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-slate-900 pb-28 font-sans">
+        <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-slate-900 pb-56 font-sans">
             <style>{`
                 @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 @keyframes slide-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
@@ -652,7 +656,7 @@ const MobileLabels: React.FC = () => {
                                                     <div className="flex items-center gap-1.5 mt-1.5">
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleUpdateQueueQty(item.sku, item.quantity - 1)}
+                                                            onClick={() => handleUpdateQueueQty(item.id, item.quantity - 1)}
                                                             className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
                                                         >
                                                             −
@@ -662,12 +666,12 @@ const MobileLabels: React.FC = () => {
                                                             min="1"
                                                             step="1"
                                                             value={item.quantity}
-                                                            onChange={(e) => handleUpdateQueueQty(item.sku, parseInt(e.target.value) || 1)}
+                                                            onChange={(e) => handleUpdateQueueQty(item.id, parseInt(e.target.value) || 1)}
                                                             className="w-10 h-7 text-center bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 dark:border-amber-700/60 rounded-lg text-amber-800 dark:text-amber-300 font-black text-xs focus:ring-0 p-0"
                                                         />
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleUpdateQueueQty(item.sku, item.quantity + 1)}
+                                                            onClick={() => handleUpdateQueueQty(item.id, item.quantity + 1)}
                                                             className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
                                                         >
                                                             +
@@ -679,7 +683,7 @@ const MobileLabels: React.FC = () => {
                                                 {/* Delete button */}
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleRemoveFromQueue(item.sku)}
+                                                    onClick={() => handleRemoveFromQueue(item.id)}
                                                     className="active:scale-90 p-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 text-rose-500 dark:text-rose-400 rounded-xl transition-all shrink-0 border border-rose-200/60 dark:border-rose-800/50"
                                                     title="Eliminar de la cola"
                                                 >

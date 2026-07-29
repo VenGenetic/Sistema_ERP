@@ -8,18 +8,13 @@ const MobileLayout: React.FC = () => {
     const location = useLocation();
     const [queueCount, setQueueCount] = useState(0);
 
-    const refreshQueueCount = useCallback(() => {
-        setQueueCount(getPrintQueue().length);
+    const refreshQueueCount = useCallback(async () => {
+        const queue = await getPrintQueue();
+        setQueueCount(queue.length);
     }, []);
 
     useEffect(() => {
         refreshQueueCount();
-        // Re-check queue count on route changes and storage events
-        const onStorage = (e: StorageEvent) => {
-            if (e.key === 'mobile_print_queue') refreshQueueCount();
-        };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
     }, [refreshQueueCount]);
 
     // Refresh queue badge whenever the route changes (e.g., after adding from catalog)
