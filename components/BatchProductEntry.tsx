@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
-import { read, utils, writeFile } from 'xlsx';
 
 interface Account {
     id: number;
@@ -248,7 +247,9 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     };
 
     // Excel Logic
-    const handleDownloadTemplate = () => {
+    const handleDownloadTemplate = async () => {
+        // xlsx se carga solo al usar esta función, para no inflar el bundle inicial
+        const { utils, writeFile } = await import('xlsx');
         const ws = utils.json_to_sheet([
             { SKU: 'EJEMPLO-SKU', Nombre: 'Producto Ejemplo', Cantidad: 10, 'Costo S/I': 15.50, 'Costo Desc.': 0, Margen: 0.65, 'PVP': 30.00 }
         ], { header: ['SKU', 'Nombre', 'Cantidad', 'Costo S/I', 'Costo Desc.', 'Margen', 'PVP'] });
@@ -262,7 +263,8 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        reader.onload = async (evt) => {
+            const { read, utils } = await import('xlsx');
             const bstr = evt.target?.result;
             const wb = read(bstr, { type: 'binary' });
             const wsname = wb.SheetNames[0];

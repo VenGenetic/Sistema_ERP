@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import * as XLSX from 'xlsx';
 import { supabase } from '../supabaseClient';
 import { WarehouseSelect } from '../components/WarehouseSelect';
 import { MediaLightbox } from '../components/MediaLightbox';
@@ -447,12 +446,15 @@ const Replenishment: React.FC = () => {
     // ──────────────────────────────────────────────
     // 8. EXPORT TO EXCEL
     // ──────────────────────────────────────────────
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const cartItems = Object.values(cart);
         if (cartItems.length === 0) {
             alert('El carrito de pedido está vacío.');
             return;
         }
+
+        // xlsx se carga solo cuando se exporta, para no inflar el bundle inicial
+        const XLSX = await import('xlsx');
 
         const activeDraft = drafts.find(d => d.id === activeDraftId);
         const draftName = activeDraft ? activeDraft.name : 'Abastecimiento';

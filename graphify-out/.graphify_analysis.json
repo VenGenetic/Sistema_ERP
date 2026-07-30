@@ -1,0 +1,1125 @@
+{
+  "communities": {
+    "0": [
+      "components_medialightbox",
+      "components_medialightbox_mediaitem",
+      "components_medialightbox_medialightbox",
+      "components_medialightbox_medialightboxprops",
+      "components_mobile_mobilesearchbar",
+      "components_mobile_mobilesearchbar_mobilesearchbar",
+      "components_mobile_mobilesearchbar_mobilesearchbarprops",
+      "components_mobile_mobilesearchbar_window",
+      "components_printqueuepreviewmodal",
+      "components_printqueuepreviewmodal_printqueuepreviewmodal",
+      "components_printqueuepreviewmodal_printqueuepreviewmodalprops",
+      "components_productgroupmodal",
+      "components_productgroupmodal_productgroupmodal",
+      "components_productgroupmodal_productgroupmodalprops",
+      "components_productlabelmodal",
+      "components_productlabelmodal_productlabelmodal",
+      "components_productlabelmodal_productlabelmodalprops",
+      "components_productlabelmodal_renderlabeltocanvas",
+      "components_quicktagassignmodal_quicktagassignmodal",
+      "components_videothumbnail",
+      "components_videothumbnail_videothumbnail",
+      "components_videothumbnail_videothumbnailprops",
+      "jspdf",
+      "package_dependencies_jspdf",
+      "pages_mobile_mobilecatalog",
+      "pages_mobile_mobilecatalog_mobilecatalog",
+      "pages_mobile_mobileinventory",
+      "pages_mobile_mobileinventory_mobileinventory",
+      "pages_mobile_mobilelabels",
+      "pages_mobile_mobilelabels_mobilelabels",
+      "pages_products",
+      "pages_products_getinitialparams",
+      "pages_products_products",
+      "utils_discontinuedhelper",
+      "utils_discontinuedhelper_isproductdiscontinued",
+      "utils_image",
+      "utils_image_getthumbnailurl",
+      "utils_mobilelabelprinter",
+      "utils_mobilelabelprinter_addtoprinthistory",
+      "utils_mobilelabelprinter_getprinthistory",
+      "utils_mobilelabelprinter_printhistoryitem",
+      "utils_mobilelabelprinter_printlabelsquick",
+      "utils_mobilelabelprinter_renderlabeltocanvas",
+      "utils_mobileprintqueue",
+      "utils_mobileprintqueue_addtoqueue",
+      "utils_mobileprintqueue_clearqueue",
+      "utils_mobileprintqueue_downloadqueuepdf",
+      "utils_mobileprintqueue_generatequeuepdf",
+      "utils_mobileprintqueue_getprintqueue",
+      "utils_mobileprintqueue_getqueuepagecount",
+      "utils_mobileprintqueue_getqueuetotallabels",
+      "utils_mobileprintqueue_printqueueitem",
+      "utils_mobileprintqueue_removefromqueue",
+      "utils_mobileprintqueue_savequeue",
+      "utils_mobileprintqueue_updatequeueitemqty",
+      "utils_mobilesearchengine",
+      "utils_mobilesearchengine_calcularrelevancia",
+      "utils_mobilesearchengine_expandirterminos",
+      "utils_mobilesearchengine_expansioncache",
+      "utils_mobilesearchengine_getnormalized",
+      "utils_mobilesearchengine_getsuggestions",
+      "utils_mobilesearchengine_isfuzzymatch",
+      "utils_mobilesearchengine_iswordboundarymatch",
+      "utils_mobilesearchengine_limpiartexto",
+      "utils_mobilesearchengine_normalizedcache",
+      "utils_mobilesearchengine_normalizedproduct",
+      "utils_mobilesearchengine_searchproducts",
+      "utils_mobilesearchengine_sinonimosbase",
+      "utils_mobilesearchengine_synonymlookup",
+      "utils_mobilesearchengine_usemobileproducts"
+    ],
+    "1": [
+      "components_editdemandmodal",
+      "components_editdemandmodal_editdemandmodal",
+      "components_editdemandmodal_editdemandmodalprops",
+      "components_editdemandmodal_productdemand",
+      "components_exportdemandsmodal",
+      "components_exportdemandsmodal_exportdemandsmodal",
+      "components_exportdemandsmodal_exportdemandsmodalprops",
+      "components_exportdemandsmodal_productdemand",
+      "components_productdemandmodal",
+      "components_productdemandmodal_parseclipboardtext",
+      "components_productdemandmodal_productdemandmodal",
+      "components_productdemandmodal_productdemandmodalprops",
+      "components_sharedemandmodal",
+      "components_sharedemandmodal_productdemand",
+      "components_sharedemandmodal_sharedemandmodal",
+      "components_sharedemandmodal_sharedemandmodalprops",
+      "components_whatsappbutton",
+      "components_whatsappbutton_whatsappbutton",
+      "components_whatsappbutton_whatsappbuttonprops",
+      "contexts_authcontext",
+      "contexts_authcontext_authcontext",
+      "contexts_authcontext_authcontexttype",
+      "contexts_authcontext_authprovider",
+      "contexts_authcontext_getorcreatedevicesessionid",
+      "contexts_authcontext_permissions",
+      "contexts_authcontext_useauth",
+      "contexts_authcontext_userprofile",
+      "package_dependencies_react",
+      "pages_commissiondashboard",
+      "pages_commissiondashboard_commissiondashboard",
+      "pages_commissiondashboard_globalpool",
+      "pages_commissiondashboard_pointledgersummary",
+      "pages_dashboard",
+      "pages_dashboard_activityitem",
+      "pages_dashboard_dashboard",
+      "pages_expenses",
+      "pages_expenses_expense",
+      "pages_expenses_expenses",
+      "pages_expenses_startofmonthlocal",
+      "pages_expenses_startofweeklocal",
+      "pages_expenses_todaylocal",
+      "pages_productdemands",
+      "pages_productdemands_productdemand",
+      "pages_productdemands_productdemands",
+      "react",
+      "utils_phone",
+      "utils_phone_formatphonedisplay",
+      "utils_phone_isvalidecmobile",
+      "utils_phone_normalizephoneec",
+      "utils_phone_stripnondigits",
+      "utils_whatsapp",
+      "utils_whatsapp_buildwhatsappconfirmationurl",
+      "utils_whatsapp_buildwhatsappdemandurl",
+      "utils_whatsapp_buildwhatsappdiscontinuedurl",
+      "utils_whatsapp_buildwhatsappshippingurl",
+      "utils_whatsapp_openwhatsapp",
+      "utils_whatsapp_whatsappdemandcontext",
+      "utils_whatsapp_whatsappordercontext"
+    ],
+    "2": [
+      "components_accountdetails",
+      "components_accountdetails_accountdetails",
+      "components_accountdetails_transactiondisplay",
+      "components_financeconfig",
+      "components_financeconfig_financeconfig",
+      "components_financedashboard",
+      "components_financedashboard_financedashboard",
+      "components_financedashboard_sortableaccountcard",
+      "components_newtransactionmodal",
+      "components_newtransactionmodal_newtransactionmodal",
+      "components_newtransactionmodal_newtransactionmodalprops",
+      "components_newtransactionmodal_templine",
+      "components_sourcingquickeditmodal",
+      "components_sourcingquickeditmodal_sourcingquickeditmodal",
+      "components_sourcingquickeditmodal_sourcingquickeditmodalprops",
+      "components_transactionhistory",
+      "components_transactionhistory_expandedtransaction",
+      "components_transactionhistory_transactionhistory",
+      "pages_finance",
+      "pages_finance_finance",
+      "pages_finance_financebreadcrumbs",
+      "pages_sourcingpipeline",
+      "pages_sourcingpipeline_sourcingitem",
+      "pages_sourcingpipeline_sourcingpipeline",
+      "supabaseclient",
+      "types_finance",
+      "types_finance_account",
+      "types_finance_accountrow",
+      "types_finance_transaction",
+      "types_finance_transactionline",
+      "types_finance_transactionlinerow",
+      "types_finance_transactionrow",
+      "utils_accountnature",
+      "utils_accountnature_accountcategory",
+      "utils_accountnature_categorydisplayname",
+      "utils_accountnature_getaccounteffect",
+      "utils_accountnature_getaccountnaturelabel",
+      "utils_accountnature_isdebitnatural"
+    ],
+    "3": [
+      "app",
+      "app_adminsetup",
+      "app_authconfirm",
+      "app_commissiondashboard",
+      "app_customers",
+      "app_dailyregistry",
+      "app_dashboard",
+      "app_expenses",
+      "app_finance",
+      "app_inventory",
+      "app_inventorymode",
+      "app_inventorysession",
+      "app_loadingfallback",
+      "app_login",
+      "app_mobilecatalog",
+      "app_mobiledashboard",
+      "app_mobileinventory",
+      "app_mobilelabels",
+      "app_mobilelayout",
+      "app_notfound",
+      "app_orders",
+      "app_poe",
+      "app_pos",
+      "app_productdemands",
+      "app_products",
+      "app_repdashboard",
+      "app_replenishment",
+      "app_resetpassword",
+      "app_settings",
+      "app_sourcingpipeline",
+      "app_tags",
+      "app_team",
+      "app_testconnection"
+    ],
+    "4": [
+      "components_poe_poecell",
+      "components_poe_poecell_poecell",
+      "components_poe_poecell_poecellprops",
+      "components_poe_poemodal",
+      "components_poe_poemodal_poemodal",
+      "components_poe_poetable",
+      "components_poe_poetable_poetable",
+      "components_poe_sidepeekconsole",
+      "components_poe_sidepeekconsole_sidepeekconsole",
+      "components_poe_soptypeaeditor",
+      "components_poe_soptypeaeditor_props",
+      "components_poe_soptypeaeditor_soptypeaeditor",
+      "components_poe_soptypebeditor",
+      "components_poe_soptypebeditor_props",
+      "components_poe_soptypebeditor_soptypebeditor",
+      "pages_poe",
+      "pages_poe_poe",
+      "store_usepoestore",
+      "store_usepoestore_default_local_columns",
+      "store_usepoestore_default_local_tags",
+      "store_usepoestore_poestorestate",
+      "store_usepoestore_usepoestore",
+      "types_poe",
+      "types_poe_default_tag_colors",
+      "types_poe_poecolumn",
+      "types_poe_poecolumntype",
+      "types_poe_poeprocedure",
+      "types_poe_poetag",
+      "types_poe_sopdecisionnode",
+      "types_poe_sopliststep",
+      "types_poe_sopnodetype",
+      "types_poe_soptype"
+    ],
+    "5": [
+      "dotenv",
+      "inventario_desorganizado_transfer_to_guayaquil_py_inventario_desorganizado_transfer_to_guayaquil",
+      "inventario_desorganizado_transfer_to_guayaquil_py_inventario_desorganizado_transfer_to_guayaquil_transfer",
+      "package",
+      "package_devdependencies",
+      "package_devdependencies_dotenv",
+      "package_devdependencies_types_node",
+      "package_devdependencies_types_react",
+      "package_devdependencies_types_react_dom",
+      "package_devdependencies_typescript",
+      "package_devdependencies_vite",
+      "package_devdependencies_vitejs_plugin_react",
+      "package_name",
+      "package_private",
+      "package_scripts",
+      "package_scripts_build",
+      "package_scripts_dev",
+      "package_scripts_preview",
+      "package_scripts_sync_importer_stock",
+      "package_scripts_sync_products",
+      "package_type",
+      "package_version",
+      "scripts_export_guayaquil_json_export_inventory",
+      "scripts_export_guayaquil_json_py_scripts_export_guayaquil_json",
+      "types_node",
+      "types_react",
+      "types_react_dom",
+      "typescript",
+      "vite",
+      "vitejs_plugin_react"
+    ],
+    "6": [
+      "dnd_kit_core",
+      "dnd_kit_sortable",
+      "dnd_kit_utilities",
+      "html2canvas",
+      "jsbarcode",
+      "jszip",
+      "lucide_react",
+      "package_dependencies",
+      "package_dependencies_dnd_kit_core",
+      "package_dependencies_dnd_kit_sortable",
+      "package_dependencies_dnd_kit_utilities",
+      "package_dependencies_html2canvas",
+      "package_dependencies_jsbarcode",
+      "package_dependencies_jszip",
+      "package_dependencies_lucide_react",
+      "package_dependencies_pg",
+      "package_dependencies_react_dom",
+      "package_dependencies_react_router_dom",
+      "package_dependencies_supabase_supabase_js",
+      "package_dependencies_xlsx",
+      "package_dependencies_zustand",
+      "pages_replenishment_replenishment",
+      "pg",
+      "react_dom",
+      "react_router_dom",
+      "supabase_supabase_js",
+      "xlsx",
+      "zustand"
+    ],
+    "7": [
+      "components_inviteusermodal",
+      "components_inviteusermodal_inviteusermodal",
+      "components_inviteusermodal_inviteusermodalprops",
+      "components_inviteusermodal_rationale_17",
+      "components_settings_accountpanel",
+      "components_settings_accountpanel_accountpanel",
+      "components_settings_apikeyspanel",
+      "components_settings_apikeyspanel_apikey",
+      "components_settings_apikeyspanel_apikeyspanel",
+      "components_settings_brandspanel",
+      "components_settings_brandspanel_brand",
+      "components_settings_brandspanel_brandspanel",
+      "components_settings_profilepanel",
+      "components_settings_profilepanel_profilepanel",
+      "components_settings_teampanel",
+      "components_settings_teampanel_teampanel",
+      "pages_settings",
+      "pages_settings_devpanel",
+      "pages_settings_financepanel",
+      "pages_settings_inventorypanel",
+      "pages_settings_partnerspanel",
+      "pages_settings_settings",
+      "pages_team",
+      "pages_team_getrolecolor",
+      "pages_team_team",
+      "pages_team_user"
+    ],
+    "8": [
+      "ref_dom",
+      "ref_dom_iterable",
+      "ref_es2022",
+      "ref_node",
+      "ref_supabase_functions",
+      "ref_vite_client",
+      "tsconfig",
+      "tsconfig_compileroptions",
+      "tsconfig_compileroptions_allowimportingtsextensions",
+      "tsconfig_compileroptions_allowjs",
+      "tsconfig_compileroptions_experimentaldecorators",
+      "tsconfig_compileroptions_isolatedmodules",
+      "tsconfig_compileroptions_jsx",
+      "tsconfig_compileroptions_lib",
+      "tsconfig_compileroptions_module",
+      "tsconfig_compileroptions_moduledetection",
+      "tsconfig_compileroptions_moduleresolution",
+      "tsconfig_compileroptions_noemit",
+      "tsconfig_compileroptions_paths",
+      "tsconfig_compileroptions_skiplibcheck",
+      "tsconfig_compileroptions_target",
+      "tsconfig_compileroptions_types",
+      "tsconfig_compileroptions_usedefineforclassfields",
+      "tsconfig_exclude"
+    ],
+    "9": [
+      "components_catalogimportwizard",
+      "components_catalogimportwizard_catalogimportwizard",
+      "components_catalogimportwizard_catalogimportwizardprops",
+      "components_catalogimportwizard_catalogrow",
+      "pages_adminsetup",
+      "pages_adminsetup_adminsetup",
+      "pages_authconfirm",
+      "pages_authconfirm_authconfirm",
+      "pages_inventorymode",
+      "pages_inventorymode_groupdata",
+      "pages_inventorymode_inventorymode",
+      "pages_inventorysession",
+      "pages_inventorysession_groupitem",
+      "pages_inventorysession_inventorysession",
+      "pages_repdashboard",
+      "pages_repdashboard_dailystats",
+      "pages_repdashboard_repdashboard",
+      "pages_resetpassword",
+      "pages_resetpassword_resetpassword",
+      "pages_testconnection",
+      "pages_testconnection_testconnection",
+      "supabaseclient_supabase"
+    ],
+    "10": [
+      "components_pos_paymentmodal",
+      "components_pos_paymentmodal_paymentmodal",
+      "components_pos_paymentmodal_paymentmodalprops",
+      "components_pos_paymentmodal_todayecuador",
+      "hooks_usebarcodescanner",
+      "hooks_usebarcodescanner_usebarcodescanner",
+      "pages_customers",
+      "pages_customers_customerrequest",
+      "pages_customers_customers",
+      "pages_customers_formatrequestnotes",
+      "pages_customers_parserequestreminder",
+      "pages_customers_unifiedcustomer",
+      "pages_pos",
+      "pages_pos_pos",
+      "store_cartstore",
+      "store_cartstore_cartitem",
+      "store_cartstore_cartstate",
+      "store_cartstore_customer",
+      "store_cartstore_defaultconsumidorfinal",
+      "store_cartstore_inventoryresult",
+      "store_cartstore_product",
+      "store_cartstore_usecartstore"
+    ],
+    "11": [
+      "components_bulkeditmodal",
+      "components_bulkeditmodal_bulk_fields",
+      "components_bulkeditmodal_bulkeditmodal",
+      "components_bulkeditmodal_bulkeditmodalprops",
+      "components_bulkeditmodal_bulkfieldkey",
+      "components_bulkeditmodal_calcprice",
+      "components_bulkeditmodal_costwithvat",
+      "components_bulkeditmodal_r",
+      "components_warehouseselect",
+      "components_warehouseselect_warehouse",
+      "components_warehouseselect_warehouseselect",
+      "components_warehouseselect_warehouseselectprops",
+      "pages_replenishment",
+      "pages_replenishment_cartitem",
+      "pages_replenishment_importerproduct",
+      "pages_replenishment_replenishmentdraft"
+    ],
+    "12": [
+      "components_inventorymovementmodal",
+      "components_inventorymovementmodal_inventorymovementmodal",
+      "components_inventorymovementmodal_inventorymovementmodalprops",
+      "components_inventorymovementmodal_product",
+      "components_inventorymovementmodal_warehouse",
+      "types_supabase",
+      "types_supabase_compositetypes",
+      "types_supabase_constants",
+      "types_supabase_database",
+      "types_supabase_databasewithoutinternals",
+      "types_supabase_defaultschema",
+      "types_supabase_enums",
+      "types_supabase_json",
+      "types_supabase_tables",
+      "types_supabase_tablesinsert",
+      "types_supabase_tablesupdate"
+    ],
+    "13": [
+      "components_fitmentsearch",
+      "components_fitmentsearch_fitmentsearch",
+      "components_fitmentsearch_fitmentsearchprops",
+      "components_partprofilemodal",
+      "components_partprofilemodal_partprofilemodal",
+      "components_partprofilemodal_partprofilemodalprops",
+      "components_productentryform",
+      "components_productentryform_calculatedvalues",
+      "components_productentryform_costformstate",
+      "components_productentryform_productentryform",
+      "pages_inventory",
+      "pages_inventory_inventory",
+      "pages_inventory_movement",
+      "pages_inventory_stockitem",
+      "pages_inventory_warehouse"
+    ],
+    "14": [
+      "pages_orders",
+      "pages_orders_columns",
+      "pages_orders_order",
+      "pages_orders_orderitem",
+      "pages_orders_orders",
+      "utils_orderstatemachine",
+      "utils_orderstatemachine_getnextstatuses",
+      "utils_orderstatemachine_getstatusesforrole",
+      "utils_orderstatemachine_istransitionallowed",
+      "utils_orderstatemachine_orderstatus",
+      "utils_orderstatemachine_status_colors",
+      "utils_orderstatemachine_status_labels",
+      "utils_orderstatemachine_status_responsible_role",
+      "utils_orderstatemachine_valid_transitions"
+    ],
+    "15": [
+      "inventario_desorganizado_upload_inventory",
+      "inventario_desorganizado_upload_inventory_dirname",
+      "inventario_desorganizado_upload_inventory_exceldata",
+      "inventario_desorganizado_upload_inventory_filename",
+      "inventario_desorganizado_upload_inventory_finalinventoryupload",
+      "inventario_desorganizado_upload_inventory_jsondatastr",
+      "inventario_desorganizado_upload_inventory_jsonparsed",
+      "inventario_desorganizado_upload_inventory_matchedproducts",
+      "inventario_desorganizado_upload_inventory_normalize",
+      "inventario_desorganizado_upload_inventory_parsedexcel",
+      "inventario_desorganizado_upload_inventory_tokenize",
+      "inventario_desorganizado_upload_inventory_unmatchedexcel",
+      "inventario_desorganizado_upload_inventory_workbook"
+    ],
+    "16": [
+      "components_protectedroute",
+      "components_protectedroute_protectedroute",
+      "components_sessiontimeouthandler",
+      "components_sessiontimeouthandler_sessiontimeouthandler",
+      "pages_login",
+      "pages_login_authmode",
+      "pages_login_login",
+      "utils_devicedetection",
+      "utils_devicedetection_getpreferredviewmode",
+      "utils_devicedetection_ismobiledevice",
+      "utils_devicedetection_shouldredirecttomobile",
+      "utils_devicedetection_viewmode"
+    ],
+    "17": [
+      "scripts_export_product_images",
+      "scripts_export_product_images_buildskumap",
+      "scripts_export_product_images_dirname",
+      "scripts_export_product_images_downloadimage",
+      "scripts_export_product_images_envcontent",
+      "scripts_export_product_images_envpath",
+      "scripts_export_product_images_envvars",
+      "scripts_export_product_images_exportdir",
+      "scripts_export_product_images_filename",
+      "scripts_export_product_images_getallfiles",
+      "scripts_export_product_images_main",
+      "scripts_export_product_images_supabase"
+    ],
+    "18": [
+      "app_app",
+      "components_errorboundary",
+      "components_errorboundary_errorboundary",
+      "components_errorboundary_errorboundary_componentdidcatch",
+      "components_errorboundary_errorboundary_getderivedstatefromerror",
+      "components_errorboundary_errorboundary_render",
+      "components_errorboundary_props",
+      "components_errorboundary_state",
+      "index",
+      "index_root",
+      "index_rootelement"
+    ],
+    "19": [
+      "components_quicktagassignmodal",
+      "components_quicktagassignmodal_quicktagassignmodalprops",
+      "components_tagmanager",
+      "components_tagmanager_colors",
+      "components_tagmanager_props",
+      "components_tagmanager_sortabletagitem",
+      "components_tagmanager_tag",
+      "components_tagmanager_tagmanager",
+      "pages_tags",
+      "pages_tags_tags"
+    ],
+    "20": [
+      "components_batchproductentry",
+      "components_batchproductentry_account",
+      "components_batchproductentry_batchproductentry",
+      "components_batchproductentry_batchproductentryprops",
+      "components_batchproductentry_productrow",
+      "components_brandselect",
+      "components_brandselect_brand",
+      "components_brandselect_brandselect",
+      "components_brandselect_brandselectprops"
+    ],
+    "21": [
+      "pages_dailyregistry",
+      "pages_dailyregistry_dailyregistry",
+      "pages_dailyregistry_dailysummary",
+      "pages_dailyregistry_editcartitem",
+      "pages_dailyregistry_ndaysagolocal",
+      "pages_dailyregistry_order",
+      "pages_dailyregistry_orderitem",
+      "pages_dailyregistry_todaylocal",
+      "pages_dailyregistry_tolocaldate"
+    ],
+    "22": [
+      "scripts_upload_local_images_dirname",
+      "scripts_upload_local_images_envcontent",
+      "scripts_upload_local_images_envpath",
+      "scripts_upload_local_images_envvars",
+      "scripts_upload_local_images_filename",
+      "scripts_upload_local_images_js_scripts_upload_local_images",
+      "scripts_upload_local_images_js_scripts_upload_local_images_main",
+      "scripts_upload_local_images_processbatch",
+      "scripts_upload_local_images_supabase"
+    ],
+    "23": [
+      "components_headeraccount",
+      "components_headeraccount_headeraccount",
+      "components_layout",
+      "components_layout_layout",
+      "components_mobile_mobilelayout",
+      "components_mobile_mobilelayout_mobilelayout",
+      "utils_devicedetection_setpreferredviewmode"
+    ],
+    "24": [
+      "components_productmodal",
+      "components_productmodal_calcmargin",
+      "components_productmodal_calcprice",
+      "components_productmodal_costwithvat",
+      "components_productmodal_productmodal",
+      "components_productmodal_productmodalprops",
+      "components_productmodal_r"
+    ],
+    "25": [
+      "scripts_sync_odoo_products",
+      "scripts_sync_odoo_products_dirname",
+      "scripts_sync_odoo_products_filename",
+      "scripts_sync_odoo_products_jsonpath",
+      "scripts_sync_odoo_products_localimagesdir",
+      "scripts_sync_odoo_products_main",
+      "scripts_sync_odoo_products_supabase"
+    ],
+    "26": [
+      "apply_migration",
+      "apply_migration_dirname",
+      "apply_migration_envpath",
+      "apply_migration_filename",
+      "apply_migration_main",
+      "apply_migration_migrationpath"
+    ],
+    "27": [
+      "inventario_desorganizado_wipe_db",
+      "inventario_desorganizado_wipe_db_dirname",
+      "inventario_desorganizado_wipe_db_filename",
+      "inventario_desorganizado_wipe_db_supabase",
+      "inventario_desorganizado_wipe_db_wipe",
+      "inventario_desorganizado_wipe_db_wipetable"
+    ],
+    "28": [
+      "scripts_import_products",
+      "scripts_import_products_dirname",
+      "scripts_import_products_filename",
+      "scripts_import_products_jsonpath",
+      "scripts_import_products_main",
+      "scripts_import_products_supabase"
+    ],
+    "29": [
+      "scripts_sync_importer_stock",
+      "scripts_sync_importer_stock_dirname",
+      "scripts_sync_importer_stock_filename",
+      "scripts_sync_importer_stock_jsonpath",
+      "scripts_sync_importer_stock_main",
+      "scripts_sync_importer_stock_supabase"
+    ],
+    "30": [
+      "components_inventorygroupselectmodal",
+      "components_inventorygroupselectmodal_groupdata",
+      "components_inventorygroupselectmodal_inventorygroupselectmodal",
+      "components_inventorygroupselectmodal_inventorygroupselectmodalprops",
+      "components_inventorygroupselectmodal_successstate"
+    ],
+    "31": [
+      "inventario_desorganizado_check_deps",
+      "inventario_desorganizado_check_deps_checkdependencies",
+      "inventario_desorganizado_check_deps_dirname",
+      "inventario_desorganizado_check_deps_filename",
+      "inventario_desorganizado_check_deps_supabase"
+    ],
+    "32": [
+      "inventario_desorganizado_check_discrepancy",
+      "inventario_desorganizado_check_discrepancy_check",
+      "inventario_desorganizado_check_discrepancy_dirname",
+      "inventario_desorganizado_check_discrepancy_filename",
+      "inventario_desorganizado_check_discrepancy_supabase"
+    ],
+    "33": [
+      "inventario_desorganizado_check_excel",
+      "inventario_desorganizado_check_excel_data",
+      "inventario_desorganizado_check_excel_dirname",
+      "inventario_desorganizado_check_excel_filename",
+      "inventario_desorganizado_check_excel_workbook"
+    ],
+    "34": [
+      "inventario_desorganizado_check_excel_extended",
+      "inventario_desorganizado_check_excel_extended_data",
+      "inventario_desorganizado_check_excel_extended_dirname",
+      "inventario_desorganizado_check_excel_extended_filename",
+      "inventario_desorganizado_check_excel_extended_workbook"
+    ],
+    "35": [
+      "inventario_desorganizado_transfer_to_guayaquil_dirname",
+      "inventario_desorganizado_transfer_to_guayaquil_filename",
+      "inventario_desorganizado_transfer_to_guayaquil_js_inventario_desorganizado_transfer_to_guayaquil",
+      "inventario_desorganizado_transfer_to_guayaquil_js_inventario_desorganizado_transfer_to_guayaquil_transfer",
+      "inventario_desorganizado_transfer_to_guayaquil_supabase"
+    ],
+    "36": [
+      "inventario_desorganizado_upload_to_supabase",
+      "inventario_desorganizado_upload_to_supabase_dirname",
+      "inventario_desorganizado_upload_to_supabase_filename",
+      "inventario_desorganizado_upload_to_supabase_run",
+      "inventario_desorganizado_upload_to_supabase_supabase"
+    ],
+    "37": [
+      "log_env_keys",
+      "log_env_keys_dirname",
+      "log_env_keys_envcontent",
+      "log_env_keys_envpath",
+      "log_env_keys_filename"
+    ],
+    "38": [
+      "scripts_apply_migration_stock_filter",
+      "scripts_apply_migration_stock_filter_dirname",
+      "scripts_apply_migration_stock_filter_filename",
+      "scripts_apply_migration_stock_filter_main",
+      "scripts_apply_migration_stock_filter_migrationpath"
+    ],
+    "39": [
+      "scripts_export_guayaquil_json_dirname",
+      "scripts_export_guayaquil_json_exportinventory",
+      "scripts_export_guayaquil_json_filename",
+      "scripts_export_guayaquil_json_js_scripts_export_guayaquil_json",
+      "scripts_export_guayaquil_json_supabase"
+    ],
+    "40": [
+      "scripts_update_product_names",
+      "scripts_update_product_names_dirname",
+      "scripts_update_product_names_filename",
+      "scripts_update_product_names_supabase",
+      "scripts_update_product_names_updatenames"
+    ],
+    "41": [
+      "temp_migration",
+      "temp_migration_dirname",
+      "temp_migration_envpath",
+      "temp_migration_filename",
+      "temp_migration_main"
+    ],
+    "42": [
+      "components_bulkmediauploadmodal",
+      "components_bulkmediauploadmodal_bulkmediauploadmodal",
+      "components_bulkmediauploadmodal_bulkmediauploadmodalprops",
+      "components_bulkmediauploadmodal_filevalidation"
+    ],
+    "43": [
+      "debug_accounts",
+      "debug_accounts_checkaccounts",
+      "debug_accounts_createclient",
+      "debug_accounts_supabase"
+    ],
+    "44": [
+      "scratch_check_inventory_cjs_scratch_check_inventory",
+      "scratch_check_inventory_cjs_scratch_check_inventory_createclient",
+      "scratch_check_inventory_cjs_scratch_check_inventory_run",
+      "scratch_check_inventory_cjs_scratch_check_inventory_supabase"
+    ],
+    "45": [
+      "scratch_check_inventory_js_scratch_check_inventory",
+      "scratch_check_inventory_js_scratch_check_inventory_createclient",
+      "scratch_check_inventory_js_scratch_check_inventory_run",
+      "scratch_check_inventory_js_scratch_check_inventory_supabase"
+    ],
+    "46": [
+      "scripts_check_categories",
+      "scripts_check_categories_checkcategories",
+      "scripts_check_categories_dirname",
+      "scripts_check_categories_filename"
+    ],
+    "47": [
+      "scripts_check_transaction",
+      "scripts_check_transaction_dirname",
+      "scripts_check_transaction_filename",
+      "scripts_check_transaction_fixtransaction"
+    ],
+    "48": [
+      "scripts_fix_categories_data",
+      "scripts_fix_categories_data_createclient",
+      "scripts_fix_categories_data_fixcategories",
+      "scripts_fix_categories_data_supabase"
+    ],
+    "49": [
+      "scripts_fix_types_cjs_scripts_fix_types",
+      "scripts_fix_types_content",
+      "scripts_fix_types_fs",
+      "scripts_fix_types_replacetable"
+    ],
+    "50": [
+      "scripts_generate_sql",
+      "scripts_generate_sql_files",
+      "scripts_generate_sql_fs",
+      "scripts_generate_sql_path"
+    ],
+    "51": [
+      "scripts_import_lista_precios",
+      "scripts_import_lista_precios_clean_price",
+      "scripts_import_lista_precios_escape_sql",
+      "scripts_import_lista_precios_main"
+    ],
+    "52": [
+      "scripts_upload_local_images_load_env",
+      "scripts_upload_local_images_py_scripts_upload_local_images",
+      "scripts_upload_local_images_py_scripts_upload_local_images_main",
+      "scripts_upload_local_images_upload_and_link_image"
+    ],
+    "53": [
+      "check_db",
+      "check_db_run",
+      "check_db_supabase"
+    ],
+    "54": [
+      "components_partnermodal",
+      "components_partnermodal_partnermodal",
+      "components_partnermodal_partnermodalprops"
+    ],
+    "55": [
+      "find_numeric",
+      "find_numeric_content",
+      "find_numeric_fs"
+    ],
+    "56": [
+      "inventario_desorganizado_actualizar_stock_importadora",
+      "inventario_desorganizado_actualizar_stock_importadora_main",
+      "inventario_desorganizado_actualizar_stock_importadora_run_step"
+    ],
+    "57": [
+      "scratch_check_all_tables",
+      "scratch_check_all_tables_run",
+      "scratch_check_all_tables_supabase"
+    ],
+    "58": [
+      "scratch_list_accounts",
+      "scratch_list_accounts_run",
+      "scratch_list_accounts_supabase"
+    ],
+    "59": [
+      "scratch_test_demand_query",
+      "scratch_test_demand_query_supabase",
+      "scratch_test_demand_query_test"
+    ],
+    "60": [
+      "scratch_test_expenses_db",
+      "scratch_test_expenses_db_run",
+      "scratch_test_expenses_db_supabase"
+    ],
+    "61": [
+      "scripts_excel_to_json",
+      "scripts_excel_to_json_clean_price",
+      "scripts_excel_to_json_main"
+    ],
+    "62": [
+      "scripts_pdf_to_excel",
+      "scripts_pdf_to_excel_clean_text",
+      "scripts_pdf_to_excel_extract_price_data"
+    ],
+    "63": [
+      "supabase_functions_sync_provider_deno",
+      "supabase_functions_sync_provider_deno_imports",
+      "supabase_functions_sync_provider_deno_imports_supabase_functions_js"
+    ],
+    "64": [
+      "test_connection",
+      "test_connection_dirname",
+      "test_connection_envpath"
+    ],
+    "65": [
+      "test_counts",
+      "test_counts_checkcounts",
+      "test_counts_supabase"
+    ],
+    "66": [
+      "test_image",
+      "test_image_run",
+      "test_image_sb"
+    ],
+    "67": [
+      "pages_mobile_mobiledashboard",
+      "pages_mobile_mobiledashboard_mobiledashboard"
+    ],
+    "68": [
+      "pages_notfound",
+      "pages_notfound_notfound"
+    ],
+    "69": [
+      "scratch_pg_list_accounts",
+      "scratch_pg_list_accounts_run"
+    ],
+    "70": [
+      "vercel",
+      "vercel_rewrites"
+    ],
+    "71": [
+      "refactor2"
+    ],
+    "72": [
+      "refactor3"
+    ],
+    "73": [
+      "refactor4"
+    ],
+    "74": [
+      "scripts_analyze_pdf"
+    ],
+    "75": [
+      "scripts_fix_types_js_scripts_fix_types"
+    ],
+    "76": [
+      "scripts_inspect_new_pdf"
+    ],
+    "77": [
+      "supabase_functions_sync_provider_index"
+    ],
+    "78": [
+      "vite_config"
+    ]
+  },
+  "cohesion": {
+    "0": 0.09440993788819876,
+    "1": 0.05928614640048397,
+    "2": 0.1379800853485064,
+    "3": 0.06060606060606061,
+    "4": 0.1774193548387097,
+    "5": 0.06666666666666667,
+    "6": 0.07142857142857142,
+    "7": 0.10153846153846154,
+    "8": 0.08333333333333333,
+    "9": 0.09090909090909091,
+    "10": 0.1774891774891775,
+    "11": 0.2,
+    "12": 0.13333333333333333,
+    "13": 0.1619047619047619,
+    "14": 0.16483516483516483,
+    "15": 0.15384615384615385,
+    "16": 0.2727272727272727,
+    "17": 0.21212121212121213,
+    "18": 0.2,
+    "19": 0.24444444444444444,
+    "20": 0.25,
+    "21": 0.3055555555555556,
+    "22": 0.25,
+    "23": 0.42857142857142855,
+    "24": 0.7142857142857143,
+    "25": 0.2857142857142857,
+    "26": 0.3333333333333333,
+    "27": 0.4,
+    "28": 0.3333333333333333,
+    "29": 0.3333333333333333,
+    "30": 0.4,
+    "31": 0.4,
+    "32": 0.4,
+    "33": 0.4,
+    "34": 0.4,
+    "35": 0.4,
+    "36": 0.4,
+    "37": 0.4,
+    "38": 0.4,
+    "39": 0.4,
+    "40": 0.4,
+    "41": 0.4,
+    "42": 0.5,
+    "43": 0.5,
+    "44": 0.5,
+    "45": 0.5,
+    "46": 0.5,
+    "47": 0.5,
+    "48": 0.5,
+    "49": 0.5,
+    "50": 0.5,
+    "51": 0.8333333333333334,
+    "52": 0.8333333333333334,
+    "53": 0.6666666666666666,
+    "54": 0.6666666666666666,
+    "55": 0.6666666666666666,
+    "56": 1.0,
+    "57": 0.6666666666666666,
+    "58": 0.6666666666666666,
+    "59": 0.6666666666666666,
+    "60": 0.6666666666666666,
+    "61": 1.0,
+    "62": 1.0,
+    "63": 0.6666666666666666,
+    "64": 0.6666666666666666,
+    "65": 0.6666666666666666,
+    "66": 0.6666666666666666,
+    "67": 1.0,
+    "68": 1.0,
+    "69": 1.0,
+    "70": 1.0,
+    "71": 1.0,
+    "72": 1.0,
+    "73": 1.0,
+    "74": 1.0,
+    "75": 1.0,
+    "76": 1.0,
+    "77": 1.0,
+    "78": 1.0
+  },
+  "gods": [
+    {
+      "id": "supabaseclient_supabase",
+      "label": "supabase",
+      "degree": 59
+    },
+    {
+      "id": "contexts_authcontext_useauth",
+      "label": "useAuth()",
+      "degree": 17
+    },
+    {
+      "id": "utils_image_getthumbnailurl",
+      "label": "getThumbnailUrl()",
+      "degree": 17
+    },
+    {
+      "id": "tsconfig_compileroptions",
+      "label": "compilerOptions",
+      "degree": 16
+    },
+    {
+      "id": "pages_mobile_mobilelabels_mobilelabels",
+      "label": "MobileLabels()",
+      "degree": 15
+    },
+    {
+      "id": "utils_mobileprintqueue_getprintqueue",
+      "label": "getPrintQueue()",
+      "degree": 15
+    },
+    {
+      "id": "components_printqueuepreviewmodal_printqueuepreviewmodal",
+      "label": "PrintQueuePreviewModal()",
+      "degree": 13
+    },
+    {
+      "id": "pages_products_products",
+      "label": "Products()",
+      "degree": 12
+    },
+    {
+      "id": "store_usepoestore_usepoestore",
+      "label": "usePOEStore",
+      "degree": 11
+    },
+    {
+      "id": "utils_discontinuedhelper_isproductdiscontinued",
+      "label": "isProductDiscontinued()",
+      "degree": 11
+    }
+  ],
+  "surprises": [
+    {
+      "source": "Inventory()",
+      "target": "getThumbnailUrl()",
+      "source_files": [
+        "pages/Inventory.tsx",
+        "utils/image.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `Inventory()` unexpectedly reaches hub `getThumbnailUrl()`"
+    },
+    {
+      "source": "Layout()",
+      "target": "useAuth()",
+      "source_files": [
+        "components/Layout.tsx",
+        "contexts/AuthContext.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "PrintQueuePreviewModalProps",
+      "target": "PrintQueueItem",
+      "source_files": [
+        "components/PrintQueuePreviewModal.tsx",
+        "utils/mobilePrintQueue.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; peripheral node `PrintQueuePreviewModalProps` unexpectedly reaches hub `PrintQueueItem`"
+    },
+    {
+      "source": "ProductDemandModal()",
+      "target": "isProductDiscontinued()",
+      "source_files": [
+        "components/ProductDemandModal.tsx",
+        "utils/discontinuedHelper.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "ProtectedRoute()",
+      "target": "useAuth()",
+      "source_files": [
+        "components/ProtectedRoute.tsx",
+        "contexts/AuthContext.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `supabase` connect `supabase` to `Products.tsx`, `ProductDemands.tsx`, `supabaseClient.ts`, `usePOEStore.ts`, `Settings.tsx`, `BulkMediaUploadModal.tsx`, `BulkEditModal.tsx`, `supabase.ts`, `Inventory.tsx`, `POS.tsx`, `Orders.tsx`, `deviceDetection.ts`, `TagManager.tsx`, `BatchProductEntry.tsx`, `DailyRegistry.tsx`, `Layout.tsx`, `ProductModal.tsx`, `InventoryGroupSelectModal.tsx`?",
+      "why": "High betweenness centrality (0.157) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `dependencies` connect `dependencies` to `Products.tsx`, `ProductDemands.tsx`, `devDependencies`?",
+      "why": "High betweenness centrality (0.089) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `jspdf` connect `Products.tsx` to `dependencies`?",
+      "why": "High betweenness centrality (0.042) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `Dashboard`, `Team`, `Customers` to the rest of the system?",
+      "why": "296 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Products.tsx` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.09440993788819876 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `ProductDemands.tsx` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.05928614640048397 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `supabaseClient.ts` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.1379800853485064 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import JSZip from 'jszip';
 import { supabase } from '../supabaseClient';
 import { ProductModal } from '../components/ProductModal';
 import { ProductGroupModal } from '../components/ProductGroupModal';
@@ -660,7 +659,8 @@ const Products: React.FC = () => {
 
             setExportProgress({ current: 0, total: allProducts.length });
 
-            // 2. Crear el ZIP
+            // 2. Crear el ZIP (jszip se carga solo al exportar, para no inflar el bundle inicial)
+            const { default: JSZip } = await import('jszip');
             const zip = new JSZip();
             let success = 0;
             let failed = 0;

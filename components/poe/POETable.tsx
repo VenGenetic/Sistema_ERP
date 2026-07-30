@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { usePOEStore } from '../../store/usePOEStore';
+import { useShallow } from 'zustand/react/shallow';
 import { POECell } from './POECell';
 import { POEColumnType, POEColumn, POEProcedure } from '../../types/poe';
 import { 
@@ -37,7 +38,25 @@ export const POETable: React.FC = () => {
     setSelectedProcedureForModal,
     setIsCreatingNewProcedureModal,
     deleteProcedure
-  } = usePOEStore();
+  } = usePOEStore(
+    useShallow((state) => ({
+      procedures: state.procedures,
+      columns: state.columns,
+      tags: state.tags,
+      searchQuery: state.searchQuery,
+      selectedSopTypeFilter: state.selectedSopTypeFilter,
+      sortColumnId: state.sortColumnId,
+      sortDirection: state.sortDirection,
+      columnFilters: state.columnFilters,
+      activeSidePeekColumnId: state.activeSidePeekColumnId,
+      setActiveSidePeekColumnId: state.setActiveSidePeekColumnId,
+      setSort: state.setSort,
+      createColumn: state.createColumn,
+      setSelectedProcedureForModal: state.setSelectedProcedureForModal,
+      setIsCreatingNewProcedureModal: state.setIsCreatingNewProcedureModal,
+      deleteProcedure: state.deleteProcedure,
+    }))
+  );
 
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColName, setNewColName] = useState('');

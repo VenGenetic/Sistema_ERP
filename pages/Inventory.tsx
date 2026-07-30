@@ -7,7 +7,6 @@ import { PartProfileModal } from '../components/PartProfileModal'; // New Compon
 import { ProductModal } from '../components/ProductModal';
 import { FitmentSearch } from '../components/FitmentSearch'; // New Component
 import { getThumbnailUrl } from '../utils/image';
-import { utils, writeFile } from 'xlsx';
 
 // Define types based on our join queries
 interface StockItem {
@@ -404,6 +403,8 @@ const Inventory: React.FC = () => {
     const handleExportToExcel = async () => {
         setExportLoading(true);
         try {
+            // xlsx se carga solo al exportar, para no inflar el bundle inicial
+            const { utils, writeFile } = await import('xlsx');
             const ivaMult = 1 + exportIvaPercent / 100;
 
             // 1. Fetch ALL matching products (no pagination)

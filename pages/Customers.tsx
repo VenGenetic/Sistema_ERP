@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import type { Customer } from '../store/cartStore'; // Reuse the interface we already have
+import { useShallow } from 'zustand/react/shallow';
 import { Plus, Search, Edit2, Trash2, X, Briefcase, User, Percent, Users, MessageSquare, Bell, ClipboardList, Check, AlertCircle, Calendar, DollarSign, ShoppingBag, Sparkles, Phone, Package, Zap, Copy } from 'lucide-react';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
 import { normalizePhoneEC } from '../utils/phone';
@@ -64,7 +65,13 @@ export interface UnifiedCustomer {
 
 export default function Customers() {
     const navigate = useNavigate();
-    const { setCustomer, clearCart, addToCart } = useCartStore();
+    const { setCustomer, clearCart, addToCart } = useCartStore(
+        useShallow((state) => ({
+            setCustomer: state.setCustomer,
+            clearCart: state.clearCart,
+            addToCart: state.addToCart,
+        }))
+    );
 
 
     const [customers, setCustomers] = useState<Customer[]>([]);

@@ -315,7 +315,8 @@ const MobileLabels: React.FC = () => {
                                                     <img
                                                         src={getThumbnailUrl(prod.image_url, 200)}
                                                         alt={prod.name}
-                                                        className="w-18 h-18 w-[72px] h-[72px] object-cover rounded-2xl border border-slate-100 dark:border-slate-700 shrink-0 shadow-sm"
+                                                        loading="lazy"
+                                                        className="w-[72px] h-[72px] object-cover rounded-2xl border border-slate-100 dark:border-slate-700 shrink-0 shadow-sm"
                                                     />
                                                 ) : (
                                                     <div className="w-[72px] h-[72px] bg-slate-100 dark:bg-slate-700/60 rounded-2xl flex items-center justify-center text-slate-400 shrink-0">
@@ -445,6 +446,7 @@ const MobileLabels: React.FC = () => {
                                                     <img
                                                         src={getThumbnailUrl(item.image_url, 200)}
                                                         alt={item.name}
+                                                        loading="lazy"
                                                         className="w-12 h-12 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0"
                                                     />
                                                 ) : (
@@ -527,7 +529,7 @@ const MobileLabels: React.FC = () => {
                                         <div key={prod.id} className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-750 flex flex-col gap-2.5 transition-all">
                                             <div className="flex gap-3 items-center">
                                                 {prod.image_url ? (
-                                                    <img src={getThumbnailUrl(prod.image_url, 200)} alt={prod.name} className="w-14 h-14 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 shadow-sm" />
+                                                    <img src={getThumbnailUrl(prod.image_url, 200)} alt={prod.name} loading="lazy" className="w-14 h-14 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 shadow-sm" />
                                                 ) : (
                                                     <div className="w-14 h-14 bg-slate-100 dark:bg-slate-700/60 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                                         <span className="material-symbols-outlined text-2xl">image</span>
@@ -639,7 +641,7 @@ const MobileLabels: React.FC = () => {
                                                 style={{ animationDelay: `${idx * 40}ms` }}
                                             >
                                                 {item.image_url ? (
-                                                    <img src={getThumbnailUrl(item.image_url, 200)} alt={item.name} className="w-12 h-12 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0" />
+                                                    <img src={getThumbnailUrl(item.image_url, 200)} alt={item.name} loading="lazy" className="w-12 h-12 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0" />
                                                 ) : (
                                                     <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                                         <span className="material-symbols-outlined text-xl">image</span>

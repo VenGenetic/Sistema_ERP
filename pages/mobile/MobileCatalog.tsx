@@ -427,7 +427,8 @@ const MobileCatalog: React.FC = () => {
                                                 )}
                                                 {prod.group_id && (
                                                     <span className="px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold flex items-center gap-1 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400">
-                                                        <span className="material-symbols-outlined text-xs">link</span> Grupo
+                                                        <span className="material-symbols-outlined text-xs">link</span>
+                                                        Grupo{groupCounts[prod.group_id] > 1 ? ` (+${groupCounts[prod.group_id] - 1})` : ''}
                                                     </span>
                                                 )}
                                                 {prod.product_tags?.map((pt: any) => {
@@ -618,7 +619,7 @@ const MobileCatalog: React.FC = () => {
 
                         <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl mb-4 border border-slate-200/60 dark:border-slate-750">
                             {queueSheetProduct.image_url ? (
-                                <img src={getThumbnailUrl(queueSheetProduct.image_url, 200)} alt={queueSheetProduct.name} className="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
+                                <img src={getThumbnailUrl(queueSheetProduct.image_url, 200)} alt={queueSheetProduct.name} loading="lazy" className="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
                             ) : (
                                 <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                     <span className="material-symbols-outlined">image</span>

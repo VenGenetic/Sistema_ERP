@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { POEProcedure, POEColumn, POETag } from '../../types/poe';
 import { usePOEStore } from '../../store/usePOEStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Plus, Check, X, Settings, Tag as TagIcon } from 'lucide-react';
 
 interface POECellProps {
@@ -9,7 +10,18 @@ interface POECellProps {
 }
 
 export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
-  const { tags, updateCellCustomValue, setActiveSidePeekColumnId, createTag } = usePOEStore();
+  // Selección con shallow-compare: esta celda se re-renderiza solo cuando
+  // cambian tags/acciones que usa, no en cada cambio de cualquier otro
+  // campo del store (search, sort, filtros, etc.) — antes se re-renderizaban
+  // TODAS las celdas de la tabla en cada tecla del buscador.
+  const { tags, updateCellCustomValue, setActiveSidePeekColumnId, createTag } = usePOEStore(
+    useShallow((state) => ({
+      tags: state.tags,
+      updateCellCustomValue: state.updateCellCustomValue,
+      setActiveSidePeekColumnId: state.setActiveSidePeekColumnId,
+      createTag: state.createTag,
+    }))
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditingText, setIsEditingText] = useState(false);

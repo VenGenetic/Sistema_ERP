@@ -778,6 +778,7 @@ const ProductDemands: React.FC = () => {
                                                     <img
                                                         src={getThumbnailUrl(demand.product.image_url, 60, 60)}
                                                         alt=""
+                                                        loading="lazy"
                                                         className="h-12 w-12 object-cover rounded cursor-pointer"
                                                         onClick={() => handleOpenLightboxDemand(demand)}
                                                     />
@@ -860,6 +861,7 @@ const ProductDemands: React.FC = () => {
                                 <img
                                     src={getThumbnailUrl(demand.product.image_url, 60, 60)}
                                     alt=""
+                                    loading="lazy"
                                     className="h-12 w-12 object-cover rounded cursor-pointer mt-1 flex-shrink-0"
                                     onClick={() => handleOpenLightboxDemand(demand)}
                                 />
@@ -971,6 +973,7 @@ const ProductDemands: React.FC = () => {
                                                 <img
                                                     src={getThumbnailUrl(demand.product.image_url, 48, 48)}
                                                     alt=""
+                                                    loading="lazy"
                                                     className="h-10 w-10 object-cover rounded cursor-pointer flex-shrink-0"
                                                     onClick={() => handleOpenLightboxDemand(demand)}
                                                 />
@@ -1035,6 +1038,7 @@ const ProductDemands: React.FC = () => {
                                         <img
                                             src={getThumbnailUrl(group.product.image_url, 60, 60)}
                                             alt=""
+                                            loading="lazy"
                                             className="h-12 w-12 object-cover rounded cursor-pointer flex-shrink-0"
                                             onClick={(e) => {
                                                 e.stopPropagation();

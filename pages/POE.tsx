@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { usePOEStore } from '../store/usePOEStore';
+import { useShallow } from 'zustand/react/shallow';
 import { POETable } from '../components/poe/POETable';
 import { SidePeekConsole } from '../components/poe/SidePeekConsole';
 import { POEModal } from '../components/poe/POEModal';
@@ -28,7 +29,19 @@ const POE: React.FC = () => {
     clearAllFilters,
     columnFilters,
     setIsCreatingNewProcedureModal
-  } = usePOEStore();
+  } = usePOEStore(
+    useShallow((state) => ({
+      fetchPOEData: state.fetchPOEData,
+      loading: state.loading,
+      searchQuery: state.searchQuery,
+      setSearchQuery: state.setSearchQuery,
+      selectedSopTypeFilter: state.selectedSopTypeFilter,
+      setSelectedSopTypeFilter: state.setSelectedSopTypeFilter,
+      clearAllFilters: state.clearAllFilters,
+      columnFilters: state.columnFilters,
+      setIsCreatingNewProcedureModal: state.setIsCreatingNewProcedureModal,
+    }))
+  );
 
   useEffect(() => {
     fetchPOEData();

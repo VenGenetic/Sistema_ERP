@@ -22,6 +22,13 @@ const MobileLayout: React.FC = () => {
         refreshQueueCount();
     }, [location.pathname, refreshQueueCount]);
 
+    // Refresh instantly on any queue mutation, even without navigating away
+    // (e.g. adding several items from the catalog without leaving the page).
+    useEffect(() => {
+        window.addEventListener('print-queue-changed', refreshQueueCount);
+        return () => window.removeEventListener('print-queue-changed', refreshQueueCount);
+    }, [refreshQueueCount]);
+
     const handleSwitchToDesktop = () => {
         setPreferredViewMode('desktop');
         navigate('/', { replace: true });

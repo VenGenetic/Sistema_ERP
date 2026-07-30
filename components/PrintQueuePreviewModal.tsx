@@ -32,11 +32,13 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
     const [isProcessing, setIsProcessing] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-    // Cargar cola cuando se abre el modal
+    // Cargar cola cuando se abre el modal. force=true: el modal debe reflejar
+    // lo que pueda haber cambiado en otra pestaña/dispositivo, no la caché
+    // en memoria que usan las pantallas del modo móvil para responder rápido.
     useEffect(() => {
         if (isOpen) {
             const loadQueue = async () => {
-                const items = await getPrintQueue();
+                const items = await getPrintQueue(true);
                 setQueue(items);
                 setShowClearConfirm(false);
             };
@@ -44,29 +46,33 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
         }
     }, [isOpen]);
 
-    // Generar y cachear imágenes PNG en base64 para los lienzos de las etiquetas
+    // Generar y cachear imágenes PNG en base64 para los lienzos de las etiquetas.
+    // Usa el updater funcional de setState (en vez de leer `labelImages` del
+    // closure) para no tener que incluir `labelImages` en las dependencias:
+    // eso evitaba que el efecto se re-disparara a sí mismo cada vez que
+    // cacheaba una nueva etiqueta, re-recorriendo la cola completa de más.
     useEffect(() => {
         if (!isOpen) return;
-        
-        let hasNew = false;
-        const updatedImages = { ...labelImages };
 
-        queue.forEach((item) => {
-            if (!updatedImages[item.sku]) {
-                try {
-                    const canvas = renderLabelToCanvas({ sku: item.sku, name: item.name });
-                    updatedImages[item.sku] = canvas.toDataURL('image/png', 1.0);
-                    hasNew = true;
-                } catch (err) {
-                    console.error('Error generando etiqueta para SKU:', item.sku, err);
+        setLabelImages((prev) => {
+            let hasNew = false;
+            const updatedImages = { ...prev };
+
+            queue.forEach((item) => {
+                if (!updatedImages[item.sku]) {
+                    try {
+                        const canvas = renderLabelToCanvas({ sku: item.sku, name: item.name });
+                        updatedImages[item.sku] = canvas.toDataURL('image/png', 1.0);
+                        hasNew = true;
+                    } catch (err) {
+                        console.error('Error generando etiqueta para SKU:', item.sku, err);
+                    }
                 }
-            }
-        });
+            });
 
-        if (hasNew) {
-            setLabelImages(updatedImages);
-        }
-    }, [queue, isOpen, labelImages]);
+            return hasNew ? updatedImages : prev;
+        });
+    }, [queue, isOpen]);
 
     // Calcular todas las etiquetas individuales ordenadas para rellenar las páginas A4
     const allLabels = useMemo(() => {

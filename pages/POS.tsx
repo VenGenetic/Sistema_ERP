@@ -4,6 +4,7 @@ import { MapPin, DollarSign, AlertTriangle, ArrowLeft, LogOut, Package, Search, 
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
 import { supabase } from '../supabaseClient';
 import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { PaymentModal } from '../components/pos/PaymentModal';
 
@@ -17,7 +18,20 @@ const POS: React.FC = () => {
         setCustomer, addToCart,
         updateQuantity, updateUnitPrice, removeFromCart, clearCart,
         getSubtotal, getTotal
-    } = useCartStore();
+    } = useCartStore(
+        useShallow((state) => ({
+            cart: state.cart,
+            customer: state.customer,
+            setCustomer: state.setCustomer,
+            addToCart: state.addToCart,
+            updateQuantity: state.updateQuantity,
+            updateUnitPrice: state.updateUnitPrice,
+            removeFromCart: state.removeFromCart,
+            clearCart: state.clearCart,
+            getSubtotal: state.getSubtotal,
+            getTotal: state.getTotal,
+        }))
+    );
 
     // Local UI State
     const [searchQuery, setSearchQuery] = useState('');

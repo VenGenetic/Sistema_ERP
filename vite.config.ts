@@ -25,7 +25,11 @@ export default defineConfig(({ mode }) => {
             manualChunks: {
               vendor: ['react', 'react-dom', 'react-router-dom', 'zustand'],
               ui: ['lucide-react', '@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
-              data: ['xlsx', '@supabase/supabase-js']
+              supabase: ['@supabase/supabase-js'],
+              // xlsx/jszip ahora se importan con import() dinámico donde se usan
+              // (exportar/importar Excel, exportar ZIP de imágenes), así que ya
+              // no deben ir junto a supabase-js, que se carga en cada página.
+              xlsx: ['xlsx'],
             }
           }
         },

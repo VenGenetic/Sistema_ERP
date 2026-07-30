@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCartStore } from '../../store/cartStore';
+import { useShallow } from 'zustand/react/shallow';
 
 // Ecuador is UTC-5; get today's local date
 const todayEcuador = () => {
@@ -16,7 +17,13 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onProcess, paymentAccounts }) => {
-    const { customer, getSubtotal, getTotal } = useCartStore();
+    const { customer, getSubtotal, getTotal } = useCartStore(
+        useShallow((state) => ({
+            customer: state.customer,
+            getSubtotal: state.getSubtotal,
+            getTotal: state.getTotal,
+        }))
+    );
     const [selectedAccount, setSelectedAccount] = useState<number>(paymentAccounts[0]?.id || 0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [saleDate, setSaleDate] = useState<string>(todayEcuador());

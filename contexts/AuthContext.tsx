@@ -173,10 +173,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             )
             .subscribe();
 
-        // 2. Intervalo de verificación (Cada 10 segundos)
-        const interval = setInterval(checkSessionDb, 10000);
-
-        // 3. Verificación inmediata cuando el usuario vuelve a enfocar la pestaña
+        // 2. Verificación inmediata cuando el usuario vuelve a enfocar la pestaña
+        // (el polling periódico por setInterval se retiró: la suscripción
+        // realtime de arriba ya notifica el mismo cambio al instante, y
+        // sondear cada 10s a `profiles` en cada sesión activa era trabajo
+        // redundante sin beneficio adicional)
         const handleFocus = () => {
             checkSessionDb();
         };
@@ -187,7 +188,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         return () => {
             channel.unsubscribe();
-            clearInterval(interval);
             window.removeEventListener('focus', handleFocus);
         };
     }, [session?.user?.id, userProfile]);

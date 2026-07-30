@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePOEStore } from '../../store/usePOEStore';
+import { useShallow } from 'zustand/react/shallow';
 import { DEFAULT_TAG_COLORS, POETag, POEColumnType } from '../../types/poe';
 import { 
   X, 
@@ -36,7 +37,24 @@ export const SidePeekConsole: React.FC = () => {
     setSort,
     columnFilters,
     setColumnFilter
-  } = usePOEStore();
+  } = usePOEStore(
+    useShallow((state) => ({
+      columns: state.columns,
+      tags: state.tags,
+      activeSidePeekColumnId: state.activeSidePeekColumnId,
+      setActiveSidePeekColumnId: state.setActiveSidePeekColumnId,
+      updateColumn: state.updateColumn,
+      deleteColumn: state.deleteColumn,
+      createTag: state.createTag,
+      updateTag: state.updateTag,
+      deleteTag: state.deleteTag,
+      sortColumnId: state.sortColumnId,
+      sortDirection: state.sortDirection,
+      setSort: state.setSort,
+      columnFilters: state.columnFilters,
+      setColumnFilter: state.setColumnFilter,
+    }))
+  );
 
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(DEFAULT_TAG_COLORS[0]);

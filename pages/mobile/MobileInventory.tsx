@@ -163,7 +163,7 @@ const MobileInventory: React.FC = () => {
                                     className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-750 flex items-center gap-3.5 shadow-xs cursor-pointer active:scale-95 transition-all hover:border-blue-500"
                                 >
                                     {prod.image_url ? (
-                                        <img src={getThumbnailUrl(prod.image_url, 150)} alt={prod.name} className="w-12 h-12 rounded-xl object-cover border border-slate-100 dark:border-slate-700 shrink-0" />
+                                        <img src={getThumbnailUrl(prod.image_url, 150)} alt={prod.name} loading="lazy" className="w-12 h-12 rounded-xl object-cover border border-slate-100 dark:border-slate-700 shrink-0" />
                                     ) : (
                                         <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700/60 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                             <span className="material-symbols-outlined text-xl">image</span>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { read, utils, writeFile } from 'xlsx';
 
 interface CatalogRow {
     id: string;
@@ -61,7 +60,9 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
     // ──────────────────────────────────────────────
     // TEMPLATE DOWNLOAD
     // ──────────────────────────────────────────────
-    const handleDownloadTemplate = () => {
+    const handleDownloadTemplate = async () => {
+        // xlsx se carga solo al usar esta función, para no inflar el bundle inicial
+        const { utils, writeFile } = await import('xlsx');
         const templateData = [
             { 'SKU': 'SKU-123', 'Nombre': 'Filtro de Aceite Premium', 'Costo S/IVA': 12.50, 'Margen': 0.35, 'Categoría': 'Repuestos', 'IVA %': 12 },
             { 'SKU': 'SKU-456', 'Nombre': 'Pastillas de Freno XYZ', 'Costo S/IVA': 45.00, 'Margen': '', 'Categoría': 'Frenos', 'IVA %': '' },
@@ -91,8 +92,9 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        reader.onload = async (evt) => {
             try {
+                const { read, utils } = await import('xlsx');
                 const bstr = evt.target?.result;
                 const wb = read(bstr, { type: 'binary' });
                 const wsname = wb.SheetNames[0];

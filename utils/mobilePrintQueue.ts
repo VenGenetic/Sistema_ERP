@@ -21,6 +21,25 @@ export interface PrintQueueItem {
 // ── Constants ──────────────────────────────────────────
 const QUEUE_KEY = 'mobile_print_queue';
 
+// ── In-memory cache ────────────────────────────────────
+// Avoids a full round-trip (auth check + joined SELECT) after every single
+// mutation (add/remove/qty change). Mutations below update this cache
+// optimistically once the write succeeds, instead of re-fetching from
+// Supabase. This matters most on mobile: the "Labels" queue screen has
+// rapid-fire +/- quantity taps, and each one used to cost 2 network
+// round-trips just to redraw the same list. Consumers that need a
+// guaranteed-fresh read (e.g. opening the desktop preview modal) can pass
+// force=true to getPrintQueue().
+let cachedQueue: PrintQueueItem[] | null = null;
+
+// Notify listeners (e.g. the mobile bottom-nav badge) that the queue changed
+// without them needing to poll or re-fetch from the network.
+const notifyQueueChanged = () => {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('print-queue-changed'));
+    }
+};
+
 // ── Migration from Local Storage ───────────────────────
 export const migrateLocalQueueToSupabase = async (userId: string) => {
     try {
@@ -55,10 +74,20 @@ export const migrateLocalQueueToSupabase = async (userId: string) => {
 };
 
 // ── Read ───────────────────────────────────────────────
-export const getPrintQueue = async (): Promise<PrintQueueItem[]> => {
+// force=true skips the in-memory cache and always re-fetches from Supabase
+// (use when correctness matters more than speed, e.g. opening a modal that
+// must reflect what another tab/device may have changed).
+export const getPrintQueue = async (force = false): Promise<PrintQueueItem[]> => {
+    if (!force && cachedQueue !== null) {
+        return cachedQueue;
+    }
+
     try {
         const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) return [];
+        if (!userData.user) {
+            cachedQueue = [];
+            return cachedQueue;
+        }
 
         await migrateLocalQueueToSupabase(userData.user.id);
 
@@ -79,10 +108,10 @@ export const getPrintQueue = async (): Promise<PrintQueueItem[]> => {
 
         if (error) {
             console.error('Error fetching print queue:', error);
-            return [];
+            return cachedQueue ?? [];
         }
 
-        return data.map((item: any) => ({
+        cachedQueue = data.map((item: any) => ({
             id: item.product_id,
             sku: item.products.sku,
             name: item.products.name,
@@ -90,9 +119,10 @@ export const getPrintQueue = async (): Promise<PrintQueueItem[]> => {
             quantity: item.quantity,
             addedAt: new Date(item.created_at).getTime()
         }));
+        return cachedQueue;
     } catch (err) {
         console.error('getPrintQueue Error:', err);
-        return [];
+        return cachedQueue ?? [];
     }
 };
 
@@ -106,19 +136,17 @@ export const addToQueue = async (
         if (!userData.user) return await getPrintQueue();
 
         const q = Math.max(1, quantity);
-        
-        // Fetch existing to add
-        const { data: existing } = await supabase
-            .from('print_queue_items')
-            .select('quantity')
-            .eq('user_id', userData.user.id)
-            .eq('product_id', product.id)
-            .maybeSingle();
 
-        if (existing) {
+        // Make sure we have a queue to read the "already in queue?" state
+        // from locally, instead of an extra SELECT round-trip.
+        if (cachedQueue === null) await getPrintQueue();
+        const existingLocal = cachedQueue?.find(item => item.id === product.id);
+        const newQty = (existingLocal?.quantity || 0) + q;
+
+        if (existingLocal) {
             await supabase
                 .from('print_queue_items')
-                .update({ quantity: existing.quantity + q })
+                .update({ quantity: newQty })
                 .eq('user_id', userData.user.id)
                 .eq('product_id', product.id);
         } else {
@@ -127,15 +155,32 @@ export const addToQueue = async (
                 .insert({
                     user_id: userData.user.id,
                     product_id: product.id,
-                    quantity: q
+                    quantity: newQty
                 });
         }
+
+        if (cachedQueue) {
+            if (existingLocal) {
+                cachedQueue = cachedQueue.map(item =>
+                    item.id === product.id ? { ...item, quantity: newQty } : item
+                );
+            } else {
+                cachedQueue = [...cachedQueue, {
+                    id: product.id,
+                    sku: product.sku,
+                    name: product.name,
+                    image_url: product.image_url,
+                    quantity: newQty,
+                    addedAt: Date.now(),
+                }];
+            }
+        }
+        notifyQueueChanged();
+        return cachedQueue ?? await getPrintQueue();
     } catch (e) {
         console.error('Error in addToQueue:', e);
+        return await getPrintQueue(true);
     }
-    
-    // Return updated queue
-    return await getPrintQueue();
 };
 
 // ── Remove single item ────────────────────────────────
@@ -149,27 +194,40 @@ export const removeFromQueue = async (product_id: number): Promise<PrintQueueIte
                 .eq('user_id', userData.user.id)
                 .eq('product_id', product_id);
         }
+        if (cachedQueue) {
+            cachedQueue = cachedQueue.filter(item => item.id !== product_id);
+        }
+        notifyQueueChanged();
+        return cachedQueue ?? await getPrintQueue();
     } catch (e) {
         console.error('Error in removeFromQueue:', e);
+        return await getPrintQueue(true);
     }
-    return await getPrintQueue();
 };
 
 // ── Update quantity ────────────────────────────────────
 export const updateQueueItemQty = async (product_id: number, newQty: number): Promise<PrintQueueItem[]> => {
+    const q = Math.max(1, newQty);
     try {
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
             await supabase
                 .from('print_queue_items')
-                .update({ quantity: Math.max(1, newQty) })
+                .update({ quantity: q })
                 .eq('user_id', userData.user.id)
                 .eq('product_id', product_id);
         }
+        if (cachedQueue) {
+            cachedQueue = cachedQueue.map(item =>
+                item.id === product_id ? { ...item, quantity: q } : item
+            );
+        }
+        notifyQueueChanged();
+        return cachedQueue ?? await getPrintQueue();
     } catch (e) {
         console.error('Error in updateQueueItemQty:', e);
+        return await getPrintQueue(true);
     }
-    return await getPrintQueue();
 };
 
 // ── Clear all ──────────────────────────────────────────
@@ -182,6 +240,8 @@ export const clearQueue = async (): Promise<void> => {
                 .delete()
                 .eq('user_id', userData.user.id);
         }
+        cachedQueue = [];
+        notifyQueueChanged();
     } catch (e) {
         console.error('Error in clearQueue:', e);
     }

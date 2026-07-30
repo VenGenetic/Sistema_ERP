@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePOEStore } from '../../store/usePOEStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SOPTypeAEditor } from './SOPTypeAEditor';
 import { SOPTypeBEditor } from './SOPTypeBEditor';
 import { SOPType } from '../../types/poe';
@@ -27,7 +28,19 @@ export const POEModal: React.FC = () => {
     updateProcedure,
     columns,
     tags
-  } = usePOEStore();
+  } = usePOEStore(
+    useShallow((state) => ({
+      selectedProcedureForModal: state.selectedProcedureForModal,
+      setSelectedProcedureForModal: state.setSelectedProcedureForModal,
+      isCreatingNewProcedureModal: state.isCreatingNewProcedureModal,
+      setIsCreatingNewProcedureModal: state.setIsCreatingNewProcedureModal,
+      newProcedureTypePreset: state.newProcedureTypePreset,
+      createProcedure: state.createProcedure,
+      updateProcedure: state.updateProcedure,
+      columns: state.columns,
+      tags: state.tags,
+    }))
+  );
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
