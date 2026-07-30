@@ -151,9 +151,9 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
     return (
         <div className="relative w-full z-30" ref={dropdownRef}>
             <div className={`relative flex items-center transition-all duration-300 rounded-2xl border ${
-                isFocused 
-                    ? 'bg-white dark:bg-slate-800 border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-500/20' 
-                    : 'bg-white dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 shadow-sm hover:border-slate-300 dark:hover:border-slate-600'
+                isFocused
+                    ? 'bg-slate-900 border-amber-500 shadow-lg ring-2 ring-amber-500/20'
+                    : 'bg-slate-900/90 border-slate-700 shadow-sm hover:border-slate-600'
             }`}>
                 {/* Icono Lupa o Escaner */}
                 <div className="pl-4 text-slate-400 dark:text-slate-400 flex items-center pointer-events-none">
@@ -201,7 +201,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                             className={`p-2 rounded-xl transition-all flex items-center justify-center active:scale-90 ${
                                 isListening
                                     ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 animate-pulse'
-                                    : 'text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-700'
+                                    : 'text-slate-400 hover:text-amber-400 hover:bg-slate-700'
                             }`}
                             title="Buscar por voz"
                         >
@@ -230,7 +230,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                                         key={term}
                                         type="button"
                                         onClick={() => handleSuggestionClick(term)}
-                                        className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-blue-600 dark:hover:bg-blue-600 hover:text-white dark:hover:text-white text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-xl transition-all active:scale-95 border border-slate-200/60 dark:border-slate-700 shadow-xs"
+                                        className="px-3.5 py-2 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 text-sm font-semibold rounded-xl transition-all active:scale-95 border border-slate-700 shadow-xs"
                                     >
                                         {term}
                                     </button>
@@ -242,7 +242,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                         <div className="py-2">
                             <div className="px-4 py-2 text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Coincidencias Rápida</span>
-                                <span className="text-blue-600 dark:text-blue-400 font-extrabold">{sugerencias.length} resultados</span>
+                                <span className="text-amber-400 font-extrabold">{sugerencias.length} resultados</span>
                             </div>
                             
                             <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -253,21 +253,21 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                                             key={index}
                                             type="button"
                                             onClick={() => handleSuggestionClick(sugerencia)}
-                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/80 flex items-center gap-3 group transition-colors border-l-4 border-transparent hover:border-blue-500 active:bg-slate-100 dark:active:bg-slate-750"
+                                            className="w-full text-left px-4 py-3 hover:bg-slate-800/80 flex items-center gap-3 group transition-colors border-l-4 border-transparent hover:border-amber-500 active:bg-slate-750"
                                         >
                                             <div className={`p-1.5 rounded-xl flex items-center justify-center ${
-                                                isCode ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:text-blue-500'
+                                                isCode ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400 group-hover:text-amber-400'
                                             }`}>
                                                 <span className="material-symbols-outlined text-[18px]">
                                                     {isCode ? 'history' : 'search'}
                                                 </span>
                                             </div>
                                             <span className={`flex-1 text-sm ${
-                                                isCode ? 'font-mono font-bold text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200 font-semibold'
+                                                isCode ? 'font-mono font-bold text-amber-400' : 'text-slate-200 font-semibold'
                                             }`}>
                                                 {sugerencia.replace(/"/g, '')}
                                             </span>
-                                            <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-blue-500 text-[18px] transition-transform group-hover:translate-x-1">
+                                            <span className="material-symbols-outlined text-slate-600 group-hover:text-amber-400 text-[18px] transition-transform group-hover:translate-x-1">
                                                 chevron_right
                                             </span>
                                         </button>

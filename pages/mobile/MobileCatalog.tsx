@@ -260,7 +260,7 @@ const MobileCatalog: React.FC = () => {
     // 4. RENDER
     // ──────────────────────────────────────────────
     return (
-        <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-900 animate-fade-in relative font-sans">
+        <div className="flex flex-col min-h-screen bg-slate-950 animate-fade-in relative font-sans">
             <style>{`
                 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
                 @keyframes slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -280,27 +280,27 @@ const MobileCatalog: React.FC = () => {
             )}
 
             {/* --- HEADER STICKY --- */}
-            <div className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/60 px-4 py-4 shadow-xs">
+            <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/60 px-4 py-4 shadow-xs">
                 <div className="flex justify-between items-center mb-3">
                     <div>
-                        <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Catálogo Móvil</h1>
-                        <p className="text-[11px] text-slate-400 font-semibold">{filteredAllProducts.length} de {allProducts.length} repuestos activos</p>
+                        <h1 className="text-2xl font-black text-white tracking-tight">Catálogo Móvil</h1>
+                        <p className="text-[11px] text-slate-500 font-semibold">{filteredAllProducts.length} de {allProducts.length} repuestos activos</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleRefresh}
-                            className="p-2.5 h-11 w-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 active:scale-95 transition-all flex items-center justify-center"
+                            className="p-2.5 h-11 w-11 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center"
                             title="Actualizar catálogo"
                         >
-                            <span className={`material-symbols-outlined text-[22px] ${catalogLoading ? 'animate-spin text-blue-500' : ''}`}>sync</span>
+                            <span className={`material-symbols-outlined text-[22px] ${catalogLoading ? 'animate-spin text-amber-400' : ''}`}>sync</span>
                         </button>
-                        <button 
+                        <button
                             onClick={() => setIsFiltersOpen(true)}
-                            className="relative p-2.5 h-11 w-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 active:scale-95 transition-all flex items-center justify-center"
+                            className="relative p-2.5 h-11 w-11 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 active:scale-95 transition-all flex items-center justify-center"
                         >
                             <span className="material-symbols-outlined text-[24px]">tune</span>
                             {activeFilterCount > 0 && (
-                                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-[20px] px-1 bg-blue-600 text-white text-[10px] font-extrabold rounded-full border-2 border-white dark:border-slate-900">
+                                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-[20px] px-1 bg-amber-500 text-slate-950 text-[10px] font-extrabold rounded-full border-2 border-slate-950">
                                     {activeFilterCount}
                                 </span>
                             )}
@@ -322,10 +322,10 @@ const MobileCatalog: React.FC = () => {
             {/* --- PRODUCT LIST --- */}
             <div className="flex-1 p-4 pb-36 overflow-y-auto">
                 {visibleProducts.length === 0 && !catalogLoading && (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-400 bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-750 my-4 shadow-sm">
-                        <span className="material-symbols-outlined text-[56px] mb-2 text-slate-300 dark:text-slate-600">search_off</span>
-                        <p className="font-bold text-slate-700 dark:text-slate-200">No se encontraron productos</p>
-                        <p className="text-xs mt-1 max-w-[220px] text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-400 bg-slate-900/60 rounded-3xl border border-slate-800 my-4 shadow-sm">
+                        <span className="material-symbols-outlined text-[56px] mb-2 text-slate-700">search_off</span>
+                        <p className="font-bold text-slate-200">No se encontraron productos</p>
+                        <p className="text-xs mt-1 max-w-[220px] text-center text-slate-500">
                             El buscador usa doble filtro y sinónimos. Verifica que todas las palabras clave existan.
                         </p>
                     </div>
@@ -342,8 +342,8 @@ const MobileCatalog: React.FC = () => {
                             <div 
                                 key={prod.id}
                                 ref={index === visibleProducts.length - 1 ? lastElementRef : null}
-                                className={`bg-white dark:bg-slate-800 rounded-3xl overflow-hidden shadow-sm border transition-all ${
-                                    isSelected ? 'border-blue-500 shadow-lg shadow-blue-500/10 bg-blue-50/5 dark:bg-blue-900/10' : 'border-slate-200/80 dark:border-slate-750'
+                                className={`bg-slate-900 rounded-3xl overflow-hidden shadow-sm border transition-all ${
+                                    isSelected ? 'border-amber-500 shadow-lg shadow-amber-500/10 bg-amber-500/5' : 'border-slate-800'
                                 }`}
                             >
                                 {/* Collapsed state */}
@@ -351,20 +351,20 @@ const MobileCatalog: React.FC = () => {
                                     <div 
                                         onClick={(e) => { e.stopPropagation(); toggleSelectRow(prod.id); }}
                                         className={`w-6 h-6 shrink-0 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
-                                            isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
+                                            isSelected ? 'bg-amber-500 border-amber-500' : 'border-slate-600 bg-slate-800'
                                         }`}
                                     >
-                                        {isSelected && <span className="material-symbols-outlined text-white text-[16px] font-black">check</span>}
+                                        {isSelected && <span className="material-symbols-outlined text-slate-950 text-[16px] font-black">check</span>}
                                     </div>
 
-                                    <div 
+                                    <div
                                         onClick={(e) => { e.stopPropagation(); handleOpenLightbox(prod, 'image'); }}
-                                        className="w-16 h-16 shrink-0 rounded-2xl bg-slate-100 dark:bg-slate-700/50 relative overflow-hidden flex items-center justify-center border border-slate-200/80 dark:border-slate-700 shadow-inner"
+                                        className="w-16 h-16 shrink-0 rounded-2xl bg-slate-800/60 relative overflow-hidden flex items-center justify-center border border-slate-700 shadow-inner"
                                     >
                                         {imageUrl ? (
                                             <img src={imageUrl} alt={prod.name} className="w-full h-full object-cover" loading="lazy" />
                                         ) : (
-                                            <span className="material-symbols-outlined text-slate-300 dark:text-slate-500 text-2xl">image</span>
+                                            <span className="material-symbols-outlined text-slate-500 text-2xl">image</span>
                                         )}
                                         {globalStock <= 0 && (
                                             <div className="absolute inset-0 bg-rose-500/20 backdrop-blur-[1px] flex items-center justify-center">
@@ -375,26 +375,26 @@ const MobileCatalog: React.FC = () => {
                                     
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-xs font-mono font-extrabold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-lg border border-blue-200/60 dark:border-blue-800/60 shrink-0">
+                                            <span className="text-xs font-mono font-extrabold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 shrink-0">
                                                 {prod.sku}
                                             </span>
-                                            <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/80 px-2 py-0.5 rounded-lg flex items-center gap-1 shrink-0">
+                                            <span className="text-xs font-extrabold text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-lg flex items-center gap-1 shrink-0">
                                                 <span className="material-symbols-outlined text-[13px] text-emerald-500">inventory_2</span> {globalStock}
                                             </span>
                                         </div>
-                                        <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-snug line-clamp-2">
+                                        <h3 className="font-bold text-white text-sm leading-snug line-clamp-2">
                                             {prod.name}
                                         </h3>
                                         {prod.brands?.name && (
-                                            <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
                                                 {prod.brands.name}
                                             </p>
                                         )}
                                     </div>
 
-                                    <button 
-                                        onClick={(e) => handleQuickPrint(prod, e)} 
-                                        className="shrink-0 w-11 h-11 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center active:scale-90 transition-all border border-emerald-200/50 dark:border-emerald-800/50"
+                                    <button
+                                        onClick={(e) => handleQuickPrint(prod, e)}
+                                        className="shrink-0 w-11 h-11 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center active:scale-90 transition-all border border-emerald-500/20"
                                         title="Imprimir 3 etiquetas"
                                     >
                                         <span className="material-symbols-outlined text-[22px]">print</span>
@@ -403,16 +403,16 @@ const MobileCatalog: React.FC = () => {
 
                                 {/* Expanded area */}
                                 {isExpanded && (
-                                    <div className="border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/50 animate-fade-in">
+                                    <div className="border-t border-slate-800 bg-slate-950/40 animate-fade-in">
                                         <div className="p-4">
-                                            <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-tight mb-2">
+                                            <h3 className="font-bold text-white text-sm leading-tight mb-2">
                                                 {prod.name}
                                             </h3>
                                             <div className="flex items-center gap-2 mb-3">
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                                                <p className="text-xs text-slate-400 font-semibold">
                                                     Marca: {prod.brands?.name || 'Sin marca'}
                                                 </p>
-                                                <button onClick={(e) => handleCopySku(prod.sku, e)} className="p-1 px-2 bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg active:bg-slate-300 transition-colors flex items-center gap-1 text-xs font-semibold">
+                                                <button onClick={(e) => handleCopySku(prod.sku, e)} className="min-h-[44px] px-3 bg-slate-800 text-slate-300 rounded-lg active:bg-slate-700 transition-colors flex items-center gap-1 text-xs font-semibold">
                                                     <span className="material-symbols-outlined text-[14px]">{copiedSku === prod.sku ? 'check' : 'content_copy'}</span>
                                                     {copiedSku === prod.sku ? 'Copiado' : 'Copiar SKU'}
                                                 </button>
@@ -421,12 +421,12 @@ const MobileCatalog: React.FC = () => {
                                             {/* Tags block */}
                                             <div className="flex flex-wrap gap-1.5 mb-3">
                                                 {isProductDiscontinued(prod) && (
-                                                    <span className="px-2 py-0.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-extrabold flex items-center gap-1 dark:bg-rose-900/30 dark:border-rose-800 dark:text-rose-400">
+                                                    <span className="px-2 py-0.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-extrabold flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-xs">warning</span> Descontinuado
                                                     </span>
                                                 )}
                                                 {prod.group_id && (
-                                                    <span className="px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold flex items-center gap-1 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400">
+                                                    <span className="px-2 py-0.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold flex items-center gap-1">
                                                         <span className="material-symbols-outlined text-xs">link</span>
                                                         Grupo{groupCounts[prod.group_id] > 1 ? ` (+${groupCounts[prod.group_id] - 1})` : ''}
                                                     </span>
@@ -439,28 +439,28 @@ const MobileCatalog: React.FC = () => {
                                                         </span>
                                                     );
                                                 })}
-                                                <button onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }} className="px-2 py-0.5 rounded-lg bg-slate-200/60 border border-dashed border-slate-400 text-slate-600 text-xs font-bold flex items-center gap-0.5 active:bg-slate-300 dark:bg-slate-700 dark:border-slate-500 dark:text-slate-300">
+                                                <button onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }} className="px-2 py-0.5 rounded-lg bg-slate-800 border border-dashed border-slate-600 text-slate-300 text-xs font-bold flex items-center gap-0.5 active:bg-slate-700">
                                                     <span className="material-symbols-outlined text-xs">add</span> Tag
                                                 </button>
                                             </div>
 
                                             {/* Stock info */}
-                                            <div className="flex items-center gap-4 mb-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                                            <div className="flex items-center gap-4 mb-3 bg-slate-950/60 p-2.5 rounded-2xl border border-slate-800">
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-xs uppercase font-extrabold text-slate-400">Stock Local:</span>
-                                                    <span className="text-xs font-black text-slate-800 dark:text-slate-200">{prod.local_stock || 0}</span>
+                                                    <span className="text-xs uppercase font-extrabold text-slate-500">Stock Local:</span>
+                                                    <span className="text-xs font-black text-slate-200">{prod.local_stock || 0}</span>
                                                 </div>
-                                                <div className="h-4 w-px bg-slate-200 dark:bg-slate-800"></div>
+                                                <div className="h-4 w-px bg-slate-800"></div>
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-xs uppercase font-extrabold text-slate-400">Importadora:</span>
-                                                    <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${prod.importer_stock > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'text-slate-400'}`}>
+                                                    <span className="text-xs uppercase font-extrabold text-slate-500">Importadora:</span>
+                                                    <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${prod.importer_stock > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-500'}`}>
                                                         {prod.importer_stock || 0}
                                                     </span>
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Price PVP */}
-                                            <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-white dark:to-slate-100 text-white dark:text-slate-900 rounded-2xl p-3 px-4 shadow-sm flex justify-between items-center">
+                                            <div className="bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 rounded-2xl p-3 px-4 shadow-sm flex justify-between items-center">
                                                 <span className="font-extrabold text-xs uppercase tracking-wider opacity-80">Precio PVP:</span>
                                                 <span className="font-black text-lg">
                                                     ${(prod.price || 0).toFixed(2)}
@@ -469,20 +469,20 @@ const MobileCatalog: React.FC = () => {
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="border-t border-slate-200/70 dark:border-slate-700/60 flex divide-x divide-slate-200/70 dark:divide-slate-700/60 bg-white dark:bg-slate-800 rounded-b-3xl">
-                                            <button onClick={(e) => { e.stopPropagation(); setGroupModalProduct(prod); setSelectedGroupId(prod.group_id); setIsGroupModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 active:bg-blue-100 transition-colors" title="Relacionados">
+                                        <div className="border-t border-slate-800 flex divide-x divide-slate-800 bg-slate-900 rounded-b-3xl">
+                                            <button onClick={(e) => { e.stopPropagation(); setGroupModalProduct(prod); setSelectedGroupId(prod.group_id); setIsGroupModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/10 active:bg-cyan-500/20 transition-colors" title="Relacionados">
                                                 <span className="material-symbols-outlined text-[22px]">link</span>
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); setProductToEdit(prod); setIsModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 active:bg-slate-100 transition-colors" title="Editar">
+                                            <button onClick={(e) => { e.stopPropagation(); setProductToEdit(prod); setIsModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-slate-300 hover:bg-slate-800 active:bg-slate-750 transition-colors" title="Editar">
                                                 <span className="material-symbols-outlined text-[22px]">edit</span>
                                             </button>
-                                            <button onClick={(e) => handleOpenQueueSheet(prod, e)} className="flex-1 py-3.5 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 active:bg-amber-100 transition-colors" title="Agregar a cola de impresión">
+                                            <button onClick={(e) => handleOpenQueueSheet(prod, e)} className="flex-1 py-3.5 flex items-center justify-center text-amber-400 hover:bg-amber-500/10 active:bg-amber-500/20 transition-colors" title="Agregar a cola de impresión">
                                                 <span className="material-symbols-outlined text-[22px]">playlist_add</span>
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); setLabelProduct(prod); setIsLabelModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 active:bg-indigo-100 transition-colors" title="Ajuste Avanzado de Etiqueta">
+                                            <button onClick={(e) => { e.stopPropagation(); setLabelProduct(prod); setIsLabelModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-indigo-400 hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-colors" title="Ajuste Avanzado de Etiqueta">
                                                 <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteProduct(prod); }} className="flex-1 py-3.5 flex items-center justify-center text-rose-600 dark:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-900/10 active:bg-rose-100 transition-colors" title="Eliminar">
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteProduct(prod); }} className="flex-1 py-3.5 flex items-center justify-center text-rose-400 hover:bg-rose-500/10 active:bg-rose-500/20 transition-colors" title="Eliminar">
                                                 <span className="material-symbols-outlined text-[22px]">delete</span>
                                             </button>
                                         </div>
@@ -496,7 +496,7 @@ const MobileCatalog: React.FC = () => {
                 {/* Loading Skeletons */}
                 {catalogLoading && allProducts.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
-                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
+                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-amber-500 border-t-transparent"></div>
                         <span className="text-xs font-extrabold uppercase tracking-widest animate-pulse">Cargando base de datos móvil...</span>
                     </div>
                 )}
@@ -506,14 +506,14 @@ const MobileCatalog: React.FC = () => {
             {isFiltersOpen && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs animate-fade-in" onClick={() => setIsFiltersOpen(false)}></div>
-                    <div className="relative bg-white dark:bg-slate-900 rounded-t-[36px] p-6 pt-2 pb-10 shadow-2xl animate-slide-up border-t border-slate-200 dark:border-slate-800 max-h-[88vh] overflow-y-auto">
-                        <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-6 mt-3"></div>
-                        
+                    <div className="relative bg-slate-900 rounded-t-[36px] p-6 pt-2 pb-10 shadow-2xl animate-slide-up border-t border-slate-800 max-h-[88vh] overflow-y-auto">
+                        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-6 mt-3"></div>
+
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-blue-600">tune</span> Filtros Avanzados
+                            <h2 className="text-xl font-black text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-amber-400">tune</span> Filtros Avanzados
                             </h2>
-                            <button onClick={() => setFilters({})} className="text-sm font-extrabold text-blue-600 active:opacity-70">
+                            <button onClick={() => setFilters({})} className="text-sm font-extrabold text-amber-400 active:opacity-70">
                                 Limpiar todo
                             </button>
                         </div>
@@ -522,7 +522,7 @@ const MobileCatalog: React.FC = () => {
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">📸 Estado de Imagen</label>
                                 <div className="relative">
-                                    <select value={filters.imageStatus || ''} onChange={(e) => handleFilterChange('imageStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200/80 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-slate-200 appearance-none focus:border-blue-500 outline-none">
+                                    <select value={filters.imageStatus || ''} onChange={(e) => handleFilterChange('imageStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-800 border-2 border-slate-700 rounded-2xl font-bold text-slate-200 appearance-none focus:border-amber-500 outline-none">
                                         <option value="">Todas las Imágenes</option>
                                         <option value="con_imagen">✅ Mostrar Con Imagen</option>
                                         <option value="sin_imagen">❌ Falta Imagen</option>
@@ -533,7 +533,7 @@ const MobileCatalog: React.FC = () => {
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">🎬 Estado de Video</label>
                                 <div className="relative">
-                                    <select value={filters.videoStatus || ''} onChange={(e) => handleFilterChange('videoStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200/80 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-slate-200 appearance-none focus:border-blue-500 outline-none">
+                                    <select value={filters.videoStatus || ''} onChange={(e) => handleFilterChange('videoStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-800 border-2 border-slate-700 rounded-2xl font-bold text-slate-200 appearance-none focus:border-amber-500 outline-none">
                                         <option value="">Todos los Videos</option>
                                         <option value="con_video">✅ Mostrar Con Video</option>
                                         <option value="sin_video">❌ Falta Video</option>
@@ -544,7 +544,7 @@ const MobileCatalog: React.FC = () => {
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">📦 Estado de Stock</label>
                                 <div className="relative">
-                                    <select value={filters.stockStatus || ''} onChange={(e) => handleFilterChange('stockStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200/80 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-slate-200 appearance-none focus:border-blue-500 outline-none">
+                                    <select value={filters.stockStatus || ''} onChange={(e) => handleFilterChange('stockStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-800 border-2 border-slate-700 rounded-2xl font-bold text-slate-200 appearance-none focus:border-amber-500 outline-none">
                                         <option value="">Todos los Repuestos</option>
                                         <option value="disponibles_importadora">🟢 En Importadora</option>
                                         <option value="solo_local">🏠 Solo Local (Agotado Imp.)</option>
@@ -559,7 +559,7 @@ const MobileCatalog: React.FC = () => {
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider ml-1">⚙️ Estado en Catálogo</label>
                                 <div className="relative">
-                                    <select value={filters.discontinuedStatus || ''} onChange={(e) => handleFilterChange('discontinuedStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200/80 dark:border-slate-700 rounded-2xl font-bold text-slate-800 dark:text-slate-200 appearance-none focus:border-blue-500 outline-none">
+                                    <select value={filters.discontinuedStatus || ''} onChange={(e) => handleFilterChange('discontinuedStatus', e.target.value)} className="w-full h-14 px-4 bg-slate-800 border-2 border-slate-700 rounded-2xl font-bold text-slate-200 appearance-none focus:border-amber-500 outline-none">
                                         <option value="">Todos (General)</option>
                                         <option value="activos">✅ Solo Activos</option>
                                         <option value="descontinuados">🚨 Descontinuados</option>
@@ -569,9 +569,9 @@ const MobileCatalog: React.FC = () => {
                             </div>
                         </div>
 
-                        <button 
+                        <button
                             onClick={() => setIsFiltersOpen(false)}
-                            className="w-full mt-6 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-extrabold text-base shadow-xl shadow-blue-600/30 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                            className="w-full mt-6 h-14 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-2xl font-extrabold text-base shadow-xl shadow-amber-500/30 active:scale-95 transition-transform flex items-center justify-center gap-2"
                         >
                             <span>Aplicar Filtros</span>
                             <span className="material-symbols-outlined text-lg">check</span>
@@ -582,16 +582,16 @@ const MobileCatalog: React.FC = () => {
 
             {/* --- SELECTION PRINT BAR --- */}
             {selectedIds.size > 0 && (
-                <div className="fixed bottom-24 left-4 right-4 z-40 bg-emerald-600 rounded-3xl shadow-2xl p-3 px-5 flex items-center justify-between animate-slide-up text-white border border-emerald-400">
+                <div className="fixed bottom-24 left-4 right-4 z-40 bg-amber-500 rounded-3xl shadow-2xl p-3 px-5 flex items-center justify-between animate-slide-up text-slate-950 border border-amber-300">
                     <div className="flex items-center gap-2.5">
-                        <span className="material-symbols-outlined text-2xl">print</span>
+                        <span className="material-symbols-outlined text-2xl font-variation-fill-1">print</span>
                         <span className="font-extrabold text-sm">{selectedIds.size} repuesto(s) sel.</span>
                     </div>
                     <div className="flex gap-2.5">
-                        <button onClick={handleBulkPrint} className="px-4 py-2 bg-white text-emerald-800 rounded-2xl font-black text-xs active:scale-95 transition-all shadow-sm">
+                        <button onClick={handleBulkPrint} className="px-4 py-2 bg-slate-950 text-amber-400 rounded-2xl font-black text-xs active:scale-95 transition-all shadow-sm">
                             Imprimir 3
                         </button>
-                        <button onClick={() => setSelectedIds(new Set())} className="p-2 text-white/80 hover:text-white flex items-center">
+                        <button onClick={() => setSelectedIds(new Set())} className="p-2 text-slate-950/70 hover:text-slate-950 flex items-center">
                             <span className="material-symbols-outlined text-[20px]">close</span>
                         </button>
                     </div>
@@ -609,35 +609,35 @@ const MobileCatalog: React.FC = () => {
             {queueSheetProduct && (
                 <div className="fixed inset-0 z-50 flex flex-col justify-end">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs animate-fade-in" onClick={() => setQueueSheetProduct(null)}></div>
-                    <div className="relative bg-white dark:bg-slate-900 rounded-t-[32px] p-5 pt-2 pb-8 shadow-2xl animate-slide-up border-t border-amber-400/40 dark:border-amber-700/40">
-                        <div className="w-10 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mb-4 mt-2"></div>
-                        <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 mb-1">
-                            <span className="material-symbols-outlined text-amber-500">playlist_add</span>
+                    <div className="relative bg-slate-900 rounded-t-[32px] p-5 pt-2 pb-8 shadow-2xl animate-slide-up border-t border-amber-500/30">
+                        <div className="w-10 h-1.5 bg-slate-700 rounded-full mx-auto mb-4 mt-2"></div>
+                        <h3 className="text-lg font-black text-white flex items-center gap-2 mb-1">
+                            <span className="material-symbols-outlined text-amber-400">playlist_add</span>
                             Agregar a Cola
                         </h3>
                         <p className="text-xs text-slate-500 mb-4">Se acumulará en tu borrador de impresión</p>
 
-                        <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl mb-4 border border-slate-200/60 dark:border-slate-750">
+                        <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-2xl mb-4 border border-slate-750">
                             {queueSheetProduct.image_url ? (
-                                <img src={getThumbnailUrl(queueSheetProduct.image_url, 200)} alt={queueSheetProduct.name} loading="lazy" className="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
+                                <img src={getThumbnailUrl(queueSheetProduct.image_url, 200)} alt={queueSheetProduct.name} loading="lazy" className="w-14 h-14 rounded-xl object-cover border border-slate-700 shrink-0" />
                             ) : (
-                                <div className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+                                <div className="w-14 h-14 bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                     <span className="material-symbols-outlined">image</span>
                                 </div>
                             )}
                             <div className="flex-1 min-w-0">
-                                <span className="text-xs font-mono font-extrabold text-blue-700 dark:text-blue-300">{queueSheetProduct.sku}</span>
-                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{queueSheetProduct.name}</p>
+                                <span className="text-xs font-mono font-extrabold text-amber-300">{queueSheetProduct.sku}</span>
+                                <p className="text-sm font-bold text-white truncate">{queueSheetProduct.name}</p>
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between bg-amber-50/70 dark:bg-amber-900/15 p-3 px-4 rounded-2xl border border-amber-200/60 dark:border-amber-800/40 mb-5">
-                            <span className="text-sm font-bold text-amber-800 dark:text-amber-300">Cantidad de etiquetas:</span>
+                        <div className="flex items-center justify-between bg-amber-500/10 p-3 px-4 rounded-2xl border border-amber-500/20 mb-5">
+                            <span className="text-sm font-bold text-amber-300">Cantidad de etiquetas:</span>
                             <div className="flex items-center gap-2">
-                                <div className="flex items-center border border-amber-300/60 dark:border-amber-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-inner h-10">
+                                <div className="flex items-center border border-amber-500/30 rounded-xl overflow-hidden bg-slate-800 shadow-inner h-11">
                                     <button
                                         type="button"
-                                        className="px-3 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold text-lg"
+                                        className="px-3 h-full text-slate-400 hover:bg-slate-700 active:bg-slate-600 font-bold text-lg"
                                         onClick={() => setQueueSheetQty(Math.max(1, queueSheetQty - 1))}
                                     >
                                         −
@@ -648,11 +648,11 @@ const MobileCatalog: React.FC = () => {
                                         step="1"
                                         value={queueSheetQty}
                                         onChange={(e) => setQueueSheetQty(Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="w-14 text-center bg-transparent border-none focus:ring-0 text-slate-800 dark:text-white font-black text-lg p-0"
+                                        className="w-14 text-center bg-transparent border-none focus:ring-0 text-white font-black text-lg p-0"
                                     />
                                     <button
                                         type="button"
-                                        className="px-3 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold text-lg"
+                                        className="px-3 h-full text-slate-400 hover:bg-slate-700 active:bg-slate-600 font-bold text-lg"
                                         onClick={() => setQueueSheetQty(queueSheetQty + 1)}
                                     >
                                         +
@@ -665,14 +665,14 @@ const MobileCatalog: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setQueueSheetProduct(null)}
-                                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-2xl font-extrabold text-sm active:scale-95 transition-all"
+                                className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-2xl font-extrabold text-sm active:scale-95 transition-all"
                             >
                                 Cancelar
                             </button>
                             <button
                                 type="button"
                                 onClick={handleAddToQueueConfirm}
-                                className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-extrabold text-sm shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-2xl font-extrabold text-sm shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
                             >
                                 <span className="material-symbols-outlined text-lg">add</span>
                                 Agregar {queueSheetQty}

@@ -101,15 +101,15 @@ const MobileInventory: React.FC = () => {
     const imageUrl = selectedProduct?.image_url ? getThumbnailUrl(selectedProduct.image_url, 300) : null;
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-900 animate-fade-in pb-28 font-sans">
+        <div className="flex flex-col min-h-screen bg-slate-950 animate-fade-in pb-28 font-sans">
             {/* Header */}
-            <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-b-[36px] px-6 pt-8 pb-6 shadow-lg shadow-blue-600/20 mb-3 text-white relative overflow-hidden z-20">
-                <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+            <div className="bg-slate-900 border-b border-slate-800 rounded-b-[36px] px-6 pt-8 pb-6 shadow-lg shadow-black/20 mb-3 text-white relative overflow-hidden z-20">
+                <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl"></div>
                 <h1 className="text-3xl font-extrabold mb-1 relative z-10 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-3xl">inventory_2</span>
+                    <span className="material-symbols-outlined text-3xl text-cyan-400 font-variation-fill-1">inventory_2</span>
                     Inventario Móvil
                 </h1>
-                <p className="text-blue-100 text-xs font-semibold relative z-10">Ajuste rápido en almacén. Escanea código o busca repuesto.</p>
+                <p className="text-slate-400 text-xs font-semibold relative z-10">Ajuste rápido en almacén. Escanea código o busca repuesto.</p>
             </div>
 
             {/* Content */}
@@ -129,7 +129,7 @@ const MobileInventory: React.FC = () => {
 
                 {catalogLoading && allProducts.length === 0 && (
                     <div className="flex flex-col items-center justify-center mt-10 gap-3 text-slate-400">
-                        <div className="w-9 h-9 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-9 h-9 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
                         <span className="text-xs font-extrabold uppercase tracking-wider animate-pulse">Cargando catálogo inteligente...</span>
                     </div>
                 )}
@@ -160,24 +160,24 @@ const MobileInventory: React.FC = () => {
                                 <div
                                     key={prod.id}
                                     onClick={() => setSelectedProduct(prod)}
-                                    className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-750 flex items-center gap-3.5 shadow-xs cursor-pointer active:scale-95 transition-all hover:border-blue-500"
+                                    className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center gap-3.5 shadow-xs cursor-pointer active:scale-95 transition-all hover:border-cyan-500/50"
                                 >
                                     {prod.image_url ? (
-                                        <img src={getThumbnailUrl(prod.image_url, 150)} alt={prod.name} loading="lazy" className="w-12 h-12 rounded-xl object-cover border border-slate-100 dark:border-slate-700 shrink-0" />
+                                        <img src={getThumbnailUrl(prod.image_url, 150)} alt={prod.name} loading="lazy" className="w-12 h-12 rounded-xl object-cover border border-slate-700 shrink-0" />
                                     ) : (
-                                        <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700/60 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+                                        <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                             <span className="material-symbols-outlined text-xl">image</span>
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <span className="text-xs font-mono font-extrabold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-800/60">
+                                        <span className="text-xs font-mono font-extrabold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
                                             {prod.sku}
                                         </span>
-                                        <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate mt-1">{prod.name}</h4>
+                                        <h4 className="font-bold text-slate-100 text-sm truncate mt-1">{prod.name}</h4>
                                     </div>
                                     <div className="flex flex-col items-end shrink-0">
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase">Stock</span>
-                                        <span className={`text-sm font-black px-2 py-0.5 rounded-lg ${totStock > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'}`}>
+                                        <span className="text-[10px] text-slate-500 font-bold uppercase">Stock</span>
+                                        <span className={`text-sm font-black px-2 py-0.5 rounded-lg ${totStock > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                                             {totStock}
                                         </span>
                                     </div>
@@ -189,9 +189,9 @@ const MobileInventory: React.FC = () => {
 
                 {/* Si no hay resultados */}
                 {searchTerm.trim().length >= 2 && matchedProducts.length === 0 && !catalogLoading && (
-                    <div className="text-center py-12 px-6 text-slate-400 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-750 my-4 shadow-sm">
+                    <div className="text-center py-12 px-6 text-slate-400 bg-slate-900 rounded-3xl border border-slate-800 my-4 shadow-sm">
                         <span className="material-symbols-outlined text-5xl opacity-40 mb-2">search_off</span>
-                        <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Producto no encontrado</p>
+                        <p className="font-bold text-sm text-slate-200">Producto no encontrado</p>
                         <p className="text-xs text-slate-400 mt-1 max-w-[240px] mx-auto">Verifica las palabras clave o el código SKU. El buscador inteligente busca por doble filtro.</p>
                     </div>
                 )}
@@ -200,15 +200,15 @@ const MobileInventory: React.FC = () => {
                 {selectedProduct && (
                     <div className="flex flex-col gap-4 animate-fade-in">
                         {/* Almacén Selector */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl p-2 px-3 border border-slate-200 dark:border-slate-750 shadow-xs flex items-center justify-between gap-2">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0">Almacén:</span>
+                        <div className="bg-slate-900 rounded-2xl p-2 px-3 border border-slate-800 shadow-xs flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">Almacén:</span>
                             <select
-                                className="w-full bg-transparent p-1.5 text-slate-800 dark:text-slate-100 font-extrabold outline-none focus:ring-0 border-none text-right cursor-pointer"
+                                className="w-full bg-transparent p-1.5 text-slate-100 font-extrabold outline-none focus:ring-0 border-none text-right cursor-pointer"
                                 value={selectedWarehouseId}
                                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
                             >
                                 {warehouses.map(w => (
-                                    <option key={w.id} value={w.id} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                                    <option key={w.id} value={w.id} className="bg-slate-800 text-slate-100">
                                         📍 {w.name}
                                     </option>
                                 ))}
@@ -216,56 +216,56 @@ const MobileInventory: React.FC = () => {
                         </div>
 
                         {/* Card */}
-                        <div className="bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-lg border border-slate-200/80 dark:border-slate-750 flex flex-col items-center relative overflow-hidden">
+                        <div className="bg-slate-900 rounded-3xl p-5 shadow-lg border border-slate-800 flex flex-col items-center relative overflow-hidden">
                             {/* Stock Badge */}
                             <div className="absolute top-4 right-4 flex flex-col items-end">
-                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-0.5">Stock Global</span>
+                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Stock Global</span>
                                 <div className={`px-3 py-1 rounded-xl font-extrabold text-sm ${
-                                    globalStock > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                    globalStock > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
                                 }`}>
                                     {globalStock}
                                 </div>
                             </div>
 
-                            <div className="w-36 h-36 rounded-2xl bg-slate-50 dark:bg-slate-700/50 mb-4 p-2 border border-slate-100 dark:border-slate-700 flex items-center justify-center shadow-inner">
+                            <div className="w-36 h-36 rounded-2xl bg-slate-800/60 mb-4 p-2 border border-slate-700 flex items-center justify-center shadow-inner">
                                 {imageUrl ? (
-                                    <img src={imageUrl} alt={selectedProduct.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
+                                    <img src={imageUrl} alt={selectedProduct.name} className="w-full h-full object-contain" />
                                 ) : (
-                                    <span className="material-symbols-outlined text-5xl text-slate-300 dark:text-slate-500">image</span>
+                                    <span className="material-symbols-outlined text-5xl text-slate-600">image</span>
                                 )}
                             </div>
-                            
-                            <span className="text-sm font-mono font-extrabold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-xl mb-1.5 border border-blue-200/60 dark:border-blue-800/60">
+
+                            <span className="text-sm font-mono font-extrabold text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-xl mb-1.5 border border-cyan-500/20">
                                 {selectedProduct.sku}
                             </span>
-                            <h2 className="text-lg font-black text-slate-900 dark:text-white text-center leading-tight">
+                            <h2 className="text-lg font-black text-white text-center leading-tight">
                                 {selectedProduct.name}
                             </h2>
 
                             {/* Stock Controls */}
-                            <div className="w-full mt-6 bg-slate-50 dark:bg-slate-900/80 p-4 rounded-3xl flex items-center justify-between border border-slate-200/60 dark:border-slate-800 shadow-inner">
-                                <button 
+                            <div className="w-full mt-6 bg-slate-950/60 p-4 rounded-3xl flex items-center justify-between border border-slate-800 shadow-inner">
+                                <button
                                     type="button"
                                     onClick={() => handleMovement('OUT')}
                                     disabled={processing || currentStockInSelectedWarehouse <= 0}
-                                    className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 shadow-md border border-rose-200 dark:border-rose-900 flex items-center justify-center text-rose-600 dark:text-rose-400 active:scale-90 transition-transform disabled:opacity-30 disabled:active:scale-100"
+                                    className="w-16 h-16 rounded-2xl bg-slate-800 shadow-md border border-rose-500/30 flex items-center justify-center text-rose-400 active:scale-90 transition-transform disabled:opacity-30 disabled:active:scale-100"
                                 >
                                     <span className="material-symbols-outlined text-4xl font-extrabold">remove</span>
                                 </button>
 
                                 <div className="flex flex-col items-center">
-                                    <span className="text-[11px] text-slate-400 font-extrabold uppercase tracking-widest">En almacén</span>
-                                    <span className="text-4xl font-black text-slate-900 dark:text-white my-0.5">
+                                    <span className="text-[11px] text-slate-500 font-extrabold uppercase tracking-widest">En almacén</span>
+                                    <span className="text-4xl font-black text-white my-0.5">
                                         {currentStockInSelectedWarehouse}
                                     </span>
-                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Listo para ajustar</span>
+                                    <span className="text-[10px] text-emerald-400 font-bold">Listo para ajustar</span>
                                 </div>
 
-                                <button 
+                                <button
                                     type="button"
                                     onClick={() => handleMovement('IN')}
                                     disabled={processing}
-                                    className="w-16 h-16 rounded-2xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 shadow-lg shadow-blue-600/30 flex items-center justify-center text-white active:scale-90 transition-transform disabled:opacity-50 disabled:active:scale-100"
+                                    className="w-16 h-16 rounded-2xl bg-cyan-500 hover:bg-cyan-400 shadow-lg shadow-cyan-500/30 flex items-center justify-center text-slate-950 active:scale-90 transition-transform disabled:opacity-50 disabled:active:scale-100"
                                 >
                                     <span className="material-symbols-outlined text-4xl font-black">add</span>
                                 </button>

@@ -193,7 +193,7 @@ const MobileLabels: React.FC = () => {
     const totalPages = getQueuePageCount(queue);
 
     return (
-        <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-slate-900 pb-56 font-sans">
+        <div className="flex flex-col min-h-screen bg-slate-950 pb-56 font-sans">
             <style>{`
                 @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 @keyframes slide-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
@@ -206,25 +206,25 @@ const MobileLabels: React.FC = () => {
             `}</style>
             
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-4 pt-6 shadow-lg text-white rounded-b-3xl mb-1 z-20">
+            <div className="bg-gradient-to-r from-amber-500 to-amber-400 p-4 pt-6 shadow-lg text-slate-950 rounded-b-3xl mb-1 z-20">
                 <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight">
-                    <span className="material-symbols-outlined text-[28px]">print</span>
+                    <span className="material-symbols-outlined text-[28px] font-variation-fill-1">print</span>
                     Impresión de Etiquetas
                 </h1>
-                <p className="text-emerald-100 text-xs mt-1 font-medium">
+                <p className="text-slate-950/70 text-xs mt-1 font-semibold">
                     Impresión rápida o arma tu cola de impresión personalizada
                 </p>
             </div>
 
             {/* ── Tab Switcher ────────────────────────── */}
-            <div className="sticky top-0 z-30 px-4 pt-3 pb-1 bg-gray-50/95 dark:bg-slate-900/95 backdrop-blur-lg">
-                <div className="flex bg-white dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/80 dark:border-slate-700 shadow-sm">
+            <div className="sticky top-0 z-30 px-4 pt-3 pb-1 bg-slate-950/95 backdrop-blur-lg">
+                <div className="flex bg-slate-900 rounded-2xl p-1 border border-slate-800 shadow-sm">
                     <button
                         onClick={() => setActiveTab('quick')}
                         className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
                             activeTab === 'quick'
-                                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750'
+                                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
+                                : 'text-slate-400 hover:bg-slate-800'
                         }`}
                     >
                         <span className="material-symbols-outlined text-[16px]">bolt</span>
@@ -234,14 +234,14 @@ const MobileLabels: React.FC = () => {
                         onClick={() => setActiveTab('queue')}
                         className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative ${
                             activeTab === 'queue'
-                                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
-                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-750'
+                                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
+                                : 'text-slate-400 hover:bg-slate-800'
                         }`}
                     >
                         <span className="material-symbols-outlined text-[16px]">queue</span>
                         Cola
                         {queue.length > 0 && activeTab !== 'queue' && (
-                            <span className="absolute -top-1.5 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-amber-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-slate-800 animate-pulse-glow">
+                            <span className="absolute -top-1.5 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-amber-500 text-slate-950 text-[10px] font-black rounded-full border-2 border-slate-900 animate-pulse-glow">
                                 {queue.length}
                             </span>
                         )}
@@ -279,16 +279,16 @@ const MobileLabels: React.FC = () => {
                         {/* Loading Estado Inicial Catalogo */}
                         {(catalogLoading || reprintLoading) && allProducts.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-10 gap-3 text-slate-400">
-                                <div className="animate-spin rounded-full h-10 w-10 border-4 border-emerald-500 border-t-transparent"></div>
+                                <div className="animate-spin rounded-full h-10 w-10 border-4 border-amber-500 border-t-transparent"></div>
                                 <span className="text-xs font-semibold uppercase tracking-wider animate-pulse">Cargando catálogo inteligente...</span>
                             </div>
                         )}
 
                         {/* Sin Resultados */}
                         {searchTerm.trim().length >= 2 && matchedProducts.length === 0 && !catalogLoading && (
-                            <div className="animate-fade-in bg-white dark:bg-slate-800 rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-750 my-2 shadow-sm">
+                            <div className="animate-fade-in bg-slate-900 rounded-3xl p-8 text-center border border-slate-800 my-2 shadow-sm">
                                 <span className="material-symbols-outlined text-5xl text-slate-300 dark:text-slate-600 mb-2">search_off</span>
-                                <h3 className="text-base font-bold text-slate-700 dark:text-slate-200">No se encontró repuesto</h3>
+                                <h3 className="text-base font-bold text-slate-200">No se encontró repuesto</h3>
                                 <p className="text-xs text-slate-400 mt-1 max-w-[240px] mx-auto">
                                     Verifica si el nombre o código está bien escrito, o intenta con palabras clave más cortas.
                                 </p>
@@ -308,7 +308,7 @@ const MobileLabels: React.FC = () => {
                                     const currentQty = getCustomQty(String(prod.id));
 
                                     return (
-                                        <div key={prod.id} className="bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-md border border-slate-200/80 dark:border-slate-750 flex flex-col gap-3 transition-all">
+                                        <div key={prod.id} className="bg-slate-900 p-4 rounded-3xl shadow-md border border-slate-800 flex flex-col gap-3 transition-all">
                                             {/* Cabecera del Producto */}
                                             <div className="flex gap-3.5 items-center">
                                                 {prod.image_url ? (
@@ -325,7 +325,7 @@ const MobileLabels: React.FC = () => {
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-xs font-mono font-extrabold rounded-lg border border-blue-200 dark:border-blue-800/60">
+                                                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-xs font-mono font-extrabold rounded-lg border border-amber-500/20">
                                                             {prod.sku}
                                                         </span>
                                                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${
@@ -334,7 +334,7 @@ const MobileLabels: React.FC = () => {
                                                             Stock: {stock}
                                                         </span>
                                                     </div>
-                                                    <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-snug line-clamp-2">
+                                                    <h3 className="font-bold text-white text-sm leading-snug line-clamp-2">
                                                         {prod.name}
                                                     </h3>
                                                     {prod.brands?.name && (
@@ -350,7 +350,7 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handlePrint(prod, 3)}
-                                                    className="active:scale-95 transition-all bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/25 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-blue-200 dark:border-blue-800 shadow-xs"
+                                                    className="active:scale-95 transition-all bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-amber-500/25 shadow-xs"
                                                 >
                                                     <span className="material-symbols-outlined text-xl">print</span>
                                                     <span className="font-black text-base">3</span>
@@ -359,7 +359,7 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handlePrint(prod, 6)}
-                                                    className="active:scale-95 transition-all bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/25 dark:hover:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-violet-200 dark:border-violet-800 shadow-xs"
+                                                    className="active:scale-95 transition-all bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-cyan-500/25 shadow-xs"
                                                 >
                                                     <span className="material-symbols-outlined text-xl">print</span>
                                                     <span className="font-black text-base">6</span>
@@ -368,7 +368,7 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handlePrint(prod, 21)}
-                                                    className="active:scale-95 transition-all bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/25 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-emerald-200 dark:border-emerald-800 shadow-xs"
+                                                    className="active:scale-95 transition-all bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-emerald-500/25 shadow-xs"
                                                 >
                                                     <span className="material-symbols-outlined text-xl">print</span>
                                                     <span className="font-black text-base">21</span>
@@ -380,7 +380,7 @@ const MobileLabels: React.FC = () => {
                                             <div className="bg-slate-50 dark:bg-slate-900/80 p-2 px-3 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-3 mt-0.5">
                                                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Otro número:</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-inner h-9">
+                                                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
                                                         <button 
                                                             type="button"
                                                             className="px-2.5 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold"
@@ -407,7 +407,7 @@ const MobileLabels: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handlePrint(prod, currentQty)}
-                                                        className="active:scale-95 transition-transform bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 px-4 h-9 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                                                        className="active:scale-95 transition-transform bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
                                                     >
                                                         <span>Imprimir</span>
                                                     </button>
@@ -423,7 +423,7 @@ const MobileLabels: React.FC = () => {
                         {(!searchTerm || matchedProducts.length === 0) && (
                             <div className="mt-4 animate-fade-in z-10">
                                 <div className="flex items-center justify-between mb-3 px-1">
-                                    <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                    <h2 className="text-base font-bold text-slate-200 flex items-center gap-2">
                                         <span className="material-symbols-outlined text-slate-400">history</span>
                                         Impresiones Recientes
                                     </h2>
@@ -433,7 +433,7 @@ const MobileLabels: React.FC = () => {
                                 </div>
                                 
                                 {printHistory.length === 0 ? (
-                                    <div className="text-center py-8 px-4 text-slate-400 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200/80 dark:border-slate-750 shadow-xs">
+                                    <div className="text-center py-8 px-4 text-slate-400 bg-slate-900 rounded-3xl border border-slate-800 shadow-xs">
                                         <span className="material-symbols-outlined text-4xl opacity-30 mb-1">print_disabled</span>
                                         <p className="font-semibold text-sm">No hay impresiones recientes</p>
                                         <p className="text-xs text-slate-400 mt-0.5">Cuando imprimas etiquetas, aparecerán aquí para fácil acceso.</p>
@@ -441,7 +441,7 @@ const MobileLabels: React.FC = () => {
                                 ) : (
                                     <div className="flex flex-col gap-2.5">
                                         {printHistory.map((item, index) => (
-                                            <div key={`${item.id}-${index}`} className="bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-750 flex items-center gap-3 transition-colors hover:border-emerald-500/50">
+                                            <div key={`${item.id}-${index}`} className="bg-slate-900 p-3 rounded-2xl shadow-sm border border-slate-800 flex items-center gap-3 transition-colors hover:border-emerald-500/50">
                                                 {item.image_url ? (
                                                     <img
                                                         src={getThumbnailUrl(item.image_url, 200)}
@@ -526,7 +526,7 @@ const MobileLabels: React.FC = () => {
                                     const alreadyInQueue = queue.find(q => q.sku === prod.sku);
 
                                     return (
-                                        <div key={prod.id} className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-750 flex flex-col gap-2.5 transition-all">
+                                        <div key={prod.id} className="bg-slate-900 p-3.5 rounded-2xl shadow-sm border border-slate-800 flex flex-col gap-2.5 transition-all">
                                             <div className="flex gap-3 items-center">
                                                 {prod.image_url ? (
                                                     <img src={getThumbnailUrl(prod.image_url, 200)} alt={prod.name} loading="lazy" className="w-14 h-14 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 shadow-sm" />
@@ -537,7 +537,7 @@ const MobileLabels: React.FC = () => {
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-[11px] font-mono font-extrabold rounded-lg border border-blue-200 dark:border-blue-800/60">
+                                                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[11px] font-mono font-extrabold rounded-lg border border-amber-500/20">
                                                             {prod.sku}
                                                         </span>
                                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${stock > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
@@ -549,7 +549,7 @@ const MobileLabels: React.FC = () => {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <h3 className="font-bold text-slate-900 dark:text-white text-xs leading-snug line-clamp-2">{prod.name}</h3>
+                                                    <h3 className="font-bold text-white text-xs leading-snug line-clamp-2">{prod.name}</h3>
                                                 </div>
                                             </div>
 
@@ -557,7 +557,7 @@ const MobileLabels: React.FC = () => {
                                             <div className="flex items-center justify-between gap-2 bg-amber-50/60 dark:bg-amber-900/10 p-2 px-3 rounded-xl border border-amber-200/60 dark:border-amber-800/40">
                                                 <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Cantidad:</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center border border-amber-300/60 dark:border-amber-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-inner h-9">
+                                                    <div className="flex items-center border border-amber-300/60 dark:border-amber-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
                                                         <button
                                                             type="button"
                                                             className="px-2.5 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold"
@@ -584,7 +584,7 @@ const MobileLabels: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleAddToQueue(prod)}
-                                                        className="active:scale-95 transition-all bg-amber-500 hover:bg-amber-600 text-white px-4 h-9 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                                                        className="active:scale-95 transition-all bg-amber-500 hover:bg-amber-600 text-white px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
                                                     >
                                                         <span className="material-symbols-outlined text-[16px]">add</span>
                                                         Agregar
@@ -599,9 +599,9 @@ const MobileLabels: React.FC = () => {
 
                         {/* No search results */}
                         {queueSearchTerm.trim().length >= 2 && queueMatchedProducts.length === 0 && !catalogLoading && (
-                            <div className="animate-fade-in bg-white dark:bg-slate-800 rounded-3xl p-6 text-center border border-slate-200 dark:border-slate-750 my-1 shadow-sm">
+                            <div className="animate-fade-in bg-slate-900 rounded-3xl p-6 text-center border border-slate-800 my-1 shadow-sm">
                                 <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600 mb-1">search_off</span>
-                                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">No se encontró repuesto</h3>
+                                <h3 className="text-sm font-bold text-slate-200">No se encontró repuesto</h3>
                             </div>
                         )}
 
@@ -609,7 +609,7 @@ const MobileLabels: React.FC = () => {
                         {(!queueSearchTerm || queueMatchedProducts.length === 0) && (
                             <div className="mt-2 animate-fade-in">
                                 <div className="flex items-center justify-between mb-3 px-1">
-                                    <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                    <h2 className="text-base font-bold text-slate-200 flex items-center gap-2">
                                         <span className="material-symbols-outlined text-amber-500">playlist_add_check</span>
                                         Cola de Impresión
                                         {queue.length > 0 && (
@@ -621,9 +621,9 @@ const MobileLabels: React.FC = () => {
                                 </div>
 
                                 {queue.length === 0 ? (
-                                    <div className="text-center py-10 px-4 bg-white dark:bg-slate-800 rounded-3xl border-2 border-dashed border-amber-300/60 dark:border-amber-800/40 shadow-xs">
+                                    <div className="text-center py-10 px-4 bg-slate-900 rounded-3xl border-2 border-dashed border-amber-300/60 dark:border-amber-800/40 shadow-xs">
                                         <span className="material-symbols-outlined text-5xl text-amber-300 dark:text-amber-700 mb-2">queue</span>
-                                        <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">La cola está vacía</h3>
+                                        <h3 className="font-bold text-sm text-slate-200">La cola está vacía</h3>
                                         <p className="text-xs text-slate-400 mt-1 max-w-[260px] mx-auto leading-relaxed">
                                             Busca repuestos arriba, elige la cantidad que necesitas de cada uno, y agrégalos a la cola. Cuando termines, genera un solo PDF con todas las etiquetas.
                                         </p>
@@ -637,7 +637,7 @@ const MobileLabels: React.FC = () => {
                                         {queue.map((item, idx) => (
                                             <div
                                                 key={item.sku}
-                                                className="animate-fade-in bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-750 flex items-center gap-3 transition-all"
+                                                className="animate-fade-in bg-slate-900 p-3 rounded-2xl shadow-sm border border-slate-800 flex items-center gap-3 transition-all"
                                                 style={{ animationDelay: `${idx * 40}ms` }}
                                             >
                                                 {item.image_url ? (
@@ -649,17 +649,17 @@ const MobileLabels: React.FC = () => {
                                                 )}
 
                                                 <div className="flex-1 min-w-0">
-                                                    <span className="text-[11px] font-mono font-extrabold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-800/60">
+                                                    <span className="text-[11px] font-mono font-extrabold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
                                                         {item.sku}
                                                     </span>
                                                     <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate mt-0.5">{item.name}</p>
 
                                                     {/* Inline qty editor */}
-                                                    <div className="flex items-center gap-1.5 mt-1.5">
+                                                    <div className="flex items-center gap-2 mt-1.5">
                                                         <button
                                                             type="button"
                                                             onClick={() => handleUpdateQueueQty(item.id, item.quantity - 1)}
-                                                            className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
+                                                            className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
                                                         >
                                                             −
                                                         </button>
@@ -669,12 +669,12 @@ const MobileLabels: React.FC = () => {
                                                             step="1"
                                                             value={item.quantity}
                                                             onChange={(e) => handleUpdateQueueQty(item.id, parseInt(e.target.value) || 1)}
-                                                            className="w-10 h-7 text-center bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 dark:border-amber-700/60 rounded-lg text-amber-800 dark:text-amber-300 font-black text-xs focus:ring-0 p-0"
+                                                            className="w-10 h-10 text-center bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 dark:border-amber-700/60 rounded-lg text-amber-800 dark:text-amber-300 font-black text-xs focus:ring-0 p-0"
                                                         />
                                                         <button
                                                             type="button"
                                                             onClick={() => handleUpdateQueueQty(item.id, item.quantity + 1)}
-                                                            className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
+                                                            className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
                                                         >
                                                             +
                                                         </button>
@@ -701,14 +701,14 @@ const MobileLabels: React.FC = () => {
                         {/* ── Floating Bottom Bar (when queue has items) ── */}
                         {queue.length > 0 && (
                             <div className="fixed bottom-[88px] left-2 right-2 z-40 animate-slide-up">
-                                <div className="max-w-md mx-auto bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-700/60 p-3 px-4">
+                                <div className="max-w-md mx-auto bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 p-3 px-4">
                                     {/* Summary row */}
                                     <div className="flex items-center justify-between mb-2.5">
                                         <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-500 text-lg">receipt_long</span>
+                                            <span className="material-symbols-outlined text-amber-400 text-lg">receipt_long</span>
                                             <div>
-                                                <span className="text-xs font-black text-slate-800 dark:text-white">{totalLabels} etiqueta{totalLabels !== 1 ? 's' : ''}</span>
-                                                <span className="text-[10px] text-slate-400 ml-1.5">({totalPages} hoja{totalPages !== 1 ? 's' : ''} A4)</span>
+                                                <span className="text-xs font-black text-white">{totalLabels} etiqueta{totalLabels !== 1 ? 's' : ''}</span>
+                                                <span className="text-[10px] text-slate-500 ml-1.5">({totalPages} hoja{totalPages !== 1 ? 's' : ''} A4)</span>
                                             </div>
                                         </div>
                                         {/* Clear all */}
@@ -716,16 +716,16 @@ const MobileLabels: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowClearConfirm(true)}
-                                                className="text-[11px] font-bold text-rose-500 hover:text-rose-600 active:opacity-70 flex items-center gap-0.5"
+                                                className="text-[11px] font-bold text-rose-400 hover:text-rose-300 active:opacity-70 flex items-center gap-0.5"
                                             >
                                                 <span className="material-symbols-outlined text-sm">delete_sweep</span>
                                                 Vaciar
                                             </button>
                                         ) : (
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-[10px] text-rose-500 font-bold">¿Seguro?</span>
+                                                <span className="text-[10px] text-rose-400 font-bold">¿Seguro?</span>
                                                 <button onClick={handleClearQueue} className="text-[11px] font-extrabold text-white bg-rose-500 px-2.5 py-1 rounded-lg active:scale-95">Sí</button>
-                                                <button onClick={() => setShowClearConfirm(false)} className="text-[11px] font-extrabold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-lg active:scale-95">No</button>
+                                                <button onClick={() => setShowClearConfirm(false)} className="text-[11px] font-extrabold text-slate-300 bg-slate-700 px-2.5 py-1 rounded-lg active:scale-95">No</button>
                                             </div>
                                         )}
                                     </div>
@@ -734,7 +734,7 @@ const MobileLabels: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={() => setIsPreviewModalOpen(true)}
-                                        className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white rounded-xl font-extrabold text-sm shadow-lg shadow-emerald-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-slate-950 rounded-xl font-extrabold text-sm shadow-lg shadow-amber-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                                     >
                                         <span className="material-symbols-outlined text-lg">visibility</span>
                                         Vista Previa e Imprimir ({totalLabels} etiq.)
