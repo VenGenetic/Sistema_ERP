@@ -581,6 +581,103 @@ const Products: React.FC = () => {
         }
     };
 
+    const handleDuplicateProduct = async (prod: any) => {
+        const confirmed = window.confirm(`¿Estás seguro de que deseas duplicar este producto (${prod.sku})? Se generará un nuevo código SKU automáticamente.`);
+        if (!confirmed) return;
+
+        setLoading(true);
+        try {
+            // Parse SKU using strict regex
+            const match = prod.sku.match(/^(.*)-([A-Z]{1,2})$/);
+            const baseSku = match ? match[1] : prod.sku;
+
+            // Find existing SKUs
+            const { data: existing, error: fetchError } = await supabase
+                .from('products')
+                .select('sku')
+                .eq('is_active', true)
+                .ilike('sku', `${baseSku}%`);
+            
+            if (fetchError) throw fetchError;
+
+            // Generate unique suffix
+            const getSuffix = (index: number): string => {
+                let suffix = '';
+                let temp = index;
+                while (temp >= 0) {
+                    suffix = String.fromCharCode((temp % 26) + 65) + suffix;
+                    temp = Math.floor(temp / 26) - 1;
+                }
+                return suffix;
+            };
+
+            let nextSku = '';
+            let index = 0;
+            while (true) {
+                const candidate = `${baseSku}-${getSuffix(index)}`;
+                if (!existing?.some(p => p.sku.toLowerCase() === candidate.toLowerCase())) {
+                    nextSku = candidate;
+                    break;
+                }
+                index++;
+            }
+
+            const { data: { user } } = await supabase.auth.getUser();
+
+            // Construct sanitized payload
+            const payload = {
+                sku: nextSku,
+                name: prod.name,
+                brand_id: prod.brand_id,
+                category: prod.category,
+                price: prod.price,
+                cost_without_vat: prod.cost_without_vat,
+                vat_percentage: prod.vat_percentage,
+                profit_margin: prod.profit_margin,
+                min_stock_threshold: prod.min_stock_threshold,
+                image_url: prod.image_url,
+                gallery: prod.gallery,
+                is_active: true,
+                is_discontinued: prod.is_discontinued || false,
+                discontinued_until: prod.discontinued_until || null,
+                last_edited_by: user?.id || null,
+                last_edited_at: new Date().toISOString()
+            };
+
+            const { data: newProd, error: insertError } = await supabase
+                .from('products')
+                .insert([payload])
+                .select('id')
+                .single();
+
+            if (insertError) throw insertError;
+
+            // Duplicate tags
+            if (newProd && prod.product_tags && prod.product_tags.length > 0) {
+                const tagInserts = prod.product_tags
+                    .map((pt: any) => pt.tags?.id)
+                    .filter(Boolean)
+                    .map((tagId: any) => ({
+                        product_id: newProd.id,
+                        tag_id: tagId
+                    }));
+                
+                if (tagInserts.length > 0) {
+                    const { error: tagError } = await supabase.from('product_tags').insert(tagInserts);
+                    if (tagError) console.error('Error duplicando etiquetas:', tagError);
+                }
+            }
+
+            alert(`Producto duplicado exitosamente. Nuevo SKU: ${nextSku}`);
+            fetchCatalogData(pagination.page);
+        } catch (error: any) {
+            console.error('Error al duplicar producto:', error);
+            alert('Error al duplicar producto: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleBulkDelete = async () => {
         // Verificar stock de todos los seleccionados
         const hasStock = selectedProducts.some(p => {
@@ -1029,6 +1126,13 @@ const Products: React.FC = () => {
                             title="Editar Producto"
                         >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button
+                            onClick={() => handleDuplicateProduct(prod)}
+                            className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                            title="Duplicar Producto"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">copy_all</span>
                         </button>
                         <button
                             onClick={() => { setDemandProduct(prod); setIsDemandModalOpen(true); }}
