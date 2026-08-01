@@ -27,9 +27,12 @@ interface BatchProductEntryProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    // Pre-fills the grid (e.g. from a parsed supplier invoice) instead of
+    // starting from a single blank row. Re-applied every time the modal opens.
+    initialProducts?: { sku: string; name: string; quantity: number; costWithoutVat?: number }[];
 }
 
-export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, onClose, onSuccess }) => {
+export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, onClose, onSuccess, initialProducts }) => {
     const [loading, setLoading] = useState(false);
     const [globalBrandId, setGlobalBrandId] = useState<number | null>(null);
     const [globalWarehouseId, setGlobalWarehouseId] = useState<number | null>(null);
@@ -55,7 +58,23 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     useEffect(() => {
         if (isOpen) {
             fetchAccounts();
+            if (initialProducts && initialProducts.length > 0) {
+                setRows(initialProducts.map((p, idx) => ({
+                    id: `prefill-${Date.now()}-${idx}`,
+                    sku: p.sku.toUpperCase(),
+                    name: p.name,
+                    quantity: String(p.quantity),
+                    costWithoutVat: p.costWithoutVat != null ? String(p.costWithoutVat) : '',
+                    discountedCost: '',
+                    profitMargin: '0.65',
+                    pvp: '',
+                    costWithVat: 0,
+                })));
+            }
         }
+        // Only re-apply the prefill when the modal transitions open, so edits
+        // made while it's open aren't clobbered by an unrelated re-render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
 
     const fetchAccounts = async () => {

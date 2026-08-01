@@ -1,40 +1,27 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { parseInvoicePdf, ParsedInvoiceLine } from '../utils/invoiceParser';
+import { parseInvoicePdf } from '../utils/invoiceParser';
 import { generateQueuePDF, addToQueue, PrintQueueItem } from '../utils/mobilePrintQueue';
-
-interface InvoiceRow extends ParsedInvoiceLine {
-    key: string;
-    included: boolean;
-    productId: number | null; // matched product id in catálogo, if any
-    labelName: string;        // editable name printed on the label
-    imageUrl?: string;
-}
+import { useInvoiceLabelsStore, InvoiceLabelRow } from '../store/useInvoiceLabelsStore';
+import { BatchProductEntry } from '../components/BatchProductEntry';
 
 const InvoiceLabels: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [fileName, setFileName] = useState<string | null>(null);
-    const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
-    const [rows, setRows] = useState<InvoiceRow[]>([]);
+
+    const { fileName, invoiceNumber, rows, setInvoice, updateRow, markAddedToInventory, reset } = useInvoiceLabelsStore();
+
     const [isParsing, setIsParsing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isWorking, setIsWorking] = useState(false);
     const [feedback, setFeedback] = useState<string | null>(null);
-
-    const resetState = () => {
-        setRows([]);
-        setError(null);
-        setInvoiceNumber(null);
-        setFeedback(null);
-    };
+    const [isBatchEntryOpen, setIsBatchEntryOpen] = useState(false);
 
     const handleFile = useCallback(async (file: File) => {
-        resetState();
-        setFileName(file.name);
+        setError(null);
+        setFeedback(null);
         setIsParsing(true);
         try {
             const { invoiceNumber: invNum, lines } = await parseInvoicePdf(file);
-            setInvoiceNumber(invNum);
 
             if (lines.length === 0) {
                 setError('No se pudo encontrar ningún repuesto en este PDF. Verifica que sea una factura de venta con el formato habitual (Código / Descripción / Cantidad).');
@@ -57,7 +44,7 @@ const InvoiceLabels: React.FC = () => {
                 );
             }
 
-            const builtRows: InvoiceRow[] = lines.map((line, idx) => {
+            const builtRows: InvoiceLabelRow[] = lines.map((line, idx) => {
                 const match = matches[line.sku];
                 return {
                     ...line,
@@ -66,17 +53,18 @@ const InvoiceLabels: React.FC = () => {
                     productId: match?.id ?? null,
                     labelName: match?.name ?? line.description,
                     imageUrl: match?.image_url,
+                    addedToInventory: false,
                 };
             });
 
-            setRows(builtRows);
+            setInvoice(file.name, invNum, builtRows);
         } catch (err: any) {
             console.error('Error al procesar la factura:', err);
             setError('Ocurrió un error al leer el PDF. Asegúrate de que el archivo no esté dañado y vuelve a intentarlo.');
         } finally {
             setIsParsing(false);
         }
-    }, []);
+    }, [setInvoice]);
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -91,20 +79,24 @@ const InvoiceLabels: React.FC = () => {
     };
 
     const toggleRow = (key: string) => {
-        setRows(prev => prev.map(r => (r.key === key ? { ...r, included: !r.included } : r)));
+        const row = rows.find(r => r.key === key);
+        if (row) updateRow(key, { included: !row.included });
     };
 
     const updateQty = (key: string, qty: number) => {
-        setRows(prev => prev.map(r => (r.key === key ? { ...r, quantity: Math.max(1, Math.round(qty) || 1) } : r)));
+        // Quantity changed after a row was already sent to inventory —
+        // clear the flag so it's clear a (re)addition is still pending.
+        updateRow(key, { quantity: Math.max(1, Math.round(qty) || 1), addedToInventory: false });
     };
 
     const updateName = (key: string, name: string) => {
-        setRows(prev => prev.map(r => (r.key === key ? { ...r, labelName: name } : r)));
+        updateRow(key, { labelName: name });
     };
 
     const includedRows = rows.filter(r => r.included);
     const totalLabels = includedRows.reduce((acc, r) => acc + r.quantity, 0);
     const matchedCount = rows.filter(r => r.productId !== null).length;
+    const pendingInventoryRows = includedRows.filter(r => !r.addedToInventory);
 
     const buildQueueItems = (): PrintQueueItem[] =>
         includedRows.map((r, idx) => ({
@@ -169,6 +161,31 @@ const InvoiceLabels: React.FC = () => {
         }
     };
 
+    // Instead of writing to inventory directly, hand the pending rows off to
+    // the app's existing "Entrada de Productos por Lote" tool — it already
+    // knows how to create/update products, add stock per almacén, and
+    // (optionally) record the purchase transaction, so there's no need for a
+    // second, parallel way of doing the same thing.
+    const batchEntryProducts = pendingInventoryRows.map(r => ({
+        sku: r.sku,
+        name: r.labelName || r.description,
+        quantity: r.quantity,
+        costWithoutVat: r.unitPrice,
+    }));
+
+    const handleBatchEntrySuccess = () => {
+        markAddedToInventory(pendingInventoryRows.map(r => r.key));
+        setFeedback(`${pendingInventoryRows.length} repuesto(s) enviados a Entrada por Lote e ingresados al inventario.`);
+        setTimeout(() => setFeedback(null), 5000);
+    };
+
+    const handleStartOver = () => {
+        if (rows.length > 0 && !window.confirm('¿Deseas descartar esta factura y cargar una nueva?')) return;
+        reset();
+        setError(null);
+        setFeedback(null);
+    };
+
     return (
         <div className="p-6 md:p-8 max-w-[1100px] mx-auto flex flex-col gap-6">
             <div>
@@ -178,31 +195,32 @@ const InvoiceLabels: React.FC = () => {
                 </p>
             </div>
 
-            {/* Upload zone */}
-            <div
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-white dark:bg-slate-900 text-center"
-            >
-                <span className="material-symbols-outlined text-4xl text-slate-400">picture_as_pdf</span>
-                <div>
-                    <p className="font-medium text-slate-700 dark:text-slate-200">
-                        {fileName ? fileName : 'Arrastra el PDF de la factura aquí'}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1">o haz clic para seleccionar el archivo</p>
-                </div>
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isParsing}
-                    className="px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 disabled:opacity-70"
+            {rows.length === 0 && (
+                <div
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDrop}
+                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-white dark:bg-slate-900 text-center"
                 >
-                    <span className={`material-symbols-outlined text-[20px] ${isParsing ? 'animate-spin' : ''}`}>
-                        {isParsing ? 'progress_activity' : 'upload_file'}
-                    </span>
-                    {isParsing ? 'Leyendo factura...' : 'Seleccionar PDF'}
-                </button>
-                <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileInputChange} />
-            </div>
+                    <span className="material-symbols-outlined text-4xl text-slate-400">picture_as_pdf</span>
+                    <div>
+                        <p className="font-medium text-slate-700 dark:text-slate-200">
+                            {fileName ? fileName : 'Arrastra el PDF de la factura aquí'}
+                        </p>
+                        <p className="text-sm text-slate-500 mt-1">o haz clic para seleccionar el archivo</p>
+                    </div>
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isParsing}
+                        className="px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 disabled:opacity-70"
+                    >
+                        <span className={`material-symbols-outlined text-[20px] ${isParsing ? 'animate-spin' : ''}`}>
+                            {isParsing ? 'progress_activity' : 'upload_file'}
+                        </span>
+                        {isParsing ? 'Leyendo factura...' : 'Seleccionar PDF'}
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileInputChange} />
+                </div>
+            )}
 
             {error && (
                 <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-start gap-2">
@@ -223,13 +241,22 @@ const InvoiceLabels: React.FC = () => {
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
                         <div className="text-sm text-slate-600 dark:text-slate-300">
                             {invoiceNumber && <span className="font-medium">Factura No: {invoiceNumber} · </span>}
+                            {fileName && <span className="text-slate-400">({fileName}) · </span>}
                             {rows.length} repuesto(s) detectados · {matchedCount} coinciden con el catálogo
                             {matchedCount < rows.length && (
-                                <span className="text-amber-600 dark:text-amber-400"> · {rows.length - matchedCount} sin coincidencia (se imprimen igual con la descripción de la factura)</span>
+                                <span className="text-amber-600 dark:text-amber-400"> · {rows.length - matchedCount} sin coincidencia (se imprimen con la descripción de la factura; si los envías a Entrada por Lote se crean como producto nuevo)</span>
                             )}
                         </div>
-                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {totalLabels} etiqueta(s) a imprimir
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                {totalLabels} etiqueta(s) a imprimir
+                            </span>
+                            <button
+                                onClick={handleStartOver}
+                                className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline decoration-dotted"
+                            >
+                                Cargar otra factura
+                            </button>
                         </div>
                     </div>
 
@@ -242,6 +269,7 @@ const InvoiceLabels: React.FC = () => {
                                     <th className="p-3 text-left">Nombre en la etiqueta</th>
                                     <th className="p-3 text-center w-28">Cantidad</th>
                                     <th className="p-3 text-center w-32">Catálogo</th>
+                                    <th className="p-3 text-center w-32">Inventario</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -284,10 +312,37 @@ const InvoiceLabels: React.FC = () => {
                                                 </span>
                                             )}
                                         </td>
+                                        <td className="p-3 text-center">
+                                            {row.addedToInventory ? (
+                                                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                                                    <span className="material-symbols-outlined text-[16px]">inventory_2</span> Ingresado
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">Pendiente</span>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Add to inventory via the existing Batch Entry tool */}
+                    <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                        <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400">inventory_2</span>
+                        <span className="text-sm text-slate-600 dark:text-slate-300 flex-1 min-w-[220px]">
+                            Envía estos repuestos (con su costo y cantidad de la factura) a <strong>Entrada por Lote</strong> para registrar la llegada al almacén.
+                        </span>
+                        <button
+                            onClick={() => setIsBatchEntryOpen(true)}
+                            disabled={isWorking || pendingInventoryRows.length === 0}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">add_box</span>
+                            {pendingInventoryRows.length === 0
+                                ? 'Ya enviado a Entrada por Lote'
+                                : `Enviar a Entrada por Lote (${pendingInventoryRows.reduce((a, r) => a + r.quantity, 0)})`}
+                        </button>
                     </div>
 
                     <div className="flex flex-wrap justify-end gap-3">
@@ -321,6 +376,13 @@ const InvoiceLabels: React.FC = () => {
                     </div>
                 </>
             )}
+
+            <BatchProductEntry
+                isOpen={isBatchEntryOpen}
+                onClose={() => setIsBatchEntryOpen(false)}
+                onSuccess={handleBatchEntrySuccess}
+                initialProducts={batchEntryProducts}
+            />
         </div>
     );
 };

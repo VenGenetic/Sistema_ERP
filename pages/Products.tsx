@@ -87,6 +87,19 @@ const Products: React.FC = () => {
     const [selectedProductForTags, setSelectedProductForTags] = useState<any | null>(null);
     const [copiedSku, setCopiedSku] = useState<string | null>(null);
 
+    // Catalog view mode: gallery (big thumbnails, default) vs. dense table.
+    const [viewMode, setViewMode] = useState<'table' | 'gallery'>(() => {
+        try {
+            const saved = localStorage.getItem('products_view_mode');
+            return saved === 'table' || saved === 'gallery' ? saved : 'gallery';
+        } catch {
+            return 'gallery';
+        }
+    });
+    useEffect(() => {
+        try { localStorage.setItem('products_view_mode', viewMode); } catch {}
+    }, [viewMode]);
+
     const handleCopySku = (sku: string, e: React.MouseEvent) => {
         e.stopPropagation();
         navigator.clipboard.writeText(sku).then(() => {
@@ -1182,6 +1195,283 @@ const Products: React.FC = () => {
         ));
     }, [products, selectedIds, groupCounts, copiedSku]);
 
+    // Gallery view: same data + same handlers as the table rows above, just
+    // laid out as cards with a large image so parts can be told apart at a
+    // glance instead of having to open each one to check a 40px thumbnail.
+    const renderedCards = useMemo(() => {
+        return products.map(prod => {
+            const totalStock = prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0;
+            const costWithVat = (prod.cost_without_vat || 0) * (1 + (prod.vat_percentage || 15.0) / 100);
+            const isSelected = selectedIds.has(prod.id);
+
+            return (
+                <div
+                    key={prod.id}
+                    className={`relative flex flex-col rounded-xl border overflow-hidden bg-white dark:bg-slate-800 shadow-sm transition-all hover:shadow-lg ${isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-slate-200 dark:border-slate-700'}`}
+                >
+                    {/* Selection checkbox */}
+                    <div className="absolute top-2 left-2 z-20">
+                        <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectRow(prod.id)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer shadow"
+                        />
+                    </div>
+
+                    {/* Discontinued badge */}
+                    {isProductDiscontinued(prod) && (
+                        <span
+                            className={`absolute top-2 right-2 z-20 px-1.5 py-0.5 rounded text-[10px] font-medium border shadow-sm ${prod.discontinued_until ? 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/80 dark:border-amber-800 dark:text-amber-400' : 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-900/80 dark:border-rose-800 dark:text-rose-400'} flex items-center gap-1`}
+                            title={prod.discontinued_until ? `Descontinuado Temporalmente hasta ${new Date(prod.discontinued_until).toLocaleDateString()}` : 'Descontinuado Permanentemente'}
+                        >
+                            <span className="material-symbols-outlined text-[10px]">{prod.discontinued_until ? 'hourglass_empty' : 'warning'}</span>
+                            {prod.discontinued_until ? 'Temporal' : 'Descontinuado'}
+                        </span>
+                    )}
+
+                    {/* Big thumbnail */}
+                    <div
+                        onClick={() => handleOpenLightbox(prod, 'image', 0)}
+                        className="relative aspect-[4/3] w-full bg-slate-50 dark:bg-slate-900 cursor-pointer group border-b border-slate-100 dark:border-slate-700 overflow-hidden"
+                    >
+                        {prod.image_url ? (
+                            <img
+                                src={getThumbnailUrl(prod.image_url, 500, 375)}
+                                alt={prod.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                onError={(e) => {
+                                    const target = e.currentTarget;
+                                    if (target.src.includes('render/image')) {
+                                        try { localStorage.setItem('supabase_transform_unsupported', 'true'); } catch (err) {}
+                                        target.src = prod.image_url || '';
+                                    } else {
+                                        target.style.display = 'none';
+                                        if (target.parentElement) {
+                                            target.parentElement.innerHTML = '<span class="material-symbols-outlined text-5xl text-slate-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                        }
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <span className="material-symbols-outlined text-5xl text-slate-300">image</span>
+                            </div>
+                        )}
+                        {prod.gallery && prod.gallery.some((item: any) => item.type === 'video') && (
+                            <div className="absolute bottom-2 right-2 bg-black/60 rounded-full p-1 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-[16px] text-emerald-400">play_arrow</span>
+                            </div>
+                        )}
+                        {prod.gallery && prod.gallery.length > 0 && (
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                +{prod.gallery.length}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Body */}
+                    <div className="flex flex-col gap-2 p-3 flex-1">
+                        {/* SKU row */}
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <span className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate">{prod.sku}</span>
+                            <button
+                                type="button"
+                                onClick={(e) => handleCopySku(prod.sku, e)}
+                                className={`p-1 rounded-lg transition-colors flex items-center justify-center ${copiedSku === prod.sku ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                                title={copiedSku === prod.sku ? "¡Copiado!" : "Copiar Código"}
+                            >
+                                <span className="material-symbols-outlined text-[14px]">{copiedSku === prod.sku ? 'check' : 'content_copy'}</span>
+                            </button>
+                            <a
+                                href={`https://www.lvparts.ec/catalogo?q=${encodeURIComponent(prod.sku)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded-lg transition-colors flex items-center justify-center text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                                title="Buscar en catálogo LV Parts"
+                            >
+                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                            </a>
+                        </div>
+
+                        {/* Name + status badges */}
+                        <div>
+                            <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-snug line-clamp-2" title={prod.name}>{prod.name}</h3>
+                            {(prod.group_id || prod.demand_count > 0 || prod.investigation_status === 'en_consulta' || prod.investigation_status === 'no_encontrado') && (
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {prod.group_id && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 flex items-center gap-1 cursor-help" title={`Grupo: ${prod.group_id.split('-')[0]}`}>
+                                            <span className="material-symbols-outlined text-[10px]">link</span>
+                                            Equivalente
+                                        </span>
+                                    )}
+                                    {prod.demand_count > 0 && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400 flex items-center gap-1" title={`${prod.demand_count} registros de demanda activos`}>
+                                            <span className="material-symbols-outlined text-[10px] animate-pulse">notifications_active</span>
+                                            {prod.demand_count} Demanda{prod.demand_count > 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                    {prod.investigation_status === 'en_consulta' && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title="En consulta de sourcing">
+                                            En Consulta
+                                        </span>
+                                    )}
+                                    {prod.investigation_status === 'no_encontrado' && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" title="No se encontró repuesto">
+                                            No Encontrado
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Brand */}
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {prod.brands?.name || '—'}
+                        </div>
+
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-1 items-center">
+                            {prod.product_tags && prod.product_tags.length > 0 && prod.product_tags.map((pt: any) => {
+                                const tag = pt.tags;
+                                if (!tag) return null;
+                                return (
+                                    <span
+                                        key={tag.id}
+                                        className="px-1.5 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                        style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
+                                        onClick={() => setSelectedProductForTags(prod)}
+                                        title="Clic para editar etiquetas"
+                                    >
+                                        {tag.name}
+                                    </span>
+                                );
+                            })}
+                            <button
+                                onClick={() => setSelectedProductForTags(prod)}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800"
+                                title="Asignar etiquetas"
+                            >
+                                <span className="material-symbols-outlined text-[12px]">add</span>
+                                Etiqueta
+                            </button>
+                        </div>
+
+                        {/* Prices */}
+                        <div className="grid grid-cols-3 gap-1 text-[11px] bg-slate-50 dark:bg-slate-900/40 rounded-lg px-2 py-1.5">
+                            <div className="flex flex-col">
+                                <span className="text-slate-400 dark:text-slate-500">Costo</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">${(prod.cost_without_vat || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-slate-400 dark:text-slate-500">c/IVA</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">${costWithVat.toFixed(2)}</span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-slate-500 dark:text-slate-400">PVP</span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">${(prod.price || 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        {/* Stock */}
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-slate-900 dark:text-white">
+                                {totalStock} <span className="font-normal text-slate-400">local</span>
+                            </span>
+                            {prod.importer_stock > 0 ? (
+                                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
+                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                    {prod.importer_stock} imp.
+                                </span>
+                            ) : (
+                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-full">
+                                    Agotado imp.
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center flex-wrap gap-0.5 mt-auto pt-2 border-t border-slate-100 dark:border-slate-700">
+                            <button
+                                onClick={() => handleOpenGroupModal(prod.group_id, prod)}
+                                className={`p-1.5 rounded-lg transition-colors relative ${prod.group_id ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                                title="Ver Repuestos Relacionados"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">link</span>
+                                {prod.group_id && groupCounts[prod.group_id] > 1 && (
+                                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
+                                        {groupCounts[prod.group_id] - 1}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => { setSourcingProduct(prod); setIsSourcingModalOpen(true); }}
+                                className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
+                                title="Estudio de Repuesto (Sourcing)"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">travel_explore</span>
+                            </button>
+                            <button
+                                onClick={() => handleOpenModal(prod)}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                title="Editar Producto"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">edit</span>
+                            </button>
+                            <button
+                                onClick={() => handleDuplicateProduct(prod)}
+                                className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                                title="Duplicar Producto"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">copy_all</span>
+                            </button>
+                            <button
+                                onClick={() => { setDemandProduct(prod); setIsDemandModalOpen(true); }}
+                                className={`p-1.5 rounded-lg transition-colors relative ${prod.demand_count > 0 ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 font-semibold' : 'text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
+                                title="Registrar / Ver Demanda (Lista de Espera)"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">notifications_active</span>
+                                {prod.demand_count > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse">
+                                        {prod.demand_count}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => { setLabelProduct(prod); setIsLabelModalOpen(true); }}
+                                className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                                title="Generar Etiqueta (Código de Barras)"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">barcode_scanner</span>
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    await addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+                                    await loadQueue();
+                                    setQueueToast(`✓ 1 etiqueta de ${prod.sku} agregada a la cola`);
+                                    setTimeout(() => setQueueToast(null), 2000);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                title="Agregar 1 etiqueta a la cola de impresión"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">playlist_add</span>
+                            </button>
+                            <button
+                                onClick={() => handleDeleteProduct(prod)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                title="Eliminar Producto"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        });
+    }, [products, selectedIds, groupCounts, copiedSku]);
+
     return (
         <div className="p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
             {/* ═══════ HEADER ═══════ */}
@@ -1290,6 +1580,28 @@ const Products: React.FC = () => {
                             <option value="activos">✅ Solo Activos</option>
                             <option value="descontinuados">🚨 Descontinuados</option>
                         </select>
+                    </div>
+
+                    {/* View mode toggle: gallery (big thumbnails) vs. dense table */}
+                    <div className="flex bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('gallery')}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'gallery' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                            title="Vista de galería (miniaturas grandes)"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">grid_view</span>
+                            <span className="hidden sm:inline">Galería</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('table')}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'table' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                            title="Vista de tabla (detallada)"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">table_rows</span>
+                            <span className="hidden sm:inline">Tabla</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1448,74 +1760,136 @@ const Products: React.FC = () => {
                 style={{ borderRadius: '6px' }}
                 className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-opacity ${loading ? 'opacity-60' : 'opacity-100'}`}
             >
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
-                            <tr>
-                                <th className="px-3 py-3 w-10">
-                                    <input
-                                        type="checkbox"
-                                        checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
-                                        onChange={toggleSelectAll}
-                                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-                                    />
-                                </th>
-                                {columns.map(col => (
-                                    <th
-                                        key={col.key}
-                                        className="px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                                        onClick={() => handleSort(col.key)}
-                                    >
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center gap-1">
-                                                {col.label}
-                                                <div className="flex flex-col">
-                                                    <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_up</span>
-                                                    <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
-                                                </div>
-                                            </div>
-                                            {col.key !== 'brand' && col.key !== 'price' && (
-                                                <input
-                                                    type="text"
-                                                    placeholder="Filtrar..."
-                                                    value={filters[col.key] || ''}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                                                    className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:outline-none focus:border-primary"
-                                                />
-                                            )}
-                                        </div>
+                {viewMode === 'table' ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
+                                <tr>
+                                    <th className="px-3 py-3 w-10">
+                                        <input
+                                            type="checkbox"
+                                            checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
+                                            onChange={toggleSelectAll}
+                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                        />
                                     </th>
+                                    {columns.map(col => (
+                                        <th
+                                            key={col.key}
+                                            className="px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                            onClick={() => handleSort(col.key)}
+                                        >
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center gap-1">
+                                                    {col.label}
+                                                    <div className="flex flex-col">
+                                                        <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_up</span>
+                                                        <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
+                                                    </div>
+                                                </div>
+                                                {col.key !== 'brand' && col.key !== 'price' && (
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Filtrar..."
+                                                        value={filters[col.key] || ''}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onChange={(e) => handleFilterChange(col.key, e.target.value)}
+                                                        className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:outline-none focus:border-primary"
+                                                    />
+                                                )}
+                                            </div>
+                                        </th>
+                                    ))}
+                                    <th className="px-6 py-3 text-center">Stock (Local / Imp.)</th>
+                                    <th className="px-6 py-3 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                {renderedRows}
+                                {products.length === 0 && !loading && (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
+                                                <span>No se encontraron productos que coincidan con tu búsqueda.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                                {products.length === 0 && loading && (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
+                                                <span>Cargando catálogo...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="p-4">
+                        {/* Gallery-only toolbar: keeps sorting/column-filtering/select-all available without a table header */}
+                        <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+                            <label className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
+                                    onChange={toggleSelectAll}
+                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                />
+                                Seleccionar todo
+                            </label>
+                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                            <select
+                                value={sortConfig.key}
+                                onChange={(e) => handleSort(e.target.value)}
+                                className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 focus:outline-none focus:border-primary"
+                            >
+                                {columns.map(col => (
+                                    <option key={col.key} value={col.key}>Ordenar por: {col.label}</option>
                                 ))}
-                                <th className="px-6 py-3 text-center">Stock (Local / Imp.)</th>
-                                <th className="px-6 py-3 text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                            {renderedRows}
-                            {products.length === 0 && !loading && (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
-                                            <span>No se encontraron productos que coincidan con tu búsqueda.</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                            {products.length === 0 && loading && (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
-                                            <span>Cargando catálogo...</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => setSortConfig(prev => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }))}
+                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                title={sortConfig.direction === 'asc' ? 'Ascendente' : 'Descendente'}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">{sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}</span>
+                            </button>
+                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                            {columns.filter(col => col.key !== 'brand' && col.key !== 'price').map(col => (
+                                <input
+                                    key={col.key}
+                                    type="text"
+                                    placeholder={`Filtrar ${col.label}...`}
+                                    value={filters[col.key] || ''}
+                                    onChange={(e) => handleFilterChange(col.key, e.target.value)}
+                                    className="px-3 py-1.5 text-xs w-36 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:border-primary text-slate-700 dark:text-slate-200"
+                                />
+                            ))}
+                        </div>
+
+                        {products.length > 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
+                                {renderedCards}
+                            </div>
+                        ) : !loading ? (
+                            <div className="flex flex-col items-center gap-2 py-12 text-slate-500">
+                                <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
+                                <span>No se encontraron productos que coincidan con tu búsqueda.</span>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center gap-2 py-12 text-slate-500">
+                                <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
+                                <span>Cargando catálogo...</span>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* ═══════ PAGINATION FOOTER ═══════ */}
                 {pagination.totalRecords > 0 && (
