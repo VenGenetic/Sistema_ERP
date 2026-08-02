@@ -17,6 +17,8 @@ import { ProductLabelModal } from '../components/ProductLabelModal';
 import { InventoryGroupSelectModal } from '../components/InventoryGroupSelectModal';
 import { PrintQueuePreviewModal } from '../components/PrintQueuePreviewModal';
 import { addToQueue, getPrintQueue, clearQueue, removeFromQueue, updateQueueItemQty, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF, PrintQueueItem } from '../utils/mobilePrintQueue';
+import { ProformaPanel } from '../components/ProformaPanel';
+import { useProformaStore } from '../store/useProformaStore';
 
 // Helper to parse query parameters from the hash or query string
 const getInitialParams = () => {
@@ -1183,6 +1185,13 @@ const Products: React.FC = () => {
                             <span className="material-symbols-outlined text-[18px]">playlist_add</span>
                         </button>
                         <button
+                            onClick={() => useProformaStore.getState().addItem({ id: prod.id, sku: prod.sku, name: prod.name, price: prod.price }, 1)}
+                            className="p-1.5 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-colors"
+                            title="Agregar a Proforma"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">request_quote</span>
+                        </button>
+                        <button
                             onClick={() => handleDeleteProduct(prod)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
                             title="Eliminar Producto"
@@ -1457,6 +1466,13 @@ const Products: React.FC = () => {
                                 title="Agregar 1 etiqueta a la cola de impresión"
                             >
                                 <span className="material-symbols-outlined text-[16px]">playlist_add</span>
+                            </button>
+                            <button
+                                onClick={() => useProformaStore.getState().addItem({ id: prod.id, sku: prod.sku, name: prod.name, price: prod.price }, 1)}
+                                className="p-1.5 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-colors"
+                                title="Agregar a Proforma"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">request_quote</span>
                             </button>
                             <button
                                 onClick={() => handleDeleteProduct(prod)}
@@ -2053,6 +2069,19 @@ const Products: React.FC = () => {
                         Cola Impresión
                     </button>
                     <button
+                        onClick={() => {
+                            const selectedProds = products.filter(p => selectedIds.has(p.id));
+                            selectedProds.forEach(prod => {
+                                useProformaStore.getState().addItem({ id: prod.id, sku: prod.sku, name: prod.name, price: prod.price }, 1);
+                            });
+                            setSelectedIds(new Set());
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">request_quote</span>
+                        Agregar a Proforma
+                    </button>
+                    <button
                         onClick={handleBulkDelete}
                         className="flex items-center gap-2 px-4 py-2 bg-rose-500 hover:bg-rose-400 text-white rounded-xl text-sm font-semibold transition-colors ml-2"
                     >
@@ -2201,6 +2230,9 @@ const Products: React.FC = () => {
                 onQueueUpdated={(updatedQueue) => setPrintQueue(updatedQueue)}
                 isMobile={false}
             />
+
+            {/* Proformas floating panel */}
+            <ProformaPanel />
         </div>
     );
 };
