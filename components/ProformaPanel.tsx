@@ -1,12 +1,25 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import { useProformaStore } from '../store/useProformaStore';
+import { useCartStore } from '../store/cartStore';
+import { fetchProformaStockInfo, ProformaStockInfo, STOCK_STATUS_LABELS } from '../utils/proformaStock';
 import { ProformaPreviewModal } from './ProformaPreviewModal';
 
+const STOCK_BADGE_CLASSES: Record<string, string> = {
+    in_stock: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    backorder: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    out_of_stock: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+};
+
 export const ProformaPanel: React.FC = () => {
+    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [isConverting, setIsConverting] = useState(false);
+    const [stockInfo, setStockInfo] = useState<Record<number, ProformaStockInfo>>({});
 
     const items = useProformaStore(s => s.items);
     const shippingEnabled = useProformaStore(s => s.shippingEnabled);
@@ -18,6 +31,127 @@ export const ProformaPanel: React.FC = () => {
     const setShippingCost = useProformaStore(s => s.setShippingCost);
     const clear = useProformaStore(s => s.clear);
     const getTotal = useProformaStore(s => s.getTotal);
+
+    const productIdsKey = items.map(i => i.productId).join(',');
+    useEffect(() => {
+        if (!productIdsKey) {
+            setStockInfo({});
+            return;
+        }
+        let cancelled = false;
+        fetchProformaStockInfo(productIdsKey.split(',').map(Number)).then(info => {
+            if (!cancelled) setStockInfo(info);
+        });
+        return () => { cancelled = true; };
+    }, [productIdsKey]);
+
+    // Converts the current proforma into a POS sale: resolves a real warehouse
+    // per item (mirrors the products/inventory_levels join POS.tsx already uses),
+    // loads them into the POS cart (a Zustand store, so it survives navigation),
+    // then routes to /pos so the cashier finishes checkout there. No "Venta Libre"
+    // fallback: every item gets a real warehouse_id so its stock is visible and
+    // editable in the POS cart before the sale closes (see the "Editar" stock
+    // button added to each POS cart row). If a product has never been stocked in
+    // any warehouse, we fall back to the user's ProductModal-configured default
+    // warehouse (localStorage 'erp_default_warehouse_id'); if that's not set
+    // either, the item is skipped with a clear alert rather than guessing.
+    const handleConvertToSale = async () => {
+        if (items.length === 0 || isConverting) return;
+        setIsConverting(true);
+        try {
+            const productIds = items.map(i => i.productId);
+            const [{ data: products, error: prodError }, { data: warehouses, error: whError }] = await Promise.all([
+                supabase
+                    .from('products')
+                    .select(`
+                        id, sku, name, price, cost_without_vat, vat_percentage, is_discontinued, discontinued_until,
+                        inventory_levels ( current_stock, warehouse_id, warehouses ( name ) )
+                    `)
+                    .in('id', productIds),
+                supabase.from('warehouses').select('id, name').eq('is_active', true),
+            ]);
+
+            if (prodError) throw prodError;
+            if (whError) throw whError;
+
+            const warehouseNameById = new Map<number, string>((warehouses || []).map((w: any) => [w.id, w.name]));
+            const defaultWarehouseIdRaw = localStorage.getItem('erp_default_warehouse_id');
+            const defaultWarehouseId = defaultWarehouseIdRaw ? parseInt(defaultWarehouseIdRaw, 10) : null;
+
+            const unresolved: string[] = [];
+            const lowStock: string[] = [];
+            const { clearCart, addToCart, updateQuantity, updateUnitPrice } = useCartStore.getState();
+            clearCart();
+
+            for (const item of items) {
+                const prod = products?.find((p: any) => p.id === item.productId);
+                if (!prod) {
+                    unresolved.push(item.sku);
+                    continue;
+                }
+
+                const levels: any[] = prod.inventory_levels || [];
+                const chosen = levels.find(l => l.current_stock >= item.quantity) || levels.find(l => l.current_stock > 0) || levels[0];
+
+                let warehouse_id: number;
+                let warehouse_name: string;
+                let current_stock: number;
+
+                if (chosen) {
+                    warehouse_id = chosen.warehouse_id;
+                    warehouse_name = (Array.isArray(chosen.warehouses) ? chosen.warehouses[0]?.name : chosen.warehouses?.name)
+                        || warehouseNameById.get(chosen.warehouse_id)
+                        || 'Bodega';
+                    current_stock = chosen.current_stock;
+                } else if (defaultWarehouseId && warehouseNameById.has(defaultWarehouseId)) {
+                    warehouse_id = defaultWarehouseId;
+                    warehouse_name = warehouseNameById.get(defaultWarehouseId)!;
+                    current_stock = 0;
+                } else {
+                    unresolved.push(item.sku);
+                    continue;
+                }
+
+                if (current_stock < item.quantity) lowStock.push(item.sku);
+
+                addToCart({
+                    product: {
+                        id: prod.id,
+                        sku: prod.sku,
+                        name: prod.name,
+                        price: prod.price,
+                        cost_without_vat: prod.cost_without_vat,
+                        vat_percentage: prod.vat_percentage,
+                        is_discontinued: prod.is_discontinued,
+                        discontinued_until: prod.discontinued_until,
+                    },
+                    warehouse_id,
+                    warehouse_name,
+                    current_stock,
+                });
+
+                const cartNow = useCartStore.getState().cart;
+                const newCartItem = cartNow[cartNow.length - 1];
+                updateQuantity(newCartItem.id, item.quantity);
+                updateUnitPrice(newCartItem.id, item.unitPrice);
+            }
+
+            if (unresolved.length > 0) {
+                alert(`Estos productos nunca han sido registrados en ninguna bodega y no se pudieron agregar (configura una bodega por defecto en Editar Producto, o agrégalos manualmente en el POS): ${unresolved.join(', ')}`);
+            }
+            if (lowStock.length > 0) {
+                alert(`Estos productos no tienen stock suficiente en la bodega asignada — corrige el stock desde el carrito del POS antes de cerrar la venta: ${lowStock.join(', ')}`);
+            }
+
+            setIsOpen(false);
+            navigate('/pos');
+        } catch (err) {
+            console.error('Error convirtiendo proforma a venta:', err);
+            alert('Error al convertir la proforma a venta POS. Intenta nuevamente.');
+        } finally {
+            setIsConverting(false);
+        }
+    };
 
     if (items.length === 0) return null;
 
@@ -59,7 +193,16 @@ export const ProformaPanel: React.FC = () => {
                         {items.map((item) => (
                             <div key={item.id} className="flex items-center gap-2.5 p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-750">
                                 <div className="flex-1 min-w-0">
-                                    <span className="text-[11px] font-mono font-extrabold text-teal-700 dark:text-teal-300">{item.sku}</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[11px] font-mono font-extrabold text-teal-700 dark:text-teal-300">{item.sku}</span>
+                                        {stockInfo[item.productId] && (
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${STOCK_BADGE_CLASSES[stockInfo[item.productId].status]}`}>
+                                                {stockInfo[item.productId].status === 'in_stock'
+                                                    ? `Stock: ${stockInfo[item.productId].totalStock}`
+                                                    : STOCK_STATUS_LABELS[stockInfo[item.productId].status]}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{item.name}</p>
                                     {editingPriceId === item.id ? (
                                         <input
@@ -167,11 +310,21 @@ export const ProformaPanel: React.FC = () => {
                                 Generar Imagen
                             </button>
                         </div>
+                        <button
+                            onClick={handleConvertToSale}
+                            disabled={isConverting}
+                            className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            <span className={`material-symbols-outlined text-lg ${isConverting ? 'animate-spin' : ''}`}>
+                                {isConverting ? 'progress_activity' : 'point_of_sale'}
+                            </span>
+                            {isConverting ? 'Convirtiendo...' : 'Convertir a Venta POS'}
+                        </button>
                     </div>
                 </div>
             )}
 
-            <ProformaPreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} />
+            <ProformaPreviewModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} stockInfo={stockInfo} />
         </>
     );
 };

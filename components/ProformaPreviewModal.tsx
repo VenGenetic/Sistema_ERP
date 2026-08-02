@@ -1,16 +1,24 @@
 import React, { useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import { useProformaStore } from '../store/useProformaStore';
+import { ProformaStockInfo, STOCK_STATUS_LABELS } from '../utils/proformaStock';
 
 interface ProformaPreviewModalProps {
     isOpen: boolean;
     onClose: () => void;
+    stockInfo: Record<number, ProformaStockInfo>;
 }
 
 const BUSINESS_NAME = 'LV Parts';
 const BUSINESS_URL = 'https://www.lvparts.ec/';
 
-export const ProformaPreviewModal: React.FC<ProformaPreviewModalProps> = ({ isOpen, onClose }) => {
+const STOCK_STATUS_STYLE: Record<string, string> = {
+    in_stock: 'bg-emerald-100 text-emerald-700',
+    backorder: 'bg-amber-100 text-amber-700',
+    out_of_stock: 'bg-rose-100 text-rose-700',
+};
+
+export const ProformaPreviewModal: React.FC<ProformaPreviewModalProps> = ({ isOpen, onClose, stockInfo }) => {
     const printRef = useRef<HTMLDivElement>(null);
     const [copying, setCopying] = useState(false);
     const [downloading, setDownloading] = useState(false);
@@ -133,15 +141,25 @@ export const ProformaPreviewModal: React.FC<ProformaPreviewModalProps> = ({ isOp
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {items.map((item) => (
-                                            <tr key={item.id} className="border-b border-slate-100">
-                                                <td className="py-2.5 font-mono text-[11px] font-bold text-slate-500">{item.sku}</td>
-                                                <td className="py-2.5 text-slate-800 font-medium">{item.name}</td>
-                                                <td className="py-2.5 text-center text-slate-700">{item.quantity}</td>
-                                                <td className="py-2.5 text-right text-slate-700">${item.unitPrice.toFixed(2)}</td>
-                                                <td className="py-2.5 text-right font-bold text-slate-900">${(item.quantity * item.unitPrice).toFixed(2)}</td>
-                                            </tr>
-                                        ))}
+                                        {items.map((item) => {
+                                            const status = stockInfo[item.productId]?.status;
+                                            return (
+                                                <tr key={item.id} className="border-b border-slate-100">
+                                                    <td className="py-2.5 font-mono text-[11px] font-bold text-slate-500">{item.sku}</td>
+                                                    <td className="py-2.5 text-slate-800 font-medium">
+                                                        {item.name}
+                                                        {status && (
+                                                            <span className={`ml-2 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full align-middle ${STOCK_STATUS_STYLE[status]}`}>
+                                                                {STOCK_STATUS_LABELS[status]}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2.5 text-center text-slate-700">{item.quantity}</td>
+                                                    <td className="py-2.5 text-right text-slate-700">${item.unitPrice.toFixed(2)}</td>
+                                                    <td className="py-2.5 text-right font-bold text-slate-900">${(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
 

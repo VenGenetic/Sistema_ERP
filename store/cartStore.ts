@@ -40,6 +40,7 @@ export interface CartItem {
     unitPrice: number;
     unitCost: number;
     subtotal: number;
+    current_stock: number;
 }
 
 interface CartState {
@@ -55,6 +56,7 @@ interface CartState {
     updateUnitPrice: (itemId: string, newPrice: number) => void;
     removeFromCart: (itemId: string) => void;
     clearCart: () => void;
+    syncStock: (productId: number, warehouseId: number, newStock: number) => void;
 
     // Computed Properties
     getSubtotal: () => number;
@@ -90,6 +92,7 @@ export const useCartStore = create<CartState>((set, get) => ({
             unitPrice: item.product.price,
             unitCost: unitCost,
             subtotal: item.product.price,
+            current_stock: item.current_stock,
         };
 
         set((state) => ({ cart: [...state.cart, cartItem] }));
@@ -137,6 +140,16 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     clearCart: () => {
         set({ cart: [], customer: defaultConsumidorFinal, promoDiscount: 0 });
+    },
+
+    syncStock: (productId: number, warehouseId: number, newStock: number) => {
+        set((state) => ({
+            cart: state.cart.map((item) =>
+                item.product.id === productId && item.warehouse_id === warehouseId
+                    ? { ...item, current_stock: newStock }
+                    : item
+            ),
+        }));
     },
 
     getSubtotal: () => {

@@ -715,6 +715,8 @@ const POS: React.FC = () => {
 
             if (updateError) throw updateError;
 
+            useCartStore.getState().syncStock(stockEditItem.product.id, stockEditItem.warehouse_id, stockEditNewValue);
+
             alert('Inventario actualizado.');
             setIsStockEditModalOpen(false);
             // Optionally clear search to force refresh
@@ -1041,9 +1043,27 @@ const POS: React.FC = () => {
                                             {/* Mobile & Desktop Info Layer */}
                                             <div className="flex-1">
                                                 <div className="text-sm font-bold text-slate-900">{item.product.name}</div>
-                                                <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                     <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded">{item.product.sku}</span>
                                                     <span className="text-[10px] text-slate-400">{item.warehouse_name}</span>
+                                                    {item.warehouse_id !== 0 && !item.product.sku.startsWith('DRAFT-') && (
+                                                        <>
+                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${item.current_stock >= item.quantity ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                                <Package size={10} /> Stock: {item.current_stock}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setStockEditItem({ product: item.product, warehouse_id: item.warehouse_id, warehouse_name: item.warehouse_name, current_stock: item.current_stock });
+                                                                    setStockEditNewValue(item.current_stock);
+                                                                    setIsStockEditModalOpen(true);
+                                                                }}
+                                                                className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors"
+                                                                title="Corregir stock antes de cerrar la venta"
+                                                            >
+                                                                <Edit3 size={10} /> Editar
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
 
