@@ -652,7 +652,7 @@ const MobileLabels: React.FC = () => {
                                                     <span className="text-[11px] font-mono font-extrabold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
                                                         {item.sku}
                                                     </span>
-                                                    <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate mt-0.5">{item.name}</p>
+                                                    <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate mt-0.5" title={item.name}>{item.name}</p>
 
                                                     {/* Inline qty editor */}
                                                     <div className="flex items-center gap-2 mt-1.5">

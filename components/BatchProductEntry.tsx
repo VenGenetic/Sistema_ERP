@@ -29,7 +29,12 @@ interface BatchProductEntryProps {
     onSuccess: () => void;
     // Pre-fills the grid (e.g. from a parsed supplier invoice) instead of
     // starting from a single blank row. Re-applied every time the modal opens.
-    initialProducts?: { sku: string; name: string; quantity: number; costWithoutVat?: number }[];
+    // profitMargin should be the product's OWN existing margin when it's
+    // already in the catalog — process_batch_product_entry only ever raises
+    // a product's stored margin (never lowers it), so defaulting every row
+    // to a flat guess (e.g. 0.65) permanently inflates the price of any
+    // existing product whose real margin was lower than that guess.
+    initialProducts?: { sku: string; name: string; quantity: number; costWithoutVat?: number; profitMargin?: number }[];
 }
 
 export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, onClose, onSuccess, initialProducts }) => {
@@ -66,7 +71,9 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                     quantity: String(p.quantity),
                     costWithoutVat: p.costWithoutVat != null ? String(p.costWithoutVat) : '',
                     discountedCost: '',
-                    profitMargin: '0.65',
+                    // Preserve the product's real margin if it's already in the
+                    // catalog; only brand-new products fall back to 0.65.
+                    profitMargin: p.profitMargin != null ? String(p.profitMargin) : '0.65',
                     pvp: '',
                     costWithVat: 0,
                 })));

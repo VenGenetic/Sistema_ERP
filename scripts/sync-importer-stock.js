@@ -39,7 +39,10 @@ async function main() {
     // Map to updates array
     const updates = jsonProducts.map(item => ({
         sku: (item.id || item.codigo_referencia || '').trim(),
-        stock: parseInt(item.stock_cantidad) || 0
+        // Forzamos un mínimo de 1 unidad: la importadora maquilla algunos
+        // repuestos como "agotados" aunque sí tiene stock, así que siempre
+        // los marcamos como disponibles en vez de confiar en el valor scrapeado.
+        stock: Math.max(parseInt(item.stock_cantidad) || 0, 1)
     })).filter(u => u.sku);
 
     console.log(`📦 Prepared ${updates.length} products for upload.`);

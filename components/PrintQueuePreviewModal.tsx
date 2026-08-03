@@ -296,7 +296,10 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                             <span className="text-[10px] font-mono font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-200/50 dark:border-blue-800/50">
                                                 {item.sku}
                                             </span>
-                                            <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate mt-1">
+                                            <p
+                                                className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate mt-1"
+                                                title={item.name}
+                                            >
                                                 {item.name}
                                             </p>
                                         </div>

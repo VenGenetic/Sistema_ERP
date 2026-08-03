@@ -12,6 +12,7 @@ export interface InvoiceLabelRow {
     productId: number | null; // matched product id in catálogo, if any
     labelName: string;        // editable name printed on the label
     imageUrl?: string;
+    existingMargin?: number;  // product's current profit_margin, if already in catálogo
     addedToInventory: boolean;
 }
 

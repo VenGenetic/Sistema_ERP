@@ -198,10 +198,12 @@ async function main() {
             if (!existing.is_active) {
                 // If it is inactive, reactivate it (preserving or increasing the price)
                 productsToReactivate.push(updatedProductData);
-            } else if (priceHasIncreased) {
-                // If it is active and the new price is higher, update it
-                productsToUpdate.push(updatedProductData);
             }
+            // Comentado para evitar cambios accidentales de precio en inventario activo
+            // else if (priceHasIncreased) {
+            //     // If it is active and the new price is higher, update it
+            //     productsToUpdate.push(updatedProductData);
+            // }
         }
     }
 

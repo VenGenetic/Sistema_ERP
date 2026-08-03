@@ -32,15 +32,15 @@ const InvoiceLabels: React.FC = () => {
             // Cross-reference against the catálogo to reuse the canonical
             // product name/id whenever the SKU is already registered.
             const skus = Array.from(new Set(lines.map(l => l.sku)));
-            let matches: Record<string, { id: number; name: string; image_url?: string }> = {};
+            let matches: Record<string, { id: number; name: string; image_url?: string; profit_margin?: number }> = {};
             const { data, error: dbError } = await supabase
                 .from('products')
-                .select('id, sku, name, image_url')
+                .select('id, sku, name, image_url, profit_margin')
                 .in('sku', skus);
 
             if (!dbError && data) {
                 matches = Object.fromEntries(
-                    data.map((p: any) => [p.sku, { id: p.id, name: p.name, image_url: p.image_url }])
+                    data.map((p: any) => [p.sku, { id: p.id, name: p.name, image_url: p.image_url, profit_margin: p.profit_margin }])
                 );
             }
 
@@ -53,6 +53,7 @@ const InvoiceLabels: React.FC = () => {
                     productId: match?.id ?? null,
                     labelName: match?.name ?? line.description,
                     imageUrl: match?.image_url,
+                    existingMargin: match?.profit_margin,
                     addedToInventory: false,
                 };
             });
@@ -171,6 +172,10 @@ const InvoiceLabels: React.FC = () => {
         name: r.labelName || r.description,
         quantity: r.quantity,
         costWithoutVat: r.unitPrice,
+        // Keep the product's own margin so an existing SKU's price doesn't
+        // get pushed up by a generic default (process_batch_product_entry
+        // only ever raises the stored margin, never lowers it).
+        profitMargin: r.existingMargin,
     }));
 
     const handleBatchEntrySuccess = () => {
