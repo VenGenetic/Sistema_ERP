@@ -175,11 +175,11 @@ const MobileLabels: React.FC = () => {
         if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
     };
 
-    const handleGeneratePDF = () => {
+    const handleGeneratePDF = async () => {
         if (queue.length === 0) return;
         setIsGenerating(true);
         try {
-            downloadQueuePDF(queue);
+            await downloadQueuePDF(queue);
             setSuccessMessage(`✓ PDF con ${getQueueTotalLabels(queue)} etiquetas descargado`);
             setTimeout(() => setSuccessMessage(null), 2500);
         } catch (err: any) {

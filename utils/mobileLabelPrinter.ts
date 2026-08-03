@@ -5,9 +5,10 @@
  */
 import JsBarcode from 'jsbarcode';
 import { jsPDF } from 'jspdf';
+import { loadBrandLogo, drawLabelBrandHeader } from './brandLogo';
 
 // --- Render a single label to an offscreen canvas ---
-export const renderLabelToCanvas = (product: { sku: string; name: string }): HTMLCanvasElement => {
+export const renderLabelToCanvas = async (product: { sku: string; name: string }): Promise<HTMLCanvasElement> => {
     const DPI = 300;
     const MM_TO_INCH = 1 / 25.4;
     const W = Math.round((210 / 3) * MM_TO_INCH * DPI); // ~827px
@@ -24,13 +25,17 @@ export const renderLabelToCanvas = (product: { sku: string; name: string }): HTM
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#000000';
 
-    // --- BARCODE in the center ---
+    // --- BRAND HEADER: small logo + "LV PARTS" bold, separated by a line ---
+    const logoImg = await loadBrandLogo().catch(() => null);
+    const contentTop = drawLabelBrandHeader(ctx, logoImg, W, PAD);
+
+    // --- BARCODE, vertically centered in the space left below the header ---
     const barcodeCanvas = document.createElement('canvas');
     JsBarcode(barcodeCanvas, product.sku, {
         format: 'CODE128',
         displayValue: false,
         width: 3,
-        height: Math.round(H * 0.34),
+        height: Math.round(H * 0.32),
         margin: 0,
         lineColor: '#000000',
         background: '#ffffff',
@@ -39,14 +44,15 @@ export const renderLabelToCanvas = (product: { sku: string; name: string }): HTM
     const bcW = Math.min(barcodeCanvas.width, W - PAD * 2);
     const bcH = barcodeCanvas.height;
     const bcX = (W - bcW) / 2;
-    const bcY = (H - bcH) / 2;
+    const contentH = H - contentTop;
+    const bcY = contentTop + (contentH - bcH) / 2;
 
-    // --- DESCRIPTION TEXT (above barcode) ---
-    const descAreaH = bcY - PAD;
+    // --- DESCRIPTION TEXT (above barcode, below header) ---
+    const descAreaH = bcY - contentTop;
     const descMaxW = W - PAD * 2;
 
-    let descFontSize = Math.round(H * 0.09);
-    const MIN_FONT = Math.round(H * 0.048);
+    let descFontSize = Math.round(H * 0.085);
+    const MIN_FONT = Math.round(H * 0.045);
 
     const wrapText = (text: string, maxW: number, fontSize: number) => {
         ctx.font = `bold ${fontSize}px sans-serif`;
@@ -76,7 +82,7 @@ export const renderLabelToCanvas = (product: { sku: string; name: string }): HTM
 
     const descLineH = descFontSize * 1.25;
     const descBlockH = descLines.length * descLineH;
-    let descY = PAD + (descAreaH - PAD - descBlockH) / 2 + descFontSize;
+    let descY = contentTop + (descAreaH - descBlockH) / 2 + descFontSize;
     ctx.font = `bold ${descFontSize}px sans-serif`;
     ctx.textAlign = 'center';
     for (const line of descLines) {
@@ -107,11 +113,11 @@ export const renderLabelToCanvas = (product: { sku: string; name: string }): HTM
 };
 
 // --- Generate PDF with N labels and trigger download (no new tabs) ---
-export const printLabelsQuick = (
+export const printLabelsQuick = async (
     product: { sku: string; name: string },
     quantity: number = 3
-): void => {
-    const canvas = renderLabelToCanvas(product);
+): Promise<void> => {
+    const canvas = await renderLabelToCanvas(product);
     const imgData = canvas.toDataURL('image/png', 1.0);
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });

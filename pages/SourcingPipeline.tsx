@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
+import { getStockAvailableDemandCount, warnRevertedDemands } from '../utils/importerOverride';
 
 interface SourcingItem {
     id: number;
@@ -9,6 +10,7 @@ interface SourcingItem {
     investigation_status: 'pending' | 'en_consulta' | 'no_encontrado' | 'encontrado' | null;
     auto_order_disabled: boolean;
     importer_stock: number;
+    importer_unavailable_override: boolean;
     image_url: string | null;
 }
 
@@ -27,7 +29,7 @@ const SourcingPipeline: React.FC = () => {
             // We fetch items that are either being investigated OR are out of stock in importer
             const { data, error } = await supabase
                 .from('products')
-                .select('id, sku, name, investigation_status, auto_order_disabled, importer_stock, image_url')
+                .select('id, sku, name, investigation_status, auto_order_disabled, importer_stock, importer_unavailable_override, image_url')
                 .or('importer_stock.eq.0,investigation_status.in.(en_consulta,no_encontrado)')
                 .eq('is_active', true)
                 .order('id', { ascending: false });
@@ -57,6 +59,32 @@ const SourcingPipeline: React.FC = () => {
                 .update({ investigation_status: newStatus })
                 .eq('id', item.id);
             if (error) throw error;
+            fetchPipeline();
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        }
+    };
+
+    // Quick toggle for "la importadora dice que hay stock pero en realidad no
+    // hay" -- forces importer_stock to read as 0 everywhere (Sourcing,
+    // Reposición, Demandas) until manually unmarked. Always applied as a
+    // permanent override from here; use el modal de edición del producto para
+    // marcarlo como temporal.
+    const handleToggleImporterOverride = async (item: SourcingItem) => {
+        const turningOn = !item.importer_unavailable_override;
+        try {
+            const pendingRevertCount = turningOn ? await getStockAvailableDemandCount(item.id) : 0;
+
+            const { error } = await supabase
+                .from('products')
+                .update({
+                    importer_unavailable_override: turningOn,
+                    importer_unavailable_until: null,
+                })
+                .eq('id', item.id);
+            if (error) throw error;
+
+            warnRevertedDemands(pendingRevertCount);
             fetchPipeline();
         } catch (err: any) {
             alert(`Error: ${err.message}`);
@@ -167,9 +195,21 @@ const SourcingPipeline: React.FC = () => {
                                                 {item.importer_stock > 0 && (
                                                     <span className="material-symbols-outlined text-[16px] text-blue-400" title={`Stock en Importadora: ${item.importer_stock}`}>inventory_2</span>
                                                 )}
+                                                {item.importer_unavailable_override && (
+                                                    <span className="material-symbols-outlined text-[16px] text-amber-500" title="Marcado manualmente como agotado en importadora (falso positivo del scraper)">production_quantity_limits</span>
+                                                )}
                                             </div>
 
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => handleToggleImporterOverride(item)}
+                                                    className={`p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded ${item.importer_unavailable_override ? 'text-amber-500' : 'text-slate-500 hover:text-amber-500'}`}
+                                                    title={item.importer_unavailable_override
+                                                        ? 'Quitar marca de "agotado en importadora"'
+                                                        : 'La importadora dice que hay stock pero en realidad no hay: marcar como agotado'}
+                                                >
+                                                    <span className="material-symbols-outlined text-[16px]">production_quantity_limits</span>
+                                                </button>
                                                 {col.id === 'pending' && (
                                                     <button onClick={() => handleQuickMove(item, 'en_consulta')} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 hover:text-amber-500" title="Mover a En Consulta">
                                                         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
