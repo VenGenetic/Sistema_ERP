@@ -3,6 +3,13 @@ import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
 import { TagManager, Tag } from './TagManager';
+import {
+    ImporterUnavailableDuration,
+    computeImporterUnavailableUntil,
+    durationFromUntil,
+    getStockAvailableDemandCount,
+    warnRevertedDemands,
+} from '../utils/importerOverride';
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -25,6 +32,8 @@ interface ProductModalProps {
         last_edited_at?: string | null;
         is_discontinued?: boolean;
         discontinued_until?: string | null;
+        importer_unavailable_override?: boolean;
+        importer_unavailable_until?: string | null;
         profiles?: any;
     } | null;
 }
@@ -82,7 +91,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         price: 0,
         imageUrl: '',
         isDiscontinued: false,
-        discontinuedDuration: 'permanente' // 'permanente', '3', '6', '12'
+        discontinuedDuration: 'permanente', // 'permanente', '3', '6', '12'
+        importerUnavailable: false,
+        importerUnavailableDuration: 'permanente' as ImporterUnavailableDuration
     });
     const [imageRemoved, setImageRemoved] = useState(false);
     const [gallery, setGallery] = useState<{url: string, type: 'image' | 'video'}[]>([]);
@@ -149,14 +160,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     price: Math.round(derivedPrice * 100) / 100,
                     imageUrl: productToEdit.image_url || '',
                     isDiscontinued: !!productToEdit.is_discontinued,
-                    discontinuedDuration: productToEdit.discontinued_until 
+                    discontinuedDuration: productToEdit.discontinued_until
                         ? (function() {
                             const diffMonths = Math.round((new Date(productToEdit.discontinued_until).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 30));
                             if (diffMonths <= 4) return '3';
                             if (diffMonths <= 7) return '6';
                             return '12';
                         })()
-                        : 'permanente'
+                        : 'permanente',
+                    importerUnavailable: !!productToEdit.importer_unavailable_override,
+                    importerUnavailableDuration: durationFromUntil(productToEdit.importer_unavailable_until)
                 });
                 setGallery(productToEdit.gallery || []);
             } else {
@@ -171,7 +184,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     price: 0,
                     imageUrl: '',
                     isDiscontinued: false,
-                    discontinuedDuration: 'permanente'
+                    discontinuedDuration: 'permanente',
+                    importerUnavailable: false,
+                    importerUnavailableDuration: 'permanente'
                 });
                 setGallery([]);
             }
@@ -589,6 +604,18 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 discontinued_until = d.toISOString();
             }
 
+            const importer_unavailable_until = formData.importerUnavailable
+                ? computeImporterUnavailableUntil(formData.importerUnavailableDuration)
+                : null;
+
+            // Snapshot before saving: the DB trigger reverts any 'stock_available'
+            // demand back to 'pending_stock' the moment the override is turned on,
+            // so we must count them beforehand to warn staff afterward.
+            const isTurningOverrideOn = !productToEdit?.importer_unavailable_override && formData.importerUnavailable;
+            const pendingRevertCount = (isTurningOverrideOn && productToEdit?.id)
+                ? await getStockAvailableDemandCount(productToEdit.id)
+                : 0;
+
             const payload: any = {
                 sku: formData.sku,
                 name: formData.name,
@@ -601,7 +628,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                 image_url: imageRemoved ? null : (formData.imageUrl || defaultImageUrl),
                 gallery: gallery,
                 is_discontinued: formData.isDiscontinued,
-                discontinued_until: formData.isDiscontinued ? discontinued_until : null
+                discontinued_until: formData.isDiscontinued ? discontinued_until : null,
+                importer_unavailable_override: formData.importerUnavailable,
+                importer_unavailable_until: importer_unavailable_until
             };
 
             const { data: { user } } = await supabase.auth.getUser();
@@ -744,6 +773,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     alert(`Se han actualizado ${totalUpdated} solicitudes al estado 'Descontinuado'. Recuerda notificar a los clientes correspondientes.`);
                 }
             }
+
+            warnRevertedDemands(pendingRevertCount);
 
             onSuccess();
             onClose();
@@ -1164,12 +1195,43 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 {formData.isDiscontinued && (
                                     <div className="pl-14">
                                         <label className={labelClass}>Duración de la descontinuación</label>
-                                        <select 
+                                        <select
                                             className={inputClass}
                                             value={formData.discontinuedDuration}
                                             onChange={(e) => setFormData({ ...formData, discontinuedDuration: e.target.value })}
                                         >
                                             <option value="permanente">Permanente (Nunca volverá)</option>
+                                            <option value="3">Temporal: 3 Meses</option>
+                                            <option value="6">Temporal: 6 Meses</option>
+                                            <option value="12">Temporal: 1 Año</option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <div className="relative">
+                                        <input type="checkbox" className="sr-only"
+                                            checked={formData.importerUnavailable}
+                                            onChange={(e) => setFormData({ ...formData, importerUnavailable: e.target.checked })}
+                                        />
+                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.importerUnavailable ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.importerUnavailable ? 'transform translate-x-6' : ''}`}></div>
+                                    </div>
+                                    <div>
+                                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Marcar como Agotado en Importadora</span>
+                                        <span className="text-xs text-slate-500">Úsalo cuando el sitio de la importadora diga que hay stock pero en realidad no lo tienen. El sistema tratará el stock de importadora como 0 mientras esté activo.</span>
+                                    </div>
+                                </label>
+
+                                {formData.importerUnavailable && (
+                                    <div className="pl-14">
+                                        <label className={labelClass}>Duración del marcado</label>
+                                        <select
+                                            className={inputClass}
+                                            value={formData.importerUnavailableDuration}
+                                            onChange={(e) => setFormData({ ...formData, importerUnavailableDuration: e.target.value as ImporterUnavailableDuration })}
+                                        >
+                                            <option value="permanente">Permanente (hasta que lo desmarques)</option>
                                             <option value="3">Temporal: 3 Meses</option>
                                             <option value="6">Temporal: 6 Meses</option>
                                             <option value="12">Temporal: 1 Año</option>

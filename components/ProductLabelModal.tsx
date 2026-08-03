@@ -1,120 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import JsBarcode from 'jsbarcode';
 import { jsPDF } from 'jspdf';
 import { addToQueue } from '../utils/mobilePrintQueue';
+import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
 
 interface ProductLabelModalProps {
     isOpen: boolean;
     onClose: () => void;
     product: any;
 }
-
-// Renders the label to an offscreen canvas and returns it.
-// Layout is fully canvas-based so nothing can get clipped.
-const renderLabelToCanvas = (product: any): HTMLCanvasElement => {
-    // --- Dimensions: 7cm x 4.24cm at 300 DPI to fill A4 with 0 margins ---
-    const DPI = 300;
-    const MM_TO_INCH = 1 / 25.4;
-    const W = Math.round((210 / 3) * MM_TO_INCH * DPI); // ~827px
-    const H = Math.round((297 / 7) * MM_TO_INCH * DPI); // ~501px
-    const PAD = Math.round(W * 0.04); // Reducir padding interno a ~4% para aprovechar mejor el espacio
-
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext('2d')!;
-
-    // White background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#000000';
-
-    // --- BARCODE in the center ---
-    const barcodeCanvas = document.createElement('canvas');
-    JsBarcode(barcodeCanvas, product.sku, {
-        format: 'CODE128',
-        displayValue: false,
-        width: 3,
-        height: Math.round(H * 0.34), // 34% of height
-        margin: 0,
-        lineColor: '#000000',
-        background: '#ffffff',
-    });
-
-    const bcW = Math.min(barcodeCanvas.width, W - PAD * 2);
-    const bcH = barcodeCanvas.height;
-    const bcX = (W - bcW) / 2;
-    const bcY = (H - bcH) / 2; // true vertical center
-
-    // --- DESCRIPTION TEXT (above barcode) ---
-    const descAreaH = bcY - PAD; // space above barcode minus top padding
-    const descMaxW = W - PAD * 2;
-
-    // Auto-fit font size for description
-    let descFontSize = Math.round(H * 0.09); // start at ~9% of height
-    const MIN_FONT = Math.round(H * 0.048);
-    ctx.font = `bold ${descFontSize}px sans-serif`;
-
-    const wrapText = (text: string, maxW: number, fontSize: number) => {
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        const words = text.split(' ');
-        const lines: string[] = [];
-        let current = '';
-        for (const word of words) {
-            const test = current ? `${current} ${word}` : word;
-            if (ctx.measureText(test).width > maxW && current) {
-                lines.push(current);
-                current = word;
-            } else {
-                current = test;
-            }
-        }
-        if (current) lines.push(current);
-        return lines;
-    };
-
-    // Shrink font until all lines fit in the available area
-    let descLines: string[] = [];
-    while (descFontSize >= MIN_FONT) {
-        descLines = wrapText(product.name, descMaxW, descFontSize);
-        const totalH = descLines.length * descFontSize * 1.25;
-        if (totalH <= descAreaH - PAD * 0.5) break;
-        descFontSize -= 2;
-    }
-
-    // Draw description lines, vertically centered in the top area
-    const descLineH = descFontSize * 1.25;
-    const descBlockH = descLines.length * descLineH;
-    let descY = PAD + (descAreaH - PAD - descBlockH) / 2 + descFontSize;
-    ctx.font = `bold ${descFontSize}px sans-serif`;
-    ctx.textAlign = 'center';
-    for (const line of descLines) {
-        ctx.fillText(line, W / 2, descY);
-        descY += descLineH;
-    }
-
-    // --- Draw Barcode ---
-    ctx.drawImage(barcodeCanvas, bcX, bcY, bcW, bcH);
-
-    // --- SKU TEXT (below barcode) ---
-    const skuAreaTop = bcY + bcH;
-    const skuAreaH = H - skuAreaTop - PAD;
-
-    let skuFontSize = Math.round(H * 0.1);
-    const MIN_SKU_FONT = Math.round(H * 0.055);
-    while (skuFontSize >= MIN_SKU_FONT) {
-        ctx.font = `bold ${skuFontSize}px monospace`;
-        const skuW = ctx.measureText(product.sku).width;
-        if (skuW <= descMaxW) break;
-        skuFontSize -= 2;
-    }
-    ctx.font = `bold ${skuFontSize}px monospace`;
-    ctx.textAlign = 'center';
-    const skuY = skuAreaTop + (skuAreaH + skuFontSize) / 2;
-    ctx.fillText(product.sku, W / 2, skuY);
-
-    return canvas;
-};
 
 export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, onClose, product }) => {
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -190,10 +83,10 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
         };
     }, [pdfPreviewUrl]);
 
-    const renderPreview = useCallback(() => {
+    const renderPreview = useCallback(async () => {
         if (!product) return;
         try {
-            const canvas = renderLabelToCanvas(product);
+            const canvas = await renderLabelToCanvas(product);
             labelCanvasRef.current = canvas;
 
             // Draw a scaled preview in the visible canvas

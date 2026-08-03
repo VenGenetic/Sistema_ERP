@@ -258,7 +258,7 @@ export const getQueuePageCount = (queue: PrintQueueItem[]): number => {
 };
 
 // ── Generate consolidated PDF ──────────────────────────
-export const generateQueuePDF = (queue: PrintQueueItem[]): jsPDF => {
+export const generateQueuePDF = async (queue: PrintQueueItem[]): Promise<jsPDF> => {
     if (!queue || queue.length === 0) throw new Error('La cola está vacía');
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -269,11 +269,11 @@ export const generateQueuePDF = (queue: PrintQueueItem[]): jsPDF => {
     const perPage = cols * rows; // 21
 
     const canvasCache = new Map<string, string>();
-    let globalIndex = 0; 
+    let globalIndex = 0;
 
     for (const item of queue) {
         if (!canvasCache.has(item.sku)) {
-            const canvas = renderLabelToCanvas({ sku: item.sku, name: item.name });
+            const canvas = await renderLabelToCanvas({ sku: item.sku, name: item.name });
             canvasCache.set(item.sku, canvas.toDataURL('image/png', 1.0));
         }
         const imgData = canvasCache.get(item.sku)!;
@@ -304,8 +304,8 @@ export const generateQueuePDF = (queue: PrintQueueItem[]): jsPDF => {
 };
 
 // ── Download consolidated PDF ──────────────────────────
-export const downloadQueuePDF = (queue: PrintQueueItem[]): void => {
-    const pdf = generateQueuePDF(queue);
+export const downloadQueuePDF = async (queue: PrintQueueItem[]): Promise<void> => {
+    const pdf = await generateQueuePDF(queue);
     const total = getQueueTotalLabels(queue);
     pdf.save(`etiquetas_cola_x${total}.pdf`);
 

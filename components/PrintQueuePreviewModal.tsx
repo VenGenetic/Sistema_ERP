@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     getPrintQueue,
     updateQueueItemQty,
@@ -51,27 +51,30 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
     // closure) para no tener que incluir `labelImages` en las dependencias:
     // eso evitaba que el efecto se re-disparara a sí mismo cada vez que
     // cacheaba una nueva etiqueta, re-recorriendo la cola completa de más.
+    const requestedSkusRef = useRef<Set<string>>(new Set());
+
     useEffect(() => {
         if (!isOpen) return;
+        let cancelled = false;
 
-        setLabelImages((prev) => {
-            let hasNew = false;
-            const updatedImages = { ...prev };
+        const missing = queue.filter((item) => !requestedSkusRef.current.has(item.sku));
+        if (missing.length === 0) return;
+        missing.forEach((item) => requestedSkusRef.current.add(item.sku));
 
-            queue.forEach((item) => {
-                if (!updatedImages[item.sku]) {
-                    try {
-                        const canvas = renderLabelToCanvas({ sku: item.sku, name: item.name });
-                        updatedImages[item.sku] = canvas.toDataURL('image/png', 1.0);
-                        hasNew = true;
-                    } catch (err) {
-                        console.error('Error generando etiqueta para SKU:', item.sku, err);
-                    }
+        (async () => {
+            for (const item of missing) {
+                try {
+                    const canvas = await renderLabelToCanvas({ sku: item.sku, name: item.name });
+                    if (cancelled) return;
+                    const dataUrl = canvas.toDataURL('image/png', 1.0);
+                    setLabelImages((prev) => ({ ...prev, [item.sku]: dataUrl }));
+                } catch (err) {
+                    console.error('Error generando etiqueta para SKU:', item.sku, err);
                 }
-            });
+            }
+        })();
 
-            return hasNew ? updatedImages : prev;
-        });
+        return () => { cancelled = true; };
     }, [queue, isOpen]);
 
     // Calcular todas las etiquetas individuales ordenadas para rellenar las páginas A4
@@ -120,11 +123,11 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
     }, [onQueueUpdated]);
 
     // Acciones de impresión y descarga
-    const handleDownload = () => {
+    const handleDownload = async () => {
         if (queue.length === 0 || isProcessing) return;
         setIsProcessing(true);
         try {
-            downloadQueuePDF(queue);
+            await downloadQueuePDF(queue);
         } catch (error: any) {
             alert('Error al descargar: ' + error.message);
         } finally {
@@ -132,11 +135,11 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
         }
     };
 
-    const handlePrintNow = () => {
+    const handlePrintNow = async () => {
         if (queue.length === 0 || isProcessing) return;
         setIsProcessing(true);
         try {
-            const pdf = generateQueuePDF(queue);
+            const pdf = await generateQueuePDF(queue);
             pdf.autoPrint();
             const blob = pdf.output('blob');
             const url = URL.createObjectURL(blob);

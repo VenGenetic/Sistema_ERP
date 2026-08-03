@@ -107,11 +107,11 @@ const InvoiceLabels: React.FC = () => {
             quantity: r.quantity,
         }));
 
-    const handleDownloadPdf = () => {
+    const handleDownloadPdf = async () => {
         if (includedRows.length === 0) return;
         setIsWorking(true);
         try {
-            const pdf = generateQueuePDF(buildQueueItems());
+            const pdf = await generateQueuePDF(buildQueueItems());
             const suffix = invoiceNumber ? invoiceNumber : 'factura';
             pdf.save(`etiquetas_${suffix}_x${totalLabels}.pdf`);
         } catch (err) {
@@ -122,11 +122,11 @@ const InvoiceLabels: React.FC = () => {
         }
     };
 
-    const handleOpenPdf = () => {
+    const handleOpenPdf = async () => {
         if (includedRows.length === 0) return;
         setIsWorking(true);
         try {
-            const pdf = generateQueuePDF(buildQueueItems());
+            const pdf = await generateQueuePDF(buildQueueItems());
             const blob = pdf.output('blob');
             const url = URL.createObjectURL(blob);
             window.open(url, '_blank');
