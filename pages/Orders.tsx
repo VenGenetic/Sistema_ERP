@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone, Truck, Lock, Unlock, Store } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { isTransitionAllowed } from '../utils/orderStateMachine';
+import OrderShipments from './OrderShipments';
 
 // Interfaces
 interface OrderItem { id: string; product: { name: string; sku: string }; quantity: number; unitPrice: number; subtotal: number; }
@@ -28,7 +29,7 @@ const columns = [
     { id: 'Entregado', title: 'Completado', color: 'bg-green-50', borderColor: 'border-green-300', icon: <CheckCircle2 size={18} className="text-green-500" /> },
 ];
 
-const Orders: React.FC = () => {
+const OrdersPipeline: React.FC = () => {
     const navigate = useNavigate();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
@@ -301,7 +302,7 @@ const Orders: React.FC = () => {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] p-6 bg-slate-50 dark:bg-[#0d1117] overflow-hidden">
+        <div className="flex flex-col h-full p-6 bg-slate-50 dark:bg-[#0d1117] overflow-hidden">
             {/* Header */}
             <div className="flex justify-between items-center mb-6 z-10">
                 <div>
@@ -571,6 +572,46 @@ const Orders: React.FC = () => {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+const OrdersTabs: React.FC = () => {
+    const location = useLocation();
+    const isEnvios = location.pathname.includes('/orders/envios');
+
+    return (
+        <div className="print:hidden flex gap-1 px-6 pt-4 bg-slate-50 dark:bg-[#0d1117] border-b border-slate-200 dark:border-slate-800">
+            <Link
+                to="/orders"
+                className={`px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors ${!isEnvios ? 'border-primary text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+            >
+                Pipeline
+            </Link>
+            <Link
+                to="/orders/envios"
+                className={`px-4 py-2 text-sm font-medium rounded-t-md border-b-2 transition-colors flex items-center gap-1.5 ${isEnvios ? 'border-primary text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+            >
+                <Truck size={14} />
+                Envíos
+            </Link>
+        </div>
+    );
+};
+
+const Orders: React.FC = () => {
+    const location = useLocation();
+    const isEnvios = location.pathname.includes('/orders/envios');
+
+    return (
+        <div className="flex flex-col h-[calc(100vh-64px)] print:h-auto">
+            <OrdersTabs />
+            <div className={`flex-1 print:overflow-visible ${isEnvios ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+                <Routes>
+                    <Route index element={<OrdersPipeline />} />
+                    <Route path="envios" element={<OrderShipments />} />
+                </Routes>
+            </div>
         </div>
     );
 };

@@ -181,10 +181,16 @@ const Layout: React.FC = () => {
         )}
 
         {(isAdmin || permissions?.orders?.read) && (
-          <Link to="/orders" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('orders') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">local_shipping</span>
-            Órdenes
-          </Link>
+          <>
+            <Link to="/orders" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('orders') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+              <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+              Órdenes
+            </Link>
+            <Link to="/orders/envios" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('orders/envios') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
+              <span className="material-symbols-outlined text-[20px]">local_post_office</span>
+              Envíos
+            </Link>
+          </>
         )}
 
         {(isAdmin || permissions?.commissions?.read) && (
@@ -225,7 +231,7 @@ const Layout: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col font-sans text-slate-900 dark:text-slate-50 bg-background-light dark:bg-background-dark transition-colors duration-300">
       {/* Top Navigation - Minimalist */}
-      <header className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1117] px-4 md:px-6 py-3 sticky top-0 z-40">
+      <header className="print:hidden flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1117] px-4 md:px-6 py-3 sticky top-0 z-40">
         <div className="flex items-center gap-4 md:gap-6">
           <button
             className="md:hidden text-slate-500 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-md transition-colors"
@@ -298,15 +304,15 @@ const Layout: React.FC = () => {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden relative print:overflow-visible print:block">
         {/* Desktop Sidebar */}
-        <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1117] flex-col hidden md:flex">
+        <aside className="print:hidden w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1117] flex-col hidden md:flex">
           <NavigationContent />
         </aside>
 
         {/* Mobile Sidebar Overlay */}
         {isMobileMenuOpen && (
-          <div className="absolute inset-0 z-50 flex md:hidden">
+          <div className="print:hidden absolute inset-0 z-50 flex md:hidden">
             <div className="w-64 bg-white dark:bg-[#0c1117] border-r border-slate-200 dark:border-slate-800 flex flex-col h-full shadow-2xl">
               <NavigationContent />
             </div>
@@ -318,7 +324,7 @@ const Layout: React.FC = () => {
         )}
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-background-light dark:bg-[#0d1117] transition-colors duration-300 scrollbar-hide">
+        <main className="flex-1 overflow-y-auto bg-background-light dark:bg-[#0d1117] transition-colors duration-300 scrollbar-hide print:overflow-visible print:block print:h-auto">
           <Outlet />
         </main>
       </div>

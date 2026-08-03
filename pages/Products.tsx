@@ -2053,12 +2053,12 @@ const Products: React.FC = () => {
                         Edición Rápida
                     </button>
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             const selectedProds = products.filter(p => selectedIds.has(p.id));
-                            selectedProds.forEach(prod => {
-                                addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
-                            });
-                            setPrintQueue(getPrintQueue());
+                            for (const prod of selectedProds) {
+                                await addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+                            }
+                            await loadQueue();
                             setQueueToast(`✓ ${selectedProds.length} repuesto(s) agregados a la cola`);
                             setTimeout(() => setQueueToast(null), 2200);
                             setSelectedIds(new Set());
@@ -2169,7 +2169,7 @@ const Products: React.FC = () => {
                                         <div key={item.sku} className="flex items-center gap-2.5 p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-750">
                                             <div className="flex-1 min-w-0">
                                                 <span className="text-[11px] font-mono font-extrabold text-blue-700 dark:text-blue-300">{item.sku}</span>
-                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{item.name}</p>
+                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate" title={item.name}>{item.name}</p>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
                                                 <button onClick={async () => { const updated = await updateQueueItemQty(item.id, item.quantity - 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">−</button>
