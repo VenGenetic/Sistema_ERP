@@ -4,6 +4,7 @@ import { addToQueue } from '../utils/mobilePrintQueue';
 import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
 import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
 import { LabelSizeSelector } from './LabelSizeSelector';
+import { ThermalPrinterSelector } from './ThermalPrinterSelector';
 import { LabelSizePreset } from '../utils/labelPresets';
 
 interface ProductLabelModalProps {
@@ -311,6 +312,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                     Envía cada etiqueta directamente a la impresora térmica, sin generar un PDF.
                                 </p>
                                 <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
+                                <ThermalPrinterSelector />
                                 <button
                                     onClick={handlePrintThermal}
                                     disabled={isPrintingThermal || printQuantity < 1 || !labelSize}

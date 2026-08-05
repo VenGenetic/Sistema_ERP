@@ -13,6 +13,7 @@ import {
 import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
 import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
 import { LabelSizeSelector } from './LabelSizeSelector';
+import { ThermalPrinterSelector } from './ThermalPrinterSelector';
 import { LabelSizePreset } from '../utils/labelPresets';
 import { getThumbnailUrl } from '../utils/image';
 
@@ -442,8 +443,9 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
 
                 {/* ── Thermal label size ───────────────────────────── */}
                 <div className="px-4 pt-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shrink-0">
-                    <div className="max-w-xs ml-auto">
+                    <div className="max-w-xs ml-auto flex flex-col gap-3">
                         <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
+                        <ThermalPrinterSelector />
                     </div>
                 </div>
 
