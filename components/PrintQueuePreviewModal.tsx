@@ -11,6 +11,9 @@ import {
     PrintQueueItem
 } from '../utils/mobilePrintQueue';
 import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
+import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
+import { LabelSizeSelector } from './LabelSizeSelector';
+import { LabelSizePreset } from '../utils/labelPresets';
 import { getThumbnailUrl } from '../utils/image';
 
 interface PrintQueuePreviewModalProps {
@@ -31,6 +34,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
     const [activeTab, setActiveTab] = useState<'preview' | 'edit'>('preview');
     const [isProcessing, setIsProcessing] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [labelSize, setLabelSize] = useState<LabelSizePreset | null>(null);
 
     // Cargar cola cuando se abre el modal. force=true: el modal debe reflejar
     // lo que pueda haber cambiado en otra pestaña/dispositivo, no la caché
@@ -147,6 +151,22 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
             if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
         } catch (error: any) {
             alert('Error al intentar imprimir: ' + error.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handlePrintThermal = async () => {
+        if (queue.length === 0 || isProcessing || !labelSize) return;
+        setIsProcessing(true);
+        try {
+            await printLabelsOnThermalPrinter(
+                queue.map((item) => ({ sku: item.sku, name: item.name, quantity: item.quantity })),
+                { widthMm: labelSize.widthMm, heightMm: labelSize.heightMm }
+            );
+            if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
+        } catch (error: any) {
+            alert('Error al imprimir en térmica: ' + error.message);
         } finally {
             setIsProcessing(false);
         }
@@ -420,6 +440,13 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                     </div>
                 </div>
 
+                {/* ── Thermal label size ───────────────────────────── */}
+                <div className="px-4 pt-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shrink-0">
+                    <div className="max-w-xs ml-auto">
+                        <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
+                    </div>
+                </div>
+
                 {/* ── Footer / Actions Bar ─────────────────────────── */}
                 <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                     <button
@@ -443,10 +470,10 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
 
                         <button
                             type="button"
-                            onClick={handlePrintNow}
-                            disabled={queue.length === 0 || isProcessing}
+                            onClick={handlePrintThermal}
+                            disabled={queue.length === 0 || isProcessing || !labelSize}
                             className="flex-1 sm:flex-none px-7 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-                            title="Abrir cuadro de impresión en vivo"
+                            title="Imprimir en la impresora térmica"
                         >
                             {isProcessing ? (
                                 <>
@@ -455,10 +482,21 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <span className="material-symbols-outlined text-lg">print</span>
-                                    <span>Imprimir Ahora ({totalPages} hoja{totalPages !== 1 ? 's' : ''})</span>
+                                    <span className="material-symbols-outlined text-lg">receipt_long</span>
+                                    <span>Imprimir Térmica ({totalLabels})</span>
                                 </>
                             )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handlePrintNow}
+                            disabled={queue.length === 0 || isProcessing}
+                            className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 rounded-2xl font-extrabold text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                            title="Abrir cuadro de impresión A4 en vivo"
+                        >
+                            <span className="material-symbols-outlined text-[18px] text-amber-500">print</span>
+                            A4 ({totalPages} hoja{totalPages !== 1 ? 's' : ''})
                         </button>
                     </div>
                 </div>

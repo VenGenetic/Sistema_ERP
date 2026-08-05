@@ -7,12 +7,23 @@ import JsBarcode from 'jsbarcode';
 import { jsPDF } from 'jspdf';
 import { loadBrandLogo, drawLabelBrandHeader } from './brandLogo';
 
+export interface LabelCanvasSize {
+    widthMm: number;
+    heightMm: number;
+}
+
+// Default label size: one cell of the 3x7 grid used to fill an A4 sheet (70 x 42.428mm)
+export const DEFAULT_LABEL_SIZE: LabelCanvasSize = { widthMm: 210 / 3, heightMm: 297 / 7 };
+
 // --- Render a single label to an offscreen canvas ---
-export const renderLabelToCanvas = async (product: { sku: string; name: string }): Promise<HTMLCanvasElement> => {
+export const renderLabelToCanvas = async (
+    product: { sku: string; name: string },
+    size: LabelCanvasSize = DEFAULT_LABEL_SIZE
+): Promise<HTMLCanvasElement> => {
     const DPI = 300;
     const MM_TO_INCH = 1 / 25.4;
-    const W = Math.round((210 / 3) * MM_TO_INCH * DPI); // ~827px
-    const H = Math.round((297 / 7) * MM_TO_INCH * DPI); // ~501px
+    const W = Math.round(size.widthMm * MM_TO_INCH * DPI);
+    const H = Math.round(size.heightMm * MM_TO_INCH * DPI);
     const PAD = Math.round(W * 0.04);
 
     const canvas = document.createElement('canvas');

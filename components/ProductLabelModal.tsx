@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { jsPDF } from 'jspdf';
 import { addToQueue } from '../utils/mobilePrintQueue';
 import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
+import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
+import { LabelSizeSelector } from './LabelSizeSelector';
+import { LabelSizePreset } from '../utils/labelPresets';
 
 interface ProductLabelModalProps {
     isOpen: boolean;
@@ -18,6 +21,8 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const [activeTab, setActiveTab] = useState<'image' | 'pdf'>('image');
     const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
     const [queueAdded, setQueueAdded] = useState(false);
+    const [isPrintingThermal, setIsPrintingThermal] = useState(false);
+    const [labelSize, setLabelSize] = useState<LabelSizePreset | null>(null);
 
     const createPDF = useCallback(() => {
         if (!labelCanvasRef.current) return null;
@@ -171,28 +176,20 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
         }
     };
 
-    const handlePrintImage = () => {
-        if (!labelCanvasRef.current) return;
-        const imgData = labelCanvasRef.current.toDataURL('image/png', 1.0);
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-        
-        iframe.contentDocument?.write(`
-            <html>
-                <head><title>Imprimir Etiqueta</title></head>
-                <body style="margin: 0; padding: 0;">
-                    <img src="${imgData}" style="width: 100%; display: block;" onload="window.print();" />
-                </body>
-            </html>
-        `);
-        iframe.contentDocument?.close();
-        
-        setTimeout(() => {
-            if (document.body.contains(iframe)) {
-                document.body.removeChild(iframe);
-            }
-        }, 2000);
+    const handlePrintThermal = async () => {
+        if (!product || printQuantity < 1 || !labelSize) return;
+        setIsPrintingThermal(true);
+        try {
+            await printLabelsOnThermalPrinter(
+                [{ sku: product.sku, name: product.name, quantity: printQuantity }],
+                { widthMm: labelSize.widthMm, heightMm: labelSize.heightMm }
+            );
+        } catch (error) {
+            console.error('Error al imprimir en térmica:', error);
+            alert('Ocurrió un error al enviar la etiqueta a la impresora térmica.');
+        } finally {
+            setIsPrintingThermal(false);
+        }
     };
 
     const handleOpenPDF = () => {
@@ -220,7 +217,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <span className="material-symbols-outlined">label</span>
-                        Etiqueta de Producto — Optimizada para A4
+                        Etiqueta de Producto
                     </h2>
                     <button
                         onClick={onClose}
@@ -283,25 +280,17 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                             )}
                         </div>
 
-                        {/* Right: PDF Controls */}
+                        {/* Right: Print Controls */}
                         <div className="flex flex-col gap-6 w-full lg:w-1/2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                            <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                <span className="material-symbols-outlined">print</span>
-                                Impresión en PDF (Hoja A4)
-                            </h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                                Genera un archivo PDF tamaño A4 listo para imprimir. Las etiquetas se organizarán automáticamente (hasta 21 por página).
-                            </p>
-                            
                             <div className="flex flex-col gap-2">
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cantidad de etiquetas a imprimir:</label>
                                 <div className="flex items-center gap-3">
-                                    <input 
-                                        type="number" 
-                                        min="1" 
+                                    <input
+                                        type="number"
+                                        min="1"
                                         step="1"
                                         max="500"
-                                        value={printQuantity} 
+                                        value={printQuantity}
                                         onChange={(e) => {
                                             const val = parseInt(e.target.value) || 1;
                                             setPrintQuantity(Math.max(1, val));
@@ -312,25 +301,57 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                 </div>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                            {/* Thermal printer (primary) */}
+                            <div className="flex flex-col gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                    <span className="material-symbols-outlined">receipt_long</span>
+                                    Impresora Térmica
+                                </h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    Envía cada etiqueta directamente a la impresora térmica, sin generar un PDF.
+                                </p>
+                                <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
                                 <button
-                                    onClick={handleGeneratePDF}
-                                    disabled={isGenerating || printQuantity < 1}
-                                    className="flex-1 py-3 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 dark:border-violet-800 dark:text-violet-300 font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                    onClick={handlePrintThermal}
+                                    disabled={isPrintingThermal || printQuantity < 1 || !labelSize}
+                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
-                                    <span className="material-symbols-outlined text-[20px]">download</span>
-                                    Descargar
-                                </button>
-                                <button
-                                    onClick={handleOpenPDF}
-                                    disabled={isGenerating || printQuantity < 1}
-                                    className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                    <span className={`material-symbols-outlined ${isGenerating ? 'animate-spin' : ''}`}>
-                                        {isGenerating ? 'progress_activity' : 'print'}
+                                    <span className={`material-symbols-outlined ${isPrintingThermal ? 'animate-spin' : ''}`}>
+                                        {isPrintingThermal ? 'progress_activity' : 'print'}
                                     </span>
-                                    {isGenerating ? 'Generando...' : 'Imprimir PDF'}
+                                    {isPrintingThermal ? 'Enviando...' : 'Imprimir en Térmica'}
                                 </button>
+                            </div>
+
+                            {/* A4 PDF (legacy / sticker sheets) */}
+                            <div className="flex flex-col gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                    <span className="material-symbols-outlined">description</span>
+                                    PDF en Hoja A4
+                                </h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    Genera un archivo PDF tamaño A4 (hasta 21 etiquetas por página), útil para hojas de stickers pre-cortadas.
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <button
+                                        onClick={handleGeneratePDF}
+                                        disabled={isGenerating || printQuantity < 1}
+                                        className="flex-1 py-3 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 dark:border-violet-800 dark:text-violet-300 font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="material-symbols-outlined text-[20px]">download</span>
+                                        Descargar
+                                    </button>
+                                    <button
+                                        onClick={handleOpenPDF}
+                                        disabled={isGenerating || printQuantity < 1}
+                                        className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                    >
+                                        <span className={`material-symbols-outlined ${isGenerating ? 'animate-spin' : ''}`}>
+                                            {isGenerating ? 'progress_activity' : 'print'}
+                                        </span>
+                                        {isGenerating ? 'Generando...' : 'Imprimir PDF'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -378,12 +399,15 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                     </button>
 
                     <button
-                        onClick={handlePrintImage}
-                        className="px-4 py-2 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700"
-                        title="Imprimir Directamente"
+                        onClick={handlePrintThermal}
+                        disabled={isPrintingThermal || printQuantity < 1 || !labelSize}
+                        className="px-4 py-2 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 disabled:opacity-70 disabled:cursor-not-allowed"
+                        title="Imprimir en la impresora térmica"
                     >
-                        <span className="material-symbols-outlined text-[20px]">print</span>
-                        Imprimir
+                        <span className={`material-symbols-outlined text-[20px] ${isPrintingThermal ? 'animate-spin' : ''}`}>
+                            {isPrintingThermal ? 'progress_activity' : 'print'}
+                        </span>
+                        Imprimir Térmica
                     </button>
 
                     <button
