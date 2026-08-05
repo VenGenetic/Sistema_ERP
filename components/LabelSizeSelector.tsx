@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getLabelPresets, saveLabelPreset, deleteLabelPreset, LabelSizePreset } from '../utils/labelPresets';
+import { getLabelPresets, saveLabelPreset, deleteLabelPreset, LabelSizePreset, MAX_LABEL_WIDTH_MM } from '../utils/labelPresets';
 
 interface LabelSizeSelectorProps {
     value: LabelSizePreset | null;
@@ -37,6 +37,10 @@ export const LabelSizeSelector: React.FC<LabelSizeSelectorProps> = ({ value, onC
         const height = parseFloat(newHeight);
         if (!newName.trim() || !width || !height || width <= 0 || height <= 0) {
             alert('Completa un nombre y medidas válidas (mm).');
+            return;
+        }
+        if (width > MAX_LABEL_WIDTH_MM) {
+            alert(`El ancho máximo soportado por la impresora térmica es ${MAX_LABEL_WIDTH_MM}mm (8cm).`);
             return;
         }
         setSaving(true);
@@ -110,7 +114,7 @@ export const LabelSizeSelector: React.FC<LabelSizeSelectorProps> = ({ value, onC
                     <div className="flex items-center gap-2">
                         <input
                             type="number"
-                            placeholder="Ancho mm"
+                            placeholder={`Ancho mm (máx ${MAX_LABEL_WIDTH_MM})`}
                             value={newWidth}
                             onChange={(e) => setNewWidth(e.target.value)}
                             className="w-24 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-900 dark:text-white outline-none"

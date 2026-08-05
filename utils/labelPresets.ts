@@ -15,12 +15,17 @@ export interface LabelSizePreset {
     builtIn?: boolean;
 }
 
+// The installed printer's head is 80mm wide, so no built-in preset exceeds
+// that width (see MAX_LABEL_WIDTH_MM / utils/thermalLabelPrinter.ts, which
+// also clamps this defensively at print time).
+export const MAX_LABEL_WIDTH_MM = 80;
+
 export const STANDARD_LABEL_PRESETS: LabelSizePreset[] = [
     { id: 'standard-80x50', name: '80 x 50 mm (Térmica estándar)', widthMm: 80, heightMm: 50, builtIn: true },
+    { id: 'standard-80x40', name: '80 x 40 mm', widthMm: 80, heightMm: 40, builtIn: true },
     { id: 'standard-58x40', name: '58 x 40 mm', widthMm: 58, heightMm: 40, builtIn: true },
     { id: 'standard-50x30', name: '50 x 30 mm', widthMm: 50, heightMm: 30, builtIn: true },
-    { id: 'standard-100x50', name: '100 x 50 mm', widthMm: 100, heightMm: 50, builtIn: true },
-    { id: 'standard-100x150', name: '100 x 150 mm (Envío)', widthMm: 100, heightMm: 150, builtIn: true },
+    { id: 'standard-80x100', name: '80 x 100 mm (Envío)', widthMm: 80, heightMm: 100, builtIn: true },
 ];
 
 let cachedCustomPresets: LabelSizePreset[] | null = null;

@@ -20,7 +20,10 @@ export const renderLabelToCanvas = async (
     product: { sku: string; name: string },
     size: LabelCanvasSize = DEFAULT_LABEL_SIZE
 ): Promise<HTMLCanvasElement> => {
-    const DPI = 300;
+    // 600 DPI source art gives the printer/driver headroom to downsample
+    // cleanly instead of upscaling a coarser bitmap (crisper barcode edges
+    // and text at print time).
+    const DPI = 600;
     const MM_TO_INCH = 1 / 25.4;
     const W = Math.round(size.widthMm * MM_TO_INCH * DPI);
     const H = Math.round(size.heightMm * MM_TO_INCH * DPI);
@@ -30,6 +33,8 @@ export const renderLabelToCanvas = async (
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     // White background
     ctx.fillStyle = '#ffffff';
@@ -41,11 +46,13 @@ export const renderLabelToCanvas = async (
     const contentTop = drawLabelBrandHeader(ctx, logoImg, W, PAD);
 
     // --- BARCODE, vertically centered in the space left below the header ---
+    // Bar module width is scaled with DPI so bars keep the same physical
+    // thickness regardless of source resolution (fixed at 300 DPI baseline).
     const barcodeCanvas = document.createElement('canvas');
     JsBarcode(barcodeCanvas, product.sku, {
         format: 'CODE128',
         displayValue: false,
-        width: 3,
+        width: Math.max(1, Math.round(3 * (DPI / 300))),
         height: Math.round(H * 0.32),
         margin: 0,
         lineColor: '#000000',

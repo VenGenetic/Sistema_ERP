@@ -16,10 +16,20 @@ export interface ThermalLabelItem {
     quantity: number;
 }
 
+// The installed thermal printer's head is 80mm (8cm) wide — no preset,
+// built-in or custom, may ever print wider than that regardless of what
+// was selected/saved.
+export const MAX_THERMAL_WIDTH_MM = 80;
+
 export const printLabelsOnThermalPrinter = async (
     items: ThermalLabelItem[],
-    size: LabelCanvasSize
+    requestedSize: LabelCanvasSize
 ): Promise<void> => {
+    const size: LabelCanvasSize = {
+        widthMm: Math.min(requestedSize.widthMm, MAX_THERMAL_WIDTH_MM),
+        heightMm: requestedSize.heightMm,
+    };
+
     const canvasCache = new Map<string, string>();
     const pages: string[] = [];
 
