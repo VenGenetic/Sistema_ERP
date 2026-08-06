@@ -5,7 +5,6 @@ import { supabase } from '../supabaseClient';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { isTransitionAllowed } from '../utils/orderStateMachine';
 import { reprintOrderReceipt } from '../utils/thermalReceipt';
-import { ThermalPrinterSelector } from '../components/ThermalPrinterSelector';
 import OrderShipments from './OrderShipments';
 
 // Interfaces
@@ -561,9 +560,6 @@ const OrdersPipeline: React.FC = () => {
                                         )}
                                         {!canConvert && selectedOrder?.status !== 'Listo_Cumplimiento' && selectedOrder?.status !== 'Borrador' && (
                                             <>
-                                                <div className="mb-2">
-                                                    <ThermalPrinterSelector />
-                                                </div>
                                                 <button
                                                     onClick={async () => {
                                                         try {
