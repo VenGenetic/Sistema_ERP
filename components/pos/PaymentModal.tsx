@@ -12,7 +12,7 @@ const todayEcuador = () => {
 interface PaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onProcess: (paymentAccountId: number, saleDate?: string, shippingAddress?: string, shippingCost?: number) => Promise<void>;
+    onProcess: (paymentAccountId: number, saleDate?: string, shippingAddress?: string, shippingCost?: number, printReceipt?: boolean) => Promise<void>;
     paymentAccounts: { id: number, name: string }[];
 }
 
@@ -31,6 +31,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
     const [isDelivery, setIsDelivery] = useState(false);
     const [shippingAddress, setShippingAddress] = useState('');
     const [shippingCost, setShippingCost] = useState(0);
+    const [printReceipt, setPrintReceipt] = useState(true);
 
     if (!isOpen) return null;
 
@@ -40,7 +41,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
     const handleConfirm = async () => {
         setIsProcessing(true);
         try {
-            await onProcess(selectedAccount, saleDate, isDelivery ? shippingAddress : 'POS Walk-in', isDelivery ? shippingCost : 0);
+            await onProcess(selectedAccount, saleDate, isDelivery ? shippingAddress : 'POS Walk-in', isDelivery ? shippingCost : 0, printReceipt);
             onClose(); // only close on success
         } catch (e) {
             // error handled by parent
@@ -125,6 +126,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                                     </div>
                                 </div>
                             )}
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={printReceipt} 
+                                    onChange={(e) => setPrintReceipt(e.target.checked)} 
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                                />
+                                <span className="font-bold text-slate-700">Imprimir Recibo (Impresora Térmica)</span>
+                            </label>
                         </div>
 
                         <label className="block">

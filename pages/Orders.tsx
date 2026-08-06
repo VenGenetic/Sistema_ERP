@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone, Truck, Lock, Unlock, Store } from 'lucide-react';
+import { Plus, Search, X, MessageCircle, FileText, CheckCircle2, Camera, UploadCloud, Edit, PackageSearch, Phone, Truck, Lock, Unlock, Store, Printer } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import WhatsAppButton from '../components/WhatsAppButton';
 import { isTransitionAllowed } from '../utils/orderStateMachine';
+import { reprintOrderReceipt } from '../utils/thermalReceipt';
 import OrderShipments from './OrderShipments';
 
 // Interfaces
@@ -558,12 +559,28 @@ const OrdersPipeline: React.FC = () => {
                                             </button>
                                         )}
                                         {!canConvert && selectedOrder?.status !== 'Listo_Cumplimiento' && selectedOrder?.status !== 'Borrador' && (
-                                            <button
-                                                onClick={() => setIsModalOpen(false)}
-                                                className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-lg font-bold mt-2"
-                                            >
-                                                Cerrar Vista
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await reprintOrderReceipt(selectedOrder.id);
+                                                            alert(`Recibo de la orden #${selectedOrder.id} enviado a la impresora (2 copias).`);
+                                                        } catch (err: any) {
+                                                            alert(`Error reimprimiendo recibo: ${err?.message || err}`);
+                                                        }
+                                                    }}
+                                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors text-sm mt-2"
+                                                >
+                                                    <Printer size={16} />
+                                                    <span>Reimprimir Recibo Térmico (2 copias)</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsModalOpen(false)}
+                                                    className="w-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-3 rounded-lg font-bold mt-2"
+                                                >
+                                                    Cerrar Vista
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>

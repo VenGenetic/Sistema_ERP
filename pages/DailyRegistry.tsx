@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import { reprintOrderReceipt } from '../utils/thermalReceipt';
 
 // Ecuador is UTC-5
 const TZ_OFFSET = '-05:00';
@@ -1029,6 +1030,20 @@ const DailyRegistry: React.FC = () => {
                                                                                         >
                                                                                             <span className="material-symbols-outlined text-[13px]">edit_note</span>
                                                                                             Editar Venta
+                                                                                        </button>
+                                                                                        <button
+                                                                                            onClick={async () => {
+                                                                                                try {
+                                                                                                    await reprintOrderReceipt(order.id);
+                                                                                                    alert(`Recibo de la orden #${order.id} enviado a la impresora (2 copias).`);
+                                                                                                } catch (err: any) {
+                                                                                                    alert(`Error reimprimiendo recibo: ${err?.message || err}`);
+                                                                                                }
+                                                                                            }}
+                                                                                            className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
+                                                                                        >
+                                                                                            <span className="material-symbols-outlined text-[13px]">print</span>
+                                                                                            Reimprimir Recibo
                                                                                         </button>
                                                                                         <button
                                                                                             onClick={() => handleCancelOrder(order)}

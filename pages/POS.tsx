@@ -7,6 +7,7 @@ import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Produc
 import { useShallow } from 'zustand/react/shallow';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { PaymentModal } from '../components/pos/PaymentModal';
+import { printReceiptOnThermalPrinter } from '../utils/thermalReceipt';
 
 const POS: React.FC = () => {
     const navigate = useNavigate();
@@ -558,7 +559,39 @@ const POS: React.FC = () => {
         updateUnitPrice(itemId, newPrice);
     };
 
-    const processCheckout = async (paymentAccountId: number, saleDate?: string, shippingAddress?: string, shippingCost?: number) => {
+    /**
+     * Builds the receipt from the cart as it stood at checkout. Reads
+     * cartRef rather than the render-time cart so it cannot pick up a stale
+     * snapshot if the component re-rendered while the RPC was in flight.
+     */
+    const printSaleReceipt = async (orderId: number | string | null, paymentAccountId: number) => {
+        const items = cartRef.current;
+        if (items.length === 0) return;
+
+        const account = paymentAccounts.find(a => a.id === paymentAccountId);
+        const { customer: cust, promoDiscount: promo } = useCartStore.getState();
+
+        await printReceiptOnThermalPrinter({
+            orderId,
+            date: new Date(),
+            customerName: cust.name,
+            customerId: cust.identification_number,
+            lines: items.map(i => ({
+                sku: i.product.sku,
+                name: i.product.name,
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+            })),
+            subtotal: items.reduce((acc, i) => acc + i.subtotal, 0),
+            discountPercentage: cust.discount_percentage || undefined,
+            promoDiscount: promo || undefined,
+            shipping: shippingCostRef.current || undefined,
+            total: getTotal(),
+            paymentMethod: account?.name,
+        });
+    };
+
+    const processCheckout = async (paymentAccountId: number, saleDate?: string, shippingAddress?: string, shippingCost?: number, printReceipt: boolean = true) => {
         if (cartRef.current.length === 0) return;
 
         try {
@@ -606,7 +639,31 @@ const POS: React.FC = () => {
                 }
             }
 
-            alert("¡Venta completada con éxito!");
+            // Print before clearing: the receipt is built from the cart, and
+            // clearCart() resets both the lines and the customer.
+            //
+            // A printing failure is reported but never rethrown. The sale is
+            // already committed in the database by this point, so an offline
+            // printer, an empty paper roll or a missing QZ Tray must not make
+            // a completed sale look like it failed -- that would invite the
+            // cashier to ring it up a second time.
+            const printedOrderId =
+                typeof data === 'number' ? data : (data as any)?.order_id ?? data ?? null;
+
+            let receiptWarning = '';
+            if (printReceipt) {
+                try {
+                    await printSaleReceipt(printedOrderId, paymentAccountId);
+                } catch (err: any) {
+                    console.error('No se pudo imprimir el recibo:', err);
+                    receiptWarning =
+                        `\n\nOJO: la venta SÍ se guardó, pero el recibo no se imprimió.\n` +
+                        `${err?.message || 'Error desconocido.'}\n` +
+                        `No la vuelvas a cobrar; reimprime desde Órdenes.`;
+                }
+            }
+
+            alert('¡Venta completada con éxito!' + receiptWarning);
             clearCart();
             setSearchQuery('');
             if (activeDraftId) {
