@@ -565,7 +565,7 @@ const POS: React.FC = () => {
      * cartRef rather than the render-time cart so it cannot pick up a stale
      * snapshot if the component re-rendered while the RPC was in flight.
      */
-    const printSaleReceipt = async (orderId: number | string | null, paymentAccountId: number) => {
+    const printSaleReceipt = async (orderId: number | string | null, paymentAccountId: number, shippingCost?: number) => {
         const items = cartRef.current;
         if (items.length === 0) return;
 
@@ -586,7 +586,7 @@ const POS: React.FC = () => {
             subtotal: items.reduce((acc, i) => acc + i.subtotal, 0),
             discountPercentage: cust.discount_percentage || undefined,
             promoDiscount: promo || undefined,
-            shipping: shippingCostRef.current || undefined,
+            shipping: shippingCost || undefined,
             total: getTotal(),
             paymentMethod: account?.name,
         });
@@ -654,7 +654,7 @@ const POS: React.FC = () => {
             let receiptWarning = '';
             if (printReceipt) {
                 try {
-                    await printSaleReceipt(printedOrderId, paymentAccountId);
+                    await printSaleReceipt(printedOrderId, paymentAccountId, shippingCost);
                 } catch (err: any) {
                     console.error('No se pudo imprimir el recibo:', err);
                     receiptWarning =
