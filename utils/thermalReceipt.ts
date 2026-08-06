@@ -87,10 +87,11 @@ const renderReceiptToCanvas = async (data: ReceiptData): Promise<HTMLCanvasEleme
     ctx.fillStyle = '#000000';
     ctx.textBaseline = 'alphabetic';
 
-    const BODY = mm(3.2);
-    const SMALL = mm(2.6);
-    const BIG = mm(5);
-    const LINE = Math.round(BODY * 1.45);
+    const BODY = mm(2.8);
+    const SMALL = mm(2.3);
+    const ITEM_TITLE = mm(2.4);
+    const BIG = mm(4.2);
+    const LINE = Math.round(BODY * 1.35);
 
     let y = PAD;
 
@@ -104,7 +105,7 @@ const renderReceiptToCanvas = async (data: ReceiptData): Promise<HTMLCanvasEleme
         const x = opts.align === 'center' ? W / 2 : opts.align === 'right' ? W - PAD : PAD;
         y += size;
         ctx.fillText(s, x, y);
-        y += Math.round(size * 0.45);
+        y += Math.round(size * 0.35);
     };
 
     /** Label on the left, value hard against the right margin. */
@@ -116,7 +117,7 @@ const renderReceiptToCanvas = async (data: ReceiptData): Promise<HTMLCanvasEleme
         ctx.fillText(left, PAD, y);
         ctx.textAlign = 'right';
         ctx.fillText(right, W - PAD, y);
-        y += Math.round(size * 0.45);
+        y += Math.round(size * 0.35);
     };
 
     const rule = (dashed = false) => {
@@ -165,20 +166,18 @@ const renderReceiptToCanvas = async (data: ReceiptData): Promise<HTMLCanvasEleme
     rule();
 
     // --- Line items ---
-    // Description gets its own full-width line and the amounts sit under it,
-    // rather than squeezing four columns into 72mm where long part names
-    // would have to be truncated to fit.
+    // Item description uses a smaller, cleaner font (2.4mm) so long titles fit nicely.
     for (const line of data.lines) {
-        ctx.font = `bold ${BODY}px sans-serif`;
+        ctx.font = `${ITEM_TITLE}px sans-serif`;
         for (const part of wrap(ctx, line.name, CONTENT_W)) {
-            text(part, { bold: true });
+            text(part, { size: ITEM_TITLE, bold: false });
         }
         row(
             `  ${line.sku}   ${line.quantity} x ${money(line.unitPrice)}`,
             money(line.quantity * line.unitPrice),
             { size: SMALL }
         );
-        y += Math.round(LINE * 0.2);
+        y += Math.round(LINE * 0.15);
     }
     rule();
 
