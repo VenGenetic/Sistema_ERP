@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getLabelPresets, saveLabelPreset, deleteLabelPreset, LabelSizePreset, MAX_LABEL_WIDTH_MM } from '../utils/labelPresets';
+import { getLabelPresets, saveLabelPreset, deleteLabelPreset, LabelSizePreset, MAX_LABEL_WIDTH_MM, DEFAULT_LABEL_PRESET_ID } from '../utils/labelPresets';
 
 interface LabelSizeSelectorProps {
     value: LabelSizePreset | null;
@@ -18,7 +18,9 @@ export const LabelSizeSelector: React.FC<LabelSizeSelectorProps> = ({ value, onC
         (async () => {
             const list = await getLabelPresets();
             setPresets(list);
-            if (!value && list.length > 0) onChange(list[0]);
+            if (!value && list.length > 0) {
+                onChange(list.find((p) => p.id === DEFAULT_LABEL_PRESET_ID) ?? list[0]);
+            }
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

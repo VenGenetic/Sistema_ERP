@@ -15,18 +15,38 @@ export interface LabelCanvasSize {
 // Default label size: one cell of the 3x7 grid used to fill an A4 sheet (70 x 42.428mm)
 export const DEFAULT_LABEL_SIZE: LabelCanvasSize = { widthMm: 210 / 3, heightMm: 297 / 7 };
 
+// The source art is rendered at an exact integer multiple of the thermal
+// printer's 203 DPI (see thermalLabelPrinter.ts) rather than a round number
+// like 600. That matters for the barcode: at 600 DPI a bar module lands on
+// 1.83 printer dots, so the 3:1-ish downsample smears each bar edge into
+// grey. A thermal head is 1-bit -- it either burns a dot or it doesn't --
+// so those greys get thresholded inconsistently and the bar/space ratios
+// CODE128 depends on are destroyed, which is what makes a printed label
+// refuse to scan. With OVERSAMPLE=3 every 3 source pixels collapse into
+// exactly 1 printer dot, so a module drawn 3*n pixels wide prints as
+// exactly n solid dots.
+export const OVERSAMPLE = 3;
+const DEVICE_DPI = 203;
+const SOURCE_DPI = DEVICE_DPI * OVERSAMPLE; // 609
+
+/** Exact pixel dimensions to render at, bypassing the mm->DPI calculation. */
+export interface ExactPixelSize {
+    width: number;
+    height: number;
+}
+
 // --- Render a single label to an offscreen canvas ---
 export const renderLabelToCanvas = async (
     product: { sku: string; name: string },
-    size: LabelCanvasSize = DEFAULT_LABEL_SIZE
+    size: LabelCanvasSize = DEFAULT_LABEL_SIZE,
+    exactPixels?: ExactPixelSize
 ): Promise<HTMLCanvasElement> => {
-    // 600 DPI source art gives the printer/driver headroom to downsample
-    // cleanly instead of upscaling a coarser bitmap (crisper barcode edges
-    // and text at print time).
-    const DPI = 600;
+    // When printing thermally the caller passes the exact source dimensions
+    // (device dots * OVERSAMPLE) so the downsample is a clean integer ratio.
+    // Otherwise (A4 PDF / preview) derive them from the physical size.
     const MM_TO_INCH = 1 / 25.4;
-    const W = Math.round(size.widthMm * MM_TO_INCH * DPI);
-    const H = Math.round(size.heightMm * MM_TO_INCH * DPI);
+    const W = exactPixels ? exactPixels.width : Math.round(size.widthMm * MM_TO_INCH * SOURCE_DPI);
+    const H = exactPixels ? exactPixels.height : Math.round(size.heightMm * MM_TO_INCH * SOURCE_DPI);
     const PAD = Math.round(W * 0.04);
 
     const canvas = document.createElement('canvas');
@@ -46,24 +66,35 @@ export const renderLabelToCanvas = async (
     const contentTop = drawLabelBrandHeader(ctx, logoImg, W, PAD);
 
     // --- BARCODE, vertically centered in the space left below the header ---
-    // Bar module width is scaled with DPI so bars keep the same physical
-    // thickness regardless of source resolution (fixed at 300 DPI baseline).
+    // The module (narrowest bar) width is picked in whole printer dots, and
+    // the barcode is never rescaled when drawn -- any fractional scaling
+    // would reintroduce the blurred-bar problem OVERSAMPLE exists to avoid.
+    // Start at 3 dots (~0.37mm, comfortable for handheld scanners) and step
+    // down only as far as a long SKU actually requires to fit the label.
+    const maxBarcodeW = W - PAD * 2;
     const barcodeCanvas = document.createElement('canvas');
-    JsBarcode(barcodeCanvas, product.sku, {
-        format: 'CODE128',
-        displayValue: false,
-        width: Math.max(1, Math.round(3 * (DPI / 300))),
-        height: Math.round(H * 0.32),
-        margin: 0,
-        lineColor: '#000000',
-        background: '#ffffff',
-    });
+    let moduleDots = 3;
+    for (;;) {
+        JsBarcode(barcodeCanvas, product.sku, {
+            format: 'CODE128',
+            displayValue: false,
+            width: moduleDots * OVERSAMPLE,
+            height: Math.round(H * 0.32),
+            margin: 0,
+            lineColor: '#000000',
+            background: '#ffffff',
+        });
+        if (barcodeCanvas.width <= maxBarcodeW || moduleDots === 1) break;
+        moduleDots--;
+    }
 
-    const bcW = Math.min(barcodeCanvas.width, W - PAD * 2);
+    // Snapped to the oversample grid so each module still lands on whole
+    // dots once the canvas is downsampled to the printer's resolution.
+    const bcW = barcodeCanvas.width;
     const bcH = barcodeCanvas.height;
-    const bcX = (W - bcW) / 2;
+    const bcX = Math.round((W - bcW) / 2 / OVERSAMPLE) * OVERSAMPLE;
     const contentH = H - contentTop;
-    const bcY = contentTop + (contentH - bcH) / 2;
+    const bcY = Math.round((contentTop + (contentH - bcH) / 2) / OVERSAMPLE) * OVERSAMPLE;
 
     // --- DESCRIPTION TEXT (above barcode, below header) ---
     const descAreaH = bcY - contentTop;
@@ -108,8 +139,8 @@ export const renderLabelToCanvas = async (
         descY += descLineH;
     }
 
-    // --- Draw Barcode ---
-    ctx.drawImage(barcodeCanvas, bcX, bcY, bcW, bcH);
+    // --- Draw Barcode (1:1 -- no width/height args, so no rescaling) ---
+    ctx.drawImage(barcodeCanvas, bcX, bcY);
 
     // --- SKU TEXT (below barcode) ---
     const skuAreaTop = bcY + bcH;

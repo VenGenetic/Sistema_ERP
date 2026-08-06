@@ -2,7 +2,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { jsPDF } from 'jspdf';
 import { addToQueue } from '../utils/mobilePrintQueue';
 import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
-import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
+import {
+    printLabelsOnThermalPrinter,
+    MAX_THERMAL_WIDTH_MM,
+    getCutAtEnd,
+    setCutAtEnd,
+} from '../utils/thermalLabelPrinter';
 import { LabelSizeSelector } from './LabelSizeSelector';
 import { ThermalPrinterSelector } from './ThermalPrinterSelector';
 import { LabelSizePreset } from '../utils/labelPresets';
@@ -24,6 +29,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const [queueAdded, setQueueAdded] = useState(false);
     const [isPrintingThermal, setIsPrintingThermal] = useState(false);
     const [labelSize, setLabelSize] = useState<LabelSizePreset | null>(null);
+    const [cutAtEnd, setCutAtEndState] = useState(getCutAtEnd);
 
     const createPDF = useCallback(() => {
         if (!labelCanvasRef.current) return null;
@@ -92,7 +98,19 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const renderPreview = useCallback(async () => {
         if (!product) return;
         try {
-            const canvas = await renderLabelToCanvas(product);
+            // Preview at the *selected* label size, clamped the same way
+            // printLabelsOnThermalPrinter clamps it. Rendering the A4-cell
+            // default here (as this used to) meant the preview silently
+            // showed a different aspect ratio than what actually printed.
+            const canvas = await renderLabelToCanvas(
+                product,
+                labelSize
+                    ? {
+                          widthMm: Math.min(labelSize.widthMm, MAX_THERMAL_WIDTH_MM),
+                          heightMm: labelSize.heightMm,
+                      }
+                    : undefined
+            );
             labelCanvasRef.current = canvas;
 
             // Draw a scaled preview in the visible canvas
@@ -110,7 +128,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
         } catch (error) {
             console.error("Error rendering label:", error);
         }
-    }, [product]);
+    }, [product, labelSize]);
 
     useEffect(() => {
         if (isOpen && product) {
@@ -183,7 +201,9 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
         try {
             await printLabelsOnThermalPrinter(
                 [{ sku: product.sku, name: product.name, quantity: printQuantity }],
-                { widthMm: labelSize.widthMm, heightMm: labelSize.heightMm }
+                { widthMm: labelSize.widthMm, heightMm: labelSize.heightMm },
+                undefined,
+                { gapMm: labelSize.gapMm, offsetMm: labelSize.offsetMm, cutAtEnd }
             );
         } catch (error) {
             console.error('Error al imprimir en térmica:', error);
@@ -313,6 +333,28 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                 </p>
                                 <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
                                 <ThermalPrinterSelector />
+                                {/* Only meaningful on die-cut rolls: continuous stock
+                                    already gets a cut after every label. */}
+                                {labelSize?.gapMm ? (
+                                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={cutAtEnd}
+                                            onChange={(e) => {
+                                                setCutAtEndState(e.target.checked);
+                                                setCutAtEnd(e.target.checked);
+                                            }}
+                                            className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary/30 shrink-0"
+                                        />
+                                        <span className="text-sm text-slate-700 dark:text-slate-300">
+                                            Cortar la tira al terminar
+                                            <span className="block text-xs text-slate-500 dark:text-slate-400">
+                                                Un solo corte al final para desprenderla del rollo. Tendrás que
+                                                reacomodar el rollo antes de la siguiente tanda.
+                                            </span>
+                                        </span>
+                                    </label>
+                                ) : null}
                                 <button
                                     onClick={handlePrintThermal}
                                     disabled={isPrintingThermal || printQuantity < 1 || !labelSize}
