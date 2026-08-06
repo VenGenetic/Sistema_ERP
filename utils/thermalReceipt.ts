@@ -264,7 +264,7 @@ export const reprintOrderReceipt = async (orderId: number | string, copies: numb
         .select(`
             id, created_at, shipping_cost,
             customers (name, identification_number, discount_percentage),
-            accounts (name),
+            accounts!payment_account_id (name),
             order_items (
                 quantity, unit_price,
                 products (sku, name)
