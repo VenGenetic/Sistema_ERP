@@ -84,13 +84,13 @@ async function main() {
 
     // 3. Fetch existing product SKUs and their activation status from database
     console.log("🔍 Fetching existing products in Supabase...");
-    const dbProducts = new Map(); // Map<skuUpper, { is_active: boolean, price: number }>
+    const dbProducts = new Map(); // Map<skuUpper, { id, is_active: boolean, price: number, cost_without_vat: number }>
     let page = 0;
     const pageSize = 1000;
     while (true) {
         const { data, error } = await supabase
             .from('products')
-            .select('sku, is_active, price')
+            .select('id, sku, is_active, price, cost_without_vat')
             .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (error) {
@@ -103,9 +103,11 @@ async function main() {
                 const skuUpper = p.sku.trim().toUpperCase();
                 const existing = dbProducts.get(skuUpper);
                 if (!existing || p.is_active) {
-                    dbProducts.set(skuUpper, { 
+                    dbProducts.set(skuUpper, {
+                        id: p.id,
                         is_active: !!p.is_active,
-                        price: parseFloat(p.price) || 0
+                        price: parseFloat(p.price) || 0,
+                        cost_without_vat: parseFloat(p.cost_without_vat) || 0
                     });
                 }
             }
@@ -125,6 +127,7 @@ async function main() {
     const productsToInsert = [];
     const productsToReactivate = [];
     const productsToUpdate = [];
+    const priceObservationsToInsert = [];
     const processedSkus = new Set();
 
     for (const item of jsonProducts) {
@@ -177,11 +180,11 @@ async function main() {
             productsToInsert.push(productData);
         } else {
             const currentDbPrice = existing.price || 0;
-            
+
             // Check if calculated price is higher than current database price
             let finalPrice = calculated_pvp;
             let priceHasIncreased = false;
-            
+
             if (calculated_pvp > currentDbPrice) {
                 finalPrice = calculated_pvp;
                 priceHasIncreased = true;
@@ -194,6 +197,22 @@ async function main() {
                 ...productData,
                 price: finalPrice
             };
+
+            // Log what the importer showed whenever it differs from what we
+            // have stored, regardless of whether it gets applied below --
+            // otherwise this data is silently lost for active products (see
+            // the disabled productsToUpdate push right after).
+            if (cost_without_vat !== existing.cost_without_vat) {
+                priceObservationsToInsert.push({
+                    product_id: existing.id,
+                    sku: rawSku,
+                    observed_cost_without_vat: cost_without_vat,
+                    observed_pvp: calculated_pvp,
+                    db_cost_without_vat: existing.cost_without_vat,
+                    db_price: existing.price,
+                    applied_to_product: !existing.is_active // only the reactivation path below actually writes it
+                });
+            }
 
             if (!existing.is_active) {
                 // If it is inactive, reactivate it (preserving or increasing the price)
@@ -210,6 +229,28 @@ async function main() {
     console.log(`📦 New products to import: ${productsToInsert.length}`);
     console.log(`📦 Inactive products to reactivate: ${productsToReactivate.length}`);
     console.log(`📦 Active products to update (price increased): ${productsToUpdate.length}`);
+    console.log(`📦 Importer price differences observed (existing products): ${priceObservationsToInsert.length}`);
+
+    // 5b. Log every importer price difference we noticed, whether or not it
+    // gets applied to the product further down.
+    if (priceObservationsToInsert.length > 0) {
+        if (isDryRun) {
+            console.log(`[DRY-RUN] Simulating logging of ${priceObservationsToInsert.length} importer price observations...`);
+        } else {
+            console.log(`📥 Logging ${priceObservationsToInsert.length} importer price observations...`);
+            const batchSize = 500;
+            for (let i = 0; i < priceObservationsToInsert.length; i += batchSize) {
+                const batch = priceObservationsToInsert.slice(i, i + batchSize);
+                const { error } = await supabase.from('importer_price_observations').insert(batch);
+                if (error) {
+                    console.warn(`   ⚠️ Failed to log price observations batch (index ${i}):`, error.message);
+                }
+            }
+            console.log(`✅ Importer price observations logged.`);
+        }
+    } else {
+        console.log("ℹ️ No importer price differences to log.");
+    }
 
     // 6. Perform DB insertion if needed
     if (productsToInsert.length > 0) {
