@@ -4,17 +4,79 @@ import { parseInvoicePdf } from '../utils/invoiceParser';
 import { generateQueuePDF, addToQueue, PrintQueueItem } from '../utils/mobilePrintQueue';
 import { useInvoiceLabelsStore, InvoiceLabelRow } from '../store/useInvoiceLabelsStore';
 import { BatchProductEntry } from '../components/BatchProductEntry';
+import { LabelSizeSelector } from '../components/LabelSizeSelector';
+import { ThermalPrinterSelector } from '../components/ThermalPrinterSelector';
+import { LabelSizePreset } from '../utils/labelPresets';
+import { printLabelsOnThermalPrinter, getCutAtEnd } from '../utils/thermalLabelPrinter';
+
+/**
+ * Reads a print-range expression -- "1-10", "12", "1-5, 8, 14-16" -- into the
+ * set of 1-based line numbers it names.
+ *
+ * Returns null when the text names nothing usable, rather than an empty set.
+ * The difference matters: the caller applies the result as the whole
+ * selection, so a typo that quietly resolved to "nothing" would untick every
+ * line on the invoice instead of reporting a mistake.
+ */
+export const parseRowSelection = (text: string, rowCount: number): Set<number> | null => {
+    const picked = new Set<number>();
+
+    for (const part of text.split(',')) {
+        const chunk = part.trim();
+        if (!chunk) continue;
+
+        const range = chunk.match(/^(\d+)\s*-\s*(\d+)$/);
+        if (range) {
+            let from = Number(range[1]);
+            let to = Number(range[2]);
+            // "10-1" is what someone means by "the first ten" written backwards.
+            if (from > to) [from, to] = [to, from];
+            for (let n = from; n <= to; n++) {
+                if (n >= 1 && n <= rowCount) picked.add(n);
+            }
+            continue;
+        }
+
+        if (/^\d+$/.test(chunk)) {
+            const n = Number(chunk);
+            if (n >= 1 && n <= rowCount) picked.add(n);
+            continue;
+        }
+
+        return null; // one unparseable chunk invalidates the whole expression
+    }
+
+    return picked.size > 0 ? picked : null;
+};
 
 const InvoiceLabels: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const { fileName, invoiceNumber, rows, setInvoice, updateRow, markAddedToInventory, reset } = useInvoiceLabelsStore();
+    const { fileName, invoiceNumber, rows, setInvoice, updateRow, setIncluded, markAddedToInventory, reset } = useInvoiceLabelsStore();
 
     const [isParsing, setIsParsing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isWorking, setIsWorking] = useState(false);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [isBatchEntryOpen, setIsBatchEntryOpen] = useState(false);
+    const [labelSize, setLabelSize] = useState<LabelSizePreset | null>(null);
+    const [isPrintingThermal, setIsPrintingThermal] = useState(false);
+    const [rangeText, setRangeText] = useState('');
+
+    const applyRangeSelection = () => {
+        const picked = parseRowSelection(rangeText, rows.length);
+        if (!picked) {
+            setError(
+                `No entendí "${rangeText}". Escribe números de línea y rangos separados por comas, ` +
+                `por ejemplo: 1-10, 12, 15-18 (hay ${rows.length} línea(s)).`
+            );
+            return;
+        }
+        setError(null);
+        setIncluded(rows.filter((_, i) => picked.has(i + 1)).map(r => r.key));
+        setFeedback(`${picked.size} de ${rows.length} línea(s) seleccionadas.`);
+        setTimeout(() => setFeedback(null), 4000);
+    };
 
     const handleFile = useCallback(async (file: File) => {
         setError(null);
@@ -136,6 +198,35 @@ const InvoiceLabels: React.FC = () => {
             setError('Ocurrió un error al abrir el PDF de etiquetas.');
         } finally {
             setIsWorking(false);
+        }
+    };
+
+    // Unlike the print queue, this needs no catálogo match: the thermal path
+    // only wants a SKU, a name and a count, all of which the invoice already
+    // provides. So every included line prints, including repuestos that have
+    // never been added to the catálogo.
+    const handlePrintThermal = async () => {
+        if (includedRows.length === 0 || !labelSize) return;
+        setIsPrintingThermal(true);
+        setError(null);
+        try {
+            await printLabelsOnThermalPrinter(
+                includedRows.map(r => ({
+                    sku: r.sku,
+                    name: r.labelName || r.description,
+                    quantity: r.quantity,
+                })),
+                { widthMm: labelSize.widthMm, heightMm: labelSize.heightMm },
+                undefined,
+                { gapMm: labelSize.gapMm, offsetMm: labelSize.offsetMm, cutAtEnd: getCutAtEnd() }
+            );
+            setFeedback(`${totalLabels} etiqueta(s) enviadas a la impresora térmica.`);
+            setTimeout(() => setFeedback(null), 5000);
+        } catch (err: any) {
+            console.error('Error al imprimir en térmica:', err);
+            setError(err?.message || 'Ocurrió un error al enviar las etiquetas a la impresora térmica.');
+        } finally {
+            setIsPrintingThermal(false);
         }
     };
 
@@ -265,11 +356,46 @@ const InvoiceLabels: React.FC = () => {
                         </div>
                     </div>
 
+                    <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 shrink-0">
+                            Imprimir líneas:
+                        </label>
+                        <input
+                            type="text"
+                            value={rangeText}
+                            onChange={(e) => setRangeText(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') applyRangeSelection(); }}
+                            placeholder="ej. 1-10, 12"
+                            className="flex-1 min-w-[160px] px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                        <button
+                            onClick={applyRangeSelection}
+                            disabled={!rangeText.trim()}
+                            className="px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 border border-primary/30 rounded-lg disabled:opacity-50 shrink-0"
+                        >
+                            Aplicar
+                        </button>
+                        <span className="text-slate-300 dark:text-slate-600">|</span>
+                        <button
+                            onClick={() => { setIncluded(rows.map(r => r.key)); setRangeText(''); }}
+                            className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg shrink-0"
+                        >
+                            Todas
+                        </button>
+                        <button
+                            onClick={() => { setIncluded([]); setRangeText(''); }}
+                            className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg shrink-0"
+                        >
+                            Ninguna
+                        </button>
+                    </div>
+
                     <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                 <tr>
                                     <th className="p-3 text-left w-10"></th>
+                                    <th className="p-3 text-right w-10">#</th>
                                     <th className="p-3 text-left">Código</th>
                                     <th className="p-3 text-left">Nombre en la etiqueta</th>
                                     <th className="p-3 text-center w-28">Cantidad</th>
@@ -278,7 +404,7 @@ const InvoiceLabels: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {rows.map(row => (
+                                {rows.map((row, idx) => (
                                     <tr key={row.key} className={`border-t border-slate-100 dark:border-slate-800 ${!row.included ? 'opacity-50' : ''}`}>
                                         <td className="p-3">
                                             <input
@@ -287,6 +413,10 @@ const InvoiceLabels: React.FC = () => {
                                                 onChange={() => toggleRow(row.key)}
                                                 className="w-4 h-4 accent-primary"
                                             />
+                                        </td>
+                                        {/* The number the range box refers to. */}
+                                        <td className="p-3 text-right font-mono text-slate-400 dark:text-slate-500 tabular-nums">
+                                            {idx + 1}
                                         </td>
                                         <td className="p-3 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{row.sku}</td>
                                         <td className="p-3">
@@ -347,6 +477,31 @@ const InvoiceLabels: React.FC = () => {
                             {pendingInventoryRows.length === 0
                                 ? 'Ya enviado a Entrada por Lote'
                                 : `Enviar a Entrada por Lote (${pendingInventoryRows.reduce((a, r) => a + r.quantity, 0)})`}
+                        </button>
+                    </div>
+
+                    <div className="flex flex-col gap-3 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <span className="material-symbols-outlined">receipt_long</span>
+                            Impresora Térmica
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Imprime las {totalLabels} etiqueta(s) directamente, sin generar un PDF. Incluye los
+                            repuestos que aún no están en el catálogo.
+                        </p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
+                            <ThermalPrinterSelector />
+                        </div>
+                        <button
+                            onClick={handlePrintThermal}
+                            disabled={isPrintingThermal || includedRows.length === 0 || !labelSize}
+                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            <span className={`material-symbols-outlined ${isPrintingThermal ? 'animate-spin' : ''}`}>
+                                {isPrintingThermal ? 'progress_activity' : 'print'}
+                            </span>
+                            {isPrintingThermal ? 'Enviando...' : `Imprimir en Térmica (${totalLabels})`}
                         </button>
                     </div>
 

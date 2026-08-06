@@ -23,6 +23,12 @@ interface InvoiceLabelsState {
 
     setInvoice: (fileName: string, invoiceNumber: string | null, rows: InvoiceLabelRow[]) => void;
     updateRow: (key: string, patch: Partial<InvoiceLabelRow>) => void;
+    /**
+     * Replaces the whole inclusion selection at once. Doing this row by row
+     * through updateRow would re-map the array (and re-render) once per row,
+     * which is wasteful on a long invoice.
+     */
+    setIncluded: (keys: string[]) => void;
     markAddedToInventory: (keys: string[]) => void;
     reset: () => void;
 }
@@ -41,6 +47,11 @@ export const useInvoiceLabelsStore = create<InvoiceLabelsState>()(
             updateRow: (key, patch) => set((state) => ({
                 rows: state.rows.map(r => (r.key === key ? { ...r, ...patch } : r)),
             })),
+
+            setIncluded: (keys) => set((state) => {
+                const wanted = new Set(keys);
+                return { rows: state.rows.map(r => ({ ...r, included: wanted.has(r.key) })) };
+            }),
 
             markAddedToInventory: (keys) => set((state) => ({
                 rows: state.rows.map(r => (keys.includes(r.key) ? { ...r, addedToInventory: true } : r)),

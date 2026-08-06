@@ -46,13 +46,21 @@ export const STANDARD_LABEL_PRESETS: LabelSizePreset[] = [
     // called "60x40" because the liner is 60mm: 58mm of label with 1mm
     // showing each side.
     //
-    // gapMm sets the pitch, and it is calibrated from observed drift rather
-    // than measured by eye, because drift is the far more sensitive
-    // instrument: feeding 44mm made the artwork climb 2mm per label, which
-    // puts the true pitch at 46mm, so the gap is 6mm and not the ~3mm it
-    // looks like. (Artwork climbing means the feed is short; sinking would
-    // mean it is long.) Re-derive the same way if the roll is ever swapped:
-    // new gap = old gap + climb-per-label.
+    // gapMm sets the pitch and is a calibration value, not a measurement --
+    // do not "correct" it to the ~6mm the gap actually measures. It is
+    // derived from observed drift, which is a far more sensitive instrument
+    // than a ruler: artwork climbing means the feed is short, sinking means
+    // it is long, and new gap = old gap + climb-per-label.
+    //
+    // Two rounds got it here. Feeding a 44mm pitch made the artwork climb
+    // 2mm per label, putting the true pitch at 46. At 46 it still climbed,
+    // but only 0.45mm per label (the logo, which ends 4.5mm down, vanished
+    // after ten labels). That last 0.45mm over a 46mm pitch is a 0.98%
+    // shortfall -- the roller simply advances about 1% less than commanded,
+    // which is mechanical tolerance rather than anything computable, so the
+    // commanded pitch is padded to absorb it.
+    //
+    // 6.45 is therefore 6mm of real gap plus 0.45mm of scale compensation.
     //
     // This roll is printed as an uncut strip on purpose. Having the printer
     // cut each label free was implemented and abandoned: it needs the cut to
@@ -61,7 +69,7 @@ export const STANDARD_LABEL_PRESETS: LabelSizePreset[] = [
     // it, so every label after the first loses its leading 10mm. Recovering
     // that needs reverse-feed, which the firmware does not expose over
     // ESC/POS. Tearing the strip by hand costs nothing and always aligns.
-    { id: 'diecut-58x40', name: '58 x 40 mm (Troquelada, rollo 60mm)', widthMm: 58, heightMm: 40, gapMm: 6, offsetMm: 0, builtIn: true },
+    { id: 'diecut-58x40', name: '58 x 40 mm (Troquelada, rollo 60mm)', widthMm: 58, heightMm: 40, gapMm: 6.45, offsetMm: 0, builtIn: true },
 ];
 
 /**
