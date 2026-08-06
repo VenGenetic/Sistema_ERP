@@ -89,7 +89,7 @@ const renderReceiptToCanvas = async (data: ReceiptData): Promise<HTMLCanvasEleme
 
     const BODY = mm(2.8);
     const SMALL = mm(2.3);
-    const ITEM_TITLE = mm(2.4);
+    const ITEM_TITLE = mm(1.8);
     const BIG = mm(4.2);
     const LINE = Math.round(BODY * 1.35);
 
