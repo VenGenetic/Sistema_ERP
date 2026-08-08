@@ -7,7 +7,7 @@ import { BatchProductEntry } from '../components/BatchProductEntry';
 import { LabelSizeSelector } from '../components/LabelSizeSelector';
 import { ThermalPrinterSelector } from '../components/ThermalPrinterSelector';
 import { LabelSizePreset } from '../utils/labelPresets';
-import { printLabelsOnThermalPrinter, getCutAtEnd } from '../utils/thermalLabelPrinter';
+import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
 
 /**
  * Reads a print-range expression -- "1-10", "12", "1-5, 8, 14-16" -- into the
@@ -218,7 +218,7 @@ const InvoiceLabels: React.FC = () => {
                 })),
                 { widthMm: labelSize.widthMm, heightMm: labelSize.heightMm },
                 undefined,
-                { gapMm: labelSize.gapMm, offsetMm: labelSize.offsetMm, cutAtEnd: getCutAtEnd() }
+                { gapMm: labelSize.gapMm }
             );
             setFeedback(`${totalLabels} etiqueta(s) enviadas a la impresora térmica.`);
             setTimeout(() => setFeedback(null), 5000);

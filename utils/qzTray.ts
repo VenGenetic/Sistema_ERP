@@ -198,3 +198,38 @@ export const printRasterJobs = async (printerName: string, jobs: RasterPrintJob[
 
     await qz.print(config, data);
 };
+
+/**
+ * Converts a byte array to base64 without going through String.fromCharCode
+ * on the whole array at once -- spreading a large typed array into that
+ * call as individual arguments can blow the JS engine's argument-count
+ * limit. Chunking keeps it safe for arbitrarily large bitmaps.
+ */
+const uint8ToBase64 = (bytes: Uint8Array): string => {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+};
+
+/**
+ * Sends one complete TSPL command stream (page setup + BITMAP + PRINT,
+ * built by thermalLabelPrinter.ts) to the Xprinter XP-450B label printer.
+ *
+ * Unlike the ESC/POS path above, this does not ask QZ Tray to encode an
+ * image for us -- the caller has already rendered, binarised and bit-packed
+ * the label into a raw TSPL byte stream (ASCII setup commands + a binary
+ * BITMAP payload + the PRINT trigger). That stream contains non-text bytes,
+ * so it travels as a single base64-encoded raw command rather than a plain
+ * string: QZ Tray decodes it back to the exact bytes and writes them to the
+ * printer as-is, with nothing in between able to reinterpret them.
+ */
+export const printTsplJob = async (printerName: string, tsplBytes: Uint8Array): Promise<void> => {
+    await ensureQzConnected();
+    const config = qz.configs.create(printerName);
+    await qz.print(config, [
+        { type: 'raw', format: 'command', flavor: 'base64', data: uint8ToBase64(tsplBytes) },
+    ]);
+};

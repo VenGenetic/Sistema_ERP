@@ -11,7 +11,7 @@ import {
     PrintQueueItem
 } from '../utils/mobilePrintQueue';
 import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
-import { printLabelsOnThermalPrinter, getCutAtEnd } from '../utils/thermalLabelPrinter';
+import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
 import { LabelSizeSelector } from './LabelSizeSelector';
 import { ThermalPrinterSelector } from './ThermalPrinterSelector';
 import { LabelSizePreset } from '../utils/labelPresets';
@@ -165,7 +165,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                 queue.map((item) => ({ sku: item.sku, name: item.name, quantity: item.quantity })),
                 { widthMm: labelSize.widthMm, heightMm: labelSize.heightMm },
                 undefined,
-                { gapMm: labelSize.gapMm, offsetMm: labelSize.offsetMm, cutAtEnd: getCutAtEnd() }
+                { gapMm: labelSize.gapMm }
             );
             if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
         } catch (error: any) {
