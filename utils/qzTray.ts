@@ -32,11 +32,32 @@ const configureSecurity = (): void => {
     securityConfigured = true;
 };
 
+// qz.websocket.isActive() reports true as soon as the socket reaches
+// CONNECTING, not just once it's OPEN -- so two overlapping callers (e.g.
+// the printer selector's "Detectar" and a checkout print firing around the
+// same time) can race: the second one sees isActive() already true, skips
+// connect(), and calls straight into qz.printers.find()/print() before QZ
+// Tray's onopen handler has attached connection.sendData, throwing
+// "sendData is not a function". Funneling every caller through the same
+// in-flight connect() promise means the second caller waits for the first
+// connection attempt to actually finish instead of racing it.
+let connectingPromise: Promise<void> | null = null;
+
 export const ensureQzConnected = async (): Promise<void> => {
     configureSecurity();
-    if (qz.websocket.isActive()) return;
+
+    // Check the in-flight attempt *before* isActive(): isActive() alone
+    // would already read true for a connection still in CONNECTING state,
+    // which is exactly the state a concurrent caller must not act on yet.
+    if (!connectingPromise) {
+        if (qz.websocket.isActive()) return;
+        connectingPromise = qz.websocket.connect().finally(() => {
+            connectingPromise = null;
+        });
+    }
+
     try {
-        await qz.websocket.connect();
+        await connectingPromise;
     } catch (err) {
         throw new Error(
             'No se pudo conectar con QZ Tray. Verifica que la aplicación "QZ Tray" esté instalada y ' +

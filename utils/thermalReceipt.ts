@@ -1,20 +1,25 @@
 /**
  * thermalReceipt.ts
- * Prints a POS sale as a receipt on the 80mm thermal printer, over the same
- * raw ESC/POS raster path the barcode labels use (utils/qzTray.ts).
+ * Prints a POS sale as a receipt on the 80mm thermal printer, through
+ * window.print() with an explicit @page matching the receipt's rendered
+ * size -- the same mechanism thermalLabelPrinter.ts originally used for
+ * barcode labels, before that file was switched to QZ Tray. QZ Tray
+ * requires its own desktop app to be installed, running, and have its
+ * certificate trusted on every POS machine, which turned out to be an
+ * unreliable dependency in the field; window.print() only needs the
+ * thermal printer to be set up as a normal Windows/OS printer, same as
+ * any other, and prints through the browser's own print pipeline.
  *
  * Receipts are rendered as a bitmap rather than as ESC/POS text because the
  * text path would put layout at the mercy of the printer's own font metrics
  * and codepage -- and this shop prints Spanish, where a mis-set codepage
  * turns every accented character into noise. Drawing to a canvas keeps the
- * layout, the accents and the column alignment under our control, and it
- * reuses the oversample-and-binarise trick that made the labels crisp.
+ * layout, the accents and the column alignment under our control.
  *
  * NOTE ON PAPER: this expects continuous 80mm roll stock, not the die-cut
  * label roll. Receipts are variable length and get cut at the end, which is
  * exactly what die-cut stock cannot do (see thermalLabelPrinter.ts).
  */
-import { printRasterJobs, resolveThermalPrinterName } from './qzTray';
 import { loadBrandLogo, BRAND_NAME } from './brandLogo';
 import { supabase } from '../supabaseClient';
 
@@ -216,44 +221,62 @@ const renderReceiptToCanvas = async (data: ReceiptData): Promise<HTMLCanvasEleme
     return cropped;
 };
 
-/** Downsamples to device dots and forces pure black/white, as labels do. */
-const toDeviceBase64 = (source: HTMLCanvasElement): string => {
-    const dotsW = RECEIPT_DOTS_WIDTH;
-    const dotsH = Math.round(source.height / OVERSAMPLE);
+/**
+ * Sends the rendered receipt to window.print() via a hidden iframe, one
+ * "page" per copy, with @page sized to exactly match the canvas -- same
+ * approach as the pre-QZ Tray thermalLabelPrinter.ts. Resolves once the
+ * iframe is torn down, giving the browser's print pipeline time to pick up
+ * the content before it disappears from the DOM.
+ */
+const printCanvasViaBrowser = (canvas: HTMLCanvasElement, copies: number): Promise<void> => {
+    const widthMm = (canvas.width / OVERSAMPLE / THERMAL_DPI) * 25.4;
+    const heightMm = (canvas.height / OVERSAMPLE / THERMAL_DPI) * 25.4;
+    const imgData = canvas.toDataURL('image/png', 1.0);
+    const pages = Array.from(
+        { length: Math.max(1, copies) },
+        () => `<div class="receipt-page"><img src="${imgData}" /></div>`
+    ).join('');
 
-    const out = document.createElement('canvas');
-    out.width = dotsW;
-    out.height = dotsH;
-    const ctx = out.getContext('2d')!;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, dotsW, dotsH);
-    ctx.drawImage(source, 0, 0, dotsW, dotsH);
+    return new Promise((resolve) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
 
-    const img = ctx.getImageData(0, 0, dotsW, dotsH);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-        const luma = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-        const v = luma < 128 ? 0 : 255;
-        d[i] = d[i + 1] = d[i + 2] = v;
-        d[i + 3] = 255;
-    }
-    ctx.putImageData(img, 0, 0);
+        iframe.contentDocument?.open();
+        iframe.contentDocument?.write(`
+            <html>
+                <head>
+                    <title>Recibo</title>
+                    <style>
+                        @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        .receipt-page { width: ${widthMm}mm; height: ${heightMm}mm; page-break-after: always; }
+                        .receipt-page:last-child { page-break-after: auto; }
+                        .receipt-page img { display: block; width: 100%; height: 100%; }
+                    </style>
+                </head>
+                <body onload="window.print();">
+                    ${pages}
+                </body>
+            </html>
+        `);
+        iframe.contentDocument?.close();
 
-    return out.toDataURL('image/png', 1.0).split(',')[1];
+        setTimeout(() => {
+            if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+            }
+            resolve();
+        }, 3000);
+    });
 };
 
 export const printReceiptOnThermalPrinter = async (
     data: ReceiptData,
-    printerName?: string,
     copies: number = 2
 ): Promise<void> => {
     const canvas = await renderReceiptToCanvas(data);
-    const base64Png = toDeviceBase64(canvas);
-    const targetPrinter = printerName ?? (await resolveThermalPrinterName());
-    const jobs = Array.from({ length: Math.max(1, copies) }, () => ({ base64Png, cutAfter: true }));
-    await printRasterJobs(targetPrinter, jobs);
+    await printCanvasViaBrowser(canvas, copies);
 };
 
 /** Reimprime el recibo de una orden existente llamando a la BD y enviándolo a la impresora térmica (2 copias por defecto) */
@@ -300,7 +323,7 @@ export const reprintOrderReceipt = async (orderId: number | string, copies: numb
         paymentMethod: (order.accounts as any)?.name || undefined,
     };
 
-    await printReceiptOnThermalPrinter(receiptData, undefined, copies);
+    await printReceiptOnThermalPrinter(receiptData, copies);
 };
 
 /** Renders the receipt for on-screen preview without touching the printer. */

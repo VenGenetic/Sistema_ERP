@@ -8,7 +8,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { PaymentModal } from '../components/pos/PaymentModal';
 import { printReceiptOnThermalPrinter } from '../utils/thermalReceipt';
-import { ThermalPrinterSelector } from '../components/ThermalPrinterSelector';
 
 const POS: React.FC = () => {
     const navigate = useNavigate();
@@ -565,11 +564,7 @@ const POS: React.FC = () => {
      * cartRef rather than the render-time cart so it cannot pick up a stale
      * snapshot if the component re-rendered while the RPC was in flight.
      */
-    const printSaleReceipt = async (
-        orderId: number | string | null,
-        paymentAccountId: number,
-        shippingCost?: number
-    ) => {
+    const printSaleReceipt = async (orderId: number | string | null, paymentAccountId: number, shippingCost?: number) => {
         const items = cartRef.current;
         if (items.length === 0) return;
 
@@ -1254,9 +1249,6 @@ const POS: React.FC = () => {
                         </div>
 
                         {/* Removed duplicate payment selector here since it is now in the modal */}
-                        <div className="mt-4 pt-4 border-t border-slate-200">
-                            <ThermalPrinterSelector />
-                        </div>
 
                     </div>
 
