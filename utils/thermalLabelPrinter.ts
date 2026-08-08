@@ -73,9 +73,17 @@ const toPackedBitmap = (source: HTMLCanvasElement, dotsW: number, dotsH: number)
                 d[(y * dotsW + x) * 4] * 0.299 +
                 d[(y * dotsW + x) * 4 + 1] * 0.587 +
                 d[(y * dotsW + x) * 4 + 2] * 0.114;
-            // A set bit burns a dot. Threshold at the same 50% midpoint used
-            // everywhere else in this pipeline.
-            if (luma < 128) {
+            // True TSPL defines a set bit as "burn this dot" -- but this
+            // printer's BITMAP implementation does the opposite (a set bit
+            // leaves the dot white). Confirmed three ways, not guessed: a
+            // solid-0x00 test buffer printed solid black while solid-0xFF
+            // printed blank, identically whether sent by writing straight
+            // to the Windows spooler or through this exact printTsplJob
+            // path, and a real label with this condition printed correctly
+            // (dark content burned, white background stayed white). If this
+            // printer is ever swapped, re-run that 0x00/0xFF check before
+            // trusting either polarity again.
+            if (luma >= 128) {
                 packed[y * widthBytes + (x >> 3)] |= 0x80 >> (x & 7);
             }
         }
