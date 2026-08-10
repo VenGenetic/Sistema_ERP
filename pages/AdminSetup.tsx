@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { Button, Input } from '../components/ui';
 
 const AdminSetup: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -32,45 +33,43 @@ const AdminSetup: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
-            <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-8 border border-gray-700">
-                <h2 className="text-2xl font-bold text-white mb-6 text-center">Configuración Inicial: Crear Admin</h2>
+        <div className="min-h-screen bg-bg flex items-center justify-center px-4">
+            <div className="max-w-md w-full bg-surface rounded-xl shadow-lg p-8 border border-subtle">
+                <h2 className="text-xl font-bold text-fg mb-6 text-center tracking-tight">
+                    Configuración Inicial: Crear Admin
+                </h2>
 
                 {message && (
-                    <div className={`mb-4 p-3 rounded text-sm ${message.type === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                    <div
+                        role="alert"
+                        className={`mb-4 p-3 rounded-lg text-sm border ${message.type === 'success'
+                            ? 'bg-success-soft text-success-soft-fg border-success/20'
+                            : 'bg-danger-soft text-danger-soft-fg border-danger/20'}`}
+                    >
                         {message.text}
                     </div>
                 )}
 
                 <form onSubmit={handleSignUp} className="space-y-4">
-                    <div>
-                        <label className="block text-gray-300 text-sm font-medium mb-1">Correo Electrónico</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-gray-300 text-sm font-medium mb-1">Contraseña</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                            required
-                            minLength={6}
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors disabled:opacity-50"
-                    >
-                        {loading ? 'Creando...' : 'Crear Usuario Admin'}
-                    </button>
+                    <Input
+                        label="Correo Electrónico"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                    />
+                    <Input
+                        label="Contraseña"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        hint="Mínimo 6 caracteres."
+                    />
+                    <Button type="submit" variant="primary" size="lg" fullWidth loading={loading}>
+                        {loading ? 'Creando…' : 'Crear Usuario Admin'}
+                    </Button>
                 </form>
             </div>
         </div>

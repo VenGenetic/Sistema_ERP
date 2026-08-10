@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 
 <head>
   <meta charset="utf-8" />
@@ -24,6 +24,23 @@
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   </script>
+
+  <!--
+    Theme bootstrap. Runs before first paint to avoid a flash of the wrong theme.
+    Base theme is LIGHT; 'dark' is opt-in and persisted in localStorage under 'theme'.
+    Toggle at runtime with the helpers in utils/theme.ts.
+  -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('theme');
+        var useDark = stored === 'dark' ||
+          (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', useDark);
+      } catch (e) { /* localStorage blocked — stay on light */ }
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DropshipERP Suite</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
@@ -32,64 +49,388 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
   <link rel="manifest" href="/site.webmanifest">
   <meta name="msapplication-TileColor" content="#da532c">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap"
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <link
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
     rel="stylesheet" />
+
+  <!--
+    ============================================================================
+    DESIGN TOKENS  (single source of truth)
+    ============================================================================
+    Every colour is declared once here as an "R G B" triplet and consumed by the
+    Tailwind config below as rgb(var(--token) / <alpha-value>). That means:
+
+      * one definition per role, not per theme-per-component;
+      * `bg-surface` / `text-muted` / `border-subtle` flip automatically when the
+        `dark` class lands on <html> — no `dark:` variant needed at call sites;
+      * opacity modifiers still work (`bg-primary/10`, `border-subtle/50`).
+
+    Legacy token names (primary, surface-dark, border-dark, text-secondary, …)
+    are kept and re-pointed at these same variables so the ~170 call sites that
+    already use them become theme-aware for free.
+    ========================================================================= -->
+  <style>
+    :root {
+      /* ---------------------------------------------------------------
+         PALETA SERENA
+         Los acentos están desaturados a ~40-45% de croma (antes 72-94%).
+         La serenidad se consigue bajando el CROMA, nunca el contraste de
+         luminancia: por eso todos los pares siguen cumpliendo WCAG AA.
+         Verificar con `npm run check-contrast` tras cualquier cambio.
+         --------------------------------------------------------------- */
+
+      /* Superficies — gris neutro frío, croma casi nulo */
+      --bg: 247 248 250;
+      /* fondo de página                          */
+      --surface: 255 255 255;
+      /* tarjetas, tablas, modales                */
+      --surface-2: 247 248 250;
+      /* cabeceras de tabla, pozos                */
+      --surface-3: 237 239 243;
+      /* inset / deshabilitado                    */
+      --surface-hover: 241 243 247;
+      /* hover de fila y de navegación            */
+
+      /* Bordes */
+      --border: 227 230 236;
+      /* hairline — separación decorativa         */
+      --border-strong: 134 143 161;
+      /* borde de input          3.3:1  croma 13% */
+
+      /* Texto — 3 niveles bastan para una interfaz densa */
+      --fg: 27 36 54;
+      /* títulos, totales       15.7:1 (negro suavizado, no #000) */
+      --fg-muted: 98 109 128;
+      /* dato secundario         5.0:1 */
+      --fg-subtle: 131 142 159;
+      /* placeholders, pistas    3.2:1 */
+
+      /* Acentos funcionales — un tono por significado, nunca decorativo.
+         Cada color trae su `-fg`: el texto que va ENCIMA del color.
+         En claro los acentos son oscuros, así que su `-fg` es blanco. */
+      --primary: 60 107 160;
+      /* azul acero              5.1:1  croma 45% */
+      --primary-hover: 50 90 135;
+      --primary-fg: 255 255 255;
+      --primary-soft: 237 242 248;
+      --primary-soft-fg: 47 85 128;
+      /* 6.6:1 */
+
+      --success: 63 122 94;
+      /* verde salvia            4.7:1  croma 32% */
+      --success-fg: 255 255 255;
+      --success-soft: 237 245 241;
+      --success-soft-fg: 53 102 78;
+      /* 5.8:1 */
+
+      --warning: 133 106 56;
+      /* ocre apagado            5.1:1  croma 41% */
+      --warning-fg: 255 255 255;
+      --warning-soft: 250 244 232;
+      --warning-soft-fg: 111 89 48;
+      /* 5.9:1 */
+
+      --danger: 168 68 63;
+      /* teja apagada            5.5:1  croma 45% */
+      --danger-hover: 142 57 52;
+      --danger-fg: 255 255 255;
+      --danger-soft: 250 238 237;
+      --danger-soft-fg: 142 57 52;
+      /* 7.0:1 */
+
+      --ring: 60 107 160;
+      /* anillo de foco = primario */
+
+      /* Tinte de elevación (las sombras van teñidas, nunca negro puro) */
+      --shadow-color: 27 36 54;
+    }
+
+    .dark {
+      /* Oscuro sereno: superficies con azul apagado en vez de negro puro.
+         Los escalones entre --bg / --surface / --surface-2 son cortos a
+         propósito, para que la jerarquía se lea sin bordes duros. */
+      --bg: 18 22 31;
+      --surface: 26 31 43;
+      --surface-2: 31 37 50;
+      --surface-3: 38 45 60;
+      --surface-hover: 36 43 57;
+
+      --border: 46 55 70;
+      --border-strong: 104 115 141;
+      /* 3.5:1 sobre superficie — identifica el borde de los inputs */
+
+      --fg: 232 235 240;
+      /* blanco suavizado: el blanco puro sobre fondo oscuro deslumbra
+         y cansa la vista en jornadas largas de mostrador */
+      --fg-muted: 154 164 181;
+      --fg-subtle: 110 120 137;
+
+      /* En oscuro los acentos son CLAROS, así que el texto que va encima
+         es tinta oscura, no blanco. Por eso cada `-fg` se invierte aquí:
+         blanco sobre un ocre claro daría 2.2:1 (ilegible). */
+      --primary: 124 163 212;
+      /* azul acero claro    7.0:1  croma 51% */
+      --primary-hover: 153 184 224;
+      --primary-fg: 16 22 32;
+      --primary-soft: 35 54 79;
+      --primary-soft-fg: 184 208 234;
+
+      --success: 111 175 141;
+      /* salvia claro        7.4:1  croma 29% */
+      --success-fg: 16 22 32;
+      --success-soft: 30 58 46;
+      --success-soft-fg: 169 214 190;
+
+      --warning: 194 159 108;
+      /* ocre claro          6.6:1  croma 41% */
+      --warning-fg: 16 22 32;
+      --warning-soft: 61 48 22;
+      --warning-soft-fg: 232 206 150;
+
+      --danger: 217 128 121;
+      /* teja clara          5.7:1  croma 56% */
+      --danger-hover: 229 154 148;
+      --danger-fg: 16 22 32;
+      --danger-soft: 69 33 31;
+      --danger-soft-fg: 239 184 179;
+
+      --ring: 124 163 212;
+      --shadow-color: 0 0 0;
+    }
+  </style>
+
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
+        /*
+          Radius scale. The previous config flattened lg/xl/2xl/3xl to 4px, which
+          silently squared off 966 existing `rounded-*` classes. These values
+          restore a proportional scale, so the markup that already asks for
+          `rounded-lg` / `rounded-xl` now renders as intended.
+        */
         borderRadius: {
           'none': '0px',
-          'sm': '2px',
-          'DEFAULT': '3px',
-          'md': '4px',
-          'lg': '4px',
-          'xl': '4px',
-          '2xl': '4px',
-          '3xl': '4px',
+          'sm': '0.25rem',   /* 4px  — badges, chips, inline tags   */
+          'DEFAULT': '0.375rem', /* 6px  — inputs, small buttons        */
+          'md': '0.375rem',  /* 6px                                 */
+          'lg': '0.5rem',    /* 8px  — buttons, nav items           */
+          'xl': '0.625rem',  /* 10px — cards, panels                */
+          '2xl': '0.875rem', /* 14px — modals, KPI cards            */
+          '3xl': '1.25rem',  /* 20px — hero surfaces                */
           'full': '9999px',
         },
         extend: {
           colors: {
-            primary: "#1877F2",
-            "primary-hover": "#166fe5",
-            "background-light": "#f6f7f8",
-            "background-dark": "#101822",
-            "surface-dark": "#192433",
-            "surface-hover": "#233348",
-            "border-dark": "#324867",
-            "text-secondary": "#92a9c9",
-            "dark-bg": "#121212",
-            "dark-card": "#1E1E1E",
-            "dark-input": "#252525",
-            "dark-border": "#333333",
+            /* ---- semantic (preferred going forward) ---- */
+            bg: 'rgb(var(--bg) / <alpha-value>)',
+            surface: {
+              DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
+              2: 'rgb(var(--surface-2) / <alpha-value>)',
+              3: 'rgb(var(--surface-3) / <alpha-value>)',
+              hover: 'rgb(var(--surface-hover) / <alpha-value>)',
+            },
+            subtle: 'rgb(var(--border) / <alpha-value>)',
+            strong: 'rgb(var(--border-strong) / <alpha-value>)',
+            fg: {
+              DEFAULT: 'rgb(var(--fg) / <alpha-value>)',
+              muted: 'rgb(var(--fg-muted) / <alpha-value>)',
+              subtle: 'rgb(var(--fg-subtle) / <alpha-value>)',
+            },
+            primary: {
+              DEFAULT: 'rgb(var(--primary) / <alpha-value>)',
+              hover: 'rgb(var(--primary-hover) / <alpha-value>)',
+              fg: 'rgb(var(--primary-fg) / <alpha-value>)',
+              soft: 'rgb(var(--primary-soft) / <alpha-value>)',
+              'soft-fg': 'rgb(var(--primary-soft-fg) / <alpha-value>)',
+            },
+            success: {
+              DEFAULT: 'rgb(var(--success) / <alpha-value>)',
+              fg: 'rgb(var(--success-fg) / <alpha-value>)',
+              soft: 'rgb(var(--success-soft) / <alpha-value>)',
+              'soft-fg': 'rgb(var(--success-soft-fg) / <alpha-value>)',
+            },
+            warning: {
+              DEFAULT: 'rgb(var(--warning) / <alpha-value>)',
+              fg: 'rgb(var(--warning-fg) / <alpha-value>)',
+              soft: 'rgb(var(--warning-soft) / <alpha-value>)',
+              'soft-fg': 'rgb(var(--warning-soft-fg) / <alpha-value>)',
+            },
+            danger: {
+              DEFAULT: 'rgb(var(--danger) / <alpha-value>)',
+              hover: 'rgb(var(--danger-hover) / <alpha-value>)',
+              fg: 'rgb(var(--danger-fg) / <alpha-value>)',
+              soft: 'rgb(var(--danger-soft) / <alpha-value>)',
+              'soft-fg': 'rgb(var(--danger-soft-fg) / <alpha-value>)',
+            },
+
+            /* ---- legacy aliases, re-pointed at the same variables ----
+               Kept so existing markup keeps working AND becomes theme-aware.
+               Prefer the semantic names above in new code.               */
+            'primary-hover': 'rgb(var(--primary-hover) / <alpha-value>)',
+            'background-light': 'rgb(var(--bg) / <alpha-value>)',
+            'background-dark': 'rgb(var(--bg) / <alpha-value>)',
+            'surface-dark': 'rgb(var(--surface) / <alpha-value>)',
+            'surface-hover': 'rgb(var(--surface-hover) / <alpha-value>)',
+            'border-dark': 'rgb(var(--border) / <alpha-value>)',
+            'text-secondary': 'rgb(var(--fg-muted) / <alpha-value>)',
+            'dark-bg': 'rgb(var(--bg) / <alpha-value>)',
+            'dark-card': 'rgb(var(--surface) / <alpha-value>)',
+            'dark-input': 'rgb(var(--surface-2) / <alpha-value>)',
+            'dark-border': 'rgb(var(--border) / <alpha-value>)',
           },
           fontFamily: {
-            sans: ["Inter", "sans-serif"],
-            display: ["Inter", "sans-serif"],
+            sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+            display: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+            /* JetBrains Mono: usada en todo el Catálogo y en cualquier dato
+               de código (SKU, referencias). Su altura-x alta y sus formas
+               abiertas la hacen legible a 13px, a diferencia de la mayoría
+               de monoespaciadas. */
+            mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
           },
+          /*
+            Escala tipográfica modular (razón ~1.2, "Minor Third" recortada).
+            Cada paso lleva su interlineado y tracking calculados:
+              - cuerpo a 1.5x de interlineado (legibilidad, WCAG 1.4.12)
+              - títulos progresivamente más apretados (tracking negativo),
+                porque a mayor tamaño el ojo percibe más espacio entre letras
+            Se declaran explícitos para que todas las pantallas usen los
+            mismos valores en vez de heredar los de Tailwind por defecto.
+          */
+          fontSize: {
+            '2xs': ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.01em' }],      /* 11px etiquetas */
+            'xs': ['0.75rem', { lineHeight: '1.125rem' }],                              /* 12px meta      */
+            'sm': ['0.8125rem', { lineHeight: '1.25rem' }],                             /* 13px UI densa  */
+            'base': ['0.875rem', { lineHeight: '1.3125rem' }],                          /* 14px cuerpo    */
+            'lg': ['1rem', { lineHeight: '1.5rem', letterSpacing: '-0.006em' }],        /* 16px           */
+            'xl': ['1.125rem', { lineHeight: '1.625rem', letterSpacing: '-0.012em' }],  /* 18px           */
+            '2xl': ['1.375rem', { lineHeight: '1.875rem', letterSpacing: '-0.018em' }], /* 22px título    */
+            '3xl': ['1.75rem', { lineHeight: '2.125rem', letterSpacing: '-0.022em' }],  /* 28px           */
+            '4xl': ['2.125rem', { lineHeight: '2.5rem', letterSpacing: '-0.026em' }],   /* 34px cifra KPI */
+          },
+          ringColor: {
+            DEFAULT: 'rgb(var(--ring) / <alpha-value>)',
+          },
+          /*
+            Rampa de elevación serena: mucho desenfoque, poca opacidad, y
+            teñida con --shadow-color en vez de negro puro. Una sombra dura
+            "grita"; una difusa del mismo color del texto se integra.
+            Cada paso duplica aproximadamente el desenfoque del anterior.
+          */
           boxShadow: {
-            "glow": "0 0 20px rgba(0, 0, 0, 0.5), 0 0 5px rgba(255, 255, 255, 0.05)",
-          }
+            'xs': '0 1px 2px 0 rgb(var(--shadow-color) / 0.03)',
+            'sm': '0 1px 3px 0 rgb(var(--shadow-color) / 0.04), 0 1px 2px -1px rgb(var(--shadow-color) / 0.03)',
+            DEFAULT: '0 2px 6px -1px rgb(var(--shadow-color) / 0.05), 0 1px 3px -1px rgb(var(--shadow-color) / 0.04)',
+            'md': '0 4px 12px -2px rgb(var(--shadow-color) / 0.06), 0 2px 5px -2px rgb(var(--shadow-color) / 0.04)',
+            'lg': '0 12px 28px -6px rgb(var(--shadow-color) / 0.08), 0 4px 10px -4px rgb(var(--shadow-color) / 0.04)',
+            'xl': '0 20px 48px -12px rgb(var(--shadow-color) / 0.11), 0 6px 14px -6px rgb(var(--shadow-color) / 0.05)',
+            '2xl': '0 32px 72px -16px rgb(var(--shadow-color) / 0.16)',
+            'glow': '0 0 0 1px rgb(var(--primary) / 0.14), 0 4px 16px -2px rgb(var(--primary) / 0.16)',
+          },
+          /*
+            Movimiento: 180ms con salida suave. Por debajo de 150ms el cambio
+            se percibe brusco; por encima de 250ms, lento. La curva
+            "ease-out" arranca rápido y frena, que es lo que se lee como
+            calmado. (Anulado por prefers-reduced-motion más abajo.)
+          */
+          transitionDuration: {
+            DEFAULT: '180ms',
+          },
+          transitionTimingFunction: {
+            DEFAULT: 'cubic-bezier(0.32, 0.72, 0, 1)',
+          },
+          keyframes: {
+            'fade-in': {
+              from: { opacity: '0' },
+              to: { opacity: '1' },
+            },
+            'scale-in': {
+              from: { opacity: '0', transform: 'translateY(4px) scale(.985)' },
+              to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+            },
+          },
+          animation: {
+            'fade-in': 'fade-in .15s ease-out',
+            'scale-in': 'scale-in .18s cubic-bezier(.16,1,.3,1)',
+          },
         },
       },
     }
   </script>
+
   <style type="text/tailwindcss">
     @layer utilities {
       .gradient-btn {
-        background: linear-gradient(135deg, #1877F2 0%, #0d61d1 100%);
+        background: linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--primary-hover)) 100%);
+      }
+
+      /* Used by the Layout main scroll area — was previously a no-op class. */
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Numeric columns: fixed-width digits so decimals line up down the column. */
+      .tnum {
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1, 'cv05' 1;
       }
     }
   </style>
+
   <style>
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      /* Inter's contextual alternates + straight-sided digits read better in tables */
+      font-feature-settings: 'cv05' 1, 'ss03' 1;
+    }
+
+    /* A single, consistent keyboard focus ring for the whole app.
+       Applies only to keyboard focus, so mouse users never see a stray ring. */
+    :focus-visible {
+      outline: 2px solid rgb(var(--ring));
+      outline-offset: 2px;
+      border-radius: 0.25rem;
+    }
+
+    /* Custom scrollbars that match the surface tokens (light + dark). */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(var(--border-strong)) transparent;
+    }
+
+    *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background-color: rgb(var(--border-strong));
+      border-radius: 9999px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+      background-color: rgb(var(--fg-subtle));
     }
 
     .material-symbols-outlined {
@@ -99,7 +440,21 @@
     .filled-icon {
       font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     }
+
+    /* Respect the OS "reduce motion" setting — required for accessibility. */
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
   </style>
+
   <script type="importmap">
 {
   "imports": {
@@ -112,7 +467,7 @@
 </script>
 </head>
 
-<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-50">
+<body class="bg-bg text-fg antialiased">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

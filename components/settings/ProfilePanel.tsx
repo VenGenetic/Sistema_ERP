@@ -119,7 +119,7 @@ const ProfilePanel: React.FC = () => {
     return (
         <div className="flex flex-col gap-8 animate-fade-in max-w-3xl">
             <div className="bg-surface-dark border border-border-dark rounded-xl p-8">
-                <h3 className="text-xl font-bold text-white mb-6">Información Pública</h3>
+                <h3 className="text-xl font-bold text-fg mb-6">Información Pública</h3>
 
                 <div className="flex flex-col md:flex-row gap-8 items-start">
                     {/* Avatar Section */}
@@ -135,7 +135,7 @@ const ProfilePanel: React.FC = () => {
                                 )}
                             </div>
                             <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-full">
-                                <span className="material-symbols-outlined text-white text-3xl">cloud_upload</span>
+                                <span className="material-symbols-outlined text-fg text-3xl">cloud_upload</span>
                                 <input
                                     type="file"
                                     className="hidden"
@@ -166,7 +166,7 @@ const ProfilePanel: React.FC = () => {
                                         type="text"
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                                         placeholder="Ej. Alex Morgan"
                                     />
                                 </div>
@@ -179,7 +179,7 @@ const ProfilePanel: React.FC = () => {
                                         type="text"
                                         value={nickname}
                                         onChange={(e) => setNickname(e.target.value)}
-                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                                         placeholder="Ej. alexm"
                                     />
                                 </div>
@@ -192,7 +192,7 @@ const ProfilePanel: React.FC = () => {
                                         type="text"
                                         value={referralCode}
                                         onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all uppercase"
+                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all uppercase"
                                         placeholder="Ej. ALEX2024"
                                     />
                                 </div>
@@ -206,7 +206,7 @@ const ProfilePanel: React.FC = () => {
                                 value={bio}
                                 onChange={(e) => setBio(e.target.value)}
                                 rows={4}
-                                className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm p-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none placeholder-text-secondary/50"
+                                className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm p-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none placeholder-text-secondary/50"
                                 placeholder="Escribe una breve descripción sobre ti..."
                             />
                             <p className="text-xs text-text-secondary mt-1 text-right">{bio.length}/500 caracteres</p>

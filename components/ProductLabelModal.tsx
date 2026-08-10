@@ -18,7 +18,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     const labelCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [printQuantity, setPrintQuantity] = useState(3);
+    const [printQuantity, setPrintQuantity] = useState(1);
     const [activeTab, setActiveTab] = useState<'image' | 'pdf'>('image');
     const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
     const [queueAdded, setQueueAdded] = useState(false);
@@ -226,7 +226,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">

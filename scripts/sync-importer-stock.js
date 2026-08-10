@@ -37,12 +37,13 @@ async function main() {
     console.log(`📄 Found ${jsonProducts.length} products in JSON file.`);
 
     // Map to updates array
+    // Nota: el scraper (json_scraper_costos_cantidad.py) ya reporta 0 tanto para
+    // productos realmente agotados como para productos con menos de 2 unidades
+    // (regla de negocio: no vender el último repuesto), así que aquí se confía
+    // directamente en stock_cantidad sin forzar un mínimo de 1.
     const updates = jsonProducts.map(item => ({
         sku: (item.id || item.codigo_referencia || '').trim(),
-        // Forzamos un mínimo de 1 unidad: la importadora maquilla algunos
-        // repuestos como "agotados" aunque sí tiene stock, así que siempre
-        // los marcamos como disponibles en vez de confiar en el valor scrapeado.
-        stock: Math.max(parseInt(item.stock_cantidad) || 0, 1)
+        stock: parseInt(item.stock_cantidad) || 0
     })).filter(u => u.sku);
 
     console.log(`📦 Prepared ${updates.length} products for upload.`);

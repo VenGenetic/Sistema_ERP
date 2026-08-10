@@ -802,7 +802,7 @@ const POS: React.FC = () => {
 
             {/* Till Open Modal Blocking Overlay */}
             {isTillModalOpen && !activeTill && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="bg-amber-100 p-3 rounded-full text-amber-600">
@@ -858,7 +858,7 @@ const POS: React.FC = () => {
 
             {/* Stock Edit Modal */}
             {isStockEditModalOpen && stockEditItem && (
-                <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="font-bold text-slate-800 text-lg">Ajuste de Stock Rápido</h2>
@@ -1371,7 +1371,7 @@ const POS: React.FC = () => {
 
             {/* Lost Demand Modal */}
             {isLostDemandModalOpen && (
-                <div className="fixed inset-0 z-[160] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[160] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-amber-50">
                             <h2 className="font-bold text-amber-800 uppercase tracking-tight flex items-center gap-2">

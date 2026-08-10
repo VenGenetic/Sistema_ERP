@@ -797,7 +797,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1";
 
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700 my-8">
                 {/* Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
@@ -1539,7 +1539,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             )}
 
             {showConfirmModal && productToLink && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200">
                         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 bg-blue-50/50 dark:bg-blue-900/10">
                             <span className="material-symbols-outlined text-blue-500 text-[20px]">info</span>

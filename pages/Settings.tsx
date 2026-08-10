@@ -28,7 +28,7 @@ const InventoryPanel = () => {
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
             <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Alertas de Stock</h3>
+                <h3 className="text-lg font-bold text-fg mb-4">Alertas de Stock</h3>
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-text-secondary mb-1">Umbral Global de Stock Bajo</label>
@@ -36,7 +36,7 @@ const InventoryPanel = () => {
                             type="number"
                             value={lowStockThreshold}
                             onChange={(e) => setLowStockThreshold(e.target.value)}
-                            className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                            className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                         />
                         <p className="text-xs text-text-secondary mt-1">Alertar cuando la cantidad de SKU caiga por debajo de este valor.</p>
                     </div>
@@ -46,7 +46,7 @@ const InventoryPanel = () => {
                             type="email"
                             value={notifyEmail}
                             onChange={(e) => setNotifyEmail(e.target.value)}
-                            className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                            className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                         />
                     </div>
                 </div>
@@ -55,7 +55,7 @@ const InventoryPanel = () => {
             {/* Warehouses - Static for now but could be connected to DB later */}
             <div>
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white">Bodegas</h3>
+                    <h3 className="text-lg font-bold text-fg">Bodegas</h3>
                     <button className="flex items-center gap-2 text-sm bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg transition-colors">
                         <span className="material-symbols-outlined text-[16px]">add_location</span>
                         Añadir Ubicación
@@ -69,7 +69,7 @@ const InventoryPanel = () => {
                     ].map((w, i) => (
                         <div key={i} className="bg-surface-dark border border-border-dark rounded-xl p-4 hover:border-primary/50 transition-colors cursor-pointer group">
                             <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-bold text-white">{w.name}</h4>
+                                <h4 className="font-bold text-fg">{w.name}</h4>
                                 <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${w.type === 'Física' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-purple-500/10 text-purple-500 border-purple-500/20'}`}>{w.type}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-text-secondary mb-3">
@@ -78,7 +78,7 @@ const InventoryPanel = () => {
                             </div>
                             <div className="flex items-center justify-between pt-3 border-t border-border-dark">
                                 <span className="text-xs text-text-secondary">Stock Actual</span>
-                                <span className="text-sm font-mono text-white">{w.stock}</span>
+                                <span className="text-sm font-mono text-fg">{w.stock}</span>
                             </div>
                         </div>
                     ))}
@@ -102,14 +102,14 @@ const FinancePanel = () => {
         <div className="flex flex-col gap-8 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
-                    <h3 className="text-lg font-bold text-white mb-4">Moneda y Región</h3>
+                    <h3 className="text-lg font-bold text-fg mb-4">Moneda y Región</h3>
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-text-secondary mb-1">Moneda Base</label>
                             <select
                                 value={currency}
                                 onChange={(e) => setCurrency(e.target.value)}
-                                className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm p-2.5 outline-none focus:border-primary"
+                                className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm p-2.5 outline-none focus:border-primary"
                             >
                                 <option>USD ($)</option>
                                 <option>EUR (€)</option>
@@ -121,7 +121,7 @@ const FinancePanel = () => {
                             <select
                                 value={fiscalYear}
                                 onChange={(e) => setFiscalYear(e.target.value)}
-                                className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm p-2.5 outline-none focus:border-primary"
+                                className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm p-2.5 outline-none focus:border-primary"
                             >
                                 <option>31 de Diciembre</option>
                                 <option>31 de Marzo</option>
@@ -130,11 +130,11 @@ const FinancePanel = () => {
                     </div>
                 </div>
                 <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
-                    <h3 className="text-lg font-bold text-white mb-4">Automatizaciones</h3>
+                    <h3 className="text-lg font-bold text-fg mb-4">Automatizaciones</h3>
                     <div className="space-y-4">
                         <label className="flex items-center justify-between cursor-pointer group">
                             <div className="flex flex-col">
-                                <span className="text-white font-medium">Auto-Sincronización Stripe</span>
+                                <span className="text-fg font-medium">Auto-Sincronización Stripe</span>
                                 <span className="text-text-secondary text-xs">Conciliar automáticamente los pagos.</span>
                             </div>
                             <input
@@ -150,7 +150,7 @@ const FinancePanel = () => {
             {/* Read-only Chart of Accounts preview */}
             <div>
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white">Plan de Cuentas</h3>
+                    <h3 className="text-lg font-bold text-fg">Plan de Cuentas</h3>
                     <button className="flex items-center gap-2 text-sm bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg transition-colors">
                         <span className="material-symbols-outlined text-[16px]">add</span>
                         Añadir Cuenta
@@ -170,7 +170,7 @@ const DevPanel = () => {
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
             <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Variables de Entorno</h3>
+                <h3 className="text-lg font-bold text-fg mb-4">Variables de Entorno</h3>
                 <div className="space-y-3">
                     {[
                         "NEXT_PUBLIC_SUPABASE_URL",
@@ -197,11 +197,11 @@ const PartnersPanel = () => {
     return (
         <div className="flex flex-col gap-8 animate-fade-in">
             <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-2">Configuración de Webhooks</h3>
+                <h3 className="text-lg font-bold text-fg mb-2">Configuración de Webhooks</h3>
                 <p className="text-text-secondary text-sm mb-4">Endpoints para pedidos dropshipping entrantes.</p>
                 <div className="flex gap-2 items-center bg-background-dark border border-border-dark rounded-lg p-2">
                     <span className="material-symbols-outlined text-text-secondary pl-2">webhook</span>
-                    <code className="text-sm font-mono text-white flex-1 overflow-x-auto">https://api.dropshiperp.com/webhooks/v1/orders/inbound</code>
+                    <code className="text-sm font-mono text-fg flex-1 overflow-x-auto">https://api.dropshiperp.com/webhooks/v1/orders/inbound</code>
                 </div>
             </div>
         </div>
@@ -299,7 +299,7 @@ const Settings: React.FC = () => {
                         <select
                             value={activeTab}
                             onChange={(e) => setSearchParams({ tab: e.target.value })}
-                            className="block w-full rounded-lg border-border-dark bg-surface-dark text-white py-2 pl-3 pr-10 focus:border-primary focus:ring-primary sm:text-sm"
+                            className="block w-full rounded-lg border-border-dark bg-surface-dark text-fg py-2 pl-3 pr-10 focus:border-primary focus:ring-primary sm:text-sm"
                         >
                             {tabs.map((tab) => (
                                 <option key={tab.id} value={tab.id}>{tab.label}</option>
@@ -309,7 +309,7 @@ const Settings: React.FC = () => {
 
                     {/* Header Section */}
                     <div className="mb-8">
-                        <h1 className="text-2xl font-bold text-white tracking-tight">{getTitle()}</h1>
+                        <h1 className="text-2xl font-bold text-fg tracking-tight">{getTitle()}</h1>
                         <p className="text-text-secondary mt-1">{getDescription()}</p>
                     </div>
 

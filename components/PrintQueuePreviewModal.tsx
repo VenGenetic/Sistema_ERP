@@ -182,7 +182,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
             className={`fixed inset-0 z-50 flex ${
                 isMobile 
                     ? 'flex-col bg-slate-50 dark:bg-slate-950 w-full h-full' 
-                    : 'items-center justify-center bg-black/65 backdrop-blur-xs p-4'
+                    : 'items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4'
             }`}
         >
             <div 

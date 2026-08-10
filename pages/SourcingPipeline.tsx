@@ -123,7 +123,7 @@ const SourcingPipeline: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold dark:text-white tracking-tight flex items-center gap-3">
+                    <h1 className="text-2xl font-bold dark:text-white tracking-tight flex items-center gap-3">
                         <span className="material-symbols-outlined text-[32px] text-indigo-500">travel_explore</span>
                         Pipeline de Investigación
                     </h1>

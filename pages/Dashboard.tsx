@@ -1656,7 +1656,7 @@ const Dashboard: React.FC = () => {
             
             {/* Close Till Modal */}
             {isClosingTill && selectedTill && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
                         <h2 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">Cerrar Caja: {selectedTillDate}</h2>
                         
@@ -1716,7 +1716,7 @@ const Dashboard: React.FC = () => {
 
             {/* Edit Till Modal */}
             {isEditingTill && selectedTill && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
                     <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200 my-8">
                         <h2 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2 text-rose-600">Modo Administrador: Editar Caja</h2>
                         

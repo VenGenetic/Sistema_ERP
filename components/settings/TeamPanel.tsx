@@ -38,7 +38,7 @@ const TeamPanel: React.FC = () => {
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-white">Miembros del Equipo</h3>
+                <h3 className="text-lg font-bold text-fg">Miembros del Equipo</h3>
                 <button
                     onClick={() => setShowInviteModal(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-primary/20"
@@ -89,7 +89,7 @@ const TeamPanel: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-semibold text-white">
+                                                    <div className="text-sm font-semibold text-fg">
                                                         {user.full_name || user.nickname || 'Usuario sin nombre'}
                                                     </div>
                                                     <div className="text-sm text-text-secondary">{user.email}</div>

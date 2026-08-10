@@ -214,7 +214,7 @@ export const InventoryMode: React.FC = () => {
         <div className="p-6 max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                         <LayoutDashboard className="w-8 h-8 text-primary" />
                         Modo Inventario
                     </h1>

@@ -7,6 +7,18 @@ import { PartProfileModal } from '../components/PartProfileModal'; // New Compon
 import { ProductModal } from '../components/ProductModal';
 import { FitmentSearch } from '../components/FitmentSearch'; // New Component
 import { getThumbnailUrl } from '../utils/image';
+import { Button, Input } from '../components/ui';
+import { cn, page, table as t } from '../components/ui/styles';
+import {
+    ArrowLeftRight,
+    CloudUpload,
+    Database,
+    Loader2,
+    RefreshCw,
+    Search,
+    TriangleAlert,
+    X,
+} from 'lucide-react';
 
 // Define types based on our join queries
 interface StockItem {
@@ -584,7 +596,7 @@ const Inventory: React.FC = () => {
         <div className="flex flex-col gap-6 p-6 md:p-8 max-w-[1400px] mx-auto">
             {/* Export IVA Modal */}
             {showExportModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                         <div className="flex items-center gap-3 p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                             <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg">
@@ -654,7 +666,7 @@ const Inventory: React.FC = () => {
 
             {/* Product Entry Modal (Surtir) */}
             {isProductEntryOpen && selectedProductId && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden relative">
                         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
                             <h3 className="text-lg font-bold dark:text-white">Registrar Costo y Entrada</h3>
@@ -701,73 +713,77 @@ const Inventory: React.FC = () => {
                     <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                     <span className="text-slate-900 dark:text-white font-medium">Inventario y Logística</span>
                 </div>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className={page.header}>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Gestión de Inventario</h1>
-                        <p className="text-slate-500 mt-1">Controla tus almacenes físicos y virtuales, stock y movimientos (ACID Compliant).</p>
+                        <h1 className={page.title}>Gestión de Inventario</h1>
+                        <p className={page.subtitle}>
+                            Controla tus almacenes físicos y virtuales, stock y movimientos (ACID Compliant).
+                        </p>
                     </div>
-                    <div className="flex gap-3">
-                        <button
+
+                    {/* Acciones: una sola primaria; el resto en secundario/ghost. */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant="ghost"
                             onClick={fetchData}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                            loading={loading}
+                            icon={<RefreshCw size={15} />}
                         >
-                            <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
                             Actualizar
-                        </button>
+                        </Button>
+
                         {activeTab === 'stock' && (
                             <>
-                                <button
+                                <Button
+                                    variant="secondary"
                                     onClick={() => setShowExportModal(true)}
-                                    disabled={exportLoading || backupLoading}
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm disabled:opacity-50"
+                                    disabled={backupLoading}
+                                    loading={exportLoading}
+                                    icon={<Database size={15} className="text-success" />}
                                     title="Exportar inventario visible como Excel (mismo formato que importación)"
                                 >
-                                    <span className={`material-symbols-outlined text-[18px] text-emerald-600 ${exportLoading ? 'animate-spin' : ''}`}>
-                                        {exportLoading ? 'progress_activity' : 'table_view'}
-                                    </span>
-                                    {exportLoading ? 'Exportando...' : 'Exportar Excel'}
-                                </button>
-                                <button
+                                    {exportLoading ? 'Exportando…' : 'Exportar Excel'}
+                                </Button>
+
+                                <Button
+                                    variant="secondary"
                                     onClick={handleCloudBackup}
-                                    disabled={backupLoading || exportLoading}
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-blue-600/30 disabled:opacity-50"
+                                    disabled={exportLoading}
+                                    loading={backupLoading}
+                                    icon={<CloudUpload size={15} />}
                                     title="Guardar copia de seguridad en la nube (formato JSON)"
                                 >
-                                    <span className={`material-symbols-outlined text-[18px] ${backupLoading ? 'animate-spin' : ''}`}>
-                                        {backupLoading ? 'progress_activity' : 'cloud_upload'}
-                                    </span>
-                                    {backupLoading ? 'Respaldando...' : 'Respaldo Nube'}
-                                </button>
-                                <button
-                                    onClick={handleNewProduct}
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-emerald-600/30"
+                                    {backupLoading ? 'Respaldando…' : 'Respaldo Nube'}
+                                </Button>
+
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setIsLostDemandModalOpen(true)}
+                                    icon={<TriangleAlert size={15} className="text-warning" />}
+                                    title="Registrar una alerta si el cliente pidió algo que no tenemos."
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">dataset</span>
+                                    Demanda Perdida
+                                </Button>
+
+                                <Button
+                                    variant="success"
+                                    onClick={handleNewProduct}
+                                    icon={<Database size={15} />}
+                                >
                                     Entrada por Lote
-                                </button>
+                                </Button>
                             </>
                         )}
-                        <button
+
+                        <Button
+                            variant="primary"
                             onClick={() => setIsModalOpen(true)}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-primary/30"
+                            icon={<ArrowLeftRight size={15} />}
                         >
-                            <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
                             Registrar Movimiento
-                        </button>
+                        </Button>
                     </div>
                 </div>
-                {activeTab === 'stock' && (
-                    <div className="flex justify-end mt-2">
-                        <button
-                            onClick={() => setIsLostDemandModalOpen(true)}
-                            className="flex items-center justify-center gap-2 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-xs font-bold transition-colors shadow-sm border border-amber-200"
-                            title="Registrar una alerta si el cliente pidió algo que no tenemos."
-                        >
-                            <span className="material-symbols-outlined text-[16px]">warning</span>
-                            Registrar Demanda Perdida
-                        </button>
-                    </div>
-                )}
             </div>
 
 
@@ -800,20 +816,24 @@ const Inventory: React.FC = () => {
                     />
 
                     <div className="relative">
-                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                        <input
+                        <Input
                             type="text"
-                            placeholder="Buscar por nombre, SKU, palabras clave..."
+                            label="Buscar en el inventario"
+                            hideLabel
+                            inputSize="lg"
+                            placeholder="Buscar por nombre, SKU, palabras clave…"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                            leadingIcon={<Search size={16} />}
+                            className={cn(searchTerm && 'pr-10')}
                         />
                         {searchTerm && (
                             <button
                                 onClick={() => setSearchTerm('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                                aria-label="Limpiar búsqueda"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors"
                             >
-                                <span className="material-symbols-outlined text-[18px]">close</span>
+                                <X size={15} aria-hidden="true" />
                             </button>
                         )}
                     </div>
@@ -888,10 +908,12 @@ const Inventory: React.FC = () => {
                 )}
 
                 {activeTab === 'stock' && (
-                    <div className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-opacity ${loading ? 'opacity-60' : 'opacity-100'}`}>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
+                    <div className={cn(t.wrapper, 'transition-opacity', loading ? 'opacity-60' : 'opacity-100')}>
+                        <div className={t.scroll}>
+                            <table className={t.root}>
+                                {/* Cabecera pegajosa: los títulos de columna siguen
+                                    visibles al recorrer inventarios largos. */}
+                                <thead className={t.thead}>
                                     <tr>
                                         {[
                                             { key: 'product', label: 'Producto' },
@@ -899,39 +921,50 @@ const Inventory: React.FC = () => {
                                             { key: 'sku', label: 'SKU' },
                                             { key: 'prices', label: 'Precios', align: 'right' },
                                             { key: 'stock', label: 'Stock Global', align: 'right' }
-                                        ].map(col => (
-                                            <th key={col.key} className={`px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${col.align === 'right' ? 'text-right' : ''}`} onClick={() => handleSort(col.key)}>
-                                                <div className={`flex flex-col gap-2 ${col.align === 'right' ? 'items-end' : 'items-start'}`}>
-                                                    <div className="flex items-center gap-1">
-                                                        {col.label}
-                                                        <div className="flex flex-col">
-                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_up</span>
-                                                            <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
-                                                        </div>
+                                        ].map(col => {
+                                            const sorted = sortConfig.key === col.key;
+                                            const isNum = col.align === 'right';
+                                            return (
+                                                <th
+                                                    key={col.key}
+                                                    scope="col"
+                                                    aria-sort={sorted ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                                                    className={cn(t.th, t.thSortable, isNum && 'text-right')}
+                                                    onClick={() => handleSort(col.key)}
+                                                >
+                                                    <div className={cn('flex flex-col gap-1.5', isNum ? 'items-end' : 'items-start')}>
+                                                        <span className="inline-flex items-center gap-1">
+                                                            {col.label}
+                                                            <span className="flex flex-col leading-none" aria-hidden="true">
+                                                                <span className={cn('material-symbols-outlined text-[10px] leading-none', sorted && sortConfig.direction === 'asc' ? 'text-primary' : 'text-fg-subtle/50')}>arrow_drop_up</span>
+                                                                <span className={cn('material-symbols-outlined text-[10px] leading-none', sorted && sortConfig.direction === 'desc' ? 'text-primary' : 'text-fg-subtle/50')}>arrow_drop_down</span>
+                                                            </span>
+                                                        </span>
+                                                        {col.key !== 'stock' && (
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Filtrar…"
+                                                                aria-label={`Filtrar por ${col.label}`}
+                                                                value={filters[col.key] || ''}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onChange={(e) => handleFilterChange(col.key, e.target.value)}
+                                                                className="w-full min-w-[80px] h-6 px-2 text-xs font-normal normal-case tracking-normal rounded border border-subtle bg-surface text-fg placeholder:text-fg-subtle focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                                            />
+                                                        )}
                                                     </div>
-                                                    {col.key !== 'stock' && (
-                                                        <input
-                                                            type="text"
-                                                            placeholder={`Filtrar...`}
-                                                            value={filters[col.key] || ''}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                                                            className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:outline-none focus:border-primary"
-                                                        />
-                                                    )}
-                                                </div>
-                                            </th>
-                                        ))}
-                                        <th className="px-6 py-3 text-center">Estado</th>
-                                        <th className="px-6 py-3 text-center">Acciones</th>
+                                                </th>
+                                            );
+                                        })}
+                                        <th scope="col" className={cn(t.th, 'text-center')}>Estado</th>
+                                        <th scope="col" className={cn(t.th, 'text-center')}>Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                <tbody className={t.tbody}>
                                     {groupedStockItems.length === 0 && !loading && (
                                         <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                                            <td colSpan={7} className={t.empty}>
                                                 <div className="flex flex-col items-center gap-2">
-                                                    <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
+                                                    <span className="material-symbols-outlined text-[32px] text-fg-subtle" aria-hidden="true">search_off</span>
                                                     <span>No hay registros que coincidan con tu búsqueda.</span>
                                                 </div>
                                             </td>
@@ -939,10 +972,10 @@ const Inventory: React.FC = () => {
                                     )}
                                     {groupedStockItems.length === 0 && loading && (
                                         <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
-                                                    <span>Cargando inventario...</span>
+                                            <td colSpan={7} className={t.empty}>
+                                                <div className="flex flex-col items-center gap-2" role="status">
+                                                    <Loader2 size={26} className="animate-spin text-primary" aria-hidden="true" />
+                                                    <span>Cargando inventario…</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1163,7 +1196,7 @@ const Inventory: React.FC = () => {
 
             {/* Lost Demand Modal */}
             {isLostDemandModalOpen && (
-                <div className="fixed inset-0 z-[160] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[160] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-amber-50">
                             <h2 className="font-bold text-amber-800 uppercase tracking-tight flex items-center gap-2">

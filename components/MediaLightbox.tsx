@@ -103,7 +103,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm transition-opacity" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={onClose}>
             {/* Download Button */}
             {/* Open in Catalog Button */}
             <button

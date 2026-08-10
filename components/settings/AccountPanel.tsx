@@ -114,8 +114,8 @@ const AccountPanel: React.FC = () => {
             <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
                 <div className="flex items-start justify-between">
                     <div>
-                        <h3 className="text-lg font-bold text-white mb-1">Estado de Verificación</h3>
-                        <p className="text-sm text-text-secondary">Tu dirección de correo actual es <span className="text-white font-mono">{email}</span></p>
+                        <h3 className="text-lg font-bold text-fg mb-1">Estado de Verificación</h3>
+                        <p className="text-sm text-text-secondary">Tu dirección de correo actual es <span className="text-fg font-mono">{email}</span></p>
                     </div>
                     {user?.email_confirmed_at ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
@@ -142,7 +142,7 @@ const AccountPanel: React.FC = () => {
 
             {/* Change Email */}
             <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-6">Cambiar Correo Electrónico</h3>
+                <h3 className="text-lg font-bold text-fg mb-6">Cambiar Correo Electrónico</h3>
                 <form onSubmit={handleUpdateEmail} className="flex gap-4 items-end">
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-text-secondary mb-1.5">Nuevo Correo</label>
@@ -153,7 +153,7 @@ const AccountPanel: React.FC = () => {
                                 required
                                 value={newEmail}
                                 onChange={(e) => setNewEmail(e.target.value)}
-                                className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                                 placeholder="nuevo@ejemplo.com"
                             />
                         </div>
@@ -161,7 +161,7 @@ const AccountPanel: React.FC = () => {
                     <button
                         type="submit"
                         disabled={loadingEmail || !newEmail}
-                        className="px-4 py-2.5 bg-surface-hover hover:bg-border-dark border border-border-dark text-white font-medium rounded-lg transition-colors mb-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2.5 bg-surface-hover hover:bg-border-dark border border-border-dark text-fg font-medium rounded-lg transition-colors mb-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loadingEmail ? '...' : 'Actualizar'}
                     </button>
@@ -173,7 +173,7 @@ const AccountPanel: React.FC = () => {
 
             {/* Change Password */}
             <div className="bg-surface-dark border border-border-dark rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-6">Seguridad (Contraseña)</h3>
+                <h3 className="text-lg font-bold text-fg mb-6">Seguridad (Contraseña)</h3>
                 <form onSubmit={handleUpdatePassword} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -186,7 +186,7 @@ const AccountPanel: React.FC = () => {
                                     minLength={6}
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
-                                    className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                    className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                                     placeholder="••••••••"
                                 />
                             </div>
@@ -201,7 +201,7 @@ const AccountPanel: React.FC = () => {
                                     minLength={6}
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full bg-background-dark border border-border-dark rounded-lg text-white text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                                    className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                                     placeholder="••••••••"
                                 />
                             </div>

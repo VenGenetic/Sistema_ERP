@@ -114,13 +114,13 @@ const Team: React.FC = () => {
       <div className="flex items-center gap-2 mb-6 text-sm">
         <span className="text-text-secondary hover:text-white transition-colors cursor-pointer">General</span>
         <span className="material-symbols-outlined text-text-secondary text-base">chevron_right</span>
-        <span className="text-white font-medium">Equipos y Permisos</span>
+        <span className="text-fg font-medium">Equipos y Permisos</span>
       </div>
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">Gestión de Equipo</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Gestión de Equipo</h1>
           <p className="text-text-secondary text-base max-w-2xl">Administra los accesos de los miembros de tu equipo. Todos los usuarios tienen rol de Administrador y acceso total al sistema.</p>
         </div>
         <div className="flex gap-3">
@@ -140,7 +140,7 @@ const Team: React.FC = () => {
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <span className="material-symbols-outlined text-text-secondary group-focus-within:text-primary transition-colors">search</span>
           </div>
-          <input className="block w-full pl-10 pr-3 py-2.5 bg-background-dark border border-border-dark rounded-lg leading-5 text-white placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all" placeholder="Buscar por nombre, email o rol..." type="text" />
+          <input className="block w-full pl-10 pr-3 py-2.5 bg-background-dark border border-border-dark rounded-lg leading-5 text-fg placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all" placeholder="Buscar por nombre, email o rol..." type="text" />
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
           <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary bg-background-dark border border-border-dark rounded-lg hover:text-white hover:border-gray-500 transition-colors whitespace-nowrap">
@@ -189,14 +189,14 @@ const Team: React.FC = () => {
                           <img alt={`${user.name} portrait`} className="h-10 w-10 rounded-full object-cover border border-border-dark" src={user.img} />
                         )}
                         <div>
-                          <div className="text-sm font-semibold text-white">{user.name}</div>
+                          <div className="text-sm font-semibold text-fg">{user.name}</div>
                           <div className="text-sm text-text-secondary">{user.email}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="relative inline-block text-left">
-                        <span className="inline-flex justify-between items-center w-36 rounded-md border border-border-dark shadow-sm px-3 py-1.5 bg-background-dark text-sm font-medium text-white">
+                        <span className="inline-flex justify-between items-center w-36 rounded-md border border-border-dark shadow-sm px-3 py-1.5 bg-background-dark text-sm font-medium text-fg">
                           <span className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full 
                               ${user.roleColor === 'purple' ? 'bg-purple-500' : ''}

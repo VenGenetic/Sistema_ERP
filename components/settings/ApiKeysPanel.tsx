@@ -114,7 +114,7 @@ const ApiKeysPanel: React.FC = () => {
         <div className="bg-surface-dark border border-border-dark rounded-xl p-6 mt-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h3 className="text-lg font-bold text-white">Claves API (API Keys)</h3>
+                    <h3 className="text-lg font-bold text-fg">Claves API (API Keys)</h3>
                     <p className="text-sm text-text-secondary mt-1">
                         Gestiona el acceso de aplicaciones externas a tu sistema.
                     </p>
@@ -158,7 +158,7 @@ const ApiKeysPanel: React.FC = () => {
                         <tbody>
                             {apiKeys.map((key) => (
                                 <tr key={key.id} className="border-b border-border-dark hover:bg-background-dark/20 transition-colors">
-                                    <td className="px-4 py-3 font-medium text-white">{key.name}</td>
+                                    <td className="px-4 py-3 font-medium text-fg">{key.name}</td>
                                     <td className="px-4 py-3 font-mono text-xs">
                                         <div className="flex items-center gap-2">
                                             {/* We only show a preview to simulate hashed keys, though we stored raw for demo */}
@@ -196,10 +196,10 @@ const ApiKeysPanel: React.FC = () => {
 
             {/* Modal for new key */}
             {showNewKeyModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-surface-dark border border-border-dark rounded-xl w-full max-w-md overflow-hidden shadow-xl">
                         <div className="p-6 border-b border-border-dark flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-white">Nueva Clave API</h2>
+                            <h2 className="text-xl font-bold text-fg">Nueva Clave API</h2>
                             <button onClick={() => setShowNewKeyModal(false)} className="text-text-secondary hover:text-white">
                                 <span className="material-symbols-outlined">close</span>
                             </button>
@@ -217,10 +217,10 @@ const ApiKeysPanel: React.FC = () => {
                                     </div>
 
                                     <div className="bg-background-dark border border-border-dark rounded-lg p-4 flex justify-between items-center mb-6">
-                                        <code className="text-white font-mono text-sm break-all">{generatedKeyValue}</code>
+                                        <code className="text-fg font-mono text-sm break-all">{generatedKeyValue}</code>
                                         <button
                                             onClick={() => copyToClipboard(generatedKeyValue)}
-                                            className="ml-4 bg-surface-hover hover:bg-primary text-white p-2 rounded-lg transition-colors"
+                                            className="ml-4 bg-surface-hover hover:bg-primary text-fg p-2 rounded-lg transition-colors"
                                         >
                                             <span className="material-symbols-outlined">content_copy</span>
                                         </button>
@@ -243,7 +243,7 @@ const ApiKeysPanel: React.FC = () => {
                                             value={newKeyName}
                                             onChange={(e) => setNewKeyName(e.target.value)}
                                             placeholder="Ej: Integración Shopify"
-                                            className="w-full bg-background-dark border border-border-dark rounded-lg text-white p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full bg-background-dark border border-border-dark rounded-lg text-fg p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                                         />
                                     </div>
                                     <div>
@@ -251,7 +251,7 @@ const ApiKeysPanel: React.FC = () => {
                                         <select
                                             value={newKeyProvider}
                                             onChange={(e) => setNewKeyProvider(e.target.value)}
-                                            className="w-full bg-background-dark border border-border-dark rounded-lg text-white p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full bg-background-dark border border-border-dark rounded-lg text-fg p-2.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                                         >
                                             <option value="external_vendor">Proveedor Externo</option>
                                             <option value="internal_scraper">Sincronización Interna (Scraper)</option>

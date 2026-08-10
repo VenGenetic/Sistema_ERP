@@ -6,11 +6,11 @@ const NotFound: React.FC = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#0B0F1A] p-4 font-['Outfit',sans-serif]">
+        <div className="min-h-screen flex items-center justify-center bg-bg p-4 font-sans">
             <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-500">
                 {/* Error Code */}
                 <div className="relative">
-                    <h1 className="text-[150px] font-black leading-none tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-blue-500/20 to-blue-600/5 select-none">
+                    <h1 className="text-[150px] font-black leading-none tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-primary/25 to-primary/5 select-none">
                         404
                     </h1>
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -20,10 +20,10 @@ const NotFound: React.FC = () => {
 
                 {/* Message */}
                 <div className="space-y-3 relative z-10">
-                    <h2 className="text-3xl font-bold text-white tracking-tight">
+                    <h2 className="text-3xl font-bold text-fg tracking-tight">
                         Página No Encontrada
                     </h2>
-                    <p className="text-gray-400 text-lg">
+                    <p className="text-fg-muted text-lg">
                         Lo sentimos, la página que estás buscando no existe o ha sido movida.
                     </p>
                 </div>
@@ -32,7 +32,7 @@ const NotFound: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
                     <button
                         onClick={() => navigate(-1)}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 transition-all active:scale-95 group"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-surface hover:bg-surface-hover text-fg rounded-xl border border-subtle shadow-sm transition-all active:scale-95 group"
                     >
                         <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
                         <span>Volver Atrás</span>
@@ -40,7 +40,7 @@ const NotFound: React.FC = () => {
 
                     <button
                         onClick={() => navigate('/')}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95 group"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-primary hover:bg-primary-hover text-primary-fg rounded-xl shadow-lg shadow-primary/25 transition-all active:scale-95 group"
                     >
                         <Home className="w-5 h-5 transition-transform group-hover:-translate-y-1" />
                         <span>Ir al Inicio</span>

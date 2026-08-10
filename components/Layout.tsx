@@ -1,24 +1,100 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation, Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom';
 import HeaderAccount from './HeaderAccount';
 import { useAuth } from '../contexts/AuthContext';
 import { setPreferredViewMode } from '../utils/deviceDetection';
+import { ThemeToggle } from './ui/ThemeToggle';
+import { cn, kbd, nav } from './ui/styles';
 import {
+  BellRing,
+  Calculator,
+  ChevronRight,
+  Contact,
+  HandCoins,
   LayoutDashboard,
-  Box,
+  Menu,
+  Package,
+  PackageCheck,
+  Receipt,
+  ReceiptText,
+  ScanBarcode,
+  Search,
   ShoppingCart,
-  Users, // Added Users import
-  Settings,
-  PackageSearch,
-  LogOut,
-  FolderKanban,
-  FileBarChart,
-  UserCircle
+  Smartphone,
+  Store,
+  Tag,
+  Telescope,
+  Truck,
+  Users,
+  Wallet,
+  Warehouse,
+  Workflow,
+  X,
 } from 'lucide-react';
+
+/* -------------------------------------------------------------------------- */
+/*  NavItem                                                                    */
+/* -------------------------------------------------------------------------- */
+
+interface NavItemProps {
+  to: string;
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+  /** Sub-ruta: se indenta y cuelga de una guía vertical. */
+  nested?: boolean;
+  /** Acento de color para acciones que salen del flujo normal (POS, móvil). */
+  tone?: 'default' | 'accent';
+  target?: string;
+}
+
+/**
+ * Ítem de navegación.
+ *
+ * El estado activo se señala con tres pistas simultáneas —fondo tenue, color
+ * de texto e icono, y una barra vertical a la izquierda— para que se lea de un
+ * vistazo y no dependa solo del color.
+ */
+const NavItem: React.FC<NavItemProps> = ({
+  to,
+  icon: Icon,
+  label,
+  active,
+  nested = false,
+  tone = 'default',
+  target,
+}) => (
+  <Link
+    to={to}
+    target={target}
+    aria-current={active ? 'page' : undefined}
+    className={cn(
+      nav.item,
+      nested && nav.itemNested,
+      active
+        ? nav.itemActive
+        : tone === 'accent'
+          ? 'text-primary hover:bg-primary-soft'
+          : nav.itemIdle,
+    )}
+  >
+    {active && <span className={nav.itemActiveBar} aria-hidden="true" />}
+    <Icon size={17} className={nav.icon} aria-hidden="true" />
+    <span className="truncate">{label}</span>
+  </Link>
+);
+
+const NavSection: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <p className={nav.sectionLabel}>{children}</p>
+);
+
+/* -------------------------------------------------------------------------- */
+/*  Layout                                                                     */
+/* -------------------------------------------------------------------------- */
 
 const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isAdmin, permissions, userProfile } = useAuth();
+  const { isAdmin, permissions } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchVal, setSearchVal] = useState('');
@@ -52,13 +128,9 @@ const Layout: React.FC = () => {
   // Handle Ctrl+K shortcut to focus search input
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Check if user pressed Ctrl+K or Cmd+K
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        const searchInput = document.getElementById('header-search-input');
-        if (searchInput) {
-          searchInput.focus();
-        }
+        document.getElementById('header-search-input')?.focus();
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -77,254 +149,246 @@ const Layout: React.FC = () => {
     return false;
   };
 
+  const canProducts = isAdmin || permissions?.products?.read;
+  const canInventory = isAdmin || permissions?.inventory?.read;
+
   const NavigationContent = () => (
     <>
-      <div className="md:hidden p-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-        <span className="font-bold text-lg dark:text-white text-slate-900">Menú</span>
-        <button onClick={() => setIsMobileMenuOpen(false)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-          <span className="material-symbols-outlined">close</span>
+      <div className="md:hidden flex items-center justify-between px-4 h-14 border-b border-subtle">
+        <span className="font-semibold text-fg">Menú</span>
+        <button
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-label="Cerrar menú"
+          className="rounded-md p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors"
+        >
+          <X size={18} aria-hidden="true" />
         </button>
       </div>
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        <p className="px-3 text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2 mt-2">General</p>
 
-        <Link to="/" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('/') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">grid_view</span>
-          Centro de Comando
-        </Link>
-
-        <button
-          onClick={handleSwitchToMobile}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all text-left border-l-2 border-transparent"
-        >
-          <span className="material-symbols-outlined text-[20px]">smartphone</span>
-          Modo Móvil (App)
-        </button>
-
+      <nav className="flex-1 overflow-y-auto px-2 pb-4">
+        <NavSection>General</NavSection>
+        <NavItem to="/" icon={LayoutDashboard} label="Centro de Comando" active={isActive('/')} />
         {(isAdmin || permissions?.team?.read) && (
-          <Link to="/team" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('team') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">group</span>
-            Equipo
-          </Link>
+          <NavItem to="/team" icon={Users} label="Equipo" active={isActive('team')} />
         )}
 
-        <p className="px-3 text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2 mt-4">Operaciones</p>
-
+        <NavSection>Operaciones</NavSection>
         {(isAdmin || permissions?.customers?.read) && (
-          <Link to="/customers" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('customers') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">group</span>
-            Clientes
-          </Link>
+          <NavItem to="/customers" icon={Contact} label="Clientes" active={isActive('customers')} />
+        )}
+        {canProducts && (
+          <>
+            <NavItem to="/products" icon={Package} label="Catálogo" active={isActive('products')} />
+            <NavItem
+              to="/invoice-labels"
+              icon={ReceiptText}
+              label="Etiquetas de Factura"
+              active={isActive('invoice-labels')}
+              nested
+            />
+            <NavItem
+              to="/product-demands"
+              icon={BellRing}
+              label="Demanda de Stock"
+              active={isActive('product-demands')}
+            />
+            <NavItem
+              to="/sourcing"
+              icon={Telescope}
+              label="Investigación (Sourcing)"
+              active={isActive('sourcing')}
+            />
+            <NavItem to="/tags" icon={Tag} label="Etiquetas" active={isActive('tags')} />
+          </>
         )}
 
-        {(isAdmin || permissions?.products?.read) && (
-          <Link to="/products" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('products') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">category</span>
-            Catálogo
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.products?.read) && (
-          <Link to="/invoice-labels" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('invoice-labels') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-            Etiquetas de Factura
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.products?.read) && (
-          <Link to="/product-demands" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('product-demands') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">notifications_active</span>
-            Demanda de Stock
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.products?.read) && (
-          <Link to="/sourcing" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('sourcing') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">travel_explore</span>
-            Investigación (Sourcing)
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.products?.read) && (
-          <Link to="/tags" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('tags') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">label</span>
-            Etiquetas
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.inventory?.read) && (
-          <Link to="/inventory" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('inventory') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">inventory_2</span>
-            Almacenes
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.inventory?.read) && (
-          <Link to="/inventory-mode" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('inventory-mode') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">barcode_scanner</span>
-            Modo Inventario
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.inventory?.read) && (
-          <Link to="/mobile" target="_blank" className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-l-2 border-transparent">
-            <span className="material-symbols-outlined text-[20px]">smartphone</span>
-            Modo Móvil (App)
-          </Link>
-        )}
-
-        {(isAdmin || permissions?.inventory?.read) && (
-          <Link to="/replenishment" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('replenishment') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">shopping_cart_checkout</span>
-            Abastecimiento
-          </Link>
+        {canInventory && (
+          <>
+            <NavItem to="/inventory" icon={Warehouse} label="Almacenes" active={isActive('inventory')} />
+            <NavItem
+              to="/inventory-mode"
+              icon={ScanBarcode}
+              label="Modo Inventario"
+              active={isActive('inventory-mode')}
+              nested
+            />
+            <NavItem
+              to="/replenishment"
+              icon={ShoppingCart}
+              label="Abastecimiento"
+              active={isActive('replenishment')}
+            />
+          </>
         )}
 
         {(isAdmin || permissions?.orders?.read) && (
           <>
-            <Link to="/orders" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('orders') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-              <span className="material-symbols-outlined text-[20px]">local_shipping</span>
-              Órdenes
-            </Link>
-            <Link to="/orders/envios" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('orders/envios') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-              <span className="material-symbols-outlined text-[20px]">local_post_office</span>
-              Envíos
-            </Link>
+            <NavItem to="/orders" icon={Truck} label="Órdenes" active={isActive('orders')} />
+            <NavItem
+              to="/orders/envios"
+              icon={PackageCheck}
+              label="Envíos"
+              active={isActive('orders/envios')}
+              nested
+            />
           </>
         )}
 
         {(isAdmin || permissions?.commissions?.read) && (
-          <Link to="/commissions" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('commissions') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-            <span className="material-symbols-outlined text-[20px]">payments</span>
-            Comisiones
-          </Link>
+          <NavItem to="/commissions" icon={HandCoins} label="Comisiones" active={isActive('commissions')} />
         )}
+
         {(isAdmin || permissions?.finance?.read) && (
           <>
-            <Link to="/finance" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('finance') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-              <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
-              Finanzas
-            </Link>
-            <Link to="/daily-registry" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('daily-registry') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-              <span className="material-symbols-outlined text-[20px]">point_of_sale</span>
-              Cierre Diario
-            </Link>
-            <Link to="/expenses" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ml-4 ${isActive('expenses') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-              <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-              Registro de Gastos
-            </Link>
+            <NavItem to="/finance" icon={Wallet} label="Finanzas" active={isActive('finance')} />
+            <NavItem
+              to="/daily-registry"
+              icon={Calculator}
+              label="Cierre Diario"
+              active={isActive('daily-registry')}
+              nested
+            />
+            <NavItem
+              to="/expenses"
+              icon={Receipt}
+              label="Registro de Gastos"
+              active={isActive('expenses')}
+              nested
+            />
           </>
         )}
 
-        <p className="px-3 text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2 mt-4">Estándares & POE</p>
-        <Link to="/poe" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('poe') ? 'bg-slate-100 dark:bg-[#161b22] text-slate-900 dark:text-white border-l-2 border-primary' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#161b22]/50 border-l-2 border-transparent'} `}>
-          <span className="material-symbols-outlined text-[20px]">account_tree</span>
-          Estándares (SOPs)
-        </Link>
+        <NavSection>Estándares &amp; POE</NavSection>
+        <NavItem to="/poe" icon={Workflow} label="Estándares (SOPs)" active={isActive('poe')} />
 
+        <NavSection>Accesos</NavSection>
+        <button
+          onClick={handleSwitchToMobile}
+          className={cn(nav.item, 'w-full text-left text-primary hover:bg-primary-soft')}
+        >
+          <Smartphone size={17} className={nav.icon} aria-hidden="true" />
+          <span className="truncate">Modo Móvil (App)</span>
+        </button>
       </nav>
-
-      {/* System Status Footer */}
     </>
   );
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-slate-900 dark:text-slate-50 bg-background-light dark:bg-background-dark transition-colors duration-300">
-      {/* Top Navigation - Minimalist */}
-      <header className="print:hidden flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1117] px-4 md:px-6 py-3 sticky top-0 z-40">
-        <div className="flex items-center gap-4 md:gap-6">
+    <div className="min-h-screen flex flex-col font-sans bg-bg text-fg">
+      {/* Barra superior */}
+      <header className={nav.header}>
+        <div className="flex items-center gap-3 md:gap-5 min-w-0">
           <button
-            className="md:hidden text-slate-500 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-md transition-colors"
+            className="md:hidden rounded-md p-1.5 text-fg-muted hover:bg-surface-hover hover:text-fg transition-colors"
             onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Abrir menú"
           >
-            <span className="material-symbols-outlined">menu</span>
+            <Menu size={20} aria-hidden="true" />
           </button>
 
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="size-8 text-white bg-slate-900 dark:bg-white dark:text-black rounded-lg flex items-center justify-center transition-transform group-hover:scale-105 shadow-md shadow-primary/20">
-              <span className="material-symbols-outlined text-[20px] font-bold">deployed_code</span>
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0">
+            <div className="size-7 rounded-lg bg-primary text-primary-fg flex items-center justify-center shadow-sm transition-transform group-hover:scale-105">
+              <Store size={16} aria-hidden="true" />
             </div>
-            <span className="font-bold text-lg tracking-tight hidden md:block dark:text-white text-slate-900">DropshipERP</span>
+            <span className="font-semibold tracking-tight hidden md:block text-fg">
+              DropshipERP
+            </span>
           </Link>
 
-          {/* Breadcrumb / Context */}
-          <div className="hidden md:flex items-center gap-2 text-sm text-slate-400 font-mono">
-            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            <span className="uppercase tracking-wider text-xs font-semibold">
-              {location.pathname === '/' ? 'CENTRO_COMANDO' :
-                location.pathname.includes('partners') ? 'SOCIOS' :
-                  location.pathname.includes('finance') ? 'FINANZAS' :
-                    location.pathname.includes('expenses') ? 'GASTOS' :
-                      location.pathname.includes('poe') ? 'ESTANDARES_POE' :
-                        location.pathname.includes('settings') ? 'CONFIGURACION' : ''}
+          {/* Migas de pan / contexto */}
+          <div className="hidden lg:flex items-center gap-1.5 text-fg-subtle min-w-0">
+            <ChevronRight size={14} aria-hidden="true" />
+            <span className="text-2xs font-semibold uppercase tracking-wider truncate">
+              {location.pathname === '/'
+                ? 'Centro de comando'
+                : location.pathname.includes('partners')
+                  ? 'Socios'
+                  : location.pathname.includes('finance')
+                    ? 'Finanzas'
+                    : location.pathname.includes('expenses')
+                      ? 'Gastos'
+                      : location.pathname.includes('poe')
+                        ? 'Estándares POE'
+                        : location.pathname.includes('settings')
+                          ? 'Configuración'
+                          : ''}
             </span>
           </div>
         </div>
 
-        <div className="flex flex-1 justify-end gap-3 md:gap-6 items-center">
+        <div className="flex flex-1 justify-end items-center gap-2 md:gap-3">
+          {/* Buscador global */}
+          <div className="relative hidden md:block w-64">
+            <Search
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none"
+              aria-hidden="true"
+            />
+            <input
+              id="header-search-input"
+              type="search"
+              value={searchVal}
+              onChange={handleSearchChange}
+              aria-label="Buscar productos"
+              className="w-full h-9 rounded-lg bg-surface-2 border border-transparent pl-9 pr-12 text-sm text-fg placeholder:text-fg-subtle transition-colors hover:bg-surface-3 focus:bg-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+              placeholder="Buscar productos…"
+            />
+            <span className={cn(kbd, 'absolute right-2 top-1/2 -translate-y-1/2 hidden lg:inline-flex')}>
+              ⌘K
+            </span>
+          </div>
 
-          {/* Mobile App Mode Button */}
-          <button
-            onClick={handleSwitchToMobile}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-md text-xs font-semibold transition-colors shadow-sm"
-            title="Ir a Modo Móvil (App)"
-          >
-            <span className="material-symbols-outlined text-[18px]">smartphone</span>
-            <span className="hidden sm:inline">Modo Móvil</span>
-          </button>
-
-          {/* Admin POS Auto-Access Button */}
           {isAdmin && (
             <a
               href={`${window.location.pathname}#/pos`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-semibold transition-colors shadow-sm"
+              className="hidden md:inline-flex items-center gap-2 h-9 px-3.5 rounded-lg bg-success text-success-fg text-sm font-semibold shadow-sm transition-colors hover:brightness-110"
             >
-              <span className="material-symbols-outlined text-[18px]">point_of_sale</span>
-              <span>Abrir Caja (POS)</span>
+              <Store size={16} aria-hidden="true" />
+              Abrir Caja
             </a>
           )}
 
-          <div className="relative hidden md:block w-64">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[18px] text-slate-400">search</span>
-            <input
-              id="header-search-input"
-              type="text"
-              value={searchVal}
-              onChange={handleSearchChange}
-              className="w-full bg-slate-100 dark:bg-[#161b22] border-none rounded-md py-1.5 pl-9 pr-4 text-sm focus:ring-1 focus:ring-slate-400 placeholder:text-slate-500 text-slate-900 dark:text-slate-200 font-mono transition-all"
-              placeholder="Control + K para buscar..."
-            />
-          </div>
+          <button
+            onClick={handleSwitchToMobile}
+            title="Ir a Modo Móvil"
+            aria-label="Ir a Modo Móvil"
+            className="md:hidden rounded-md p-1.5 text-primary hover:bg-primary-soft transition-colors"
+          >
+            <Smartphone size={18} aria-hidden="true" />
+          </button>
 
-          <div className="flex gap-1 items-center border-l border-slate-200 dark:border-slate-800 pl-4 md:pl-6">
+          <ThemeToggle />
+
+          <div className="flex items-center border-l border-subtle pl-2 md:pl-3">
             <HeaderAccount />
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden relative print:overflow-visible print:block">
-        {/* Desktop Sidebar */}
-        <aside className="print:hidden w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1117] flex-col hidden md:flex">
+        {/* Sidebar de escritorio */}
+        <aside className={cn(nav.sidebar, 'hidden md:flex')}>
           <NavigationContent />
         </aside>
 
-        {/* Mobile Sidebar Overlay */}
+        {/* Sidebar móvil */}
         {isMobileMenuOpen && (
-          <div className="print:hidden absolute inset-0 z-50 flex md:hidden">
-            <div className="w-64 bg-white dark:bg-[#0c1117] border-r border-slate-200 dark:border-slate-800 flex flex-col h-full shadow-2xl">
+          <div className="print:hidden fixed inset-0 z-50 flex md:hidden">
+            <div className="w-64 bg-surface border-r border-subtle flex flex-col h-full shadow-2xl animate-scale-in">
               <NavigationContent />
             </div>
             <div
-              className="flex-1 bg-black/50 backdrop-blur-sm"
+              className="flex-1 bg-slate-900/50 backdrop-blur-sm animate-fade-in"
               onClick={() => setIsMobileMenuOpen(false)}
-            ></div>
+              aria-hidden="true"
+            />
           </div>
         )}
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-background-light dark:bg-[#0d1117] transition-colors duration-300 scrollbar-hide print:overflow-visible print:block print:h-auto">
+        {/* Contenido */}
+        <main className="flex-1 overflow-y-auto bg-bg print:overflow-visible print:block print:h-auto">
           <Outlet />
         </main>
       </div>

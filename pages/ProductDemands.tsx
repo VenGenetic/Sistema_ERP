@@ -1132,7 +1132,7 @@ const ProductDemands: React.FC = () => {
             {/* Header & Title */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold dark:text-white tracking-tight">Demanda de Stock</h1>
+                    <h1 className="text-2xl font-bold dark:text-white tracking-tight">Demanda de Stock</h1>
                     <p className="text-slate-500 mt-1">Gestión de la lista de espera de clientes para productos agotados.</p>
                 </div>
                 <button
@@ -1319,7 +1319,7 @@ const ProductDemands: React.FC = () => {
             )}
 
             {flagActionDemand && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
                         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1387,7 +1387,7 @@ const ProductDemands: React.FC = () => {
             )}
 
             {discontinueProductId && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
                         <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-rose-50 dark:bg-rose-900/20 flex items-center gap-3">
                             <span className="material-symbols-outlined text-rose-500">warning</span>

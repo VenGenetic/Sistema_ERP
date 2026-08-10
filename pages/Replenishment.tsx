@@ -515,7 +515,7 @@ const Replenishment: React.FC = () => {
                 
                 {/* Header Title */}
                 <div>
-                    <h1 className="text-3xl font-bold dark:text-white tracking-tight flex items-center gap-3">
+                    <h1 className="text-2xl font-bold dark:text-white tracking-tight flex items-center gap-3">
                         <span className="material-symbols-outlined text-[32px] text-primary">local_mall</span>
                         Abastecimiento de Importadora
                     </h1>

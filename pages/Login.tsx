@@ -120,16 +120,16 @@ const Login: React.FC = () => {
     };
 
     return (
-        <div className="bg-dark-bg font-display antialiased text-slate-100 min-h-screen flex flex-col">
+        <div className="bg-dark-bg font-display antialiased text-fg min-h-screen flex flex-col">
             <div className="flex flex-1 flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
-                <div className="w-full max-w-md bg-dark-card shadow-glow rounded-xl overflow-hidden border border-white/10">
+                <div className="w-full max-w-md bg-surface shadow-lg rounded-xl overflow-hidden border border-subtle">
                     <div className="px-8 pt-10 pb-6 flex flex-col items-center">
                         <div className="h-16 w-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-6 border border-blue-500/20 shadow-[0_0_15px_rgba(24,119,242,0.15)]">
                             <span className="material-symbols-outlined text-4xl text-primary drop-shadow-md">
                                 {authMode === 'magic_link' ? 'auto_awesome' : 'inventory_2'}
                             </span>
                         </div>
-                        <h2 className="text-2xl font-bold tracking-tight text-center text-white">
+                        <h2 className="text-2xl font-bold tracking-tight text-center text-fg">
                             {authMode === 'password' && 'Iniciar Sesión en el Sistema ERP'}
                             {authMode === 'forgot' && 'Recuperar Contraseña'}
                             {authMode === 'magic_link' && 'Acceso con Enlace Mágico'}
@@ -161,7 +161,7 @@ const Login: React.FC = () => {
                                         <span className="material-symbols-outlined text-gray-500 text-[20px] transition-colors group-focus-within:text-primary">mail</span>
                                     </div>
                                     <input
-                                        className="block w-full rounded-lg border border-dark-border bg-dark-input py-3 pl-10 text-white placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm sm:leading-6 transition-all duration-200"
+                                        className="block w-full rounded-lg border border-dark-border bg-dark-input py-3 pl-10 text-fg placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm sm:leading-6 transition-all duration-200"
                                         id="email"
                                         name="email"
                                         placeholder="nombre@compania.com"
@@ -185,7 +185,7 @@ const Login: React.FC = () => {
                                             <span className="material-symbols-outlined text-gray-500 text-[20px] transition-colors group-focus-within:text-primary">lock</span>
                                         </div>
                                         <input
-                                            className="block w-full rounded-lg border border-dark-border bg-dark-input py-3 pl-10 pr-10 text-white placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm sm:leading-6 transition-all duration-200"
+                                            className="block w-full rounded-lg border border-dark-border bg-dark-input py-3 pl-10 pr-10 text-fg placeholder:text-gray-600 focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm sm:leading-6 transition-all duration-200"
                                             id="password"
                                             name="password"
                                             placeholder="••••••••"
@@ -212,7 +212,7 @@ const Login: React.FC = () => {
                             <div>
                                 <button
                                     disabled={loading}
-                                    className="flex w-full justify-center rounded-lg gradient-btn px-3 py-3 text-sm font-semibold leading-6 text-white shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex w-full justify-center rounded-lg gradient-btn px-3 py-3 text-sm font-semibold leading-6 text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                     type="submit"
                                 >
                                     {loading 
@@ -270,7 +270,7 @@ const Login: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    <div className="border-t border-white/5 bg-[#1a1a1a] py-4 px-8 flex items-center justify-between text-xs text-gray-500">
+                    <div className="border-t border-subtle bg-surface-2 py-4 px-8 flex items-center justify-between text-xs text-fg-muted">
                         <div className="flex items-center gap-1.5">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400/50 opacity-75"></span>

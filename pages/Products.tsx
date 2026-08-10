@@ -1012,7 +1012,20 @@ const Products: React.FC = () => {
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-slate-900 dark:text-white break-words whitespace-normal" title={prod.name}>{prod.name}</span>
+                            {/*
+                                Nombre completo también en la vista de tabla.
+                                `max-w-prose` acota la medida de línea: un texto que cruza
+                                toda la pantalla obliga al ojo a saltar de renglón y se
+                                vuelve incómodo de leer (regla clásica de 45-75 caracteres
+                                por línea; en monoespaciada conviene quedarse en la parte
+                                baja de ese rango).
+                            */}
+                            <span
+                                className="font-bold text-fg break-words whitespace-normal leading-relaxed max-w-prose"
+                                lang="es"
+                            >
+                                {prod.name}
+                            </span>
                             {isProductDiscontinued(prod) && (
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${prod.discontinued_until ? 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400' : 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:border-rose-800 dark:text-rose-400'} flex items-center gap-1`} title={prod.discontinued_until ? `Descontinuado Temporalmente hasta ${new Date(prod.discontinued_until).toLocaleDateString()}` : 'Descontinuado Permanentemente'}>
                                     <span className="material-symbols-outlined text-[10px]">{prod.discontinued_until ? 'hourglass_empty' : 'warning'}</span>
@@ -1307,7 +1320,21 @@ const Products: React.FC = () => {
 
                         {/* Name + status badges */}
                         <div>
-                            <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-snug line-clamp-2" title={prod.name}>{prod.name}</h3>
+                            {/*
+                                Nombre completo, sin recorte.
+                                `line-clamp-2` escondía las descripciones largas y obligaba
+                                a pasar el ratón para leerlas. Ahora envuelve entero con
+                                interlineado holgado (1.625) — necesario en monoespaciada,
+                                donde las líneas apretadas se leen como un bloque compacto.
+                                `break-words` evita que una referencia larga sin espacios
+                                desborde la tarjeta.
+                            */}
+                            <h3
+                                className="font-bold text-sm text-fg leading-relaxed break-words hyphens-auto"
+                                lang="es"
+                            >
+                                {prod.name}
+                            </h3>
                             {(prod.group_id || prod.demand_count > 0 || prod.investigation_status === 'en_consulta' || prod.investigation_status === 'no_encontrado') && (
                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                     {prod.group_id && (
@@ -1489,11 +1516,14 @@ const Products: React.FC = () => {
     }, [products, selectedIds, groupCounts, copiedSku]);
 
     return (
-        <div className="p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
+        // `font-mono` = JetBrains Mono en todo el Catálogo (ver fontFamily en index.html).
+        // Al ser monoespaciada ocupa ~10% más de ancho por carácter, así que los
+        // nombres largos se compensan abajo con más interlineado y sin recortes.
+        <div className="font-mono p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
             {/* ═══════ HEADER ═══════ */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold dark:text-white tracking-tight">Catálogo de Productos</h1>
+                    <h1 className="text-2xl font-bold dark:text-white tracking-tight">Catálogo de Productos</h1>
                     <p className="text-slate-500 mt-1">Gestiona la información maestra de tus productos (SKU, Nombres, Categorías).</p>
                 </div>
                 <div className="flex gap-3">
@@ -1889,8 +1919,14 @@ const Products: React.FC = () => {
                             ))}
                         </div>
 
+                        {/*
+                            `items-stretch` + `auto-rows-fr` en la rejilla: al mostrarse los
+                            nombres completos, cada tarjeta tiene un alto distinto. Esto
+                            iguala el alto dentro de cada fila para que la rejilla no quede
+                            dentada, sin volver a recortar el texto.
+                        */}
                         {products.length > 0 ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4 items-stretch auto-rows-fr">
                                 {renderedCards}
                             </div>
                         ) : !loading ? (

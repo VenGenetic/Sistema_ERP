@@ -59,7 +59,7 @@ const POE: React.FC = () => {
             <div className="p-2 rounded-2xl bg-gradient-to-br from-blue-500/20 via-indigo-500/20 to-purple-500/20 border border-blue-500/30 text-blue-500 dark:text-blue-400 shadow-sm">
               <BookOpen className="w-6 h-6 stroke-[2.5]" />
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl md:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Proceso Operacional Estándar (POE)
             </h1>
             <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-mono font-extrabold text-[11px] border border-blue-500/20">

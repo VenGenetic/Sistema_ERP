@@ -285,7 +285,7 @@ const InvoiceLabels: React.FC = () => {
     return (
         <div className="p-6 md:p-8 max-w-[1100px] mx-auto flex flex-col gap-6">
             <div>
-                <h1 className="text-3xl font-bold dark:text-white tracking-tight">Etiquetas de Factura</h1>
+                <h1 className="text-2xl font-bold dark:text-white tracking-tight">Etiquetas de Factura</h1>
                 <p className="text-slate-500 mt-1">
                     Sube el PDF de una factura de compra y genera automáticamente todas las etiquetas de los repuestos que vinieron en ella, respetando la cantidad de cada uno.
                 </p>

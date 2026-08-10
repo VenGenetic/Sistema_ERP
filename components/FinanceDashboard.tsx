@@ -231,7 +231,7 @@ const FinanceDashboard: React.FC = () => {
         <div className="flex flex-col gap-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Cuentas y Libro Financiero</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Cuentas y Libro Financiero</h1>
                     <p className="text-slate-500 mt-1">Resumen en tiempo real de todas las cuentas financieras.</p>
                 </div>
                 <div className="flex gap-3">

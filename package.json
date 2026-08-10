@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "sync-products": "node scripts/sync-odoo-products.js",
     "sync-importer-stock": "node scripts/sync-importer-stock.js",
+    "check-contrast": "node scripts/check-contrast.mjs",
     "feed:meta": "node scripts/generate-meta-feed.js"
   },
   "dependencies": {

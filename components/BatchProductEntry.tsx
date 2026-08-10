@@ -340,7 +340,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
                 {/* Header */}
                 <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
