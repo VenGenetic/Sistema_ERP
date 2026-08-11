@@ -210,6 +210,62 @@
       --ring: 124 163 212;
       --shadow-color: 0 0 0;
     }
+
+    /* =========================================================================
+       .on-paper — DOCUMENTOS QUE SE IMPRIMEN O SE EXPORTAN COMO IMAGEN
+       =========================================================================
+       Los tokens de arriba se invierten con el tema: en oscuro `--fg` es casi
+       blanco (232 235 240). Eso es correcto para la interfaz, pero un documento
+       que SIEMPRE se dibuja sobre papel blanco —la proforma que se captura con
+       html2canvas y se envía al cliente— salía con la tinta casi blanca sobre
+       blanco: las descripciones de los repuestos quedaban ilegibles.
+
+       Esta clase vuelve a declarar la paleta CLARA dentro de su subárbol, así
+       que `text-fg`, `bg-success-soft`, `border-subtle`… resuelven a tinta
+       oscura sin importar el tema que tenga puesto el usuario. Se aplica al
+       contenedor capturado, no al modal que lo rodea (ese sí sigue el tema).
+
+       Al añadir un token nuevo arriba, añádelo también aquí.
+       ====================================================================== */
+    .on-paper {
+      --bg: 236 239 244;
+      --surface: 255 255 255;
+      --surface-2: 246 248 251;
+      --surface-3: 226 231 239;
+      --surface-hover: 241 244 249;
+
+      --border: 216 222 231;
+      --border-strong: 134 143 161;
+
+      --fg: 27 36 54;
+      --fg-muted: 98 109 128;
+      --fg-subtle: 131 142 159;
+
+      --primary: 60 107 160;
+      --primary-hover: 50 90 135;
+      --primary-fg: 255 255 255;
+      --primary-soft: 237 242 248;
+      --primary-soft-fg: 47 85 128;
+
+      --success: 59 115 85;
+      --success-fg: 255 255 255;
+      --success-soft: 237 245 241;
+      --success-soft-fg: 53 102 78;
+
+      --warning: 128 102 54;
+      --warning-fg: 255 255 255;
+      --warning-soft: 250 244 232;
+      --warning-soft-fg: 111 89 48;
+
+      --danger: 168 68 63;
+      --danger-hover: 142 57 52;
+      --danger-fg: 255 255 255;
+      --danger-soft: 250 238 237;
+      --danger-soft-fg: 142 57 52;
+
+      --ring: 60 107 160;
+      --shadow-color: 27 36 54;
+    }
   </style>
 
   <script>

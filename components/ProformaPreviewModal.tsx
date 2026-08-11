@@ -115,9 +115,19 @@ export const ProformaPreviewModal: React.FC<ProformaPreviewModalProps> = ({ isOp
                     </button>
                 </div>
 
-                {/* Capturable document — fixed width, natural height (grows/shrinks with content) */}
-                <div className="p-6 bg-slate-100 flex justify-center">
-                    <div ref={printRef} className="bg-white" style={{ width: '650px' }}>
+                {/*
+                    Documento capturable — ancho fijo, alto natural.
+
+                    `on-paper` (definida en index.html) fuerza la paleta clara en
+                    todo este subárbol. Sin ella, con el tema oscuro activo los
+                    tokens `text-fg` / `text-fg-muted` resolvían a casi blanco
+                    (232 235 240) sobre el `bg-white` fijo del documento, y las
+                    descripciones de los repuestos salían ilegibles en la imagen
+                    que se envía al cliente. El modal que envuelve al documento sí
+                    sigue el tema del usuario: sólo la hoja va siempre en claro.
+                */}
+                <div className="p-6 bg-surface-3 flex justify-center">
+                    <div ref={printRef} className="on-paper bg-white" style={{ width: '650px' }}>
                         <div className="border border-subtle rounded-xl overflow-hidden">
                             <div className="h-2 w-full bg-success"></div>
 

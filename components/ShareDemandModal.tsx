@@ -108,12 +108,20 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                     </button>
                 </div>
 
-                {/* Contenido (El div que será capturado) */}
-                <div className="p-6 bg-slate-100 flex justify-center items-center">
+                {/*
+                    Contenido (El div que será capturado).
+
+                    `on-paper` fuerza la paleta clara en el ticket: se dibuja
+                    siempre sobre blanco, así que sin ella los tokens de texto
+                    (`text-fg`, `text-fg-muted`) resolvían a casi blanco cuando el
+                    usuario tenía el tema oscuro, y la imagen enviada al cliente
+                    salía ilegible. Ver la definición en index.html.
+                */}
+                <div className="p-6 bg-surface-3 flex justify-center items-center">
                     {/* Contenedor Cuadrado con Margen */}
-                    <div 
+                    <div
                         ref={printRef}
-                        className="bg-white flex items-center justify-center"
+                        className="on-paper bg-white flex items-center justify-center"
                         style={{ width: '500px', height: '500px', padding: '24px', boxSizing: 'border-box' }}
                     >
                         {/* Tarjeta del Ticket interna */}

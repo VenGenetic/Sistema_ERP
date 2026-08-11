@@ -121,7 +121,11 @@ const OrderShipments: React.FC = () => {
                  que el original de 9cm) para que quepa en repuestos chicos:
                  no ocupa toda la hoja, solo un recuadro que se recorta y se
                  pega en el paquete. */}
-            <div className="hidden print:block text-black" style={{ width: '11.25cm', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+            {/* `on-paper`: la guía se imprime sobre papel blanco, así que los
+                tokens de texto deben resolver siempre a tinta oscura. Con el tema
+                oscuro activo, las etiquetas "De" / "Para" (`text-fg-muted`) salían
+                casi blancas y desaparecían al imprimir. Ver index.html. */}
+            <div className="on-paper hidden print:block text-black" style={{ width: '11.25cm', fontFamily: 'Arial, Helvetica, sans-serif' }}>
                 <div className="border-2 border-black rounded-lg overflow-hidden">
                     {/* Dos columnas: remitente (izquierda) / destinatario (derecha) */}
                     <div className="flex">
