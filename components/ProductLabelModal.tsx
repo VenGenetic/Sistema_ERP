@@ -6,6 +6,18 @@ import { printLabelsOnThermalPrinter, MAX_THERMAL_WIDTH_MM } from '../utils/ther
 import { LabelSizeSelector } from './LabelSizeSelector';
 import { ThermalPrinterSelector } from './ThermalPrinterSelector';
 import { LabelSizePreset } from '../utils/labelPresets';
+import {
+  Check,
+  Copy,
+  Download,
+  FileText,
+  ListPlus,
+  Loader2,
+  Printer,
+  ReceiptText,
+  Tag,
+  X,
+} from 'lucide-react';
 
 interface ProductLabelModalProps {
     isOpen: boolean;
@@ -227,58 +239,50 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-surface rounded-2xl shadow-lg w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined">label</span>
+                <div className="flex items-center justify-between p-4 border-b border-subtle shrink-0">
+                    <h2 className="text-xl font-bold text-fg flex items-center gap-2">
+                        <Tag size={18} aria-hidden="true" />
                         Etiqueta de Producto
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        className="p-2 text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-surface-hover transition-colors"
                     >
-                        <span className="material-symbols-outlined">close</span>
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 flex flex-col items-center bg-slate-50 dark:bg-slate-950/50 overflow-y-auto">
+                <div className="p-6 flex flex-col items-center bg-surface-2 overflow-y-auto">
                     <div className="flex flex-col lg:flex-row gap-8 w-full items-start justify-center">
                         {/* Left: Preview */}
                         <div className="flex flex-col items-center w-full lg:w-1/2">
                             <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg mb-4 w-full max-w-sm">
                                 <button
                                     onClick={() => setActiveTab('image')}
-                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                                        activeTab === 'image' 
-                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                    }`}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${ activeTab === 'image' ? 'bg-white dark:bg-slate-700 text-fg shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:hover:text-slate-200' }`}
                                 >
                                     Etiqueta Sola
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('pdf')}
-                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                                        activeTab === 'pdf' 
-                                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                                    }`}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${ activeTab === 'pdf' ? 'bg-white dark:bg-slate-700 text-fg shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:hover:text-slate-200' }`}
                                 >
                                     Vista Previa PDF
                                 </button>
                             </div>
                             
                             {activeTab === 'image' ? (
-                                <div className="shadow-2xl ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm">
+                                <div className="shadow-xl ring-1 ring-slate-300 dark:ring-slate-700 rounded-sm">
                                     <canvas
                                         ref={previewCanvasRef}
                                         style={{ display: 'block', maxWidth: '100%' }}
                                     />
                                 </div>
                             ) : (
-                                <div className="w-full h-[400px] border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                <div className="w-full h-[400px] border border-strong rounded-lg overflow-hidden bg-surface-3 flex items-center justify-center">
                                     {pdfPreviewUrl ? (
                                         <iframe 
                                             src={pdfPreviewUrl} 
@@ -286,8 +290,8 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                             title="PDF Preview"
                                         />
                                     ) : (
-                                        <div className="flex flex-col items-center gap-2 text-slate-400">
-                                            <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
+                                        <div className="flex flex-col items-center gap-2 text-fg-subtle">
+                                            <Loader2 size={28} className="animate-spin" aria-hidden="true" />
                                             <span className="text-sm">Generando vista previa...</span>
                                         </div>
                                     )}
@@ -296,9 +300,9 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                         </div>
 
                         {/* Right: Print Controls */}
-                        <div className="flex flex-col gap-6 w-full lg:w-1/2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="flex flex-col gap-6 w-full lg:w-1/2 bg-surface p-6 rounded-xl border border-subtle shadow-sm">
                             <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cantidad de etiquetas a imprimir:</label>
+                                <label className="text-sm font-medium text-fg">Cantidad de etiquetas a imprimir:</label>
                                 <div className="flex items-center gap-3">
                                     <input
                                         type="number"
@@ -310,19 +314,19 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                             const val = parseInt(e.target.value) || 1;
                                             setPrintQuantity(Math.max(1, val));
                                         }}
-                                        className="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                        className="w-24 px-3 py-2 bg-surface-2 border border-subtle rounded-lg text-fg font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                                     />
-                                    <span className="text-sm text-slate-500">etiquetas</span>
+                                    <span className="text-sm text-fg-muted">etiquetas</span>
                                 </div>
                             </div>
 
                             {/* Thermal printer (primary) */}
                             <div className="flex flex-col gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                    <span className="material-symbols-outlined">receipt_long</span>
+                                <h3 className="font-semibold text-fg flex items-center gap-2">
+                                    <ReceiptText size={18} aria-hidden="true" />
                                     Impresora Térmica
                                 </h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                <p className="text-sm text-fg-muted">
                                     Envía cada etiqueta directamente a la impresora térmica, sin generar un PDF.
                                 </p>
                                 <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
@@ -330,41 +334,37 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                                 <button
                                     onClick={handlePrintThermal}
                                     disabled={isPrintingThermal || printQuantity < 1 || !labelSize}
-                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                    className="w-full py-3 bg-success hover:bg-success text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
-                                    <span className={`material-symbols-outlined ${isPrintingThermal ? 'animate-spin' : ''}`}>
-                                        {isPrintingThermal ? 'progress_activity' : 'print'}
-                                    </span>
+                                    {isPrintingThermal ? <Loader2 size={18} className={`${isPrintingThermal ? 'animate-spin' : ''}`} aria-hidden="true" /> : <Printer size={18} className={`${isPrintingThermal ? 'animate-spin' : ''}`} aria-hidden="true" />}
                                     {isPrintingThermal ? 'Enviando...' : 'Imprimir en Térmica'}
                                 </button>
                             </div>
 
                             {/* A4 PDF (legacy / sticker sheets) */}
                             <div className="flex flex-col gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                    <span className="material-symbols-outlined">description</span>
+                                <h3 className="font-semibold text-fg flex items-center gap-2">
+                                    <FileText size={18} aria-hidden="true" />
                                     PDF en Hoja A4
                                 </h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                <p className="text-sm text-fg-muted">
                                     Genera un archivo PDF tamaño A4 (hasta 21 etiquetas por página), útil para hojas de stickers pre-cortadas.
                                 </p>
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     <button
                                         onClick={handleGeneratePDF}
                                         disabled={isGenerating || printQuantity < 1}
-                                        className="flex-1 py-3 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 dark:border-violet-800 dark:text-violet-300 font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                        className="flex-1 py-3 bg-primary-soft hover:bg-primary-soft text-primary border border-primary/20 font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                                     >
-                                        <span className="material-symbols-outlined text-[20px]">download</span>
+                                        <Download size={20} aria-hidden="true" />
                                         Descargar
                                     </button>
                                     <button
                                         onClick={handleOpenPDF}
                                         disabled={isGenerating || printQuantity < 1}
-                                        className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                        className="flex-1 py-3 bg-primary hover:bg-primary text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                                     >
-                                        <span className={`material-symbols-outlined ${isGenerating ? 'animate-spin' : ''}`}>
-                                            {isGenerating ? 'progress_activity' : 'print'}
-                                        </span>
+                                        {isGenerating ? <Loader2 size={18} className={`${isGenerating ? 'animate-spin' : ''}`} aria-hidden="true" /> : <Printer size={18} className={`${isGenerating ? 'animate-spin' : ''}`} aria-hidden="true" />}
                                         {isGenerating ? 'Generando...' : 'Imprimir PDF'}
                                     </button>
                                 </div>
@@ -374,10 +374,10 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap justify-end gap-3 bg-white dark:bg-slate-900 shrink-0">
+                <div className="p-4 border-t border-subtle flex flex-wrap justify-end gap-3 bg-surface shrink-0">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors mr-auto"
+                        className="px-4 py-2 text-fg-muted font-medium hover:bg-surface-hover rounded-lg transition-colors mr-auto"
                     >
                         Cerrar
                     </button>
@@ -392,52 +392,38 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                             if (navigator.vibrate) navigator.vibrate(50);
                             setTimeout(() => setQueueAdded(false), 2500);
                         }}
-                        className={`px-4 py-2 font-medium rounded-lg transition-colors flex items-center gap-2 border ${
-                            queueAdded
-                                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700'
-                                : 'text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 border-amber-200 dark:border-amber-700'
-                        }`}
+                        className={`px-4 py-2 font-medium rounded-lg transition-colors flex items-center gap-2 border ${ queueAdded ? 'bg-warning-soft text-warning border-warning/20 dark:border-warning' : 'text-warning hover:bg-warning-soft border-warning/20 dark:border-warning' }`}
                         title="Agregar estas etiquetas a la cola de impresión"
                     >
-                        <span className="material-symbols-outlined text-[20px]">
-                            {queueAdded ? 'check' : 'playlist_add'}
-                        </span>
+                        {queueAdded ? <Check size={20} aria-hidden="true" /> : <ListPlus size={20} aria-hidden="true" />}
                         {queueAdded ? `¡${printQuantity} agregadas a la cola!` : `Agregar ${printQuantity} a Cola`}
                     </button>
                     
                     <button
                         onClick={handleDownloadImage}
-                        className="px-4 py-2 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700"
+                        className="px-4 py-2 text-fg font-medium hover:bg-surface-hover rounded-lg transition-colors flex items-center gap-2 border border-subtle"
                         title="Descargar imagen PNG"
                     >
-                        <span className="material-symbols-outlined text-[20px]">download</span>
+                        <Download size={20} aria-hidden="true" />
                         Descargar
                     </button>
 
                     <button
                         onClick={handlePrintThermal}
                         disabled={isPrintingThermal || printQuantity < 1 || !labelSize}
-                        className="px-4 py-2 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="px-4 py-2 text-fg font-medium hover:bg-surface-hover rounded-lg transition-colors flex items-center gap-2 border border-subtle disabled:opacity-70 disabled:cursor-not-allowed"
                         title="Imprimir en la impresora térmica"
                     >
-                        <span className={`material-symbols-outlined text-[20px] ${isPrintingThermal ? 'animate-spin' : ''}`}>
-                            {isPrintingThermal ? 'progress_activity' : 'print'}
-                        </span>
+                        {isPrintingThermal ? <Loader2 size={20} className={`${isPrintingThermal ? 'animate-spin' : ''}`} aria-hidden="true" /> : <Printer size={20} className={`${isPrintingThermal ? 'animate-spin' : ''}`} aria-hidden="true" />}
                         Imprimir Térmica
                     </button>
 
                     <button
                         onClick={handleCopyImage}
                         disabled={isGenerating}
-                        className={`px-5 py-2 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors ${
-                            copied
-                                ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
-                                : 'bg-primary hover:bg-primary/90 shadow-primary/30'
-                        } disabled:opacity-70 disabled:cursor-not-allowed`}
+                        className={`px-5 py-2 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors ${ copied ? 'bg-success hover:bg-success shadow-success/30' : 'bg-primary hover:bg-primary/90 shadow-primary/30' } disabled:opacity-70 disabled:cursor-not-allowed`}
                     >
-                        <span className="material-symbols-outlined text-[20px]">
-                            {copied ? 'check' : 'content_copy'}
-                        </span>
+                        {copied ? <Check size={20} aria-hidden="true" /> : <Copy size={20} aria-hidden="true" />}
                         {copied ? '¡Copiado!' : 'Copiar Imagen'}
                     </button>
                 </div>

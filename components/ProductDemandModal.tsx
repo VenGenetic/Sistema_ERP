@@ -3,6 +3,14 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { ShareDemandModal } from './ShareDemandModal';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
+import {
+  BellRing,
+  ClipboardPaste,
+  Loader2,
+  Save,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 
 const parseClipboardText = (text: string) => {
     const phoneRegex = /\+?[0-9\s\-\(\)\.]{7,20}/g;
@@ -277,34 +285,34 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-[#0c1117] rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#161b22]">
-                    <div className="flex items-center gap-2 text-slate-800 dark:text-white">
-                        <span className="material-symbols-outlined text-[20px] text-blue-500">notifications_active</span>
+                <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
+                    <div className="flex items-center gap-2 text-fg">
+                        <BellRing size={20} className="text-primary" aria-hidden="true" />
                         <h2 className="text-lg font-bold tracking-tight">Lista de Espera</h2>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                    <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto">
-                    <div className="mb-6 bg-slate-100 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Producto Solicitado</span>
-                        <span className="block font-medium text-slate-900 dark:text-white line-clamp-2">{product.name}</span>
-                        <span className="block font-mono text-xs text-slate-500 mt-1">{product.sku}</span>
+                    <div className="mb-6 bg-surface-3 p-3 rounded-lg border border-subtle">
+                        <span className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">Producto Solicitado</span>
+                        <span className="block font-medium text-fg line-clamp-2">{product.name}</span>
+                        <span className="block font-mono text-xs text-fg-muted mt-1">{product.sku}</span>
                     </div>
 
                     {discontinued ? (
-                        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 p-6 rounded-lg mb-4 flex flex-col items-center justify-center text-center">
-                            <span className="material-symbols-outlined text-[32px] text-rose-500 mb-2">warning</span>
-                            <p className="text-sm font-bold text-rose-800 dark:text-rose-400">
+                        <div className="bg-danger-soft border border-danger/20 p-6 rounded-lg mb-4 flex flex-col items-center justify-center text-center">
+                            <TriangleAlert size={32} className="text-danger mb-2" aria-hidden="true" />
+                            <p className="text-sm font-bold text-danger">
                                 Este producto se encuentra descontinuado.
                             </p>
-                            <p className="text-xs text-rose-600 dark:text-rose-500 mt-2">
+                            <p className="text-xs text-danger mt-2">
                                 No es posible añadir nuevos clientes a la lista de espera de un producto descontinuado.
                             </p>
                         </div>
@@ -312,16 +320,16 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                         <form id="demand-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                        Teléfono <span className="text-rose-500">*</span>
+                                    <label className="block text-sm font-medium text-fg">
+                                        Teléfono <span className="text-danger">*</span>
                                     </label>
                                     <button
                                         type="button"
                                         onClick={handlePastePhone}
-                                        className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 font-semibold transition-colors"
+                                        className="flex items-center gap-1 text-xs text-primary hover:text-primary font-semibold transition-colors"
                                         title="Pega el teléfono desde el portapapeles"
                                     >
-                                        <span className="material-symbols-outlined text-[15px]">content_paste</span>
+                                        <ClipboardPaste size={15} aria-hidden="true" />
                                         Pegar Teléfono
                                     </button>
                                 </div>
@@ -330,23 +338,23 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                                     required
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value.replace(/[^0-9+]/g, ''))}
-                                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#161b22] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full px-3 py-2 border border-strong rounded-lg bg-surface text-fg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                     placeholder="+593999999999"
                                 />
                             </div>
 
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    Nombre del Cliente <span className="text-slate-400 text-xs font-normal">(Opcional)</span>
+                                <label className="block text-sm font-medium text-fg">
+                                    Nombre del Cliente <span className="text-fg-subtle text-xs font-normal">(Opcional)</span>
                                 </label>
                                 <button
                                     type="button"
                                     onClick={handlePasteName}
-                                    className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 font-semibold transition-colors"
+                                    className="flex items-center gap-1 text-xs text-primary hover:text-primary font-semibold transition-colors"
                                     title="Pega el nombre desde el portapapeles"
                                 >
-                                    <span className="material-symbols-outlined text-[15px]">content_paste</span>
+                                    <ClipboardPaste size={15} aria-hidden="true" />
                                     Pegar Nombre
                                 </button>
                             </div>
@@ -354,25 +362,25 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#161b22] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full px-3 py-2 border border-strong rounded-lg bg-surface text-fg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 placeholder="Ej. Juan Pérez"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                Notas adicionales <span className="text-slate-400 text-xs font-normal">(Opcional)</span>
+                            <label className="block text-sm font-medium text-fg mb-1">
+                                Notas adicionales <span className="text-fg-subtle text-xs font-normal">(Opcional)</span>
                             </label>
                             <textarea
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 rows={2}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-[#161b22] text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                                className="w-full px-3 py-2 border border-strong rounded-lg bg-surface text-fg focus:ring-2 focus:ring-primary focus:border-transparent transition-all resize-none"
                                 placeholder="Ej. Busca versión en color negro..."
                             />
                         </div>
                         
-                        <div className="flex items-center gap-3 mt-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center gap-3 mt-1 bg-surface-2 p-3 rounded-lg border border-subtle">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -388,24 +396,20 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                                     }
                                     setIsApproved(!isApproved);
                                 }}
-                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                    isApproved ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
-                                }`}
+                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ isApproved ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600' }`}
                                 role="switch"
                                 aria-checked={isApproved}
                             >
                                 <span
                                     aria-hidden="true"
-                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                        isApproved ? 'translate-x-5' : 'translate-x-0'
-                                    }`}
+                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${ isApproved ? 'translate-x-5' : 'translate-x-0' }`}
                                 />
                             </button>
                             <div>
-                                <span className={`block text-sm font-semibold ${isApproved ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                <span className={`block text-sm font-semibold ${isApproved ? 'text-primary dark:text-primary' : 'text-slate-700 dark:text-slate-300'}`}>
                                     {isApproved ? 'Pedido Aprobado en espera' : 'Pedido No Aprobado'}
                                 </span>
-                                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                                <span className="block text-xs text-fg-muted">
                                     Activa esto si verificaste el stock en la importadora. (Opcional)
                                 </span>
                             </div>
@@ -415,11 +419,11 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#161b22] flex justify-end gap-3">
+                <div className="px-6 py-4 border-t border-subtle bg-surface-2 flex justify-end gap-3">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                     >
                         Cancelar
                     </button>
@@ -427,12 +431,12 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
                         type="submit"
                         form="demand-form"
                         disabled={loading || discontinued}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm shadow-blue-500/20"
+                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 shadow-sm shadow-primary/20"
                     >
                         {loading ? (
-                            <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+                            <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                         ) : (
-                            <span className="material-symbols-outlined text-[18px]">save</span>
+                            <Save size={18} aria-hidden="true" />
                         )}
                         Registrar
                     </button>

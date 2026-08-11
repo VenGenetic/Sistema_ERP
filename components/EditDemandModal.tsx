@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  FilePen,
+  Info,
+  Loader2,
+  Phone,
+  Save,
+  User,
+  X,
+} from 'lucide-react';
 
 interface ProductDemand {
     id: number;
@@ -107,40 +116,40 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-[#0c1117] rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#161b22]">
-                    <div className="flex items-center gap-2 text-slate-800 dark:text-white">
-                        <span className="material-symbols-outlined text-[20px] text-blue-500">edit_note</span>
+                <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
+                    <div className="flex items-center gap-2 text-fg">
+                        <FilePen size={20} className="text-primary" aria-hidden="true" />
                         <h2 className="text-lg font-bold tracking-tight">Editar Solicitud</h2>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                    <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto">
-                    <div className="mb-4 bg-slate-100 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Producto Solicitado</span>
-                        <span className="block font-medium text-slate-900 dark:text-white line-clamp-2">{demand.product?.name || 'Producto Desconocido'}</span>
-                        <span className="block font-mono text-xs text-slate-500 mt-1">{demand.product?.sku || ''}</span>
+                    <div className="mb-4 bg-surface-3 p-3 rounded-lg border border-subtle">
+                        <span className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">Producto Solicitado</span>
+                        <span className="block font-medium text-fg line-clamp-2">{demand.product?.name || 'Producto Desconocido'}</span>
+                        <span className="block font-mono text-xs text-fg-muted mt-1">{demand.product?.sku || ''}</span>
                     </div>
 
                     {(demand.created_at || demand.creator_name) && (
-                        <div className="mb-6 bg-slate-50 dark:bg-slate-900/30 p-3 rounded-lg border border-slate-200 dark:border-slate-850 text-xs text-slate-500 dark:text-slate-400 flex flex-col gap-1.5">
+                        <div className="mb-6 bg-surface-2 p-3 rounded-lg border border-subtle text-xs text-fg-muted flex flex-col gap-1.5">
                             {demand.created_at && (
                                 <div className="flex justify-between items-center">
-                                    <span className="font-semibold text-slate-400">Fecha de Registro:</span>
+                                    <span className="font-semibold text-fg-subtle">Fecha de Registro:</span>
                                     <span>{new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}</span>
                                 </div>
                             )}
                             {demand.creator_name && (
                                 <div className="flex justify-between items-center">
-                                    <span className="font-semibold text-slate-400">Registrado por:</span>
-                                    <span className="font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[14px]">person</span>
+                                    <span className="font-semibold text-fg-subtle">Registrado por:</span>
+                                    <span className="font-medium text-fg flex items-center gap-1">
+                                        <User size={14} aria-hidden="true" />
                                         {demand.creator_name}
                                     </span>
                                 </div>
@@ -151,30 +160,30 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
                     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                         
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                                Nombre del Cliente <span className="text-slate-400 font-normal">(Opcional)</span>
+                            <label className="block text-sm font-semibold text-fg mb-1.5">
+                                Nombre del Cliente <span className="text-fg-subtle font-normal">(Opcional)</span>
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span className="material-symbols-outlined text-slate-400 text-[18px]">person</span>
+                                    <User size={18} className="text-fg-subtle" aria-hidden="true" />
                                 </div>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="Ej. Juan Pérez"
-                                    className="w-full pl-10 pr-3 py-2 bg-white dark:bg-[#0c1117] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-shadow"
+                                    className="w-full pl-10 pr-3 py-2 bg-surface border border-strong rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-shadow"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                                Número de WhatsApp <span className="text-rose-500">*</span>
+                            <label className="block text-sm font-semibold text-fg mb-1.5">
+                                Número de WhatsApp <span className="text-danger">*</span>
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span className="material-symbols-outlined text-slate-400 text-[18px]">call</span>
+                                    <Phone size={18} className="text-fg-subtle" aria-hidden="true" />
                                 </div>
                                 <input
                                     type="tel"
@@ -182,30 +191,30 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
                                     onChange={(e) => setPhone(e.target.value.replace(/[^0-9+\s-]/g, ''))}
                                     placeholder="Ej. 0991234567"
                                     required
-                                    className="w-full pl-10 pr-3 py-2 bg-white dark:bg-[#0c1117] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-shadow"
+                                    className="w-full pl-10 pr-3 py-2 bg-surface border border-strong rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-shadow"
                                 />
                             </div>
-                            <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px]">info</span>
+                            <p className="text-xs text-fg-muted mt-1.5 flex items-center gap-1">
+                                <Info size={14} aria-hidden="true" />
                                 Se usará para enviar el mensaje automático
                             </p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                                Notas Adicionales <span className="text-slate-400 font-normal">(Opcional)</span>
+                            <label className="block text-sm font-semibold text-fg mb-1.5">
+                                Notas Adicionales <span className="text-fg-subtle font-normal">(Opcional)</span>
                             </label>
                             <textarea
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 placeholder="Ej. El cliente busca solo color rojo, llamar por la tarde..."
                                 rows={3}
-                                className="w-full p-3 bg-white dark:bg-[#0c1117] border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-shadow resize-none"
+                                className="w-full p-3 bg-surface border border-strong rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-shadow resize-none"
                             />
                         </div>
 
                         {demand.status === 'pending_stock' && (
-                            <div className="flex items-center gap-3 mt-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center gap-3 mt-2 bg-surface-2 p-3 rounded-lg border border-subtle">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -221,24 +230,20 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
                                         }
                                         setIsApproved(!isApproved);
                                     }}
-                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                        isApproved ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
-                                    }`}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ isApproved ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600' }`}
                                     role="switch"
                                     aria-checked={isApproved}
                                 >
                                     <span
                                         aria-hidden="true"
-                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                            isApproved ? 'translate-x-5' : 'translate-x-0'
-                                        }`}
+                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${ isApproved ? 'translate-x-5' : 'translate-x-0' }`}
                                     />
                                 </button>
                                 <div>
-                                    <span className={`block text-sm font-semibold ${isApproved ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                    <span className={`block text-sm font-semibold ${isApproved ? 'text-primary dark:text-primary' : 'text-slate-700 dark:text-slate-300'}`}>
                                         {isApproved ? 'Pedido Aprobado en espera' : 'Pedido No Aprobado'}
                                     </span>
-                                    <span className="block text-xs text-slate-500 dark:text-slate-400">
+                                    <span className="block text-xs text-fg-muted">
                                         Activa esto si verificaste el stock en la importadora.
                                     </span>
                                 </div>
@@ -246,28 +251,28 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
                         )}
 
                         {/* Footer / Actions */}
-                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+                        <div className="mt-4 pt-4 border-t border-subtle flex justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={onClose}
                                 disabled={loading}
-                                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                className="px-4 py-2 text-sm font-medium text-fg-muted bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
                                 type="submit"
                                 disabled={loading || !phone.trim()}
-                                className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primary rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? (
                                     <>
-                                        <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                                        <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                                         Guardando...
                                     </>
                                 ) : (
                                     <>
-                                        <span className="material-symbols-outlined text-[18px]">save</span>
+                                        <Save size={18} aria-hidden="true" />
                                         Guardar Cambios
                                     </>
                                 )}

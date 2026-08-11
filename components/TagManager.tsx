@@ -17,6 +17,15 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+  GripVertical,
+  Loader2,
+  Pencil,
+  Plus,
+  Tag,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 export interface Tag {
     id: string;
@@ -56,15 +65,15 @@ const SortableTagItem = ({ tag, onEdit, onDelete }: { tag: Tag, onEdit: () => vo
         <div 
             ref={setNodeRef} 
             style={style} 
-            className={`flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 group hover:border-slate-300 dark:hover:border-slate-600 transition-colors ${isDragging ? 'shadow-lg border-blue-500 dark:border-blue-500' : ''}`}
+            className={`flex items-center justify-between p-3 border border-subtle rounded-lg bg-surface group hover:border-slate-300 dark:hover:border-slate-600 transition-colors ${isDragging ? 'shadow-lg border-primary dark:border-primary' : ''}`}
         >
             <div className="flex items-center gap-3">
                 <div 
                     {...attributes} 
                     {...listeners} 
-                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-300 dark:text-slate-600 hover:text-slate-500"
+                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-fg-subtle hover:text-slate-500"
                 >
-                    <span className="material-symbols-outlined">drag_indicator</span>
+                    <GripVertical size={18} aria-hidden="true" />
                 </div>
                 <span 
                     className="px-2 py-0.5 text-xs font-bold rounded"
@@ -74,8 +83,8 @@ const SortableTagItem = ({ tag, onEdit, onDelete }: { tag: Tag, onEdit: () => vo
                 </span>
             </div>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={onEdit} className="p-1 text-slate-400 hover:text-blue-500 rounded"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                <button onClick={onDelete} className="p-1 text-slate-400 hover:text-rose-500 rounded"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                <button onClick={onEdit} className="p-1 text-fg-subtle hover:text-primary rounded"><Pencil size={18} aria-hidden="true" /></button>
+                <button onClick={onDelete} className="p-1 text-fg-subtle hover:text-danger rounded"><Trash2 size={18} aria-hidden="true" /></button>
             </div>
         </div>
     );
@@ -181,18 +190,18 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
     };
 
     const content = (
-        <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl">
+        <div className="flex flex-col h-full bg-surface rounded-xl">
             {/* Header */}
-            <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+            <div className="p-5 border-b border-subtle flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 rounded-lg">
-                        <span className="material-symbols-outlined text-[24px]">label</span>
+                    <div className="p-2 bg-danger-soft text-danger rounded-lg">
+                        <Tag size={24} aria-hidden="true" />
                     </div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">Gestionar Etiquetas</h2>
+                    <h2 className="text-xl font-bold text-fg">Gestionar Etiquetas</h2>
                 </div>
                 {onClose && (
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined">close</span>
+                    <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <X size={18} aria-hidden="true" />
                     </button>
                 )}
             </div>
@@ -200,7 +209,7 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
             <div className="p-6 overflow-y-auto flex-1">
                 {/* Editor */}
                 {editingTag && (
-                    <div className="mb-6 p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900">
+                    <div className="mb-6 p-4 border border-subtle rounded-xl bg-surface-2">
                         <h3 className="text-sm font-semibold mb-3 dark:text-white">
                             {editingTag.id ? 'Editar Etiqueta' : 'Nueva Etiqueta'}
                         </h3>
@@ -210,7 +219,7 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
                                 placeholder="Nombre (ej. Nuevo, Promoción, Fallado)"
                                 value={editingTag.name || ''}
                                 onChange={e => setEditingTag({ ...editingTag, name: e.target.value })}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm dark:text-white"
+                                className="w-full px-3 py-2 bg-surface border border-strong rounded-lg text-sm dark:text-white"
                             />
                             <div className="flex flex-wrap gap-2">
                                 {COLORS.map(c => (
@@ -223,7 +232,7 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
                                 ))}
                             </div>
                             <div className="flex gap-2 justify-end mt-2">
-                                <button onClick={() => setEditingTag(null)} className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">Cancelar</button>
+                                <button onClick={() => setEditingTag(null)} className="px-3 py-1.5 text-sm text-fg-muted hover:text-slate-700 dark:hover:text-slate-300">Cancelar</button>
                                 <button onClick={handleSave} className="px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">Guardar</button>
                             </div>
                         </div>
@@ -233,16 +242,16 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
                 {!editingTag && (
                     <button 
                         onClick={() => setEditingTag({ name: '', color: COLORS[0] })}
-                        className="mb-4 w-full py-2 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                        className="mb-4 w-full py-2 border-2 border-dashed border-strong rounded-lg text-fg-muted hover:bg-surface-hover transition-colors flex items-center justify-center gap-2 text-sm font-medium"
                     >
-                        <span className="material-symbols-outlined text-[18px]">add</span>
+                        <Plus size={18} aria-hidden="true" />
                         Crear Etiqueta
                     </button>
                 )}
 
                 {/* List */}
                 {loading ? (
-                    <div className="text-center py-8 text-slate-400"><span className="material-symbols-outlined animate-spin text-[24px]">progress_activity</span></div>
+                    <div className="text-center py-8 text-fg-subtle"><Loader2 size={24} className="animate-spin" aria-hidden="true" /></div>
                 ) : (
                     <div className="flex flex-col gap-2">
                         <DndContext 
@@ -265,7 +274,7 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
                             </SortableContext>
                         </DndContext>
                         {tags.length === 0 && !editingTag && (
-                            <div className="text-center py-8 text-slate-400 text-sm">No hay etiquetas creadas.</div>
+                            <div className="text-center py-8 text-fg-subtle text-sm">No hay etiquetas creadas.</div>
                         )}
                     </div>
                 )}
@@ -277,7 +286,7 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md h-[80vh] shadow-2xl">
+            <div className="w-full max-w-md h-[80vh] shadow-xl">
                 {content}
             </div>
         </div>

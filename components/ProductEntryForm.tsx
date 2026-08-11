@@ -80,13 +80,13 @@ export const ProductEntryForm = ({ productId, onSave }: { productId: number, onS
     };
 
     return (
-        <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div className="p-4 bg-surface rounded-lg border border-subtle">
             <h3 className="text-lg font-bold mb-4 dark:text-white">Ingreso de Precios (Lógica Strikes)</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Costo Sin IVA (Obligatorio) */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Costo Unitario (Sin IVA)</label>
+                    <label className="block text-sm font-medium text-fg">Costo Unitario (Sin IVA)</label>
                     <input
                         type="number"
                         value={form.costoSinIva}
@@ -98,8 +98,8 @@ export const ProductEntryForm = ({ productId, onSave }: { productId: number, onS
 
                 {/* Costo Descontado (Opcional) */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Costo c/ Descuento <span className="text-xs text-slate-500">(Opcional)</span>
+                    <label className="block text-sm font-medium text-fg">
+                        Costo c/ Descuento <span className="text-xs text-fg-muted">(Opcional)</span>
                     </label>
                     <input
                         type="number"
@@ -112,8 +112,8 @@ export const ProductEntryForm = ({ productId, onSave }: { productId: number, onS
 
                 {/* Porcentaje Descuento (Calculado / ReadOnly) */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-500">Descuento Aplicado (%)</label>
-                    <div className="mt-1 p-2 bg-slate-100 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300 font-mono">
+                    <label className="block text-sm font-medium text-fg-muted">Descuento Aplicado (%)</label>
+                    <div className="mt-1 p-2 bg-surface-3 rounded text-fg font-mono">
                         {calculated.porcentajeDescuento !== null
                             ? `${calculated.porcentajeDescuento.toFixed(2)}%`
                             : 'N/A'}
@@ -122,7 +122,7 @@ export const ProductEntryForm = ({ productId, onSave }: { productId: number, onS
 
                 {/* Porcentaje IVA */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">IVA (%)</label>
+                    <label className="block text-sm font-medium text-fg">IVA (%)</label>
                     <input
                         type="number"
                         value={form.porcentajeIva}
@@ -132,12 +132,12 @@ export const ProductEntryForm = ({ productId, onSave }: { productId: number, onS
                 </div>
 
                 {/* Costo Final con IVA (Calculado) */}
-                <div className="col-span-full bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-                    <label className="block text-sm font-bold text-blue-800 dark:text-blue-300">Costo Final (Con IVA)</label>
-                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">
+                <div className="col-span-full bg-primary-soft p-4 rounded-lg border border-primary/20">
+                    <label className="block text-sm font-bold text-primary">Costo Final (Con IVA)</label>
+                    <div className="text-2xl font-bold text-primary mt-1">
                         ${calculated.costoConIva.toFixed(2)}
                     </div>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    <p className="text-xs text-primary mt-1">
                         * Este valor se usará para calcular márgenes de venta.
                     </p>
                 </div>

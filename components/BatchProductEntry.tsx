@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
+import {
+  CirclePlus,
+  Database,
+  Download,
+  FileUp,
+  Loader2,
+  Trash,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 interface Account {
     id: number;
@@ -341,25 +351,25 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="bg-surface rounded-xl shadow-lg w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-subtle">
                 {/* Header */}
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                <div className="p-6 border-b border-subtle flex justify-between items-center bg-surface-2">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
-                            <span className="material-symbols-outlined text-[24px]">dataset</span>
+                        <div className="p-2 bg-primary-soft text-primary-soft-fg rounded-lg">
+                            <Database size={24} aria-hidden="true" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Entrada de Productos por Lote</h2>
-                            <p className="text-sm text-slate-500">Ingresa inventario, costos y genera transacción financiera.</p>
+                            <h2 className="text-xl font-bold text-fg">Entrada de Productos por Lote</h2>
+                            <p className="text-sm text-fg-muted">Ingresa inventario, costos y genera transacción financiera.</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={handleDownloadTemplate}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-surface border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors"
                             title="Descargar plantilla Excel para importar"
                         >
-                            <span className="material-symbols-outlined text-[18px]">download</span>
+                            <Download size={18} aria-hidden="true" />
                             Plantilla
                         </button>
                         <div className="relative">
@@ -370,19 +380,19 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                                 title="Importar desde Excel"
                             />
-                            <button className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
-                                <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                            <button className="flex items-center gap-1 px-3 py-1.5 bg-success-soft border border-success/20 rounded-lg text-sm font-medium text-success-soft-fg hover:bg-success-soft transition-colors">
+                                <FileUp size={18} aria-hidden="true" />
                                 Importar Excel
                             </button>
                         </div>
-                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors ml-2">
-                            <span className="material-symbols-outlined">close</span>
+                        <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors ml-2">
+                            <X size={18} aria-hidden="true" />
                         </button>
                     </div>
                 </div>
 
                 {/* Global Configuration */}
-                <div className="relative z-20 p-6 grid grid-cols-1 md:grid-cols-5 gap-6 border-b border-slate-200 dark:border-slate-700 items-end">
+                <div className="relative z-20 p-6 grid grid-cols-1 md:grid-cols-5 gap-6 border-b border-subtle items-end">
                     <div>
                         <WarehouseSelect
                             value={globalWarehouseId}
@@ -409,12 +419,12 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                     checked={skipFinancialTransaction}
                                     onChange={(e) => setSkipFinancialTransaction(e.target.checked)}
                                 />
-                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                                <span className="ml-2 text-xs text-slate-500 font-medium whitespace-nowrap group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">Solo Inventario</span>
+                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-warning"></div>
+                                <span className="ml-2 text-xs text-fg-muted font-medium whitespace-nowrap group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">Solo Inventario</span>
                             </label>
                         </div>
                         <select
-                            className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors ${skipFinancialTransaction ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-primary focus:border-primary'}`}
+                            className={`w-full px-3 py-2 border rounded-lg outline-none transition-colors ${skipFinancialTransaction ? 'bg-slate-100 dark:bg-slate-800 border-subtle text-fg-subtle cursor-not-allowed' : 'bg-slate-50 dark:bg-slate-900 border-strong focus:ring-2 focus:ring-primary focus:border-primary'}`}
                             value={selectedAccountId || ''}
                             onChange={(e) => setSelectedAccountId(parseInt(e.target.value))}
                             disabled={skipFinancialTransaction}
@@ -428,20 +438,20 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">IVA Global (%)</label>
+                        <label className="block text-sm font-medium text-fg mb-1">IVA Global (%)</label>
                         <input
                             type="number"
                             min="0"
                             step="0.01"
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                            className="w-full px-3 py-2 bg-surface-2 border border-strong rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                             value={globalVat}
                             onChange={(e) => setGlobalVat(parseFloat(e.target.value) || 0)}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Modo de Ingreso</label>
-                        <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg h-[42px]">
-                            <span className={`text-[10px] font-bold uppercase ${!entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Costo</span>
+                        <label className="text-sm font-medium text-fg">Modo de Ingreso</label>
+                        <div className="flex items-center gap-3 p-2 bg-surface-2 border border-strong rounded-lg h-[42px]">
+                            <span className={`text-2xs font-bold uppercase ${!entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Costo</span>
                             <label className="flex items-center cursor-pointer relative group">
                                 <input type="checkbox" className="sr-only peer"
                                     checked={entryByPrice}
@@ -449,7 +459,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                 />
                                 <div className="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
                             </label>
-                            <span className={`text-[10px] font-bold uppercase ${entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Precio</span>
+                            <span className={`text-2xs font-bold uppercase ${entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Precio</span>
                         </div>
                     </div>
                 </div>
@@ -457,136 +467,136 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 {/* Spreadsheet Table */}
                 <div className="flex-1 overflow-auto p-0">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-50 dark:bg-slate-700/50 sticky top-0 z-10 shadow-sm">
+                        <thead className="bg-surface-2 sticky top-0 z-10 shadow-sm">
                             <tr>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-10">#</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">SKU *</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-48">Nombre *</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Cant.</th>
-                                <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider w-32 ${entryByPrice ? 'text-amber-500 italic' : 'text-slate-500'}`} title="Costo Unitario Sin IVA">
+                                <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-10">#</th>
+                                <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-32">SKU *</th>
+                                <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-48">Nombre *</th>
+                                <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-24">Cant.</th>
+                                <th className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider w-32 ${entryByPrice ? 'text-warning italic' : 'text-slate-500'}`} title="Costo Unitario Sin IVA">
                                     {entryByPrice ? 'Costo (Calc)' : 'Costo S/I *'}
                                 </th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32" title="Opcional: Si hay descuento">Costo Desc.</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Margen</th>
-                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28 bg-slate-100 dark:bg-slate-800 text-center">Costo + IVA</th>
-                                <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider w-28 text-center ${entryByPrice ? 'bg-primary/10 text-primary' : 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600'}`}>
+                                <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-32" title="Opcional: Si hay descuento">Costo Desc.</th>
+                                <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-24">Margen</th>
+                                <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-28 bg-surface-3 text-center">Costo + IVA</th>
+                                <th className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider w-28 text-center ${entryByPrice ? 'bg-primary/10 text-primary' : 'bg-success-soft text-success'}`}>
                                     {entryByPrice ? 'PVP Entry *' : 'PVP Tentativo'}
                                 </th>
-                                <th className="px-4 py-3 w-10"></th>
+                                <th className="px-4 py-2.5 w-10"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                        <tbody className="divide-y divide-subtle">
                             {rows.map((row, index) => (
-                                <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                                    <td className="px-4 py-2 text-slate-400 text-xs">{index + 1}</td>
-                                    <td className="px-2 py-2">
+                                <tr key={row.id} className="hover:bg-surface-hover">
+                                    <td className="px-4 py-3 text-fg-subtle text-xs">{index + 1}</td>
+                                    <td className="px-4 py-3">
                                         <input
                                             type="text"
-                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm font-mono uppercase focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full px-2 py-1.5 bg-surface border border-subtle rounded text-sm font-mono focus:ring-1 focus:ring-primary outline-none"
                                             value={row.sku}
                                             onChange={e => handleRowChange(row.id, 'sku', e.target.value.toUpperCase())}
                                             placeholder="SKU-123"
                                         />
                                     </td>
-                                    <td className="px-2 py-2">
+                                    <td className="px-4 py-3">
                                         <input
                                             type="text"
-                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full px-2 py-1.5 bg-surface border border-subtle rounded text-sm focus:ring-1 focus:ring-primary outline-none"
                                             value={row.name}
                                             onChange={e => handleRowChange(row.id, 'name', e.target.value)}
                                             placeholder="Nombre Producto"
                                         />
                                     </td>
-                                    <td className="px-2 py-2">
+                                    <td className="px-4 py-3">
                                         <input
                                             type="number"
                                             min="1"
-                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-primary outline-none text-center"
+                                            className="w-full px-2 py-1.5 bg-surface border border-subtle rounded text-sm focus:ring-1 focus:ring-primary outline-none text-center"
                                             value={row.quantity}
                                             onChange={e => handleRowChange(row.id, 'quantity', e.target.value)}
                                             placeholder="1"
                                         />
                                     </td>
-                                    <td className="px-2 py-2">
+                                    <td className="px-4 py-3">
                                         <input
                                             type="number"
                                             min="0"
                                             step="0.0001"
-                                            className={`w-full px-2 py-1.5 border rounded text-sm outline-none ${entryByPrice ? 'bg-amber-50/30 dark:bg-amber-900/5 border-amber-200/30 text-slate-400 cursor-not-allowed' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-primary'}`}
+                                            className={`w-full px-2 py-1.5 border rounded text-sm outline-none ${entryByPrice ? 'bg-warning-soft/30 border-warning/20 text-fg-subtle cursor-not-allowed' : 'bg-white dark:bg-slate-900 border-subtle focus:ring-1 focus:ring-primary'}`}
                                             value={row.costWithoutVat}
                                             onChange={e => !entryByPrice && handleRowChange(row.id, 'costWithoutVat', e.target.value)}
                                             placeholder={entryByPrice ? 'Calc...' : '0.00'}
                                             readOnly={entryByPrice}
                                         />
                                     </td>
-                                    <td className="px-2 py-2">
+                                    <td className="px-4 py-3">
                                         <input
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full px-2 py-1.5 bg-surface border border-subtle rounded text-sm focus:ring-1 focus:ring-primary outline-none"
                                             value={row.discountedCost}
                                             onChange={e => handleRowChange(row.id, 'discountedCost', e.target.value)}
                                             placeholder="Opcional"
                                         />
                                     </td>
-                                    <td className="px-2 py-2">
+                                    <td className="px-4 py-3">
                                         <input
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-primary outline-none"
+                                            className="w-full px-2 py-1.5 bg-surface border border-subtle rounded text-sm focus:ring-1 focus:ring-primary outline-none"
                                             value={row.profitMargin}
                                             onChange={e => handleRowChange(row.id, 'profitMargin', e.target.value)}
                                             placeholder="0.30"
                                         />
                                     </td>
-                                    <td className="px-4 py-2 text-center font-mono text-sm text-slate-600 bg-slate-50 dark:bg-slate-800/50">
+                                    <td className="px-4 py-3 text-center font-mono text-sm text-fg-muted bg-surface-2">
                                         ${row.costWithVat.toFixed(2)}
                                     </td>
-                                    <td className={`px-2 py-2 text-center text-sm ${entryByPrice ? 'bg-primary/5' : 'bg-emerald-50 dark:bg-emerald-900/10'}`}>
+                                    <td className={`px-4 py-3 text-center text-sm ${entryByPrice ? 'bg-primary/5' : 'bg-success-soft dark:bg-success/10'}`}>
                                         {entryByPrice ? (
                                             <input
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-primary/30 rounded text-sm font-bold text-primary focus:ring-2 focus:ring-primary outline-none text-center"
+                                                className="w-full px-2 py-1.5 bg-surface border border-primary/30 rounded text-sm font-bold text-primary focus:ring-2 focus:ring-primary outline-none text-center"
                                                 value={row.pvp}
                                                 onChange={e => handleRowChange(row.id, 'pvp', e.target.value)}
                                                 placeholder="0.00"
                                             />
                                         ) : (
-                                            <span className="font-bold text-emerald-600">${parseFloat(row.pvp || '0').toFixed(2)}</span>
+                                            <span className="font-bold text-success">${parseFloat(row.pvp || '0').toFixed(2)}</span>
                                         )}
                                     </td>
-                                    <td className="px-2 py-2 text-center">
+                                    <td className="px-4 py-3 text-center">
                                         <button
                                             onClick={() => removeRow(row.id)}
-                                            className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                            className="p-1 hover:bg-danger-soft text-fg-subtle hover:text-danger rounded transition-colors"
                                             title="Eliminar fila"
                                         >
-                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            <Trash2 size={18} aria-hidden="true" />
                                         </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                    <div className="p-4 border-t border-subtle flex justify-between items-center">
                         <button
                             onClick={addRow}
                             className="flex items-center gap-2 text-primary hover:text-primary/80 font-medium text-sm transition-colors"
                         >
-                            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                            <CirclePlus size={18} aria-hidden="true" />
                             Agregar Fila
                         </button>
 
                         {rows.length > 0 && (rows[0].sku || rows.length > 1) && (
                             <button
                                 onClick={clearAllRows}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg text-xs font-semibold transition-all border border-transparent hover:border-red-200"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-danger hover:bg-danger-soft rounded-lg text-xs font-semibold transition-all border border-transparent hover:border-danger/20"
                             >
-                                <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                                <Trash size={18} aria-hidden="true" />
                                 Limpiar Todo el Lote
                             </button>
                         )}
@@ -594,31 +604,31 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                <div className="p-4 border-t border-subtle bg-surface-2">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="flex gap-6 text-sm">
                             <div className="flex flex-col">
-                                <span className="text-slate-500">Total Costo S/IVA</span>
-                                <span className="font-bold text-slate-900 dark:text-white">${totals.totalCostExVat.toFixed(2)}</span>
+                                <span className="text-fg-muted">Total Costo S/IVA</span>
+                                <span className="font-bold text-fg">${totals.totalCostExVat.toFixed(2)}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-slate-500">Total Costo C/IVA</span>
-                                <span className="font-bold text-indigo-600">${totals.totalCostIncVat.toFixed(2)}</span>
+                                <span className="text-fg-muted">Total Costo C/IVA</span>
+                                <span className="font-bold text-primary">${totals.totalCostIncVat.toFixed(2)}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-slate-500">Total PVP Esperado</span>
-                                <span className="font-bold text-emerald-600">${totals.totalPvp.toFixed(2)}</span>
+                                <span className="text-fg-muted">Total PVP Esperado</span>
+                                <span className="font-bold text-success">${totals.totalPvp.toFixed(2)}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-slate-500">Ganancia Est.</span>
-                                <span className="font-bold text-teal-600">${totals.estimatedProfit.toFixed(2)}</span>
+                                <span className="text-fg-muted">Ganancia Est.</span>
+                                <span className="font-bold text-success">${totals.estimatedProfit.toFixed(2)}</span>
                             </div>
                         </div>
 
                         <div className="flex gap-3">
                             <button
                                 onClick={onClose}
-                                className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
+                                className="px-4 py-2 text-fg hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
                             >
                                 Cancelar
                             </button>
@@ -627,7 +637,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                 disabled={loading}
                                 className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                             >
-                                {loading && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
+                                {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
                                 {loading ? 'Procesando...' : 'Guardar Lote Completo'}
                             </button>
                         </div>

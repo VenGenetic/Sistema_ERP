@@ -4,6 +4,10 @@ import { supabase } from '../supabaseClient';
 import { Account, Transaction, TransactionLine } from '../types/finance';
 import NewTransactionModal from './NewTransactionModal';
 import { getAccountNatureLabel } from '../utils/accountNature';
+import {
+  History,
+  Plus,
+} from 'lucide-react';
 
 interface TransactionDisplay extends TransactionLine {
     transaction: Transaction;
@@ -86,11 +90,11 @@ const AccountDetails: React.FC = () => {
     };
 
     if (loading && !account) {
-        return <div className="p-8 text-center text-slate-500">Cargando detalles de la cuenta...</div>;
+        return <div className="p-8 text-center text-fg-muted">Cargando detalles de la cuenta...</div>;
     }
 
     if (!account) {
-        return <div className="p-8 text-center text-slate-500">Cuenta no encontrada.</div>;
+        return <div className="p-8 text-center text-fg-muted">Cuenta no encontrada.</div>;
     }
 
     // Get current balance (from the latest transaction or 0)
@@ -100,55 +104,52 @@ const AccountDetails: React.FC = () => {
         <div className="flex flex-col gap-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{account.name}</h1>
+                    <h1 className="text-2xl font-bold text-fg tracking-tight">{account.name}</h1>
                     <div className="flex items-center gap-2 mt-1">
-                        <span className="px-2 py-0.5 rounded text-xs font-mono bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{account.code}</span>
-                        <span className="text-slate-500 text-sm uppercase font-medium">{account.currency}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${account.category === 'asset' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                                account.category === 'liability' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                                    'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                            }`}>
+                        <span className="px-2 py-0.5 rounded text-xs font-mono bg-surface-3 text-fg-muted">{account.code}</span>
+                        <span className="text-fg-muted text-sm font-medium">{account.currency}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${account.category === 'asset' ? 'bg-primary-soft text-primary dark:text-primary' : account.category === 'liability' ? 'bg-warning-soft text-warning dark:text-warning' : 'bg-slate-100 text-fg dark:bg-slate-700 dark:text-slate-300' }`}>
                             {account.category}
                         </span>
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                    <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Saldo Actual</span>
-                    <span className={`text-3xl font-black ${Number(currentBalance) < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                    <span className="text-xs text-fg-muted uppercase tracking-wider font-semibold">Saldo Actual</span>
+                    <span className={`text-3xl font-bold ${Number(currentBalance) < 0 ? 'text-danger' : 'text-success'}`}>
                         {formatCurrency(Number(currentBalance) || 0, account.currency)}
                     </span>
                     <button
                         onClick={() => setIsModalOpen(true)}
                         className="mt-2 flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shadow-primary/30"
                     >
-                        <span className="material-symbols-outlined text-[18px]">add</span>
+                        <Plus size={18} aria-hidden="true" />
                         Nueva Transacción
                     </button>
                 </div>
             </div>
 
             {/* Transactions Table for this Account */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 rounded-t-xl">
-                    <h3 className="font-semibold text-slate-800 dark:text-white">Auxiliar de Cuenta / Estado de Cuenta</h3>
+            <div className="bg-surface rounded-xl border border-subtle shadow-sm flex flex-col">
+                <div className="p-4 border-b border-subtle flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 rounded-t-xl">
+                    <h3 className="font-semibold text-fg">Auxiliar de Cuenta / Estado de Cuenta</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
-                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider w-[120px]">Fecha</th>
-                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descripción / Referencia</th>
-                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[140px]">Débito ({(() => { const n = getAccountNatureLabel(account?.category); return `${n.debitEffect} ${n.debitLabel}`; })()})</th>
-                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[140px]">Crédito ({(() => { const n = getAccountNatureLabel(account?.category); return `${n.creditEffect} ${n.creditLabel}`; })()})</th>
-                                <th className="py-3 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-[160px]">Saldo</th>
+                            <tr className="bg-surface-2 border-b border-subtle">
+                                <th className="py-3 px-6 text-xs font-semibold text-fg-muted uppercase tracking-wider w-[120px]">Fecha</th>
+                                <th className="py-3 px-6 text-xs font-semibold text-fg-muted uppercase tracking-wider">Descripción / Referencia</th>
+                                <th className="py-3 px-6 text-xs font-semibold text-fg-muted uppercase tracking-wider text-right w-[140px]">Débito ({(() => { const n = getAccountNatureLabel(account?.category); return `${n.debitEffect} ${n.debitLabel}`; })()})</th>
+                                <th className="py-3 px-6 text-xs font-semibold text-fg-muted uppercase tracking-wider text-right w-[140px]">Crédito ({(() => { const n = getAccountNatureLabel(account?.category); return `${n.creditEffect} ${n.creditLabel}`; })()})</th>
+                                <th className="py-3 px-6 text-xs font-semibold text-fg-muted uppercase tracking-wider text-right w-[160px]">Saldo</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                             {transactions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-12 text-slate-500">
+                                    <td colSpan={5} className="text-center py-12 text-fg-muted">
                                         <div className="flex flex-col items-center gap-2">
-                                            <span className="material-symbols-outlined text-4xl opacity-20">history</span>
+                                            <History size={32} className="opacity-20" aria-hidden="true" />
                                             <p>No hay transacciones registradas para esta cuenta</p>
                                         </div>
                                     </td>
@@ -157,26 +158,26 @@ const AccountDetails: React.FC = () => {
                                 transactions.map((row, index) => {
                                     const date = new Date(row.transaction.created_at).toLocaleDateString();
                                     return (
-                                        <tr key={index} className="group hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                                            <td className="py-4 px-6 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{date}</td>
+                                        <tr key={index} className="group hover:bg-surface-hover transition-colors">
+                                            <td className="py-4 px-6 text-sm text-fg-muted whitespace-nowrap">{date}</td>
                                             <td className="py-4 px-6">
                                                 <div className="flex flex-col">
-                                                    <span className="text-sm font-medium text-slate-900 dark:text-white">{row.transaction.description}</span>
+                                                    <span className="text-sm font-medium text-fg">{row.transaction.description}</span>
                                                     <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase">{row.transaction.reference_type}</span>
+                                                        <span className="text-2xs px-1.5 py-0.5 rounded bg-surface-3 text-fg-muted font-bold uppercase">{row.transaction.reference_type}</span>
                                                         {row.transaction.order_id && (
-                                                            <span className="text-[10px] text-primary font-medium hover:underline cursor-pointer">#ORD-{row.transaction.order_id}</span>
+                                                            <span className="text-2xs text-primary font-medium hover:underline cursor-pointer">#ORD-{row.transaction.order_id}</span>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="py-4 px-6 text-right text-sm font-medium text-slate-900 dark:text-white">
+                                            <td className="py-4 px-6 text-right text-sm font-medium text-fg">
                                                 {row.debit > 0 ? formatCurrency(row.debit, account.currency) : '-'}
                                             </td>
-                                            <td className="py-4 px-6 text-right text-sm font-medium text-slate-900 dark:text-white">
+                                            <td className="py-4 px-6 text-right text-sm font-medium text-fg">
                                                 {row.credit > 0 ? formatCurrency(row.credit, account.currency) : '-'}
                                             </td>
-                                            <td className={`py-4 px-6 text-right text-sm font-bold ${Number(row.runningBalance) < 0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+                                            <td className={`py-4 px-6 text-right text-sm font-bold ${Number(row.runningBalance) < 0 ? 'text-danger' : 'text-slate-900 dark:text-white'}`}>
                                                 {formatCurrency(Number(row.runningBalance) || 0, account.currency)}
                                             </td>
                                         </tr>

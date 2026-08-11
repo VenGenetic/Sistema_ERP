@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import {
+  CircleCheck,
+  Copy,
+  Key,
+  KeyRound,
+  RefreshCw,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 interface ApiKey {
     id: string;
@@ -123,13 +132,13 @@ const ApiKeysPanel: React.FC = () => {
                     onClick={() => { setShowNewKeyModal(true); setGeneratedKeyValue(null); }}
                     className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
-                    <span className="material-symbols-outlined text-[18px]">key</span>
+                    <Key size={18} aria-hidden="true" />
                     Generar Clave
                 </button>
             </div>
 
             {error && (
-                <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-lg text-sm">
+                <div className="mb-4 bg-danger/10 border border-danger/20 text-danger p-3 rounded-lg text-sm">
                     {error}
                 </div>
             )}
@@ -140,7 +149,7 @@ const ApiKeysPanel: React.FC = () => {
                 </div>
             ) : apiKeys.length === 0 ? (
                 <div className="text-center py-8 border-2 border-dashed border-border-dark rounded-lg">
-                    <span className="material-symbols-outlined text-4xl text-text-secondary mb-2">vpn_key_off</span>
+                    <KeyRound size={32} className="text-text-secondary mb-2" aria-hidden="true" />
                     <p className="text-text-secondary">No hay claves API generadas.</p>
                 </div>
             ) : (
@@ -148,11 +157,11 @@ const ApiKeysPanel: React.FC = () => {
                     <table className="w-full text-left text-sm text-text-secondary">
                         <thead className="text-xs text-text-secondary uppercase bg-background-dark/50">
                             <tr>
-                                <th className="px-4 py-3 font-medium">Nombre</th>
-                                <th className="px-4 py-3 font-medium">Clave</th>
-                                <th className="px-4 py-3 font-medium">Proveedor</th>
-                                <th className="px-4 py-3 font-medium">Último Uso</th>
-                                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+                                <th className="px-4 py-2.5 font-medium">Nombre</th>
+                                <th className="px-4 py-2.5 font-medium">Clave</th>
+                                <th className="px-4 py-2.5 font-medium">Proveedor</th>
+                                <th className="px-4 py-2.5 font-medium">Último Uso</th>
+                                <th className="px-4 py-2.5 font-medium text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -168,7 +177,7 @@ const ApiKeysPanel: React.FC = () => {
                                                 className="text-primary hover:text-white"
                                                 title="Copiar Clave Completa"
                                             >
-                                                <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                                                <Copy size={16} aria-hidden="true" />
                                             </button>
                                         </div>
                                     </td>
@@ -181,10 +190,10 @@ const ApiKeysPanel: React.FC = () => {
                                     <td className="px-4 py-3 text-right">
                                         <button
                                             onClick={() => handleRevokeKey(key.id)}
-                                            className="text-red-500 hover:text-red-400 p-1"
+                                            className="text-danger hover:text-danger p-1"
                                             title="Revocar"
                                         >
-                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            <Trash2 size={18} aria-hidden="true" />
                                         </button>
                                     </td>
                                 </tr>
@@ -197,20 +206,20 @@ const ApiKeysPanel: React.FC = () => {
             {/* Modal for new key */}
             {showNewKeyModal && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface-dark border border-border-dark rounded-xl w-full max-w-md overflow-hidden shadow-xl">
+                    <div className="bg-surface-dark border border-border-dark rounded-xl w-full max-w-md overflow-hidden shadow-lg">
                         <div className="p-6 border-b border-border-dark flex justify-between items-center">
                             <h2 className="text-xl font-bold text-fg">Nueva Clave API</h2>
                             <button onClick={() => setShowNewKeyModal(false)} className="text-text-secondary hover:text-white">
-                                <span className="material-symbols-outlined">close</span>
+                                <X size={18} aria-hidden="true" />
                             </button>
                         </div>
 
                         <div className="p-6">
                             {generatedKeyValue ? (
                                 <div>
-                                    <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg mb-6">
+                                    <div className="bg-success/10 border border-success/20 text-success p-4 rounded-lg mb-6">
                                         <div className="flex items-center gap-2 mb-2 font-bold">
-                                            <span className="material-symbols-outlined">check_circle</span>
+                                            <CircleCheck size={18} aria-hidden="true" />
                                             ¡Clave generada exitosamente!
                                         </div>
                                         <p className="text-sm">Por favor, copia tu nueva clave API. Por razones de seguridad, no podrás volver a verla completa una vez cierres esta ventana.</p>
@@ -222,7 +231,7 @@ const ApiKeysPanel: React.FC = () => {
                                             onClick={() => copyToClipboard(generatedKeyValue)}
                                             className="ml-4 bg-surface-hover hover:bg-primary text-fg p-2 rounded-lg transition-colors"
                                         >
-                                            <span className="material-symbols-outlined">content_copy</span>
+                                            <Copy size={18} aria-hidden="true" />
                                         </button>
                                     </div>
 
@@ -274,9 +283,9 @@ const ApiKeysPanel: React.FC = () => {
                                             className="bg-primary hover:bg-primary/90 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
                                         >
                                             {generating ? (
-                                                <span className="material-symbols-outlined animate-spin text-[18px]">sync</span>
+                                                <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
                                             ) : (
-                                                <span className="material-symbols-outlined text-[18px]">key</span>
+                                                <Key size={18} aria-hidden="true" />
                                             )}
                                             Generar
                                         </button>

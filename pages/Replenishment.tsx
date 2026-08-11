@@ -2,6 +2,26 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { WarehouseSelect } from '../components/WarehouseSelect';
 import { MediaLightbox } from '../components/MediaLightbox';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FolderOpen,
+  Image as ImageIcon,
+  Loader2,
+  Minus,
+  Pencil,
+  Plus,
+  Search,
+  SearchX,
+  ShoppingBag,
+  ShoppingBasket,
+  ShoppingCart,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 interface ImporterProduct {
     codigo: string;
@@ -516,17 +536,17 @@ const Replenishment: React.FC = () => {
                 {/* Header Title */}
                 <div>
                     <h1 className="text-2xl font-bold dark:text-white tracking-tight flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[32px] text-primary">local_mall</span>
+                        <ShoppingBag size={32} className="text-primary" aria-hidden="true" />
                         Abastecimiento de Importadora
                     </h1>
-                    <p className="text-slate-500 mt-1">
+                    <p className="text-fg-muted mt-1">
                         Compara tu stock local con las existencias y fotos de la importadora, y genera pedidos rápidos descargables en Excel.
                     </p>
                 </div>
 
                 {/* Filters & Selector */}
                 {/* Filters & Selector */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative z-20">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-surface p-5 rounded-xl border border-subtle shadow-sm relative z-20">
                     {/* Warehouse Dropdown */}
                     <div className="md:col-span-1">
                         <WarehouseSelect
@@ -539,24 +559,24 @@ const Replenishment: React.FC = () => {
 
                     {/* Search Input (Global) */}
                     <div className="md:col-span-2 flex flex-col justify-end">
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        <label className="block text-sm font-medium text-fg mb-1">
                             Buscador General:
                         </label>
                         <div className="relative">
-                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" aria-hidden="true" />
                             <input
                                 type="text"
                                 placeholder="Buscar por código (SKU) o por nombre..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-10 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm text-slate-900 dark:text-slate-100"
+                                className="w-full pl-10 pr-10 py-2 bg-surface-2 border border-strong rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm text-fg"
                             />
                             {searchTerm && (
                                 <button
                                     onClick={() => setSearchTerm('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                    <X size={18} aria-hidden="true" />
                                 </button>
                             )}
                         </div>
@@ -564,13 +584,13 @@ const Replenishment: React.FC = () => {
                 </div>
 
                 {/* Catalog Table */}
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col">
+                <div className="bg-surface rounded-xl border border-subtle shadow-sm overflow-hidden flex-1 flex flex-col">
                     <div className="overflow-x-auto flex-1">
                         <table className="w-full text-left border-collapse">
-                            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider sticky top-0 z-10">
+                            <thead className="bg-surface-2 text-fg-muted font-medium text-xs uppercase tracking-wider sticky top-0 z-10">
                                 <tr>
                                     {/* Código Column */}
-                                    <th className="px-4 py-2 cursor-default min-w-[120px]">
+                                    <th className="px-4 py-2.5 cursor-default min-w-[120px]">
                                         <div className="flex flex-col gap-1.5">
                                             <span className="font-bold text-xs">Código</span>
                                             <input
@@ -578,13 +598,13 @@ const Replenishment: React.FC = () => {
                                                 placeholder="Filtrar..."
                                                 value={skuFilter}
                                                 onChange={(e) => setSkuFilter(e.target.value)}
-                                                className="w-full px-2 py-0.5 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-primary shadow-sm"
+                                                className="w-full px-2 py-0.5 text-xs font-normal border border-subtle rounded bg-surface text-fg focus:outline-none focus:border-primary shadow-sm"
                                             />
                                         </div>
                                     </th>
 
                                     {/* Repuesto Column */}
-                                    <th className="px-4 py-2 cursor-default">
+                                    <th className="px-4 py-2.5 cursor-default">
                                         <div className="flex flex-col gap-1.5">
                                             <span className="font-bold text-xs">Repuesto</span>
                                             <input
@@ -592,40 +612,40 @@ const Replenishment: React.FC = () => {
                                                 placeholder="Filtrar..."
                                                 value={nameFilter}
                                                 onChange={(e) => setNameFilter(e.target.value)}
-                                                className="w-full px-2 py-0.5 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-primary shadow-sm"
+                                                className="w-full px-2 py-0.5 text-xs font-normal border border-subtle rounded bg-surface text-fg focus:outline-none focus:border-primary shadow-sm"
                                             />
                                         </div>
                                     </th>
 
-                                    <th className="px-4 py-2 text-center align-bottom w-32">
+                                    <th className="px-4 py-2.5 text-center align-bottom w-32">
                                         <span className="font-bold block mb-1 text-xs text-center">Mi Stock (Local)</span>
                                     </th>
-                                    <th className="px-4 py-2 text-center align-bottom w-36">
+                                    <th className="px-4 py-2.5 text-center align-bottom w-36">
                                         <span className="font-bold block mb-1 text-xs text-center">Stock Importadora</span>
                                     </th>
-                                    <th className="px-4 py-2 text-right align-bottom w-28">
+                                    <th className="px-4 py-2.5 text-right align-bottom w-28">
                                         <span className="font-bold block mb-1 text-xs text-right">Costo Prov.</span>
                                     </th>
-                                    <th className="px-4 py-2 text-center w-28 align-bottom">
+                                    <th className="px-4 py-2.5 text-center w-28 align-bottom">
                                         <span className="font-bold block mb-1 text-xs text-center">Acción</span>
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                            <tbody className="divide-y divide-subtle">
                                 {loadingProducts ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
+                                        <td colSpan={6} className="px-6 py-16 text-center text-fg-muted">
                                             <div className="flex flex-col items-center gap-2">
-                                                <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
+                                                <Loader2 size={36} className="animate-spin text-primary" aria-hidden="true" />
                                                 <span>Cargando catálogo de la importadora...</span>
                                             </div>
                                         </td>
                                     </tr>
                                 ) : paginatedProducts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
+                                        <td colSpan={6} className="px-6 py-16 text-center text-fg-muted">
                                             <div className="flex flex-col items-center gap-2">
-                                                <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
+                                                <SearchX size={36} className="text-fg-subtle" aria-hidden="true" />
                                                 <span>No se encontraron productos coincidentes en el catálogo.</span>
                                             </div>
                                         </td>
@@ -635,21 +655,21 @@ const Replenishment: React.FC = () => {
                                     const inCart = cart[prod.codigo];
                                     
                                     return (
-                                        <tr key={prod.codigo} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors border-b border-slate-200 dark:border-slate-700">
+                                        <tr key={prod.codigo} className="hover:bg-surface-hover transition-colors border-b border-subtle">
                                             {/* Código (SKU) Column */}
-                                            <td className="px-4 py-2 font-mono text-xs text-slate-500 dark:text-slate-400 align-middle whitespace-nowrap">
+                                            <td className="px-4 py-3 font-mono text-xs text-fg-muted align-middle whitespace-nowrap">
                                                 {prod.codigo}
                                             </td>
 
                                             {/* Repuesto (Foto + Nombre) Column */}
-                                            <td className="px-4 py-2 align-middle">
+                                            <td className="px-4 py-3 align-middle">
                                                 <div className="flex items-center gap-3">
                                                     {prod.imagen ? (
                                                         <div 
                                                             onClick={() => handleOpenLightbox(prod)}
-                                                            className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-zoom-in group/img"
+                                                            className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white shadow-sm relative cursor-zoom-in group/img"
                                                         >
-                                                            <span className="material-symbols-outlined text-[16px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">image</span>
+                                                            <ImageIcon size={16} className="text-fg-subtle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0" aria-hidden="true" />
                                                             <img 
                                                                 src={prod.imagen} 
                                                                 alt="" 
@@ -666,13 +686,13 @@ const Replenishment: React.FC = () => {
                                                             <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors"></div>
                                                         </div>
                                                     ) : (
-                                                        <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center relative">
-                                                            <span className="material-symbols-outlined text-[16px] text-slate-400">image</span>
+                                                        <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 flex items-center justify-center relative">
+                                                            <ImageIcon size={16} className="text-fg-subtle" aria-hidden="true" />
                                                         </div>
                                                     )}
                                                     
                                                     <span 
-                                                        className="font-semibold text-slate-900 dark:text-white break-words line-clamp-2 max-w-lg block leading-snug text-xs md:text-sm"
+                                                        className="font-semibold text-fg break-words line-clamp-2 max-w-lg block leading-snug text-xs md:text-sm"
                                                         title={prod.nombre}
                                                     >
                                                         {prod.nombre}
@@ -681,54 +701,54 @@ const Replenishment: React.FC = () => {
                                             </td>
                                             
                                             {/* Mi Stock */}
-                                            <td className="px-4 py-2 text-center align-middle">
+                                            <td className="px-4 py-3 text-center align-middle">
                                                 {!selectedWarehouseId ? (
                                                     <span className="text-[11px] text-slate-405 italic">Seleccione almacén</span>
                                                 ) : loadingStock ? (
-                                                    <span className="material-symbols-outlined text-[14px] animate-spin text-slate-400">progress_activity</span>
+                                                    <Loader2 size={14} className="animate-spin text-fg-subtle" aria-hidden="true" />
                                                 ) : localStock !== null ? (
-                                                    <span className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${localStock > 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-900/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800'}`}>
+                                                    <span className={`px-2 py-0.5 text-[11px] font-bold rounded-lg ${localStock > 0 ? 'bg-success-soft text-success border border-success/20 dark:border-success' : 'bg-danger-soft text-danger border border-danger/20 dark:border-danger'}`}>
                                                         {localStock} uds
                                                     </span>
                                                 ) : (
-                                                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700">
+                                                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-lg bg-surface-2 text-fg-subtle border border-subtle">
                                                         No registrado (0)
                                                     </span>
                                                 )}
                                             </td>
 
                                             {/* Stock Importadora */}
-                                            <td className="px-4 py-2 text-center align-middle">
-                                                <span className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${prod.cantidad > 0 ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-505 border border-slate-200 dark:border-slate-700'}`}>
+                                            <td className="px-4 py-3 text-center align-middle">
+                                                <span className={`px-2 py-0.5 text-[11px] font-bold rounded-lg ${prod.cantidad > 0 ? 'bg-primary-soft text-primary border border-primary/20 dark:border-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-505 border border-subtle dark:border-slate-700'}`}>
                                                     {prod.cantidad} uds
                                                 </span>
                                             </td>
 
                                             {/* Costo Proveedor */}
-                                            <td className="px-4 py-2 text-right font-mono text-xs font-semibold text-slate-750 dark:text-slate-300 align-middle">
+                                            <td className="px-4 py-3 text-right font-mono text-xs font-semibold text-fg dark:text-slate-300 align-middle">
                                                 ${(prod.costo || 0).toFixed(2)}
                                             </td>
 
                                             {/* Acción */}
-                                            <td className="px-4 py-2 text-center align-middle">
+                                            <td className="px-4 py-3 text-center align-middle">
                                                 {prod.cantidad === 0 ? (
                                                     <button
                                                         disabled
-                                                        className="w-full px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-650 rounded-lg text-xs font-bold cursor-not-allowed border border-slate-200 dark:border-slate-700"
+                                                        className="w-full px-2 py-1 bg-surface-3 text-fg-subtle rounded-lg text-xs font-bold cursor-not-allowed border border-subtle"
                                                     >
                                                         Agotado
                                                     </button>
                                                 ) : inCart ? (
                                                     <div className="flex items-center justify-center gap-0.5 bg-primary/10 dark:bg-primary/20 text-primary border border-primary/30 rounded-lg px-2 py-1">
-                                                        <span className="material-symbols-outlined text-[11px]">done</span>
-                                                        <span className="text-[10px] font-bold">Añadido ({inCart.quantity})</span>
+                                                        <Check size={11} aria-hidden="true" />
+                                                        <span className="text-2xs font-bold">Añadido ({inCart.quantity})</span>
                                                     </div>
                                                 ) : (
                                                     <button
                                                         onClick={() => handleAddToCart(prod)}
                                                         className="w-full px-2 py-1 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
                                                     >
-                                                        <span className="material-symbols-outlined text-[12px] font-bold">add</span>
+                                                        <Plus size={12} className="font-bold" aria-hidden="true" />
                                                         Añadir
                                                     </button>
                                                 )}
@@ -742,32 +762,32 @@ const Replenishment: React.FC = () => {
 
                     {/* Pagination Footer */}
                     {filteredProducts.length > 0 && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-                            <div className="text-sm text-slate-500">
-                                Mostrando <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-subtle bg-slate-50/50 dark:bg-slate-900/30">
+                            <div className="text-sm text-fg-muted">
+                                Mostrando <span className="font-semibold text-fg">
                                     {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filteredProducts.length)}
-                                </span> de <span className="font-semibold text-slate-700 dark:text-slate-300">{filteredProducts.length.toLocaleString()}</span> items encontrados
+                                </span> de <span className="font-semibold text-fg">{filteredProducts.length.toLocaleString()}</span> items encontrados
                             </div>
 
                             <div className="flex items-center gap-2">
                                 <button
                                     disabled={currentPage === 1}
                                     onClick={() => setCurrentPage(prev => prev - 1)}
-                                    className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-1 px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
-                                    <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                                    <ChevronLeft size={16} aria-hidden="true" />
                                     Anterior
                                 </button>
-                                <span className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg">
+                                <span className="px-3 py-1.5 text-sm font-medium text-fg bg-surface border border-subtle rounded-lg">
                                     {currentPage} / {totalPages || 1}
                                 </span>
                                 <button
                                     disabled={currentPage >= totalPages}
                                     onClick={() => setCurrentPage(prev => prev + 1)}
-                                    className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-1 px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     Siguiente
-                                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                                    <ChevronRight size={16} aria-hidden="true" />
                                 </button>
                             </div>
                         </div>
@@ -776,20 +796,20 @@ const Replenishment: React.FC = () => {
             </div>
 
             {/* ═══════ RIGHT PANEL: SHOPPING CART DRAWER ═══════ */}
-            <div className="w-full lg:w-96 flex-shrink-0 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg h-[calc(100vh-112px)] sticky top-24 overflow-hidden">
+            <div className="w-full lg:w-96 flex-shrink-0 flex flex-col bg-surface rounded-xl border border-subtle shadow-lg h-[calc(100vh-112px)] sticky top-24 overflow-hidden">
                 {/* Header */}
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 flex justify-between items-center">
+                <div className="p-4 border-b border-subtle bg-slate-50/50 dark:bg-slate-900/30 flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px] text-primary">shopping_basket</span>
-                        <h2 className="font-bold text-slate-900 dark:text-white">Pedido de Abastecimiento</h2>
+                        <ShoppingBasket size={20} className="text-primary" aria-hidden="true" />
+                        <h2 className="font-bold text-fg">Pedido de Abastecimiento</h2>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleAutoSuggest}
-                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-indigo-500 rounded transition-colors"
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-primary rounded transition-colors"
                             title="Auto-Pedir Repuestos Sourcing"
                         >
-                            <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                            <Sparkles size={18} aria-hidden="true" />
                         </button>
                         <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">
                             {cartCount} piezas
@@ -798,16 +818,16 @@ const Replenishment: React.FC = () => {
                 </div>
 
                 {/* Drafts Selector & Actions */}
-                <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100/30 dark:bg-slate-900/10 flex items-center justify-between gap-2 text-xs">
+                <div className="px-4 py-2 border-b border-subtle bg-slate-100/30 dark:bg-slate-900/10 flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span className="text-slate-400 font-medium">Borrador:</span>
+                        <span className="text-fg-subtle font-medium">Borrador:</span>
                         <select
                             value={activeDraftId}
                             onChange={(e) => handleSwitchDraft(e.target.value)}
-                            className="bg-transparent border-none text-slate-700 dark:text-slate-300 font-bold outline-none cursor-pointer p-0 pr-6 text-xs truncate max-w-[150px] focus:ring-0"
+                            className="bg-transparent border-none text-fg font-bold outline-none cursor-pointer p-0 pr-6 text-xs truncate max-w-[150px] focus:ring-0"
                         >
                             {drafts.map(d => (
-                                <option key={d.id} value={d.id} className="bg-white dark:bg-slate-800 text-slate-850 dark:text-slate-200 font-normal">
+                                <option key={d.id} value={d.id} className="bg-surface text-fg dark:text-slate-200 font-normal">
                                     {d.name}
                                 </option>
                             ))}
@@ -820,24 +840,24 @@ const Replenishment: React.FC = () => {
                                 const active = drafts.find(d => d.id === activeDraftId);
                                 if (active) handleRenameDraft(activeDraftId, active.name);
                             }}
-                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-450 rounded transition-colors"
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-fg-muted rounded transition-colors"
                             title="Renombrar borrador activo"
                         >
-                            <span className="material-symbols-outlined text-[16px] leading-none">edit</span>
+                            <Pencil size={16} className="leading-none" aria-hidden="true" />
                         </button>
                         <button
                             onClick={handleCreateDraft}
-                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-450 rounded transition-colors"
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-fg-muted rounded transition-colors"
                             title="Crear nuevo borrador"
                         >
-                            <span className="material-symbols-outlined text-[16px] leading-none">add</span>
+                            <Plus size={16} className="leading-none" aria-hidden="true" />
                         </button>
                         <button
                             onClick={() => setIsManageDraftsOpen(true)}
-                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-450 rounded transition-colors"
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 text-fg-muted rounded transition-colors"
                             title="Administrar borradores guardados"
                         >
-                            <span className="material-symbols-outlined text-[16px] leading-none">folder_open</span>
+                            <FolderOpen size={16} className="leading-none" aria-hidden="true" />
                         </button>
                     </div>
                 </div>
@@ -845,58 +865,58 @@ const Replenishment: React.FC = () => {
                 {/* Cart Items List */}
                 <div className="flex-1 p-3 overflow-y-auto space-y-2">
                     {cartList.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 py-12 text-center">
-                            <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-700 mb-2">shopping_cart</span>
+                        <div className="h-full flex flex-col items-center justify-center text-fg-subtle py-12 text-center">
+                            <ShoppingCart size={48} className="text-fg-subtle mb-2" aria-hidden="true" />
                             <p className="text-sm font-semibold">El carrito está vacío</p>
                             <p className="text-xs mt-1">Busca y añade los productos del importador que deseas reabastecer.</p>
                         </div>
                     ) : (
                         cartList.map(item => (
-                            <div key={item.codigo} className="bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-850 flex items-center gap-2 relative group hover:border-slate-300 dark:hover:border-slate-650 transition-colors">
+                            <div key={item.codigo} className="bg-surface-2 p-2 rounded-lg border border-slate-100 dark:border-subtle flex items-center gap-2 relative group hover:border-slate-300 dark:hover:border-subtle transition-colors">
                                 {/* Cart Item Image */}
                                 {item.imagen ? (
                                     <div 
                                         onClick={() => handleOpenLightbox(item)}
-                                        className="h-9 w-9 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-zoom-in group/cartimg"
+                                        className="h-9 w-9 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white shadow-sm relative cursor-zoom-in group/cartimg"
                                     >
                                         <img src={item.imagen} alt="" className="h-full w-full object-cover group-hover/cartimg:scale-105 transition-transform" />
                                     </div>
                                 ) : (
-                                    <div className="h-9 w-9 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center relative">
-                                        <span className="material-symbols-outlined text-[14px] text-slate-400">image</span>
+                                    <div className="h-9 w-9 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 flex items-center justify-center relative">
+                                        <ImageIcon size={14} className="text-fg-subtle" aria-hidden="true" />
                                     </div>
                                 )}
 
                                 {/* Item Info */}
                                 <div className="flex-1 min-w-0 pr-2">
-                                    <span className="text-[9px] font-mono font-semibold text-slate-400 block leading-none">{item.codigo}</span>
-                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white break-words whitespace-normal leading-tight mt-0.5">{item.nombre}</h4>
+                                    <span className="text-[12px] font-mono font-semibold text-fg-subtle block leading-none">{item.codigo}</span>
+                                    <h4 className="text-xs font-bold text-fg break-words whitespace-normal leading-tight mt-0.5">{item.nombre}</h4>
                                     
                                     <div className="flex items-center justify-between mt-1">
                                         <div className="flex flex-col">
-                                            <span className="text-[9px] text-slate-400 font-medium leading-none">Cost: ${(item.costo || 0).toFixed(2)}</span>
-                                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 mt-0.5">Subt: ${((item.costo || 0) * item.quantity).toFixed(2)}</span>
+                                            <span className="text-[12px] text-fg-subtle font-medium leading-none">Cost: ${(item.costo || 0).toFixed(2)}</span>
+                                            <span className="text-2xs font-bold text-fg mt-0.5">Subt: ${((item.costo || 0) * item.quantity).toFixed(2)}</span>
                                         </div>
 
                                         {/* Counter */}
-                                        <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 overflow-hidden">
+                                        <div className="flex items-center border border-subtle rounded-lg bg-surface overflow-hidden">
                                             <button
                                                 onClick={() => handleUpdateQuantity(item.codigo, item.quantity - 1, item.cantidad)}
-                                                className="px-1 py-0.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                                className="px-1 py-0.5 text-fg-muted hover:bg-surface-hover transition-colors"
                                             >
-                                                <span className="material-symbols-outlined text-[12px] leading-none font-bold">remove</span>
+                                                <Minus size={12} className="leading-none font-bold" aria-hidden="true" />
                                             </button>
                                             <input
                                                 type="number"
                                                 value={item.quantity}
                                                 onChange={(e) => handleUpdateQuantity(item.codigo, parseInt(e.target.value) || 0, item.cantidad)}
-                                                className="w-8 text-center text-[10px] font-semibold bg-transparent border-none outline-none focus:ring-0 p-0"
+                                                className="w-8 text-center text-2xs font-semibold bg-transparent border-none outline-none focus:ring-0 p-0"
                                             />
                                             <button
                                                 onClick={() => handleUpdateQuantity(item.codigo, item.quantity + 1, item.cantidad)}
-                                                className="px-1 py-0.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                                className="px-1 py-0.5 text-fg-muted hover:bg-surface-hover transition-colors"
                                             >
-                                                <span className="material-symbols-outlined text-[12px] leading-none font-bold">add</span>
+                                                <Plus size={12} className="leading-none font-bold" aria-hidden="true" />
                                             </button>
                                         </div>
                                     </div>
@@ -905,10 +925,10 @@ const Replenishment: React.FC = () => {
                                 {/* Delete Button */}
                                 <button
                                     onClick={() => handleRemoveFromCart(item.codigo)}
-                                    className="absolute top-1.5 right-1.5 text-slate-400 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                                    className="absolute top-1.5 right-1.5 text-fg-subtle hover:text-danger transition-colors opacity-0 group-hover:opacity-100"
                                     title="Quitar"
                                 >
-                                    <span className="material-symbols-outlined text-[14px]">close</span>
+                                    <X size={14} aria-hidden="true" />
                                 </button>
                             </div>
                         ))
@@ -917,32 +937,32 @@ const Replenishment: React.FC = () => {
 
                 {/* Footer Controls */}
                 {cartList.length > 0 && (
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30 flex flex-col gap-2.5">
-                        <div className="flex justify-between text-xs text-slate-500 font-medium">
+                    <div className="p-4 border-t border-subtle bg-surface-2 flex flex-col gap-2.5">
+                        <div className="flex justify-between text-xs text-fg-muted font-medium">
                             <span>Total de Repuestos:</span>
-                            <span className="font-bold text-slate-700 dark:text-slate-300">{cartList.length} SKU</span>
+                            <span className="font-bold text-fg">{cartList.length} SKU</span>
                         </div>
-                        <div className="flex justify-between text-xs text-slate-500 font-medium">
+                        <div className="flex justify-between text-xs text-fg-muted font-medium">
                             <span>Total de Unidades:</span>
-                            <span className="font-bold text-slate-700 dark:text-slate-300">{cartCount} piezas</span>
+                            <span className="font-bold text-fg">{cartCount} piezas</span>
                         </div>
-                        <div className="flex justify-between text-sm text-slate-950 dark:text-white font-extrabold pb-2 border-t border-dashed border-slate-200 dark:border-slate-700 pt-2">
+                        <div className="flex justify-between text-sm text-slate-950 dark:text-white font-bold pb-2 border-t border-dashed border-subtle pt-2">
                             <span>SUMA TOTAL:</span>
-                            <span className="text-emerald-600 dark:text-emerald-400 text-base">${cartTotalAmount.toFixed(2)}</span>
+                            <span className="text-success text-base">${cartTotalAmount.toFixed(2)}</span>
                         </div>
                         
                         <div className="flex gap-2">
                             <button
                                 onClick={handleClearCart}
-                                className="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all"
+                                className="flex-1 px-4 py-2.5 border border-strong rounded-lg text-fg hover:bg-surface-hover text-xs font-bold transition-all"
                             >
                                 Vaciar Lista
                             </button>
                             <button
                                 onClick={handleExportExcel}
-                                className="flex-[2] bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg py-2.5 text-xs font-bold shadow-md shadow-emerald-700/10 flex items-center justify-center gap-1.5 transition-colors"
+                                className="flex-[2] bg-success hover:bg-success text-white rounded-lg py-2.5 text-xs font-bold shadow-md shadow-success/10 flex items-center justify-center gap-1.5 transition-colors"
                             >
-                                <span className="material-symbols-outlined text-[16px] font-bold">download</span>
+                                <Download size={16} className="font-bold" aria-hidden="true" />
                                 Descargar Excel
                             </button>
                         </div>
@@ -954,15 +974,15 @@ const Replenishment: React.FC = () => {
             {isManageDraftsOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsManageDraftsOpen(false)}></div>
-                    <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[80vh]">
+                    <div className="relative bg-surface rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-subtle flex flex-col max-h-[80vh]">
                         {/* Header */}
-                        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/30">
+                        <div className="px-5 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
                             <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[20px] text-primary">folder_open</span>
-                                <h3 className="font-bold text-slate-900 dark:text-white">Pedidos Guardados (Borradores)</h3>
+                                <FolderOpen size={20} className="text-primary" aria-hidden="true" />
+                                <h3 className="font-bold text-fg">Pedidos Guardados (Borradores)</h3>
                             </div>
-                            <button onClick={() => setIsManageDraftsOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                <span className="material-symbols-outlined">close</span>
+                            <button onClick={() => setIsManageDraftsOpen(false)} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                <X size={18} aria-hidden="true" />
                             </button>
                         </div>
 
@@ -977,23 +997,23 @@ const Replenishment: React.FC = () => {
                                 return (
                                     <div 
                                         key={d.id} 
-                                        className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${isActive ? 'bg-primary/5 border-primary dark:bg-primary/10' : 'bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-700 hover:border-slate-350 dark:hover:border-slate-655'}`}
+                                        className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${isActive ? 'bg-primary/5 border-primary dark:bg-primary/10' : 'bg-slate-50 dark:bg-slate-900/20 border-subtle hover:border-strong dark:hover:border-slate-655'}`}
                                     >
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{d.name}</h4>
+                                                <h4 className="font-bold text-fg text-sm">{d.name}</h4>
                                                 {isActive && (
-                                                    <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-primary/20">
+                                                    <span className="bg-primary/10 text-primary text-2xs font-bold px-2 py-0.5 rounded-full border border-primary/20">
                                                         Activo
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-3 text-slate-400 dark:text-slate-500 text-xs">
+                                            <div className="flex items-center gap-3 text-fg-subtle text-xs">
                                                 <span>📅 Creado: {new Date(d.createdAt).toLocaleDateString()}</span>
                                                 <span>•</span>
                                                 <span>📋 {dItems.length} SKU ({dCount} uds)</span>
                                                 <span>•</span>
-                                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">${dTotal.toFixed(2)}</span>
+                                                <span className="font-semibold text-success">${dTotal.toFixed(2)}</span>
                                             </div>
                                         </div>
 
@@ -1001,25 +1021,25 @@ const Replenishment: React.FC = () => {
                                             {!isActive && (
                                                 <button
                                                     onClick={() => { handleSwitchDraft(d.id); setIsManageDraftsOpen(false); }}
-                                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold transition-all border border-slate-200 dark:border-slate-600"
+                                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-surface-3 text-fg rounded-lg text-xs font-bold transition-all border border-subtle"
                                                 >
                                                     Cargar
                                                 </button>
                                             )}
                                             <button
                                                 onClick={() => handleRenameDraft(d.id, d.name)}
-                                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-650 dark:hover:text-slate-300 rounded-lg transition-all"
+                                                className="p-2 hover:bg-surface-hover text-fg-subtle hover:text-fg-muted dark:hover:text-slate-300 rounded-lg transition-all"
                                                 title="Renombrar"
                                             >
-                                                <span className="material-symbols-outlined text-[16px] leading-none">edit</span>
+                                                <Pencil size={16} className="leading-none" aria-hidden="true" />
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteDraft(d.id)}
                                                 disabled={drafts.length === 1}
-                                                className="p-2 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-600 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="p-2 hover:bg-danger-soft text-fg-subtle hover:text-danger rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title="Eliminar"
                                             >
-                                                <span className="material-symbols-outlined text-[16px] leading-none">delete</span>
+                                                <Trash2 size={16} className="leading-none" aria-hidden="true" />
                                             </button>
                                         </div>
                                     </div>

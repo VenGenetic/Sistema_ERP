@@ -68,7 +68,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
             onBlur={handleSaveText}
             onKeyDown={(e) => e.key === 'Enter' && handleSaveText()}
             autoFocus
-            className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-blue-500 rounded text-slate-900 dark:text-white focus:outline-none"
+            className="w-full px-2 py-1 text-xs bg-surface border border-primary rounded text-fg focus:outline-none"
           />
         </div>
       );
@@ -77,12 +77,12 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
     return (
       <div
         onClick={handleStartEdit}
-        className="w-full h-full min-h-[36px] px-3 py-2 text-xs text-slate-700 dark:text-slate-300 flex items-center cursor-text hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors truncate"
+        className="w-full h-full min-h-[36px] px-3 py-2 text-xs text-fg flex items-center cursor-text hover:bg-surface-hover transition-colors truncate"
       >
         {currentValue ? (
           column.type === 'date' ? new Date(currentValue).toLocaleDateString() : currentValue
         ) : (
-          <span className="text-slate-400 dark:text-slate-600 italic text-[11px]">Vacío...</span>
+          <span className="text-fg-subtle italic text-[11px]">Vacío...</span>
         )}
       </div>
     );
@@ -118,7 +118,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
       <div ref={cellRef} className="relative w-full h-full min-h-[36px] px-2 py-1.5 flex items-center">
         <div 
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full min-h-[26px] flex items-center gap-1 cursor-pointer rounded hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all px-1"
+          className="w-full min-h-[26px] flex items-center gap-1 cursor-pointer rounded hover:bg-surface-hover transition-all px-1"
         >
           {selectedTag ? (
             <span 
@@ -133,7 +133,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
               {selectedTag.name}
             </span>
           ) : (
-            <span className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-[11px] inline-flex items-center gap-1 transition-colors px-1">
+            <span className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-300 text-[11px] inline-flex items-center gap-1 transition-colors px-1">
               <Plus className="w-3 h-3" />
               Seleccionar...
             </span>
@@ -141,14 +141,14 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
         </div>
 
         {isOpen && (
-          <div className="absolute top-full left-0 z-50 mt-1 w-56 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute top-full left-0 z-50 mt-1 w-56 bg-surface border border-subtle rounded-lg shadow-lg p-2 animate-in fade-in zoom-in-95 duration-150">
             <input
               type="text"
               placeholder="Buscar o crear tag..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               autoFocus
-              className="w-full text-xs px-2.5 py-1.5 bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white mb-2 focus:outline-none focus:border-blue-500"
+              className="w-full text-xs px-2.5 py-1.5 bg-surface-2 border border-subtle rounded-lg text-fg mb-2 focus:outline-none focus:border-primary"
             />
             
             <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
@@ -159,9 +159,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
                     <div
                       key={t.id}
                       onClick={() => handleSelectTag(t.id)}
-                      className={`flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                        isSelected ? 'bg-slate-100 dark:bg-slate-800 font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                      }`}
+                      className={`flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${ isSelected ? 'bg-slate-100 dark:bg-slate-800 font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60' }`}
                     >
                       <span 
                         className="px-2 py-0.5 rounded-full text-[11px] font-medium flex items-center gap-1.5 truncate"
@@ -170,20 +168,20 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
                         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.color }} />
                         {t.name}
                       </span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-blue-500 shrink-0 ml-2" />}
+                      {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0 ml-2" />}
                     </div>
                   );
                 })
               ) : searchTerm.trim() ? (
                 <button
                   onClick={handleCreateNewTag}
-                  className="w-full flex items-center gap-1.5 text-left px-2 py-1.5 text-xs text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-md transition-colors"
+                  className="w-full flex items-center gap-1.5 text-left px-2 py-1.5 text-xs text-primary hover:bg-primary-soft rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Crear tag: <span className="font-semibold">"{searchTerm}"</span>
                 </button>
               ) : (
-                <p className="text-center py-2 text-[11px] text-slate-400">Sin tags en este grupo.</p>
+                <p className="text-center py-2 text-[11px] text-fg-subtle">Sin tags en este grupo.</p>
               )}
             </div>
 
@@ -194,7 +192,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
                   setIsOpen(false);
                   setActiveSidePeekColumnId(column.id);
                 }}
-                className="flex items-center gap-1 text-slate-500 hover:text-blue-500 dark:hover:text-blue-400 font-medium transition-colors w-full justify-center py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 text-fg-muted hover:text-primary font-medium transition-colors w-full justify-center py-1 rounded hover:bg-surface-hover"
               >
                 <Settings className="w-3 h-3" />
                 Administrar Tags (Consola)
@@ -237,7 +235,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
       <div ref={cellRef} className="relative w-full h-full min-h-[36px] px-2 py-1.5 flex items-center">
         <div 
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full min-h-[26px] flex flex-wrap items-center gap-1 cursor-pointer rounded hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all px-1"
+          className="w-full min-h-[26px] flex flex-wrap items-center gap-1 cursor-pointer rounded hover:bg-surface-hover transition-all px-1"
         >
           {selectedTags.length > 0 ? (
             selectedTags.map(tag => (
@@ -254,14 +252,14 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
                 {tag.name}
                 <button
                   onClick={(e) => handleToggleTag(tag.id, e)}
-                  className="hover:bg-black/10 dark:hover:bg-white/10 rounded-full p-0.5 text-slate-500 hover:text-rose-500 transition-colors ml-0.5"
+                  className="hover:bg-black/10 dark:hover:bg-white/10 rounded-full p-0.5 text-fg-muted hover:text-danger transition-colors ml-0.5"
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>
               </span>
             ))
           ) : (
-            <span className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-[11px] inline-flex items-center gap-1 transition-colors px-1">
+            <span className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-300 text-[11px] inline-flex items-center gap-1 transition-colors px-1">
               <Plus className="w-3 h-3" />
               Añadir a lista...
             </span>
@@ -269,14 +267,14 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
         </div>
 
         {isOpen && (
-          <div className="absolute top-full left-0 z-50 mt-1 w-60 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute top-full left-0 z-50 mt-1 w-60 bg-surface border border-subtle rounded-lg shadow-lg p-2 animate-in fade-in zoom-in-95 duration-150">
             <input
               type="text"
               placeholder="Buscar o crear para lista..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               autoFocus
-              className="w-full text-xs px-2.5 py-1.5 bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white mb-2 focus:outline-none focus:border-blue-500"
+              className="w-full text-xs px-2.5 py-1.5 bg-surface-2 border border-subtle rounded-lg text-fg mb-2 focus:outline-none focus:border-primary"
             />
             
             <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
@@ -287,9 +285,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
                     <div
                       key={t.id}
                       onClick={() => handleToggleTag(t.id)}
-                      className={`flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
-                        isSelected ? 'bg-slate-100 dark:bg-slate-800 font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                      }`}
+                      className={`flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${ isSelected ? 'bg-slate-100 dark:bg-slate-800 font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60' }`}
                     >
                       <span 
                         className="px-2 py-0.5 rounded-full text-[11px] font-medium flex items-center gap-1.5 truncate max-w-[170px]"
@@ -298,7 +294,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
                         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.color }} />
                         {t.name}
                       </span>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-400 dark:border-slate-600'}`}>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary text-white' : 'border-slate-400 dark:border-slate-600'}`}>
                         {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
                     </div>
@@ -307,13 +303,13 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
               ) : searchTerm.trim() ? (
                 <button
                   onClick={handleCreateNewTag}
-                  className="w-full flex items-center gap-1.5 text-left px-2 py-1.5 text-xs text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-md transition-colors"
+                  className="w-full flex items-center gap-1.5 text-left px-2 py-1.5 text-xs text-primary hover:bg-primary-soft rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Crear tag: <span className="font-semibold">"{searchTerm}"</span>
                 </button>
               ) : (
-                <p className="text-center py-2 text-[11px] text-slate-400">Sin tags configurados.</p>
+                <p className="text-center py-2 text-[11px] text-fg-subtle">Sin tags configurados.</p>
               )}
             </div>
 
@@ -324,7 +320,7 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
                   setIsOpen(false);
                   setActiveSidePeekColumnId(column.id);
                 }}
-                className="flex items-center gap-1 text-slate-500 hover:text-blue-500 dark:hover:text-blue-400 font-medium transition-colors w-full justify-center py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="flex items-center gap-1 text-fg-muted hover:text-primary font-medium transition-colors w-full justify-center py-1 rounded hover:bg-surface-hover"
               >
                 <Settings className="w-3 h-3" />
                 Administrar Tags (Consola)
@@ -336,5 +332,5 @@ export const POECell: React.FC<POECellProps> = ({ procedure, column }) => {
     );
   }
 
-  return <div className="px-3 py-2 text-xs text-slate-400">-</div>;
+  return <div className="px-3 py-2 text-xs text-fg-subtle">-</div>;
 };

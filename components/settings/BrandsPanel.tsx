@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import {
+  Check,
+  Pencil,
+  Plus,
+  X,
+} from 'lucide-react';
 
 interface Brand {
     id: number;
@@ -78,8 +84,8 @@ const BrandsPanel: React.FC = () => {
     };
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Administrar Marcas</h2>
+        <div className="bg-surface rounded-xl border border-subtle shadow-sm p-6">
+            <h2 className="text-xl font-bold text-fg mb-6">Administrar Marcas</h2>
 
             <form onSubmit={handleCreate} className="flex gap-2 mb-8">
                 <input
@@ -87,72 +93,72 @@ const BrandsPanel: React.FC = () => {
                     value={newBrandName}
                     onChange={(e) => setNewBrandName(e.target.value)}
                     placeholder="Nueva marca..."
-                    className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-slate-900 dark:text-white"
+                    className="flex-1 px-4 py-2 bg-surface-2 border border-strong rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-fg"
                 />
                 <button
                     type="submit"
                     disabled={submitting || !newBrandName.trim()}
                     className="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                    <span className="material-symbols-outlined text-[20px]">add</span>
+                    <Plus size={20} aria-hidden="true" />
                     Agregar
                 </button>
             </form>
 
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
+                    <thead className="bg-surface-2 text-fg-muted font-medium text-xs uppercase tracking-wider">
                         <tr>
-                            <th className="px-6 py-4">Nombre de Marca</th>
-                            <th className="px-6 py-4 text-center">Estado</th>
-                            <th className="px-6 py-4 text-right">Acciones</th>
+                            <th className="px-4 py-2.5">Nombre de Marca</th>
+                            <th className="px-4 py-2.5 text-center">Estado</th>
+                            <th className="px-4 py-2.5 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    <tbody className="divide-y divide-subtle">
                         {loading ? (
-                            <tr><td colSpan={3} className="text-center py-8 text-slate-500">Cargando marcas...</td></tr>
+                            <tr><td colSpan={3} className="text-center py-8 text-fg-muted">Cargando marcas...</td></tr>
                         ) : brands.length === 0 ? (
-                            <tr><td colSpan={3} className="text-center py-8 text-slate-500">No hay marcas registradas.</td></tr>
+                            <tr><td colSpan={3} className="text-center py-8 text-fg-muted">No hay marcas registradas.</td></tr>
                         ) : (
                             brands.map(brand => (
-                                <tr key={brand.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <td className="px-6 py-4">
+                                <tr key={brand.id} className="hover:bg-surface-hover transition-colors">
+                                    <td className="px-4 py-3">
                                         {isEditing === brand.id ? (
                                             <input
                                                 type="text"
                                                 value={editName}
                                                 onChange={(e) => setEditName(e.target.value)}
-                                                className="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded focus:ring-2 focus:ring-primary outline-none"
+                                                className="w-full px-2 py-1 bg-surface border border-strong rounded focus:ring-2 focus:ring-primary outline-none"
                                                 autoFocus
                                             />
                                         ) : (
-                                            <span className="font-medium text-slate-900 dark:text-white">{brand.name}</span>
+                                            <span className="font-medium text-fg">{brand.name}</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 text-center">
+                                    <td className="px-4 py-3 text-center">
                                         <button
                                             onClick={() => toggleStatus(brand.id, brand.is_active)}
-                                            className={`px-2 py-1 rounded-full text-xs font-medium ${brand.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
+                                            className={`px-2 py-1 rounded-full text-xs font-medium ${brand.is_active ? 'bg-success-soft text-success dark:text-success' : 'bg-danger-soft text-danger dark:text-danger'}`}
                                         >
                                             {brand.is_active ? 'Activo' : 'Inactivo'}
                                         </button>
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-4 py-3 text-right">
                                         {isEditing === brand.id ? (
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={() => handleUpdate(brand.id)}
                                                     disabled={submitting}
-                                                    className="p-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                                                    className="p-1 text-success hover:text-success transition-colors"
                                                 >
-                                                    <span className="material-symbols-outlined text-[18px]">check</span>
+                                                    <Check size={18} aria-hidden="true" />
                                                 </button>
                                                 <button
                                                     onClick={() => setIsEditing(null)}
                                                     disabled={submitting}
-                                                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                                                    className="p-1 text-fg-subtle hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                                                 >
-                                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                                    <X size={18} aria-hidden="true" />
                                                 </button>
                                             </div>
                                         ) : (
@@ -161,9 +167,9 @@ const BrandsPanel: React.FC = () => {
                                                     setIsEditing(brand.id);
                                                     setEditName(brand.name);
                                                 }}
-                                                className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                className="p-1 text-fg-subtle hover:text-primary transition-colors"
                                             >
-                                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                <Pencil size={18} aria-hidden="true" />
                                             </button>
                                         )}
                                     </td>

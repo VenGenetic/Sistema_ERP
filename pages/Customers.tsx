@@ -815,21 +815,21 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
     });
 
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Users className="w-6 h-6 text-blue-500" />
+                    <h1 className="text-2xl font-bold text-fg flex items-center gap-2">
+                        <Users className="w-6 h-6 text-primary" />
                         Directorio de Clientes
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-fg-muted mt-1">
                         Gestiona tu cartera de clientes, talleres mecánicos y aliados comerciales.
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <button
                         onClick={() => setIsQuickModalOpen(true)}
-                        className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+                        className="bg-warning hover:bg-warning text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
                     >
                         <Zap className="w-4 h-4" />
                         ⚡ Registro Rápido (WhatsApp)
@@ -841,85 +841,85 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
 
             
             {/* TABS */}
-            <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 max-w-fit">
+            <div className="flex space-x-1 bg-surface-3 p-1 rounded-xl mb-4 max-w-fit">
                 <button
                     onClick={() => setActiveTab('waitlist')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'waitlist' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'waitlist' ? 'bg-white dark:bg-slate-700 text-primary shadow' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     CRM Lista de Espera (Teléfonos)
                 </button>
                 <button
                     onClick={() => setActiveTab('pos')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'pos' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'pos' ? 'bg-white dark:bg-slate-700 text-primary shadow' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     Clientes Facturación POS
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+            <div className="bg-surface rounded-xl shadow-sm border border-subtle overflow-hidden">
+                <div className="p-4 border-b border-subtle">
                     <div className="relative max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-subtle" />
                         <input
                             type="text"
                             placeholder="Buscar por nombre, cédula/RUC, teléfono o repuesto..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 transition-all dark:text-white"
+                            className="w-full pl-10 pr-4 py-2 bg-surface-2 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary transition-all dark:text-white"
                         />
                     </div>
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
-                        <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 uppercase font-semibold text-xs">
+                    <table className="w-full text-left text-sm text-fg-muted">
+                        <thead className="bg-surface-2 text-fg-muted uppercase font-semibold text-xs">
                             <tr>
-                                <th className="px-6 py-4">Identificación</th>
-                                <th className="px-6 py-4">Nombre / Razón Social</th>
-                                <th className="px-6 py-4">Contacto</th>
-                                <th className="px-6 py-4">Tipo</th>
-                                <th className="px-6 py-4">Reservas / WhatsApp</th>
-                                <th className="px-6 py-4 text-right">Acciones</th>
+                                <th className="px-4 py-2.5">Identificación</th>
+                                <th className="px-4 py-2.5">Nombre / Razón Social</th>
+                                <th className="px-4 py-2.5">Contacto</th>
+                                <th className="px-4 py-2.5">Tipo</th>
+                                <th className="px-4 py-2.5">Reservas / WhatsApp</th>
+                                <th className="px-4 py-2.5 text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                        <tbody className="divide-y divide-subtle">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                    <td colSpan={5} className="px-4 py-3 text-center text-fg-muted">
                                         Cargando directorio...
                                     </td>
                                 </tr>
                             ) : filteredUnifiedCustomers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                    <td colSpan={5} className="px-4 py-3 text-center text-fg-muted">
                                         No se encontraron clientes.
                                     </td>
                                 </tr>
                             ) : (
                                 filteredUnifiedCustomers.map((customer) => (
-                                    <tr key={customer.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-200">
+                                    <tr key={customer.id} className="hover:bg-surface-hover transition-colors">
+                                        <td className="px-4 py-3 font-medium text-fg">
                                             {customer.posCustomer ? customer.posCustomer.identification_number : 'S/N (CRM)'}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="font-semibold text-slate-900 dark:text-white">{customer.name}</div>
+                                        <td className="px-4 py-3">
+                                            <div className="font-semibold text-fg">{customer.name}</div>
                                             {customer.is_final_consumer && (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 mt-1">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium bg-slate-100 text-fg-muted dark:bg-slate-800 mt-1">
                                                     Consumidor Final Automático
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-4 py-3">
                                             <div className="text-sm">{customer.posCustomer?.email || '-'}</div>
-                                            <div className="text-xs text-slate-500">{customer.phone || '-'}</div>
+                                            <div className="text-xs text-fg-muted">{customer.phone || '-'}</div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
+                                        <td className="px-4 py-3">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success-soft text-success-soft-fg border border-success/20">
                                                 <User className="w-3.5 h-3.5" />
                                                 {customer.posCustomer ? 'POS' : 'Demanda'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-4 py-3">
                                             {(() => {
                                                 const custRequests = customer.waitlistRequests.filter(r => r.status !== 'completed' && r.status !== 'cancelled');
                                                 const hasStockReady = custRequests.some(r => r.product && getProductStockSum(r) > 0 && (r.status === 'pending' || r.status === 'arrived' || r.status === 'pending_stock'));
@@ -928,15 +928,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 return (
                                                     <button
                                                         onClick={() => setSelectedCustomerForDrawer(customer)}
-                                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm transition-all duration-300 hover:scale-105 ${
-                                                            custRequests.length === 0
-                                                                ? 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
-                                                                : hasStockReady
-                                                                ? 'bg-emerald-500 text-white animate-pulse hover:bg-emerald-600'
-                                                                : isUrgentCust
-                                                                ? 'bg-amber-500 text-white hover:bg-amber-600'
-                                                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50'
-                                                        }`}
+                                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm transition-all duration-300 hover:scale-105 ${ custRequests.length === 0 ? 'bg-slate-100 text-fg-muted hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400' : hasStockReady ? 'bg-success text-white animate-pulse hover:bg-success' : isUrgentCust ? 'bg-warning text-white hover:bg-warning' : 'bg-primary-soft text-primary hover:bg-primary-soft border border-primary/20 dark:border-primary/50' }`}
                                                     >
                                                         <Bell className={`w-3.5 h-3.5 ${hasStockReady ? 'animate-bounce' : ''}`} />
                                                         {custRequests.length === 0 ? (
@@ -950,13 +942,13 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-4 py-3 text-right">
                                             {!customer.is_final_consumer && (
                                                 <div className="flex items-center justify-end gap-2">
                                                     {customer.posCustomer && (
                                                         <button
                                                             onClick={() => handleOpenModal(customer.posCustomer)}
-                                                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                                            className="p-1.5 text-fg-subtle hover:text-primary hover:bg-primary-soft rounded transition-colors"
                                                             title="Editar Cliente"
                                                         >
                                                             <Edit2 className="w-4 h-4" />
@@ -965,7 +957,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                     {customer.posCustomer && (
                                                         <button
                                                             onClick={() => handleDelete(customer.posCustomer.id)}
-                                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                                            className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded transition-colors"
                                                             title="Eliminar Cliente"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -985,19 +977,19 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
             {/* Create/Edit Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                    <div className="bg-surface rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-subtle">
+                            <h2 className="text-lg font-bold text-fg">
                                 {editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}
                             </h2>
-                            <button onClick={handleCloseModal} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                            <button onClick={handleCloseModal} className="text-fg-muted hover:text-slate-700 dark:hover:text-slate-300">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-sm font-medium text-fg mb-1">
                                     Cédula / RUC *
                                 </label>
                                 <input
@@ -1005,13 +997,13 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                     required
                                     value={formData.identification_number}
                                     onChange={(e) => setFormData({ ...formData, identification_number: e.target.value })}
-                                    className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                    className="w-full border border-strong rounded-lg p-2.5 text-sm bg-surface text-fg focus:ring-2 focus:ring-primary outline-none transition-shadow"
                                     placeholder="Ej: 0999999999001"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-sm font-medium text-fg mb-1">
                                     Nombre o Razón Social *
                                 </label>
                                 <input
@@ -1019,33 +1011,33 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                     required
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                    className="w-full border border-strong rounded-lg p-2.5 text-sm bg-surface text-fg focus:ring-2 focus:ring-primary outline-none transition-shadow"
                                     placeholder="Ej: Taller Motors C.A"
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-sm font-medium text-fg mb-1">
                                         Teléfono
                                     </label>
                                     <input
                                         type="tel"
                                         value={formData.phone || ''}
                                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                        className="w-full border border-strong rounded-lg p-2.5 text-sm bg-surface text-fg focus:ring-2 focus:ring-primary outline-none transition-shadow"
                                         placeholder="Opcional"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-sm font-medium text-fg mb-1">
                                         Email
                                     </label>
                                     <input
                                         type="email"
                                         value={formData.email || ''}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                        className="w-full border border-strong rounded-lg p-2.5 text-sm bg-surface text-fg focus:ring-2 focus:ring-primary outline-none transition-shadow"
                                         placeholder="Opcional"
                                     />
                                 </div>
@@ -1055,13 +1047,13 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                 <button
                                     type="button"
                                     onClick={handleCloseModal}
-                                    className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    className="flex-1 px-4 py-2 border border-strong text-fg rounded-lg font-medium hover:bg-surface-hover transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                                    className="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary transition-colors shadow-sm"
                                 >
                                     Guardar
                                 </button>
@@ -1074,20 +1066,20 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
             {/* Quick Reservation (WhatsApp) Modal */}
             {isQuickModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <Zap className="w-5 h-5 text-amber-500 animate-pulse" />
+                    <div className="bg-surface rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-subtle">
+                            <h2 className="text-lg font-bold text-fg flex items-center gap-2">
+                                <Zap className="w-5 h-5 text-warning animate-pulse" />
                                 Registro Rápido (WhatsApp)
                             </h2>
-                            <button onClick={() => setIsQuickModalOpen(false)} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                            <button onClick={() => setIsQuickModalOpen(false)} className="text-fg-muted hover:text-slate-700 dark:hover:text-slate-300">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         <form onSubmit={handleQuickSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                <label className="block text-sm font-medium text-fg mb-1">
                                     Teléfono del Cliente *
                                 </label>
                                 <input
@@ -1095,16 +1087,16 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                     required
                                     value={quickPhone}
                                     onChange={(e) => setQuickPhone(e.target.value)}
-                                    className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                    className="w-full border border-strong rounded-lg p-2.5 text-sm bg-surface text-fg focus:ring-2 focus:ring-primary outline-none transition-shadow"
                                     placeholder="Ej: 0999999999"
                                 />
                             </div>
 
                             {/* Quick items list instead of textarea */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                                <label className="block text-sm font-medium text-fg mb-1.5 flex items-center justify-between">
                                     <span>Repuestos / Códigos a Registrar *</span>
-                                    <span className="text-xs text-slate-400">({quickItems.length} {quickItems.length === 1 ? 'ítem' : 'ítems'})</span>
+                                    <span className="text-xs text-fg-subtle">({quickItems.length} {quickItems.length === 1 ? 'ítem' : 'ítems'})</span>
                                 </label>
                                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                                     {quickItems.map((item, idx) => (
@@ -1118,7 +1110,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                     newItems[idx] = e.target.value;
                                                     setQuickItems(newItems);
                                                 }}
-                                                className="flex-1 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+                                                className="flex-1 border border-strong rounded-lg p-2.5 text-sm bg-surface text-fg focus:ring-2 focus:ring-primary outline-none transition-shadow"
                                                 placeholder={`Repuesto o Código #${idx + 1}`}
                                             />
                                             {quickItems.length > 1 && (
@@ -1131,7 +1123,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                         const newItems = quickItems.filter((_, i) => i !== idx);
                                                         setQuickItems(newItems);
                                                     }}
-                                                    className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors border border-slate-200 dark:border-slate-800 shrink-0"
+                                                    className="p-2.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors border border-subtle shrink-0"
                                                     title="Eliminar repuesto"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -1143,7 +1135,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                 <button
                                     type="button"
                                     onClick={() => setQuickItems([...quickItems, ''])}
-                                    className="w-full mt-3 py-2 px-4 border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-1.5 bg-slate-50/50 dark:bg-slate-800/30"
+                                    className="w-full mt-3 py-2 px-4 border border-dashed border-strong hover:border-primary rounded-lg text-xs font-semibold text-fg-muted hover:text-primary transition-colors flex items-center justify-center gap-1.5 bg-slate-50/50 dark:bg-slate-800/30"
                                 >
                                     <Plus className="w-3.5 h-3.5" />
                                     Agregar nuevo producto
@@ -1153,8 +1145,8 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                             {/* Calendar Picker restoration */}
                             <div className="grid grid-cols-1 gap-4 my-2">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-                                        <Calendar className="w-4 h-4 text-amber-500" />
+                                    <label className="block text-sm font-medium text-fg mb-1 flex items-center gap-1.5">
+                                        <Calendar className="w-4 h-4 text-warning" />
                                         Fecha y Hora de Recordatorio *
                                     </label>
                                     <input
@@ -1169,7 +1161,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 console.debug('showPicker not supported', err);
                                             }
                                         }}
-                                        className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                        className="w-full border border-strong rounded-lg p-2.5 text-sm bg-surface text-fg outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                                     />
                                     <div className="flex flex-wrap gap-1.5 mt-2">
                                         <button
@@ -1185,7 +1177,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 const pad = (n: number) => n.toString().padStart(2, '0');
                                                 setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                             }}
-                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-2 py-1 rounded transition-colors"
                                         >
                                             Hoy tarde / Mañana
                                         </button>
@@ -1198,7 +1190,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 const pad = (n: number) => n.toString().padStart(2, '0');
                                                 setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                             }}
-                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-2 py-1 rounded transition-colors"
                                         >
                                             +1 día
                                         </button>
@@ -1211,7 +1203,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 const pad = (n: number) => n.toString().padStart(2, '0');
                                                 setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                             }}
-                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-2 py-1 rounded transition-colors"
                                         >
                                             +3 días
                                         </button>
@@ -1224,7 +1216,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 const pad = (n: number) => n.toString().padStart(2, '0');
                                                 setQuickReminder(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                             }}
-                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded transition-colors"
+                                            className="text-[11px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-2 py-1 rounded transition-colors"
                                         >
                                             +1 semana
                                         </button>
@@ -1232,9 +1224,9 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80">
-                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                            <div className="flex items-center justify-between bg-surface-2 p-2.5 rounded-lg border border-subtle">
+                                <span className="text-xs font-semibold text-fg flex items-center gap-1">
+                                    <AlertCircle className="w-3.5 h-3.5 text-warning" />
                                     ¿Es un pedido Urgente?
                                 </span>
                                 <label className="relative inline-flex items-center cursor-pointer">
@@ -1244,7 +1236,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                         onChange={(e) => setQuickUrgent(e.target.checked)}
                                         className="sr-only peer"
                                     />
-                                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-warning"></div>
                                 </label>
                             </div>
 
@@ -1252,14 +1244,14 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                 <button
                                     type="button"
                                     onClick={() => setIsQuickModalOpen(false)}
-                                    className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    className="flex-1 px-4 py-2 border border-strong text-fg rounded-lg font-medium hover:bg-surface-hover transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSavingQuick}
-                                    className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5 font-bold"
+                                    className="flex-1 px-4 py-2 bg-warning hover:bg-warning text-white rounded-lg font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5 font-bold"
                                 >
                                     {isSavingQuick ? 'Guardando...' : 'Registrar'}
                                 </button>
@@ -1279,16 +1271,16 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                     />
 
                     {/* Drawer Content */}
-                    <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl h-full flex flex-col z-10 overflow-hidden border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-300">
+                    <div className="relative w-full max-w-lg bg-surface shadow-xl h-full flex flex-col z-10 overflow-hidden border-l border-subtle animate-in slide-in-from-right duration-300">
 {/* Header */}
-                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                        <div className="px-6 py-4 border-b border-subtle flex items-center justify-between bg-surface-2">
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                    <MessageSquare className="w-5 h-5 text-blue-500" />
+                                <h2 className="text-lg font-bold text-fg flex items-center gap-2">
+                                    <MessageSquare className="w-5 h-5 text-primary" />
                                     Perfil Unificado de Cliente
                                 </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    Cliente: <strong className="text-slate-900 dark:text-white">{selectedCustomerForDrawer.name}</strong>
+                                <p className="text-xs text-fg-muted mt-0.5">
+                                    Cliente: <strong className="text-fg">{selectedCustomerForDrawer.name}</strong>
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1297,7 +1289,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                         navigator.clipboard.writeText(selectedCustomerForDrawer.phone);
                                         alert('Teléfono copiado');
                                     }}
-                                    className="p-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1 text-xs font-semibold"
+                                    className="p-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg text-fg-muted transition-colors flex items-center gap-1 text-xs font-semibold"
                                 >
                                     <Copy className="w-4 h-4" /> Copiar
                                 </button>
@@ -1305,13 +1297,13 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                     href={`https://wa.me/${selectedCustomerForDrawer.normalizedPhone}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+                                    className="p-1.5 bg-success hover:bg-success text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
                                 >
                                     <MessageSquare className="w-4 h-4" /> WhatsApp
                                 </a>
                                 <button 
                                     onClick={() => setSelectedCustomerForDrawer(null)}
-                                    className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors ml-2"
+                                    className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-fg-muted transition-colors ml-2"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -1321,9 +1313,9 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                         {/* Drawer body */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {/* WhatsApp number input */}
-                            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl p-4 space-y-3">
-                                <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
-                                    <Phone className="w-4 h-4 text-blue-500" />
+                            <div className="bg-primary-soft border border-primary/20 rounded-xl p-4 space-y-3">
+                                <h3 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                                    <Phone className="w-4 h-4 text-primary" />
                                     Número para Contacto
                                 </h3>
                                 <div className="flex gap-2">
@@ -1332,18 +1324,18 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                         placeholder="Ej: 0999999999 o +593..."
                                         value={drawerPhone}
                                         onChange={(e) => setDrawerPhone(e.target.value)}
-                                        className="flex-1 min-w-0 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="flex-1 min-w-0 border border-strong rounded-lg px-3 py-1.5 text-sm bg-surface text-fg focus:ring-2 focus:ring-primary outline-none"
                                     />
                                     <button
                                         onClick={handleSaveDrawerPhone}
                                         disabled={isSavingDrawerPhone}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors shrink-0"
+                                        className="bg-primary hover:bg-primary text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors shrink-0"
                                     >
                                         {isSavingDrawerPhone ? 'Guardando...' : 'Actualizar'}
                                     </button>
                                 </div>
                                 {!selectedCustomerForDrawer.phone && (
-                                    <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                    <p className="text-[11px] text-warning flex items-center gap-1">
                                         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                         Agrega un teléfono para habilitar notificaciones de WhatsApp.
                                     </p>
@@ -1351,26 +1343,26 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                             </div>
 
                             {/* Create Request Form */}
-                            <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-4">
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                    <Plus className="w-4 h-4 text-blue-500" />
+                            <div className="border border-subtle rounded-xl p-4 space-y-4">
+                                <h3 className="text-sm font-bold text-fg flex items-center gap-1.5">
+                                    <Plus className="w-4 h-4 text-primary" />
                                     Nueva Reserva / Pedido
                                 </h3>
 
                                 <form onSubmit={handleAddRequest} className="space-y-4">
                                     {/* Toggle custom vs cataloged */}
-                                    <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
+                                    <div className="flex gap-2 p-1 bg-surface-3 rounded-lg text-xs">
                                         <button
                                             type="button"
                                             onClick={() => { setIsCustomPart(false); setSelectedProduct(null); }}
-                                            className={`flex-1 py-1.5 rounded-md font-medium transition-colors ${!isCustomPart ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+                                            className={`flex-1 py-1.5 rounded-lg font-medium transition-colors ${!isCustomPart ? 'bg-white dark:bg-slate-700 shadow-sm text-fg dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
                                         >
                                             Repuesto de Catálogo
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => { setIsCustomPart(true); setSelectedProduct(null); }}
-                                            className={`flex-1 py-1.5 rounded-md font-medium transition-colors ${isCustomPart ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+                                            className={`flex-1 py-1.5 rounded-lg font-medium transition-colors ${isCustomPart ? 'bg-white dark:bg-slate-700 shadow-sm text-fg dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
                                         >
                                             No Catalogado (Texto libre)
                                         </button>
@@ -1378,11 +1370,11 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
 
                                     {!isCustomPart ? (
                                         <div className="relative">
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                                 Buscar Repuesto
                                             </label>
                                             <div className="relative">
-                                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-subtle" />
                                                 <input
                                                     type="text"
                                                     placeholder="Escribe SKU o nombre..."
@@ -1395,13 +1387,13 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                             setProductSearchQuery(e.target.value);
                                                         }
                                                     }}
-                                                    className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 dark:text-white"
+                                                    className="w-full pl-9 pr-8 py-2 bg-surface-2 border border-strong rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none text-fg"
                                                 />
                                                 {selectedProduct && (
                                                     <button
                                                         type="button"
                                                         onClick={() => setSelectedProduct(null)}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-slate-600"
                                                     >
                                                         <X className="w-4 h-4" />
                                                     </button>
@@ -1410,11 +1402,11 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
 
                                             {/* Autocomplete list */}
                                             {productSearchQuery.length >= 2 && !selectedProduct && (
-                                                <div className="absolute left-0 right-0 z-20 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                                                <div className="absolute left-0 right-0 z-20 mt-1 bg-surface border border-subtle rounded-lg shadow-lg max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
                                                     {isSearchingProducts ? (
-                                                        <div className="p-3 text-center text-xs text-slate-500">Buscando...</div>
+                                                        <div className="p-3 text-center text-xs text-fg-muted">Buscando...</div>
                                                     ) : searchResults.length === 0 ? (
-                                                        <div className="p-3 text-center text-xs text-slate-500">No se encontraron repuestos</div>
+                                                        <div className="p-3 text-center text-xs text-fg-muted">No se encontraron repuestos</div>
                                                     ) : (
                                                         searchResults.map(prod => {
                                                             const stock = prod.inventory_levels?.reduce((sum: number, lvl: any) => sum + (lvl.current_stock || 0), 0) || 0;
@@ -1427,16 +1419,16 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                                         setProductSearchQuery('');
                                                                         setSearchResults([]);
                                                                     }}
-                                                                    className="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex justify-between items-start"
+                                                                    className="w-full text-left p-3 hover:bg-surface-hover transition-colors flex justify-between items-start"
                                                                 >
                                                                     <div>
-                                                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{prod.name}</div>
-                                                                        <div className="text-xs text-slate-500 dark:text-slate-400">SKU: {prod.sku} | Precio: ${prod.price}</div>
+                                                                        <div className="text-sm font-semibold text-fg">{prod.name}</div>
+                                                                        <div className="text-xs text-fg-muted">SKU: {prod.sku} | Precio: ${prod.price}</div>
                                                                         {isProductDiscontinued(prod) && (
-                                                                            <div className="text-[10px] font-bold text-rose-500 mt-0.5">Descontinuado</div>
+                                                                            <div className="text-2xs font-bold text-danger mt-0.5">Descontinuado</div>
                                                                         )}
                                                                     </div>
-                                                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${stock > 0 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'}`}>
+                                                                    <span className={`text-2xs px-2 py-0.5 rounded font-bold ${stock > 0 ? 'bg-success-soft text-success dark:text-white' : 'bg-danger-soft text-danger dark:text-white'}`}>
                                                                         Stock: {stock}
                                                                     </span>
                                                                 </button>
@@ -1448,7 +1440,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                         </div>
                                     ) : (
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                                 Descripción del Repuesto Especial
                                             </label>
                                             <textarea
@@ -1457,14 +1449,14 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 placeholder="Ej: Amortiguador trasero AXXO reforzado"
                                                 value={customDescription}
                                                 onChange={(e) => setCustomDescription(e.target.value)}
-                                                className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full border border-strong rounded-lg p-2.5 bg-surface-2 text-fg text-sm outline-none focus:ring-2 focus:ring-primary"
                                             />
                                         </div>
                                     )}
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                                 Detalle Moto (Opcional)
                                             </label>
                                             <input
@@ -1472,11 +1464,11 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 placeholder="Ej: Daytona Coyote 150"
                                                 value={motorcycleDetails}
                                                 onChange={(e) => setMotorcycleDetails(e.target.value)}
-                                                className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full border border-strong rounded-lg p-2 text-sm bg-surface text-fg outline-none focus:ring-2 focus:ring-primary"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                                 Cantidad
                                             </label>
                                             <input
@@ -1485,14 +1477,14 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 required
                                                 value={quantity}
                                                 onChange={(e) => setQuantity(Number(e.target.value))}
-                                                className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full border border-strong rounded-lg p-2 text-sm bg-surface text-fg outline-none focus:ring-2 focus:ring-primary"
                                             />
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                                 Notas Internas
                                             </label>
                                             <input
@@ -1500,12 +1492,12 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 placeholder="Ej: Pago seña 50%..."
                                                 value={notes}
                                                 onChange={(e) => setNotes(e.target.value)}
-                                                className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full border border-strong rounded-lg p-2 text-sm bg-surface text-fg outline-none focus:ring-2 focus:ring-primary"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                                                <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1 flex items-center gap-1">
+                                                <Calendar className="w-3.5 h-3.5 text-warning" />
                                                 Recordatorio
                                             </label>
                                             <input
@@ -1519,7 +1511,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                         console.debug('showPicker not supported', err);
                                                     }
                                                 }}
-                                                className="w-full border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                                className="w-full border border-strong rounded-lg p-2 text-sm bg-surface text-fg outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                                             />
                                             <div className="flex flex-wrap gap-1 mt-1.5">
                                                 <button
@@ -1535,7 +1527,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                         const pad = (n: number) => n.toString().padStart(2, '0');
                                                         setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                                     }}
-                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                    className="text-2xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-1.5 py-0.5 rounded transition-colors"
                                                 >
                                                     Hoy/Mañana
                                                 </button>
@@ -1548,7 +1540,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                         const pad = (n: number) => n.toString().padStart(2, '0');
                                                         setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                                     }}
-                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                    className="text-2xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-1.5 py-0.5 rounded transition-colors"
                                                 >
                                                     +1d
                                                 </button>
@@ -1561,7 +1553,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                         const pad = (n: number) => n.toString().padStart(2, '0');
                                                         setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                                     }}
-                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                    className="text-2xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-1.5 py-0.5 rounded transition-colors"
                                                 >
                                                     +3d
                                                 </button>
@@ -1574,7 +1566,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                         const pad = (n: number) => n.toString().padStart(2, '0');
                                                         setReminderAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                                                     }}
-                                                    className="text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded transition-colors"
+                                                    className="text-2xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-fg px-1.5 py-0.5 rounded transition-colors"
                                                 >
                                                     +1s
                                                 </button>
@@ -1582,9 +1574,9 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800/80">
-                                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                            <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                                    <div className="flex items-center justify-between bg-surface-2 p-2.5 rounded-lg border border-subtle">
+                                        <span className="text-xs font-semibold text-fg flex items-center gap-1">
+                                            <AlertCircle className="w-3.5 h-3.5 text-warning" />
                                             ¿Es un pedido Urgente?
                                         </span>
                                         <label className="relative inline-flex items-center cursor-pointer">
@@ -1594,13 +1586,13 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 onChange={(e) => setIsUrgent(e.target.checked)}
                                                 className="sr-only peer"
                                             />
-                                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-warning"></div>
                                         </label>
                                     </div>
 
                                     <button
                                         type="submit"
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold text-sm shadow transition-colors"
+                                        className="w-full bg-primary hover:bg-primary text-white py-2 rounded-lg font-semibold text-sm shadow transition-colors"
                                     >
                                         Registrar Reserva
                                     </button>
@@ -1609,17 +1601,17 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
 
                             {/* Active Reservations list */}
                             <div className="space-y-3">
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                    <ClipboardList className="w-4 h-4 text-blue-500" />
+                                <h3 className="text-sm font-bold text-fg flex items-center gap-1.5">
+                                    <ClipboardList className="w-4 h-4 text-primary" />
                                     Reservas de {selectedCustomerForDrawer.name}
                                 </h3>
 
                                 {isLoadingDrawerRequests ? (
-                                    <div className="text-center py-6 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <div className="text-center py-6 text-xs text-fg-muted bg-surface-2 rounded-xl border border-slate-100 dark:border-slate-800">
                                         Cargando historial de reservas...
                                     </div>
                                 ) : drawerRequests.length === 0 ? (
-                                    <div className="text-center py-6 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                                    <div className="text-center py-6 text-xs text-fg-muted bg-surface-2 rounded-xl border border-slate-100 dark:border-slate-800">
                                         No hay reservas registradas.
                                     </div>
                                 ) : (
@@ -1631,27 +1623,11 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 return (
                                                     <div 
                                                         key={req.id} 
-                                                        className={`border rounded-xl p-4 transition-all duration-300 relative overflow-hidden ${
-                                                            req.is_urgent && req.status === 'pending'
-                                                                ? 'border-amber-300 dark:border-amber-900 bg-amber-50/20 dark:bg-amber-950/10'
-                                                                : hasStock && (req.status === 'pending' || req.status === 'arrived')
-                                                                ? 'border-emerald-300 dark:border-emerald-950 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm'
-                                                                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-                                                        }`}
+                                                        className={`border rounded-xl p-4 transition-all duration-300 relative overflow-hidden ${ req.is_urgent && req.status === 'pending' ? 'border-warning/20 bg-warning-soft/20 dark:bg-warning/10' : hasStock && (req.status === 'pending' || req.status === 'arrived') ? 'border-success/20 bg-success-soft/20 shadow-sm' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900' }`}
                                                     >
                                                         <div className="flex justify-between items-start gap-2 mb-2">
                                                             <div>
-                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                                                    req.status === 'completed'
-                                                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                                                                        : req.status === 'notified'
-                                                                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
-                                                                        : hasStock
-                                                                        ? 'bg-emerald-500 text-white'
-                                                                        : req.is_urgent
-                                                                        ? 'bg-amber-500 text-white'
-                                                                        : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-                                                                }`}>
+                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-wider ${ req.status === 'completed' ? 'bg-primary-soft text-primary dark:text-white' : req.status === 'notified' ? 'bg-primary-soft text-primary dark:text-white' : hasStock ? 'bg-success text-white' : req.is_urgent ? 'bg-warning text-white' : 'bg-slate-100 text-fg dark:bg-slate-800 dark:text-slate-300' }`}>
                                                                     {req.status === 'completed' && <Check className="w-2.5 h-2.5" />}
                                                                     {req.status === 'notified' && <MessageSquare className="w-2.5 h-2.5" />}
                                                                     {hasStock && <Package className="w-2.5 h-2.5" />}
@@ -1668,32 +1644,32 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                             </div>
                                                             <button
                                                                 onClick={() => handleDeleteRequest(req.id)}
-                                                                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                                                className="p-1 hover:bg-surface-hover text-fg-subtle hover:text-danger rounded transition-colors"
                                                                 title="Eliminar Reserva"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>
                                                         </div>
 
-                                                        <div className="font-semibold text-slate-900 dark:text-white text-sm">
+                                                        <div className="font-semibold text-fg text-sm">
                                                             {req.product ? req.product.name : req.custom_part_description}
                                                         </div>
                                                         
-                                                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 space-y-1">
+                                                        <div className="text-xs text-fg-muted mt-1 space-y-1">
                                                             {req.product && (
-                                                                <div>SKU: <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px] font-mono">{req.product.sku}</code></div>
+                                                                <div>SKU: <code className="bg-surface-3 px-1 py-0.5 rounded text-2xs font-mono">{req.product.sku}</code></div>
                                                             )}
                                                             {req.motorcycle_details && (
                                                                 <div>🏍️ Moto: {req.motorcycle_details}</div>
                                                             )}
                                                             <div>Cantidad: {req.quantity} uds</div>
                                                             {req.notes && (
-                                                                <div className="italic text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/40 px-2 py-1 rounded mt-1">
+                                                                <div className="italic text-fg-muted bg-surface-2 px-2 py-1 rounded mt-1">
                                                                     Nota: "{req.notes}"
                                                                 </div>
                                                             )}
                                                             {req.reminder_at && (
-                                                                <div className="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-1.5 bg-amber-500/10 p-1.5 rounded border border-amber-500/20">
+                                                                <div className="flex items-center gap-1.5 text-[11px] text-warning font-semibold mt-1.5 bg-warning/10 p-1.5 rounded border border-warning/20">
                                                                     <Calendar className="w-3.5 h-3.5" />
                                                                     Recordar: {new Date(req.reminder_at).toLocaleString('es-EC', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                                 </div>
@@ -1702,24 +1678,24 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
 
                                                         {req.product && (
                                                             <div className="mt-3 border-t border-slate-100 dark:border-slate-800/50 pt-2">
-                                                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 flex justify-between items-center">
+                                                                <div className="text-2xs font-bold uppercase tracking-wider text-fg-subtle mb-1 flex justify-between items-center">
                                                                     <span>Inventario en Bodegas</span>
-                                                                    <span className={stockSum > 0 ? 'text-emerald-500 font-bold' : 'text-red-500 font-bold'}>
+                                                                    <span className={stockSum > 0 ? 'text-success font-bold' : 'text-danger font-bold'}>
                                                                         Total: {stockSum} uds
                                                                     </span>
                                                                 </div>
                                                                 <div className="grid grid-cols-2 gap-1 text-[11px]">
                                                                     {req.product.inventory_levels && req.product.inventory_levels.length > 0 ? (
                                                                         req.product.inventory_levels.map((lvl, idx) => (
-                                                                            <div key={idx} className="flex justify-between items-center p-1 bg-slate-50 dark:bg-slate-800/50 rounded">
-                                                                                <span className="text-slate-500">Bodega {lvl.warehouse_id}</span>
-                                                                                <span className={`font-semibold ${lvl.current_stock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                                                                            <div key={idx} className="flex justify-between items-center p-1 bg-surface-2 rounded">
+                                                                                <span className="text-fg-muted">Bodega {lvl.warehouse_id}</span>
+                                                                                <span className={`font-semibold ${lvl.current_stock > 0 ? 'text-success dark:text-success' : 'text-slate-400'}`}>
                                                                                     {lvl.current_stock}
                                                                                 </span>
                                                                             </div>
                                                                         ))
                                                                     ) : (
-                                                                        <div className="col-span-2 text-slate-400 text-center py-1">Sin información de stock</div>
+                                                                        <div className="col-span-2 text-fg-subtle text-center py-1">Sin información de stock</div>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -1730,11 +1706,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleWhatsAppNotification(req)}
-                                                                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold shadow-sm transition-all duration-300 flex items-center justify-center gap-1.5 hover:scale-[1.02] ${
-                                                                        hasStock 
-                                                                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white animate-pulse' 
-                                                                            : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                                                    }`}
+                                                                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold shadow-sm transition-all duration-300 flex items-center justify-center gap-1.5 hover:scale-[1.02] ${ hasStock ? 'bg-success hover:bg-success text-white animate-pulse' : 'bg-primary hover:bg-primary text-white' }`}
                                                                 >
                                                                     <MessageSquare className="w-3.5 h-3.5" />
                                                                     Notificar WA
@@ -1745,7 +1717,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                                     onClick={() => handleBillRequest(req)}
                                                                     className="flex-1 bg-slate-900 hover:bg-black text-white dark:bg-slate-800 dark:hover:bg-slate-700 py-1.5 px-3 rounded-lg text-xs font-semibold shadow-sm transition-all duration-300 flex items-center justify-center gap-1.5 hover:scale-[1.02]"
                                                                 >
-                                                                    <ShoppingBag className="w-3.5 h-3.5 text-blue-400" />
+                                                                    <ShoppingBag className="w-3.5 h-3.5 text-primary" />
                                                                     Facturar POS
                                                                 </button>
                                                             </div>

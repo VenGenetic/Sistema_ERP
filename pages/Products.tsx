@@ -19,6 +19,58 @@ import { PrintQueuePreviewModal } from '../components/PrintQueuePreviewModal';
 import { addToQueue, getPrintQueue, clearQueue, removeFromQueue, updateQueueItemQty, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF, PrintQueueItem } from '../utils/mobilePrintQueue';
 import { ProformaPanel } from '../components/ProformaPanel';
 import { useProformaStore } from '../store/useProformaStore';
+import {
+  ArrowDown,
+  ArrowUp,
+  Ban,
+  BellRing,
+  Boxes,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CirclePlay,
+  Copy,
+  ExternalLink,
+  Eye,
+  FilePen,
+  FileText,
+  FolderArchive,
+  FolderUp,
+  Hourglass,
+  Image as ImageIcon,
+  LayoutGrid,
+  Link as LinkIcon,
+  ListChecks,
+  ListPlus,
+  Loader2,
+  Pencil,
+  Play,
+  Plus,
+  Printer,
+  RefreshCw,
+  Rows3,
+  ScanBarcode,
+  Search,
+  SearchX,
+  Sparkles,
+  Telescope,
+  Trash,
+  Trash2,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
+
+/**
+ * Marcador para imágenes que fallan al cargar.
+ *
+ * Se inyecta con innerHTML desde el `onError` del <img>, así que no puede ser
+ * JSX. Es el mismo trazo que Lucide (2px, extremos redondeados) y hereda el
+ * color del contenedor vía `currentColor`, de modo que respeta el tema.
+ */
+const PLACEHOLDER_IMAGE_SVG = (size: number) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`;
 
 // Helper to parse query parameters from the hash or query string
 const getInitialParams = () => {
@@ -904,45 +956,37 @@ const Products: React.FC = () => {
     const renderedRows = useMemo(() => {
         return products.map(prod => (
             <tr key={prod.id} className={`transition-colors group ${selectedIds.has(prod.id) ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
-                <td className="px-3 py-4 align-top">
+                <td className="px-4 py-3 align-top">
                     <input
                         type="checkbox"
                         checked={selectedIds.has(prod.id)}
                         onChange={() => toggleSelectRow(prod.id)}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer mt-1"
+                        className="w-4 h-4 rounded border-strong text-primary focus:ring-primary cursor-pointer mt-1"
                     />
                 </td>
-                <td className="px-6 py-4 font-mono text-sm text-slate-500 dark:text-slate-400 align-top whitespace-nowrap">
+                <td className="px-4 py-3 font-mono text-sm text-fg-muted align-top whitespace-nowrap">
                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <span>{prod.sku}</span>
                         <button
                             type="button"
                             onClick={(e) => handleCopySku(prod.sku, e)}
-                            className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${
-                                copiedSku === prod.sku
-                                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-                                    : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                            }`}
+                            className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${ copiedSku === prod.sku ? 'text-success bg-success-soft dark:bg-success/20' : 'text-slate-400 hover:text-primary hover:bg-primary-soft dark:hover:bg-primary/20' }`}
                             title={copiedSku === prod.sku ? "¡Copiado!" : "Copiar Código"}
                         >
-                            <span className="material-symbols-outlined text-[16px]">
-                                {copiedSku === prod.sku ? 'check' : 'content_copy'}
-                            </span>
+                            {copiedSku === prod.sku ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
                         </button>
                         <a
                             href={`https://www.lvparts.ec/catalogo?q=${encodeURIComponent(prod.sku)}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1.5 rounded-lg transition-colors flex items-center justify-center text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                            className="p-1.5 rounded-lg transition-colors flex items-center justify-center text-fg-subtle hover:text-warning hover:bg-warning-soft"
                             title="Buscar en catálogo LV Parts"
                         >
-                            <span className="material-symbols-outlined text-[16px]">
-                                open_in_new
-                            </span>
+                            <ExternalLink size={16} aria-hidden="true" />
                         </a>
                     </div>
                 </td>
-                <td className="px-6 py-4 align-top">
+                <td className="px-4 py-3 align-top">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-start gap-3">
                         {/* Image Thumbnail with Hover Gallery Preview */}
@@ -950,9 +994,9 @@ const Products: React.FC = () => {
                             {prod.image_url ? (
                                 <div 
                                     onClick={() => handleOpenLightbox(prod, 'image', 0)}
-                                    className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative cursor-pointer"
+                                    className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white shadow-sm relative cursor-pointer"
                                 >
-                                    <span className="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">image</span>
+                                    <ImageIcon size={20} className="text-fg-subtle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0" aria-hidden="true" />
                                     <img 
                                        src={getThumbnailUrl(prod.image_url, 80, 80)} 
                                        alt="" 
@@ -969,8 +1013,9 @@ const Products: React.FC = () => {
                                            } else {
                                                target.style.display = 'none';
                                                if (target.parentElement) {
-                                                   target.parentElement.innerHTML = '<span class="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
-                                                   target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 relative";
+                                                   // SVG inline (mismo trazo que Lucide) en vez de la webfont de iconos
+                                                   target.parentElement.innerHTML = PLACEHOLDER_IMAGE_SVG(20);
+                                                   target.parentElement.className = "h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 relative flex items-center justify-center text-fg-subtle";
                                                }
                                            }
                                        }}
@@ -978,30 +1023,30 @@ const Products: React.FC = () => {
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                                     {prod.gallery && prod.gallery.some((item: any) => item.type === 'video') && (
                                         <div className="absolute bottom-0.5 right-0.5 bg-black/60 rounded p-0.5 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-[12px] text-emerald-400">play_arrow</span>
+                                            <Play size={12} className="text-success" aria-hidden="true" />
                                         </div>
                                     )}
                                 </div>
                             ) : (
                                 <div 
                                     title="Sin Imagen"
-                                    className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center"
+                                    className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 flex items-center justify-center"
                                 >
-                                    <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
+                                    <ImageIcon size={20} className="text-fg-subtle" aria-hidden="true" />
                                 </div>
                             )}
 
                             {/* Hover Gallery Preview */}
                             {(prod.gallery && prod.gallery.length > 0) && (
-                                <div className="absolute left-12 top-0 z-50 hidden group-hover:flex flex-wrap gap-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl w-max max-w-[200px]">
+                                <div className="absolute left-12 top-0 z-50 hidden group-hover:flex flex-wrap gap-1 p-2 bg-surface border border-subtle rounded-lg shadow-lg w-max max-w-[200px]">
                                     {prod.gallery.map((item: any, idx: number) => (
                                         <div 
                                             key={idx} 
                                             onClick={(e) => { e.stopPropagation(); handleOpenLightbox(prod, 'gallery', idx + 1); }}
-                                            className="w-10 h-10 rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-black flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
+                                            className="w-10 h-10 rounded overflow-hidden border border-subtle bg-black flex items-center justify-center relative cursor-pointer hover:opacity-80 transition-opacity"
                                         >
                                             {item.type === 'video' ? (
-                                                <span className="material-symbols-outlined text-emerald-500 text-[18px]">play_circle</span>
+                                                <CirclePlay size={18} className="text-success" aria-hidden="true" />
                                             ) : (
                                                 <img src={getThumbnailUrl(item.url, 80, 80)} alt="" className="w-full h-full object-cover" />
                                             )}
@@ -1027,30 +1072,30 @@ const Products: React.FC = () => {
                                 {prod.name}
                             </span>
                             {isProductDiscontinued(prod) && (
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${prod.discontinued_until ? 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400' : 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:border-rose-800 dark:text-rose-400'} flex items-center gap-1`} title={prod.discontinued_until ? `Descontinuado Temporalmente hasta ${new Date(prod.discontinued_until).toLocaleDateString()}` : 'Descontinuado Permanentemente'}>
-                                    <span className="material-symbols-outlined text-[10px]">{prod.discontinued_until ? 'hourglass_empty' : 'warning'}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-2xs font-medium border ${prod.discontinued_until ? 'border-warning/20 bg-warning-soft text-warning-soft-fg dark:text-warning' : 'border-danger/20 bg-danger-soft text-danger-soft-fg dark:text-danger'} flex items-center gap-1`} title={prod.discontinued_until ? `Descontinuado Temporalmente hasta ${new Date(prod.discontinued_until).toLocaleDateString()}` : 'Descontinuado Permanentemente'}>
+                                    {prod.discontinued_until ? <Hourglass size={11} className="text-2xs" aria-hidden="true" /> : <TriangleAlert size={11} className="text-2xs" aria-hidden="true" />}
                                     {prod.discontinued_until ? 'Desc. Temporal' : 'Descontinuado'}
                                 </span>
                             )}
                             {prod.group_id && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 flex items-center gap-1 cursor-help" title={`Grupo: ${prod.group_id.split('-')[0]}`}>
-                                    <span className="material-symbols-outlined text-[10px]">link</span>
+                                <span className="px-1.5 py-0.5 rounded text-2xs font-medium border border-primary/20 bg-primary-soft text-primary-soft-fg flex items-center gap-1 cursor-help" title={`Grupo: ${prod.group_id.split('-')[0]}`}>
+                                    <LinkIcon size={11} aria-hidden="true" />
                                     Equivalente
                                 </span>
                             )}
                             {(prod.demand_count > 0) && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400 flex items-center gap-1" title={`${prod.demand_count} registros de demanda activos`}>
-                                    <span className="material-symbols-outlined text-[10px] animate-pulse">notifications_active</span>
+                                <span className="px-1.5 py-0.5 rounded text-2xs font-medium border border-warning/20 bg-warning-soft text-warning-soft-fg flex items-center gap-1" title={`${prod.demand_count} registros de demanda activos`}>
+                                    <BellRing size={11} aria-hidden="true" />
                                     {prod.demand_count} Demanda{prod.demand_count > 1 ? 's' : ''}
                                 </span>
                             )}
                             {prod.investigation_status === 'en_consulta' && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title="En consulta de sourcing">
+                                <span className="px-1.5 py-0.5 rounded text-2xs font-medium bg-warning-soft text-warning-soft-fg" title="En consulta de sourcing">
                                     En Consulta
                                 </span>
                             )}
                             {prod.investigation_status === 'no_encontrado' && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" title="No se encontró repuesto">
+                                <span className="px-1.5 py-0.5 rounded text-2xs font-medium bg-danger-soft text-danger-soft-fg" title="No se encontró repuesto">
                                     No Encontrado
                                 </span>
                             )}
@@ -1064,7 +1109,7 @@ const Products: React.FC = () => {
                             return (
                                 <span 
                                     key={tag.id} 
-                                    className="px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                    className="px-2 py-0.5 text-2xs font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
                                     style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
                                     onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
                                     title="Clic para editar etiquetas"
@@ -1075,115 +1120,111 @@ const Products: React.FC = () => {
                         })}
                         <button 
                             onClick={(e) => { e.stopPropagation(); setSelectedProductForTags(prod); }}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800"
+                            className="px-1.5 py-0.5 rounded text-2xs font-semibold text-fg-subtle border border-dashed border-strong hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-surface-2"
                             title="Asignar etiquetas"
                         >
-                            <span className="material-symbols-outlined text-[12px]">add</span>
+                            <Plus size={12} aria-hidden="true" />
                             Etiqueta
                         </button>
                     </div>
                     </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 align-top">{prod.brands?.name || '—'}</td>
+                <td className="px-4 py-3 text-sm text-fg-muted align-top">{prod.brands?.name || '—'}</td>
                 
                 {/* Precios y Costos */}
-                <td className="px-6 py-4 align-top">
+                <td className="px-4 py-3 align-top">
                     <div className="flex flex-col gap-1 text-xs min-w-[130px]">
                         <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-400 dark:text-slate-500 font-medium">Costo:</span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            <span className="text-fg-subtle font-medium">Costo:</span>
+                            <span className="font-semibold text-fg">
                                 ${(prod.cost_without_vat || 0).toFixed(2)}
                             </span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                            <span className="text-slate-400 dark:text-slate-500 font-medium">Con IVA:</span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            <span className="text-fg-subtle font-medium">Con IVA:</span>
+                            <span className="font-semibold text-fg">
                                 ${((prod.cost_without_vat || 0) * (1 + (prod.vat_percentage || 15.0) / 100)).toFixed(2)}
                             </span>
                         </div>
                         <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/50">
-                            <span className="text-slate-500 dark:text-slate-400 font-semibold">PVP:</span>
-                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            <span className="text-fg-muted font-semibold">PVP:</span>
+                            <span className="font-bold text-success">
                                 ${(prod.price || 0).toFixed(2)}
                             </span>
                         </div>
                     </div>
                 </td>
 
-                <td className="px-6 py-4 text-center align-top">
+                <td className="px-4 py-3 text-center align-top">
                     <div className="flex flex-col items-center justify-center">
-                        <span className="font-bold text-slate-900 dark:text-white">
+                        <span className="font-bold text-fg">
                             {prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, level: any) => acc + (level.current_stock || 0), 0) : 0}
                         </span>
                         {prod.importer_stock > 0 ? (
-                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                            <span className="text-[11px] font-semibold text-success-soft-fg mt-1 flex items-center gap-1 bg-success-soft px-2 py-0.5 rounded-full border border-success/20">
+                                <span className="w-1.5 h-1.5 bg-success rounded-full"></span>
                                 {prod.importer_stock} imp.
                             </span>
                         ) : (
-                            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-full">
+                            <span className="text-[11px] font-medium text-fg-subtle mt-1 bg-surface-3 px-2 py-0.5 rounded-full">
                                 Agotado imp.
                             </span>
                         )}
                     </div>
                 </td>
-                <td className="px-6 py-4 text-center align-top">
+                <td className="px-4 py-3 text-center align-top">
                     <div className="flex items-center justify-center gap-1">
                         <button
                             onClick={() => handleOpenGroupModal(prod.group_id, prod)}
-                            className={`p-1.5 rounded-lg transition-colors relative ${prod.group_id ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                            className={`p-1.5 rounded-lg transition-colors relative ${prod.group_id ? 'text-primary bg-primary-soft dark:bg-primary/20' : 'text-slate-400 hover:text-primary hover:bg-primary-soft dark:hover:bg-primary/20'}`}
                             title="Ver Repuestos Relacionados"
                         >
-                            <span className="material-symbols-outlined text-[18px]">link</span>
+                            <LinkIcon size={18} aria-hidden="true" />
                             {prod.group_id && groupCounts[prod.group_id] > 1 && (
-                                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
+                                <span className="absolute -top-1 -right-1 bg-danger text-white text-[12px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
                                     {groupCounts[prod.group_id] - 1}
                                 </span>
                             )}
                         </button>
                         <button
                             onClick={() => { setSourcingProduct(prod); setIsSourcingModalOpen(true); }}
-                            className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
+                            className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-primary bg-primary-soft dark:bg-primary/20' : 'text-slate-400 hover:text-primary hover:bg-primary-soft dark:hover:bg-primary/20'}`}
                             title="Estudio de Repuesto (Sourcing)"
                         >
-                            <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+                            <Telescope size={18} aria-hidden="true" />
                         </button>
                         <button
                             onClick={() => handleOpenModal(prod)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-fg-subtle hover:text-primary hover:bg-primary-soft rounded-lg transition-colors"
                             title="Editar Producto"
                         >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                            <Pencil size={18} aria-hidden="true" />
                         </button>
                         <button
                             onClick={() => handleDuplicateProduct(prod)}
-                            className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-fg-subtle hover:text-primary hover:bg-primary-soft rounded-lg transition-colors"
                             title="Duplicar Producto"
                         >
-                            <span className="material-symbols-outlined text-[18px]">copy_all</span>
+                            <Copy size={18} aria-hidden="true" />
                         </button>
                         <button
                             onClick={() => { setDemandProduct(prod); setIsDemandModalOpen(true); }}
-                            className={`p-1.5 rounded-lg transition-colors relative ${
-                                prod.demand_count > 0
-                                    ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 font-semibold'
-                                    : 'text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                            }`}
+                            className={`p-1.5 rounded-lg transition-colors relative ${ prod.demand_count > 0 ? 'text-warning bg-warning-soft font-semibold' : 'text-slate-400 hover:text-warning hover:bg-warning-soft dark:hover:bg-warning/20' }`}
                             title="Registrar / Ver Demanda (Lista de Espera)"
                         >
-                            <span className="material-symbols-outlined text-[18px]">notifications_active</span>
+                            <BellRing size={18} aria-hidden="true" />
                             {prod.demand_count > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse">
+                                <span className="absolute -top-1 -right-1 bg-warning text-white text-[12px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
                                     {prod.demand_count}
                                 </span>
                             )}
                         </button>
                         <button
                             onClick={() => { setLabelProduct(prod); setIsLabelModalOpen(true); }}
-                            className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-fg-subtle hover:text-success hover:bg-success-soft rounded-lg transition-colors"
                             title="Generar Etiqueta (Código de Barras)"
                         >
-                            <span className="material-symbols-outlined text-[18px]">barcode_scanner</span>
+                            <ScanBarcode size={18} aria-hidden="true" />
                         </button>
                         <button
                             onClick={async () => {
@@ -1192,24 +1233,24 @@ const Products: React.FC = () => {
                                 setQueueToast(`✓ 1 etiqueta de ${prod.sku} agregada a la cola`);
                                 setTimeout(() => setQueueToast(null), 2000);
                             }}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-fg-subtle hover:text-warning hover:bg-warning-soft rounded-lg transition-colors"
                             title="Agregar 1 etiqueta a la cola de impresión"
                         >
-                            <span className="material-symbols-outlined text-[18px]">playlist_add</span>
+                            <ListPlus size={18} aria-hidden="true" />
                         </button>
                         <button
                             onClick={() => useProformaStore.getState().addItem({ id: prod.id, sku: prod.sku, name: prod.name, price: prod.price }, 1)}
-                            className="p-1.5 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-fg-subtle hover:text-success hover:bg-success-soft rounded-lg transition-colors"
                             title="Agregar a Proforma"
                         >
-                            <span className="material-symbols-outlined text-[18px]">request_quote</span>
+                            <FileText size={18} aria-hidden="true" />
                         </button>
                         <button
                             onClick={() => handleDeleteProduct(prod)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
                             title="Eliminar Producto"
                         >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                            <Trash2 size={18} aria-hidden="true" />
                         </button>
                     </div>
                 </td>
@@ -1229,7 +1270,13 @@ const Products: React.FC = () => {
             return (
                 <div
                     key={prod.id}
-                    className={`relative flex flex-col rounded-xl border overflow-hidden bg-white dark:bg-slate-800 shadow-sm transition-all hover:shadow-lg ${isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-slate-200 dark:border-slate-700'}`}
+                    /*
+                        Hover contenido: la sombra sube un solo escalón (sm -> md) y el
+                        borde se define. Antes saltaba a `shadow-lg`, un brinco que en una
+                        rejilla de 5 columnas produce parpadeo al mover el ratón.
+                        Selección: borde + anillo fino, sin desplazar el contenido.
+                    */
+                    className={`relative flex flex-col rounded-xl border overflow-hidden bg-surface shadow-sm transition-[box-shadow,border-color] duration-200 hover:shadow-md ${isSelected ? 'border-primary ring-1 ring-primary/40' : 'border-subtle hover:border-strong'}`}
                 >
                     {/* Selection checkbox */}
                     <div className="absolute top-2 left-2 z-20">
@@ -1237,17 +1284,17 @@ const Products: React.FC = () => {
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelectRow(prod.id)}
-                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer shadow"
+                            className="w-4 h-4 rounded border-strong text-primary focus:ring-primary cursor-pointer shadow"
                         />
                     </div>
 
                     {/* Discontinued badge */}
                     {isProductDiscontinued(prod) && (
                         <span
-                            className={`absolute top-2 right-2 z-20 px-1.5 py-0.5 rounded text-[10px] font-medium border shadow-sm ${prod.discontinued_until ? 'border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/80 dark:border-amber-800 dark:text-amber-400' : 'border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-900/80 dark:border-rose-800 dark:text-rose-400'} flex items-center gap-1`}
+                            className={`absolute top-2 right-2 z-20 px-1.5 py-0.5 rounded text-2xs font-medium border shadow-sm ${prod.discontinued_until ? 'border-warning/20 bg-warning-soft text-warning-soft-fg dark:text-warning' : 'border-danger/20 bg-danger-soft text-danger-soft-fg dark:text-danger'} flex items-center gap-1`}
                             title={prod.discontinued_until ? `Descontinuado Temporalmente hasta ${new Date(prod.discontinued_until).toLocaleDateString()}` : 'Descontinuado Permanentemente'}
                         >
-                            <span className="material-symbols-outlined text-[10px]">{prod.discontinued_until ? 'hourglass_empty' : 'warning'}</span>
+                            {prod.discontinued_until ? <Hourglass size={11} className="text-2xs" aria-hidden="true" /> : <TriangleAlert size={11} className="text-2xs" aria-hidden="true" />}
                             {prod.discontinued_until ? 'Temporal' : 'Descontinuado'}
                         </span>
                     )}
@@ -1255,7 +1302,7 @@ const Products: React.FC = () => {
                     {/* Big thumbnail */}
                     <div
                         onClick={() => handleOpenLightbox(prod, 'image', 0)}
-                        className="relative aspect-[4/3] w-full bg-slate-50 dark:bg-slate-900 cursor-pointer group border-b border-slate-100 dark:border-slate-700 overflow-hidden"
+                        className="relative aspect-[4/3] w-full bg-surface-2 cursor-pointer group border-b border-slate-100 dark:border-slate-700 overflow-hidden"
                     >
                         {prod.image_url ? (
                             <img
@@ -1272,23 +1319,23 @@ const Products: React.FC = () => {
                                     } else {
                                         target.style.display = 'none';
                                         if (target.parentElement) {
-                                            target.parentElement.innerHTML = '<span class="material-symbols-outlined text-5xl text-slate-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">image</span>';
+                                            target.parentElement.innerHTML = PLACEHOLDER_IMAGE_SVG(40);
                                         }
                                     }
                                 }}
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                                <span className="material-symbols-outlined text-5xl text-slate-300">image</span>
+                                <ImageIcon size={40} className="text-fg-subtle" aria-hidden="true" />
                             </div>
                         )}
                         {prod.gallery && prod.gallery.some((item: any) => item.type === 'video') && (
                             <div className="absolute bottom-2 right-2 bg-black/60 rounded-full p-1 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-[16px] text-emerald-400">play_arrow</span>
+                                <Play size={16} className="text-success" aria-hidden="true" />
                             </div>
                         )}
                         {prod.gallery && prod.gallery.length > 0 && (
-                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            <span className="absolute bottom-2 left-2 bg-black/60 text-white text-2xs font-bold px-1.5 py-0.5 rounded-full">
                                 +{prod.gallery.length}
                             </span>
                         )}
@@ -1298,23 +1345,23 @@ const Products: React.FC = () => {
                     <div className="flex flex-col gap-2 p-3 flex-1">
                         {/* SKU row */}
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            <span className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate">{prod.sku}</span>
+                            <span className="font-mono text-xs text-fg-muted truncate">{prod.sku}</span>
                             <button
                                 type="button"
                                 onClick={(e) => handleCopySku(prod.sku, e)}
-                                className={`p-1 rounded-lg transition-colors flex items-center justify-center ${copiedSku === prod.sku ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                                className={`p-1 rounded-lg transition-colors flex items-center justify-center ${copiedSku === prod.sku ? 'text-success bg-success-soft dark:bg-success/20' : 'text-slate-400 hover:text-primary hover:bg-primary-soft dark:hover:bg-primary/20'}`}
                                 title={copiedSku === prod.sku ? "¡Copiado!" : "Copiar Código"}
                             >
-                                <span className="material-symbols-outlined text-[14px]">{copiedSku === prod.sku ? 'check' : 'content_copy'}</span>
+                                {copiedSku === prod.sku ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                             </button>
                             <a
                                 href={`https://www.lvparts.ec/catalogo?q=${encodeURIComponent(prod.sku)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1 rounded-lg transition-colors flex items-center justify-center text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                                className="p-1 rounded-lg transition-colors flex items-center justify-center text-fg-subtle hover:text-warning hover:bg-warning-soft"
                                 title="Buscar en catálogo LV Parts"
                             >
-                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                                <ExternalLink size={14} aria-hidden="true" />
                             </a>
                         </div>
 
@@ -1338,24 +1385,24 @@ const Products: React.FC = () => {
                             {(prod.group_id || prod.demand_count > 0 || prod.investigation_status === 'en_consulta' || prod.investigation_status === 'no_encontrado') && (
                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                     {prod.group_id && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 flex items-center gap-1 cursor-help" title={`Grupo: ${prod.group_id.split('-')[0]}`}>
-                                            <span className="material-symbols-outlined text-[10px]">link</span>
+                                        <span className="px-1.5 py-0.5 rounded text-2xs font-medium border border-primary/20 bg-primary-soft text-primary-soft-fg flex items-center gap-1 cursor-help" title={`Grupo: ${prod.group_id.split('-')[0]}`}>
+                                            <LinkIcon size={11} aria-hidden="true" />
                                             Equivalente
                                         </span>
                                     )}
                                     {prod.demand_count > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-400 flex items-center gap-1" title={`${prod.demand_count} registros de demanda activos`}>
-                                            <span className="material-symbols-outlined text-[10px] animate-pulse">notifications_active</span>
+                                        <span className="px-1.5 py-0.5 rounded text-2xs font-medium border border-warning/20 bg-warning-soft text-warning-soft-fg flex items-center gap-1" title={`${prod.demand_count} registros de demanda activos`}>
+                                            <BellRing size={11} aria-hidden="true" />
                                             {prod.demand_count} Demanda{prod.demand_count > 1 ? 's' : ''}
                                         </span>
                                     )}
                                     {prod.investigation_status === 'en_consulta' && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title="En consulta de sourcing">
+                                        <span className="px-1.5 py-0.5 rounded text-2xs font-medium bg-warning-soft text-warning-soft-fg" title="En consulta de sourcing">
                                             En Consulta
                                         </span>
                                     )}
                                     {prod.investigation_status === 'no_encontrado' && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" title="No se encontró repuesto">
+                                        <span className="px-1.5 py-0.5 rounded text-2xs font-medium bg-danger-soft text-danger-soft-fg" title="No se encontró repuesto">
                                             No Encontrado
                                         </span>
                                     )}
@@ -1364,7 +1411,7 @@ const Products: React.FC = () => {
                         </div>
 
                         {/* Brand */}
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                        <div className="text-xs text-fg-muted">
                             {prod.brands?.name || '—'}
                         </div>
 
@@ -1376,7 +1423,7 @@ const Products: React.FC = () => {
                                 return (
                                     <span
                                         key={tag.id}
-                                        className="px-1.5 py-0.5 text-[10px] font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
+                                        className="px-1.5 py-0.5 text-2xs font-bold rounded cursor-pointer hover:opacity-80 transition-opacity"
                                         style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
                                         onClick={() => setSelectedProductForTags(prod)}
                                         title="Clic para editar etiquetas"
@@ -1387,42 +1434,42 @@ const Products: React.FC = () => {
                             })}
                             <button
                                 onClick={() => setSelectedProductForTags(prod)}
-                                className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800"
+                                className="px-1.5 py-0.5 rounded text-2xs font-semibold text-fg-subtle border border-dashed border-strong hover:text-primary hover:border-primary transition-colors flex items-center gap-0.5 bg-surface-2"
                                 title="Asignar etiquetas"
                             >
-                                <span className="material-symbols-outlined text-[12px]">add</span>
+                                <Plus size={12} aria-hidden="true" />
                                 Etiqueta
                             </button>
                         </div>
 
                         {/* Prices */}
-                        <div className="grid grid-cols-3 gap-1 text-[11px] bg-slate-50 dark:bg-slate-900/40 rounded-lg px-2 py-1.5">
+                        <div className="grid grid-cols-3 gap-1 text-[11px] bg-surface-2 rounded-lg px-2 py-1.5">
                             <div className="flex flex-col">
-                                <span className="text-slate-400 dark:text-slate-500">Costo</span>
-                                <span className="font-semibold text-slate-700 dark:text-slate-300">${(prod.cost_without_vat || 0).toFixed(2)}</span>
+                                <span className="text-fg-subtle">Costo</span>
+                                <span className="font-semibold text-fg">${(prod.cost_without_vat || 0).toFixed(2)}</span>
                             </div>
                             <div className="flex flex-col items-center">
-                                <span className="text-slate-400 dark:text-slate-500">c/IVA</span>
-                                <span className="font-semibold text-slate-700 dark:text-slate-300">${costWithVat.toFixed(2)}</span>
+                                <span className="text-fg-subtle">c/IVA</span>
+                                <span className="font-semibold text-fg">${costWithVat.toFixed(2)}</span>
                             </div>
                             <div className="flex flex-col items-end">
-                                <span className="text-slate-500 dark:text-slate-400">PVP</span>
-                                <span className="font-bold text-emerald-600 dark:text-emerald-400">${(prod.price || 0).toFixed(2)}</span>
+                                <span className="text-fg-muted">PVP</span>
+                                <span className="font-bold text-success">${(prod.price || 0).toFixed(2)}</span>
                             </div>
                         </div>
 
                         {/* Stock */}
                         <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-slate-900 dark:text-white">
-                                {totalStock} <span className="font-normal text-slate-400">local</span>
+                            <span className="font-bold text-fg">
+                                {totalStock} <span className="font-normal text-fg-subtle">local</span>
                             </span>
                             {prod.importer_stock > 0 ? (
-                                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-900/30">
-                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                <span className="text-[11px] font-semibold text-success-soft-fg flex items-center gap-1 bg-success-soft px-2 py-0.5 rounded-full border border-success/20">
+                                    <span className="w-1.5 h-1.5 bg-success rounded-full"></span>
                                     {prod.importer_stock} imp.
                                 </span>
                             ) : (
-                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-full">
+                                <span className="text-[11px] font-medium text-fg-subtle bg-surface-3 px-2 py-0.5 rounded-full">
                                     Agotado imp.
                                 </span>
                             )}
@@ -1432,55 +1479,55 @@ const Products: React.FC = () => {
                         <div className="flex items-center flex-wrap gap-0.5 mt-auto pt-2 border-t border-slate-100 dark:border-slate-700">
                             <button
                                 onClick={() => handleOpenGroupModal(prod.group_id, prod)}
-                                className={`p-1.5 rounded-lg transition-colors relative ${prod.group_id ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}
+                                className={`p-1.5 rounded-lg transition-colors relative ${prod.group_id ? 'text-primary bg-primary-soft dark:bg-primary/20' : 'text-slate-400 hover:text-primary hover:bg-primary-soft dark:hover:bg-primary/20'}`}
                                 title="Ver Repuestos Relacionados"
                             >
-                                <span className="material-symbols-outlined text-[16px]">link</span>
+                                <LinkIcon size={16} aria-hidden="true" />
                                 {prod.group_id && groupCounts[prod.group_id] > 1 && (
-                                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
+                                    <span className="absolute -top-1 -right-1 bg-danger text-white text-[12px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
                                         {groupCounts[prod.group_id] - 1}
                                     </span>
                                 )}
                             </button>
                             <button
                                 onClick={() => { setSourcingProduct(prod); setIsSourcingModalOpen(true); }}
-                                className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'}`}
+                                className={`p-1.5 rounded-lg transition-colors ${prod.investigation_status && prod.investigation_status !== 'pending' ? 'text-primary bg-primary-soft dark:bg-primary/20' : 'text-slate-400 hover:text-primary hover:bg-primary-soft dark:hover:bg-primary/20'}`}
                                 title="Estudio de Repuesto (Sourcing)"
                             >
-                                <span className="material-symbols-outlined text-[16px]">travel_explore</span>
+                                <Telescope size={16} aria-hidden="true" />
                             </button>
                             <button
                                 onClick={() => handleOpenModal(prod)}
-                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-fg-subtle hover:text-primary hover:bg-primary-soft rounded-lg transition-colors"
                                 title="Editar Producto"
                             >
-                                <span className="material-symbols-outlined text-[16px]">edit</span>
+                                <Pencil size={16} aria-hidden="true" />
                             </button>
                             <button
                                 onClick={() => handleDuplicateProduct(prod)}
-                                className="p-1.5 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-fg-subtle hover:text-primary hover:bg-primary-soft rounded-lg transition-colors"
                                 title="Duplicar Producto"
                             >
-                                <span className="material-symbols-outlined text-[16px]">copy_all</span>
+                                <Copy size={16} aria-hidden="true" />
                             </button>
                             <button
                                 onClick={() => { setDemandProduct(prod); setIsDemandModalOpen(true); }}
-                                className={`p-1.5 rounded-lg transition-colors relative ${prod.demand_count > 0 ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 font-semibold' : 'text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
+                                className={`p-1.5 rounded-lg transition-colors relative ${prod.demand_count > 0 ? 'text-warning bg-warning-soft font-semibold' : 'text-slate-400 hover:text-warning hover:bg-warning-soft dark:hover:bg-warning/20'}`}
                                 title="Registrar / Ver Demanda (Lista de Espera)"
                             >
-                                <span className="material-symbols-outlined text-[16px]">notifications_active</span>
+                                <BellRing size={16} aria-hidden="true" />
                                 {prod.demand_count > 0 && (
-                                    <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse">
+                                    <span className="absolute -top-1 -right-1 bg-warning text-white text-[12px] font-bold px-1 rounded-full min-w-[15px] h-[15px] flex items-center justify-center border border-white dark:border-slate-900 shadow-sm">
                                         {prod.demand_count}
                                     </span>
                                 )}
                             </button>
                             <button
                                 onClick={() => { setLabelProduct(prod); setIsLabelModalOpen(true); }}
-                                className="p-1.5 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-fg-subtle hover:text-success hover:bg-success-soft rounded-lg transition-colors"
                                 title="Generar Etiqueta (Código de Barras)"
                             >
-                                <span className="material-symbols-outlined text-[16px]">barcode_scanner</span>
+                                <ScanBarcode size={16} aria-hidden="true" />
                             </button>
                             <button
                                 onClick={async () => {
@@ -1489,24 +1536,24 @@ const Products: React.FC = () => {
                                     setQueueToast(`✓ 1 etiqueta de ${prod.sku} agregada a la cola`);
                                     setTimeout(() => setQueueToast(null), 2000);
                                 }}
-                                className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-fg-subtle hover:text-warning hover:bg-warning-soft rounded-lg transition-colors"
                                 title="Agregar 1 etiqueta a la cola de impresión"
                             >
-                                <span className="material-symbols-outlined text-[16px]">playlist_add</span>
+                                <ListPlus size={16} aria-hidden="true" />
                             </button>
                             <button
                                 onClick={() => useProformaStore.getState().addItem({ id: prod.id, sku: prod.sku, name: prod.name, price: prod.price }, 1)}
-                                className="p-1.5 text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-fg-subtle hover:text-success hover:bg-success-soft rounded-lg transition-colors"
                                 title="Agregar a Proforma"
                             >
-                                <span className="material-symbols-outlined text-[16px]">request_quote</span>
+                                <FileText size={16} aria-hidden="true" />
                             </button>
                             <button
                                 onClick={() => handleDeleteProduct(prod)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
                                 title="Eliminar Producto"
                             >
-                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                                <Trash2 size={16} aria-hidden="true" />
                             </button>
                         </div>
                     </div>
@@ -1524,48 +1571,48 @@ const Products: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold dark:text-white tracking-tight">Catálogo de Productos</h1>
-                    <p className="text-slate-500 mt-1">Gestiona la información maestra de tus productos (SKU, Nombres, Categorías).</p>
+                    <p className="text-fg-muted mt-1">Gestiona la información maestra de tus productos (SKU, Nombres, Categorías).</p>
                 </div>
                 <div className="flex gap-3">
                     <button
                         onClick={handleRefresh}
-                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-surface border border-subtle rounded-lg text-fg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm"
                     >
-                        <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+                        <RefreshCw size={18} className="${loading ? 'animate-spin' : ''}" aria-hidden="true" />
                         Actualizar
                     </button>
                     <button
                         onClick={() => setIsImportWizardOpen(true)}
-                        className="px-4 py-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors shadow-sm"
+                        className="px-4 py-2 bg-success-soft text-success-soft-fg border border-success/20 rounded-lg flex items-center gap-2 hover:bg-success-soft transition-colors shadow-sm"
                         title="Master Data Override"
                     >
-                        <span className="material-symbols-outlined text-[20px]">magic_button</span>
+                        <Sparkles size={20} aria-hidden="true" />
                         Importar Catálogo
                     </button>
                     <button
                         onClick={() => setIsBulkMediaOpen(true)}
-                        className="px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors shadow-sm"
+                        className="px-4 py-2 bg-primary-soft text-primary-soft-fg border border-primary/20 rounded-lg flex items-center gap-2 hover:bg-primary-soft transition-colors shadow-sm"
                         title="Subir fotos y videos masivamente"
                     >
-                        <span className="material-symbols-outlined text-[20px]">drive_folder_upload</span>
+                        <FolderUp size={20} aria-hidden="true" />
                         Subir Multimedia
                     </button>
                     <button
                         onClick={handleExportZip}
                         disabled={isExporting}
-                        className="px-4 py-2 bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-400 border border-violet-200 dark:border-violet-800 rounded-lg flex items-center gap-2 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-primary-soft text-primary border border-primary/20 rounded-lg flex items-center gap-2 hover:bg-primary-soft transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                         title="Descargar todas las imágenes enlazadas como ZIP"
                     >
                         {isExporting ? (
                             <>
-                                <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                                 {exportProgress.total > 0
                                     ? `${exportProgress.current}/${exportProgress.total}...`
                                     : 'Preparando...'}
                             </>
                         ) : (
                             <>
-                                <span className="material-symbols-outlined text-[20px]">folder_zip</span>
+                                <FolderArchive size={20} aria-hidden="true" />
                                 Exportar ZIP
                             </>
                         )}
@@ -1574,7 +1621,7 @@ const Products: React.FC = () => {
                         onClick={() => handleOpenModal()}
                         className="px-4 py-2 bg-primary text-white rounded-lg flex items-center gap-2 shadow-sm shadow-primary/30 hover:bg-primary/90 transition-colors"
                     >
-                        <span className="material-symbols-outlined">add</span>
+                        <Plus size={18} aria-hidden="true" />
                         Nuevo Producto
                     </button>
                 </div>
@@ -1583,13 +1630,13 @@ const Products: React.FC = () => {
             {/* ═══════ GLOBAL SEARCH & FILTERS ═══════ */}
             <div className="flex flex-col gap-4">
                 {/* 1. Filtros Rápidos (Arriba) */}
-                <div className="flex flex-col sm:flex-row gap-2 w-full justify-end items-center bg-slate-50 dark:bg-slate-900/50 p-2 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-                    <span className="text-sm font-bold text-slate-500 uppercase tracking-wider px-2 hidden lg:block mr-auto">Filtros Rápidos</span>
+                <div className="flex flex-col sm:flex-row gap-2 w-full justify-end items-center bg-surface-2 p-2 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                    <span className="text-sm font-bold text-fg-muted px-2 hidden lg:block mr-auto">Filtros Rápidos</span>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         <select
                             value={filters.imageStatus || ''}
                             onChange={(e) => handleFilterChange('imageStatus', e.target.value)}
-                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                            className="px-4 py-3 bg-surface border border-subtle rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-fg lg:min-w-[180px]"
                         >
                             <option value="">📸 Todas las Imágenes</option>
                             <option value="con_imagen">✅ Mostrar Con Imagen</option>
@@ -1598,7 +1645,7 @@ const Products: React.FC = () => {
                         <select
                             value={filters.videoStatus || ''}
                             onChange={(e) => handleFilterChange('videoStatus', e.target.value)}
-                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                            className="px-4 py-3 bg-surface border border-subtle rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-fg lg:min-w-[180px]"
                         >
                             <option value="">🎬 Todos los Videos</option>
                             <option value="con_video">✅ Mostrar Con Video</option>
@@ -1607,7 +1654,7 @@ const Products: React.FC = () => {
                         <select
                             value={filters.stockStatus || ''}
                             onChange={(e) => handleFilterChange('stockStatus', e.target.value)}
-                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[200px]"
+                            className="px-4 py-3 bg-surface border border-subtle rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-fg lg:min-w-[200px]"
                         >
                             <option value="">📦 Todos los Repuestos</option>
                             <option value="disponibles_importadora">🟢 En Importadora</option>
@@ -1620,7 +1667,7 @@ const Products: React.FC = () => {
                         <select
                             value={filters.discontinuedStatus || ''}
                             onChange={(e) => handleFilterChange('discontinuedStatus', e.target.value)}
-                            className="px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-slate-700 dark:text-slate-300 lg:min-w-[180px]"
+                            className="px-4 py-3 bg-surface border border-subtle rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-fg lg:min-w-[180px]"
                         >
                             <option value="">⚙️ Todos (General)</option>
                             <option value="activos">✅ Solo Activos</option>
@@ -1629,14 +1676,14 @@ const Products: React.FC = () => {
                     </div>
 
                     {/* View mode toggle: gallery (big thumbnails) vs. dense table */}
-                    <div className="flex bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shrink-0">
+                    <div className="flex bg-surface border border-subtle rounded-xl p-1 shrink-0">
                         <button
                             type="button"
                             onClick={() => setViewMode('gallery')}
                             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'gallery' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
                             title="Vista de galería (miniaturas grandes)"
                         >
-                            <span className="material-symbols-outlined text-[18px]">grid_view</span>
+                            <LayoutGrid size={18} aria-hidden="true" />
                             <span className="hidden sm:inline">Galería</span>
                         </button>
                         <button
@@ -1645,7 +1692,7 @@ const Products: React.FC = () => {
                             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === 'table' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
                             title="Vista de tabla (detallada)"
                         >
-                            <span className="material-symbols-outlined text-[18px]">table_rows</span>
+                            <Rows3 size={18} aria-hidden="true" />
                             <span className="hidden sm:inline">Tabla</span>
                         </button>
                     </div>
@@ -1655,20 +1702,20 @@ const Products: React.FC = () => {
                 <div className="flex-1 flex flex-col gap-2">
                     <div className="flex gap-2 items-center">
                         <div className="relative flex-1">
-                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" aria-hidden="true" />
                             <input
                                 type="text"
                                 placeholder="Buscar por nombre o SKU..."
                                 value={searchTerms[0] || ''}
                                 onChange={(e) => updateSearchTerm(0, e.target.value)}
-                                className="w-full pl-10 pr-10 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
+                                className="w-full pl-10 pr-10 py-3 bg-surface border border-subtle rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm"
                             />
                             {(searchTerms[0] || '') && (
                                 <button
                                     onClick={() => updateSearchTerm(0, '')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-650 transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-fg-subtle hover:text-fg-muted transition-colors"
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                    <X size={18} aria-hidden="true" />
                                 </button>
                             )}
                         </div>
@@ -1682,8 +1729,8 @@ const Products: React.FC = () => {
                     </div>
 
                     {searchTerms.length > 1 && (
-                        <div className="flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-                            <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                        <div className="flex flex-col gap-2 p-3 bg-surface-2 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                            <div className="flex items-center justify-between text-xs font-bold text-fg-subtle uppercase tracking-wider px-1">
                                 <span>Palabras Clave Adicionales</span>
                                 <div className="flex gap-2">
                                     <button 
@@ -1695,7 +1742,7 @@ const Products: React.FC = () => {
                                     <span>•</span>
                                     <button 
                                         onClick={clearAllAdditionalFilters} 
-                                        className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:underline transition-all text-xs font-bold"
+                                        className="text-fg-muted hover:text-slate-700 dark:hover:text-slate-300 hover:underline transition-all text-xs font-bold"
                                     >
                                         Borrar filtros
                                     </button>
@@ -1727,41 +1774,37 @@ const Products: React.FC = () => {
                                             {isCollapsed ? (
                                                 <div 
                                                     onClick={() => toggleExpandFilter(actualIdx)}
-                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold text-xs border shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all ${isExclude ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/50' : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold text-xs border shadow-sm cursor-pointer hover:scale-105 active:scale-95 transition-all ${isExclude ? 'bg-danger-soft hover:bg-danger-soft text-danger border-danger/20 dark:border-danger/50' : 'bg-white dark:bg-slate-800 hover:bg-surface-hover text-fg border-subtle dark:border-slate-700'}`}
                                                 >
-                                                    <span className={`material-symbols-outlined text-[14px] ${isExclude ? 'text-red-500' : 'text-primary'}`}>
-                                                        {isExclude ? 'block' : 'search'}
-                                                    </span>
+                                                    {isExclude ? <Ban size={14} className={`${isExclude ? 'text-danger' : 'text-primary'}`} aria-hidden="true" /> : <Search size={14} className={`${isExclude ? 'text-danger' : 'text-primary'}`} aria-hidden="true" />}
                                                     <span className="truncate max-w-[120px]">{cleanTerm || `Filtro ${actualIdx}`}</span>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             removeSearchFilter(actualIdx);
                                                         }}
-                                                        className={`ml-1 p-0.5 rounded-full transition-colors ${isExclude ? 'hover:bg-red-200 dark:hover:bg-red-800 text-red-400 hover:text-red-700' : 'hover:bg-slate-250 dark:hover:bg-slate-700 text-gray-400 hover:text-red-550'}`}
+                                                        className={`ml-1 p-0.5 rounded-full transition-colors ${isExclude ? 'hover:bg-danger text-danger hover:text-danger' : 'hover:bg-surface-3 dark:hover:bg-slate-700 text-fg-subtle hover:text-danger'}`}
                                                         title="Eliminar filtro"
                                                     >
-                                                        <span className="material-symbols-outlined text-[14px]">close</span>
+                                                        <X size={14} aria-hidden="true" />
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className={`flex gap-2 items-center min-w-[280px] sm:min-w-[320px] p-1 rounded-xl border shadow-sm ${isExclude ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/50' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                                                <div className={`flex gap-2 items-center min-w-[280px] sm:min-w-[320px] p-1 rounded-xl border shadow-sm ${isExclude ? 'bg-danger-soft border-danger/20 dark:border-danger/50' : 'bg-white dark:bg-slate-800 border-subtle dark:border-slate-700'}`}>
                                                     <div className="relative flex-1">
-                                                        <span className={`material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] ${isExclude ? 'text-red-400' : 'text-slate-400'}`}>
-                                                            {isExclude ? 'block' : 'search'}
-                                                        </span>
+                                                        {isExclude ? <Ban size={18} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${isExclude ? 'text-danger' : 'text-slate-400'}`} aria-hidden="true" /> : <Search size={18} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${isExclude ? 'text-danger' : 'text-slate-400'}`} aria-hidden="true" />}
                                                         <input
                                                             type="text"
                                                             placeholder={isExclude ? `Palabra a excluir ${actualIdx}...` : `Palabra clave ${actualIdx}...`}
                                                             value={term}
                                                             onChange={(e) => updateSearchTerm(actualIdx, e.target.value)}
-                                                            className={`w-full pl-8 pr-20 py-2 bg-transparent text-sm outline-none ${isExclude ? 'text-red-700 dark:text-red-300 placeholder-red-300 dark:placeholder-red-700/50' : 'text-slate-700 dark:text-slate-200'}`}
+                                                            className={`w-full pl-8 pr-20 py-2 bg-transparent text-sm outline-none ${isExclude ? 'text-danger placeholder-red-300 dark:placeholder-red-700/50' : 'text-slate-700 dark:text-slate-200'}`}
                                                             autoFocus
                                                         />
                                                         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                                             <button
                                                                 onClick={toggleExclude}
-                                                                className={`px-1.5 py-0.5 rounded-md transition-colors text-[10px] font-bold uppercase tracking-wider ${isExclude ? 'bg-red-100 dark:bg-red-800/50 text-red-700 dark:text-red-300 hover:bg-red-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-200'}`}
+                                                                className={`px-1.5 py-0.5 rounded-lg transition-colors text-2xs font-bold uppercase tracking-wider ${isExclude ? 'bg-danger-soft text-danger hover:bg-danger' : 'bg-slate-100 dark:bg-slate-700 text-fg-muted hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-200'}`}
                                                                 title={isExclude ? "Cambiar a incluir" : "Cambiar a excluir"}
                                                             >
                                                                 {isExclude ? 'Excluir' : 'Incluir'}
@@ -1769,26 +1812,26 @@ const Products: React.FC = () => {
                                                             {term && (
                                                                 <button
                                                                     onClick={() => updateSearchTerm(actualIdx, '')}
-                                                                    className={`p-0.5 transition-colors ${isExclude ? 'text-red-400 hover:text-red-600' : 'text-slate-400 hover:text-slate-650'}`}
+                                                                    className={`p-0.5 transition-colors ${isExclude ? 'text-danger hover:text-danger' : 'text-slate-400 hover:text-fg-muted'}`}
                                                                 >
-                                                                    <span className="material-symbols-outlined text-[16px]">close</span>
+                                                                    <X size={16} aria-hidden="true" />
                                                                 </button>
                                                             )}
                                                         </div>
                                                     </div>
                                                     <button
                                                         onClick={() => toggleExpandFilter(actualIdx)}
-                                                        className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${isExclude ? 'hover:bg-red-100 dark:hover:bg-red-800/50 text-red-600 dark:text-red-400' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-750'}`}
+                                                        className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 ${isExclude ? 'hover:bg-danger-soft text-danger dark:text-danger' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-fg-muted hover:text-fg'}`}
                                                         title="Contraer"
                                                     >
                                                         Contraer
                                                     </button>
                                                     <button
                                                         onClick={() => removeSearchFilter(actualIdx)}
-                                                        className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 rounded-lg border border-transparent hover:border-red-200 dark:hover:border-red-900/40 flex items-center justify-center transition-colors shrink-0"
+                                                        className="p-1.5 hover:bg-danger-soft text-danger rounded-lg border border-transparent hover:border-danger/20 flex items-center justify-center transition-colors shrink-0"
                                                         title="Eliminar"
                                                     >
-                                                        <span className="material-symbols-outlined text-[16px]">close</span>
+                                                        <X size={16} aria-hidden="true" />
                                                     </button>
                                                 </div>
                                             )}
@@ -1804,33 +1847,33 @@ const Products: React.FC = () => {
             {/* ═══════ TABLE ═══════ */}
             <div 
                 style={{ borderRadius: '6px' }}
-                className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-opacity ${loading ? 'opacity-60' : 'opacity-100'}`}
+                className={`bg-surface border border-subtle shadow-sm overflow-hidden transition-opacity ${loading ? 'opacity-60' : 'opacity-100'}`}
             >
                 {viewMode === 'table' ? (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
-                            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
+                            <thead className="bg-surface-2 text-fg-muted font-medium text-xs uppercase tracking-wider">
                                 <tr>
-                                    <th className="px-3 py-3 w-10">
+                                    <th className="px-4 py-2.5 w-10">
                                         <input
                                             type="checkbox"
                                             checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
                                             onChange={toggleSelectAll}
-                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                            className="w-4 h-4 rounded border-strong text-primary focus:ring-primary cursor-pointer"
                                         />
                                     </th>
                                     {columns.map(col => (
                                         <th
                                             key={col.key}
-                                            className="px-6 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                            className="px-6 py-3 cursor-pointer hover:bg-surface-hover transition-colors"
                                             onClick={() => handleSort(col.key)}
                                         >
                                             <div className="flex flex-col gap-2">
                                                 <div className="flex items-center gap-1">
                                                     {col.label}
                                                     <div className="flex flex-col">
-                                                        <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_up</span>
-                                                        <span className={`material-symbols-outlined text-[10px] leading-none ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}`}>arrow_drop_down</span>
+                                                        <ChevronUp size={11} className="leading-none ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? 'text-primary' : 'text-slate-300'}" aria-hidden="true" />
+                                                        <ChevronDown size={11} className="leading-none ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? 'text-primary' : 'text-slate-300'}" aria-hidden="true" />
                                                     </div>
                                                 </div>
                                                 {col.key !== 'brand' && col.key !== 'price' && (
@@ -1840,23 +1883,23 @@ const Products: React.FC = () => {
                                                         value={filters[col.key] || ''}
                                                         onClick={(e) => e.stopPropagation()}
                                                         onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                                                        className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:outline-none focus:border-primary"
+                                                        className="w-full min-w-[80px] px-2 py-1 text-xs font-normal border border-subtle rounded bg-surface focus:outline-none focus:border-primary"
                                                     />
                                                 )}
                                             </div>
                                         </th>
                                     ))}
-                                    <th className="px-6 py-3 text-center">Stock (Local / Imp.)</th>
-                                    <th className="px-6 py-3 text-center">Acciones</th>
+                                    <th className="px-4 py-2.5 text-center">Stock (Local / Imp.)</th>
+                                    <th className="px-4 py-2.5 text-center">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                            <tbody className="divide-y divide-subtle">
                                 {renderedRows}
                                 {products.length === 0 && !loading && (
                                     <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-fg-muted">
                                             <div className="flex flex-col items-center gap-2">
-                                                <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
+                                                <SearchX size={36} className="text-fg-subtle" aria-hidden="true" />
                                                 <span>No se encontraron productos que coincidan con tu búsqueda.</span>
                                             </div>
                                         </td>
@@ -1864,9 +1907,9 @@ const Products: React.FC = () => {
                                 )}
                                 {products.length === 0 && loading && (
                                     <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-fg-muted">
                                             <div className="flex flex-col items-center gap-2">
-                                                <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
+                                                <Loader2 size={36} className="animate-spin text-primary" aria-hidden="true" />
                                                 <span>Cargando catálogo...</span>
                                             </div>
                                         </td>
@@ -1878,13 +1921,13 @@ const Products: React.FC = () => {
                 ) : (
                     <div className="p-4">
                         {/* Gallery-only toolbar: keeps sorting/column-filtering/select-all available without a table header */}
-                        <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
-                            <label className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer">
+                        <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-subtle">
+                            <label className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-fg-muted cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
                                     onChange={toggleSelectAll}
-                                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                                    className="w-4 h-4 rounded border-strong text-primary focus:ring-primary cursor-pointer"
                                 />
                                 Seleccionar todo
                             </label>
@@ -1892,7 +1935,7 @@ const Products: React.FC = () => {
                             <select
                                 value={sortConfig.key}
                                 onChange={(e) => handleSort(e.target.value)}
-                                className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 focus:outline-none focus:border-primary"
+                                className="px-3 py-1.5 text-xs font-medium bg-surface border border-subtle rounded-lg text-fg-muted focus:outline-none focus:border-primary"
                             >
                                 {columns.map(col => (
                                     <option key={col.key} value={col.key}>Ordenar por: {col.label}</option>
@@ -1901,10 +1944,10 @@ const Products: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setSortConfig(prev => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }))}
-                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                className="p-1.5 rounded-lg border border-subtle text-fg-muted hover:bg-surface-hover transition-colors"
                                 title={sortConfig.direction === 'asc' ? 'Ascendente' : 'Descendente'}
                             >
-                                <span className="material-symbols-outlined text-[18px]">{sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}</span>
+                                {sortConfig.direction === 'asc' ? <ArrowUp size={18} aria-hidden="true" /> : <ArrowDown size={18} aria-hidden="true" />}
                             </button>
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden sm:block" />
                             {columns.filter(col => col.key !== 'brand' && col.key !== 'price').map(col => (
@@ -1914,7 +1957,7 @@ const Products: React.FC = () => {
                                     placeholder={`Filtrar ${col.label}...`}
                                     value={filters[col.key] || ''}
                                     onChange={(e) => handleFilterChange(col.key, e.target.value)}
-                                    className="px-3 py-1.5 text-xs w-36 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:border-primary text-slate-700 dark:text-slate-200"
+                                    className="px-3 py-1.5 text-xs w-36 border border-subtle rounded-lg bg-surface focus:outline-none focus:border-primary text-fg"
                                 />
                             ))}
                         </div>
@@ -1930,13 +1973,13 @@ const Products: React.FC = () => {
                                 {renderedCards}
                             </div>
                         ) : !loading ? (
-                            <div className="flex flex-col items-center gap-2 py-12 text-slate-500">
-                                <span className="material-symbols-outlined text-[36px] text-slate-300">search_off</span>
+                            <div className="flex flex-col items-center gap-2 py-12 text-fg-muted">
+                                <SearchX size={36} className="text-fg-subtle" aria-hidden="true" />
                                 <span>No se encontraron productos que coincidan con tu búsqueda.</span>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center gap-2 py-12 text-slate-500">
-                                <span className="material-symbols-outlined animate-spin text-[36px] text-primary">progress_activity</span>
+                            <div className="flex flex-col items-center gap-2 py-12 text-fg-muted">
+                                <Loader2 size={36} className="animate-spin text-primary" aria-hidden="true" />
                                 <span>Cargando catálogo...</span>
                             </div>
                         )}
@@ -1945,9 +1988,9 @@ const Products: React.FC = () => {
 
                 {/* ═══════ PAGINATION FOOTER ═══════ */}
                 {pagination.totalRecords > 0 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-                        <div className="text-sm text-slate-500">
-                            Mostrando <span className="font-semibold text-slate-700 dark:text-slate-300">{showingFrom}–{showingTo}</span> de <span className="font-semibold text-slate-700 dark:text-slate-300">{pagination.totalRecords.toLocaleString()}</span> productos
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-subtle bg-slate-50/50 dark:bg-slate-900/30">
+                        <div className="text-sm text-fg-muted">
+                            Mostrando <span className="font-semibold text-fg">{showingFrom}–{showingTo}</span> de <span className="font-semibold text-fg">{pagination.totalRecords.toLocaleString()}</span> productos
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -1955,7 +1998,7 @@ const Products: React.FC = () => {
                             <select
                                 value={pagination.pageSize}
                                 onChange={(e) => setPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value), page: 1 }))}
-                                className="px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-primary"
+                                className="px-2 py-1.5 text-sm border border-subtle rounded-lg bg-surface text-fg focus:outline-none focus:ring-1 focus:ring-primary"
                             >
                                 <option value={20}>20 / pág</option>
                                 <option value={50}>50 / pág</option>
@@ -1966,14 +2009,14 @@ const Products: React.FC = () => {
                             <button
                                 disabled={pagination.page === 1}
                                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="flex items-center gap-1 px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                                <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                                <ChevronLeft size={16} aria-hidden="true" />
                                 Anterior
                             </button>
 
                             {/* Page indicator */}
-                            <span className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg">
+                            <span className="px-3 py-1.5 text-sm font-medium text-fg bg-surface border border-subtle rounded-lg">
                                 {pagination.page} / {totalPages || 1}
                             </span>
 
@@ -1981,10 +2024,10 @@ const Products: React.FC = () => {
                             <button
                                 disabled={pagination.page >= totalPages || totalPages === 0}
                                 onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="flex items-center gap-1 px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 Siguiente
-                                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                                <ChevronRight size={16} aria-hidden="true" />
                             </button>
                         </div>
                     </div>
@@ -2068,24 +2111,24 @@ const Products: React.FC = () => {
 
             {/* ═══════ FLOATING ACTION BAR ═══════ */}
             {selectedIds.size > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 dark:bg-slate-700 text-white rounded-2xl shadow-2xl shadow-slate-900/50 px-6 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 dark:bg-slate-700 text-white rounded-2xl shadow-xl shadow-slate-900/50 px-6 py-3 flex items-center gap-4 animate-in slide-in-from-bottom-4">
                     <div className="flex items-center gap-2 text-sm">
                         <span className="bg-primary text-white font-bold px-2.5 py-0.5 rounded-full text-xs">{selectedIds.size}</span>
-                        <span className="text-slate-300">seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                        <span className="text-fg-subtle">seleccionado{selectedIds.size !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="w-px h-6 bg-slate-600"></div>
                     <button
                         onClick={() => setIsInventoryGroupSelectOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition-colors"
                     >
-                        <span className="material-symbols-outlined text-[18px]">inventory</span>
+                        <Boxes size={18} aria-hidden="true" />
                         Grupo Inventario
                     </button>
                     <button
                         onClick={() => setIsBulkEditOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-white rounded-xl text-sm font-semibold transition-colors"
                     >
-                        <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                        <FilePen size={18} aria-hidden="true" />
                         Edición Rápida
                     </button>
                     <button
@@ -2099,9 +2142,9 @@ const Products: React.FC = () => {
                             setTimeout(() => setQueueToast(null), 2200);
                             setSelectedIds(new Set());
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-sm font-semibold transition-colors"
                     >
-                        <span className="material-symbols-outlined text-[18px]">playlist_add</span>
+                        <ListPlus size={18} aria-hidden="true" />
                         Cola Impresión
                     </button>
                     <button
@@ -2112,24 +2155,24 @@ const Products: React.FC = () => {
                             });
                             setSelectedIds(new Set());
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-xl text-sm font-semibold transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-xl text-sm font-semibold transition-colors"
                     >
-                        <span className="material-symbols-outlined text-[18px]">request_quote</span>
+                        <FileText size={18} aria-hidden="true" />
                         Agregar a Proforma
                     </button>
                     <button
                         onClick={handleBulkDelete}
-                        className="flex items-center gap-2 px-4 py-2 bg-rose-500 hover:bg-rose-400 text-white rounded-xl text-sm font-semibold transition-colors ml-2"
+                        className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-xl text-sm font-semibold transition-colors ml-2"
                     >
-                        <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                        <Trash size={18} aria-hidden="true" />
                         Eliminar Lote
                     </button>
                     <button
                         onClick={() => setSelectedIds(new Set())}
-                        className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600"
+                        className="p-1.5 text-fg-subtle hover:text-white transition-colors rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600"
                         title="Deseleccionar todo"
                     >
-                        <span className="material-symbols-outlined text-[18px]">close</span>
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
             )}
@@ -2154,8 +2197,8 @@ const Products: React.FC = () => {
 
             {/* ═══════ QUEUE TOAST ═══════ */}
             {queueToast && (
-                <div className="fixed top-6 right-6 z-50 bg-amber-500 text-white py-3 px-5 rounded-xl shadow-2xl flex items-center gap-2 font-semibold text-sm animate-in slide-in-from-top-2">
-                    <span className="material-symbols-outlined text-lg">playlist_add_check</span>
+                <div className="fixed top-6 right-6 z-50 bg-warning text-white py-3 px-5 rounded-xl shadow-xl flex items-center gap-2 font-semibold text-sm animate-in slide-in-from-top-2">
+                    <ListChecks size={18} aria-hidden="true" />
                     {queueToast}
                 </div>
             )}
@@ -2172,11 +2215,11 @@ const Products: React.FC = () => {
                         {!isQueuePanelOpen && (
                             <button
                                 onClick={() => { loadQueue(); setIsQueuePanelOpen(true); }}
-                                className="fixed bottom-6 right-6 z-40 bg-amber-500 hover:bg-amber-600 text-white w-14 h-14 rounded-full shadow-2xl shadow-amber-500/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                                className="fixed bottom-6 right-6 z-40 bg-warning hover:bg-warning text-white w-14 h-14 rounded-full shadow-xl shadow-warning/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
                                 title="Ver cola de impresión"
                             >
-                                <span className="material-symbols-outlined text-2xl">print</span>
-                                <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] flex items-center justify-center bg-white text-amber-600 text-[11px] font-black rounded-full shadow-md border-2 border-amber-500">
+                                <Printer size={24} aria-hidden="true" />
+                                <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] flex items-center justify-center bg-white text-warning text-[11px] font-bold rounded-full shadow-md border-2 border-warning">
                                     {q.length}
                                 </span>
                             </button>
@@ -2184,62 +2227,62 @@ const Products: React.FC = () => {
 
                         {/* Expanded Queue Panel */}
                         {isQueuePanelOpen && (
-                            <div className="fixed bottom-6 right-6 z-40 w-[380px] max-h-[70vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+                            <div className="fixed bottom-6 right-6 z-40 w-[380px] max-h-[70vh] bg-surface rounded-2xl shadow-xl border border-subtle flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
                                 {/* Panel Header */}
-                                <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/10">
+                                <div className="flex items-center justify-between p-4 border-b border-subtle bg-warning-soft">
                                     <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400">print</span>
-                                        <h3 className="font-bold text-slate-900 dark:text-white text-sm">Cola de Impresión</h3>
-                                        <span className="text-xs font-bold bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full">
+                                        <Printer size={18} className="text-warning" aria-hidden="true" />
+                                        <h3 className="font-bold text-fg text-sm">Cola de Impresión</h3>
+                                        <span className="text-xs font-bold bg-warning text-warning px-2 py-0.5 rounded-full">
                                             {totalLabels} etiq · {totalPages} hoja{totalPages !== 1 ? 's' : ''}
                                         </span>
                                     </div>
-                                    <button onClick={() => setIsQueuePanelOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-                                        <span className="material-symbols-outlined text-lg">close</span>
+                                    <button onClick={() => setIsQueuePanelOpen(false)} className="p-1 text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-surface-hover">
+                                        <X size={18} aria-hidden="true" />
                                     </button>
                                 </div>
 
                                 {/* Queue Items */}
                                 <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 max-h-[45vh]">
                                     {printQueue.map((item) => (
-                                        <div key={item.sku} className="flex items-center gap-2.5 p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-750">
+                                        <div key={item.sku} className="flex items-center gap-2.5 p-2.5 bg-surface-2 rounded-xl border border-slate-200/60 dark:border-subtle">
                                             <div className="flex-1 min-w-0">
-                                                <span className="text-[11px] font-mono font-extrabold text-blue-700 dark:text-blue-300">{item.sku}</span>
-                                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate" title={item.name}>{item.name}</p>
+                                                <span className="text-[11px] font-mono font-bold text-primary">{item.sku}</span>
+                                                <p className="text-xs font-semibold text-fg truncate" title={item.name}>{item.name}</p>
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
-                                                <button onClick={async () => { const updated = await updateQueueItemQty(item.id, item.quantity - 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">−</button>
+                                                <button onClick={async () => { const updated = await updateQueueItemQty(item.id, item.quantity - 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-fg-muted flex items-center justify-center text-xs font-bold hover:bg-slate-300">−</button>
                                                 <input
                                                     type="number"
                                                     min="1"
                                                     value={item.quantity}
                                                     onChange={async (e) => { const updated = await updateQueueItemQty(item.id, parseInt(e.target.value) || 1); setPrintQueue(updated); }}
-                                                    className="w-10 h-6 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-slate-800 dark:text-white p-0 focus:ring-0"
+                                                    className="w-10 h-6 text-center bg-surface border border-subtle rounded text-xs font-bold text-fg p-0 focus:ring-0"
                                                 />
-                                                <button onClick={async () => { const updated = await updateQueueItemQty(item.id, item.quantity + 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold hover:bg-slate-300">+</button>
+                                                <button onClick={async () => { const updated = await updateQueueItemQty(item.id, item.quantity + 1); setPrintQueue(updated); }} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-fg-muted flex items-center justify-center text-xs font-bold hover:bg-slate-300">+</button>
                                             </div>
-                                            <button onClick={async () => { const updated = await removeFromQueue(item.id); setPrintQueue(updated); }} className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" title="Eliminar">
-                                                <span className="material-symbols-outlined text-[16px]">close</span>
+                                            <button onClick={async () => { const updated = await removeFromQueue(item.id); setPrintQueue(updated); }} className="p-1 text-danger hover:text-danger hover:bg-danger-soft rounded-lg transition-colors" title="Eliminar">
+                                                <X size={16} aria-hidden="true" />
                                             </button>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* Panel Footer */}
-                                <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+                                <div className="p-3 border-t border-subtle flex gap-2">
                                     {!showQueueClearConfirm ? (
                                         <button
                                             onClick={() => setShowQueueClearConfirm(true)}
-                                            className="px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors flex items-center gap-1"
+                                            className="px-3 py-2 text-xs font-semibold text-danger hover:bg-danger-soft rounded-lg transition-colors flex items-center gap-1"
                                         >
-                                            <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
+                                            <Trash size={16} aria-hidden="true" />
                                             Vaciar
                                         </button>
                                     ) : (
                                         <div className="flex items-center gap-1.5">
-                                            <span className="text-[11px] text-rose-500 font-bold">¿Seguro?</span>
-                                            <button onClick={async () => { await clearQueue(); setPrintQueue([]); setShowQueueClearConfirm(false); setIsQueuePanelOpen(false); }} className="text-[11px] font-bold text-white bg-rose-500 px-2 py-1 rounded">Sí</button>
-                                            <button onClick={() => setShowQueueClearConfirm(false)} className="text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">No</button>
+                                            <span className="text-[11px] text-danger font-bold">¿Seguro?</span>
+                                            <button onClick={async () => { await clearQueue(); setPrintQueue([]); setShowQueueClearConfirm(false); setIsQueuePanelOpen(false); }} className="text-[11px] font-bold text-white bg-danger px-2 py-1 rounded">Sí</button>
+                                            <button onClick={() => setShowQueueClearConfirm(false)} className="text-[11px] font-bold text-fg-muted bg-surface-3 px-2 py-1 rounded">No</button>
                                         </div>
                                     )}
                                     <button
@@ -2247,9 +2290,9 @@ const Products: React.FC = () => {
                                             setIsQueuePanelOpen(false);
                                             setIsQueuePreviewOpen(true);
                                         }}
-                                        className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                                        className="flex-1 py-2 bg-success hover:from-success hover:to-success text-white rounded-xl font-bold text-sm shadow-md shadow-success/20 transition-all flex items-center justify-center gap-2"
                                     >
-                                        <span className="material-symbols-outlined text-lg">visibility</span>
+                                        <Eye size={18} aria-hidden="true" />
                                         Vista Previa e Imprimir ({totalLabels})
                                     </button>
                                 </div>

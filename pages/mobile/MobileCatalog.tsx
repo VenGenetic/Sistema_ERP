@@ -473,7 +473,7 @@ const MobileCatalog: React.FC = () => {
                                             <button onClick={(e) => { e.stopPropagation(); setGroupModalProduct(prod); setSelectedGroupId(prod.group_id); setIsGroupModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/10 active:bg-cyan-500/20 transition-colors" title="Relacionados">
                                                 <span className="material-symbols-outlined text-[22px]">link</span>
                                             </button>
-                                            <button onClick={(e) => { e.stopPropagation(); setProductToEdit(prod); setIsModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-slate-300 hover:bg-slate-800 active:bg-slate-750 transition-colors" title="Editar">
+                                            <button onClick={(e) => { e.stopPropagation(); setProductToEdit(prod); setIsModalOpen(true); }} className="flex-1 py-3.5 flex items-center justify-center text-slate-300 hover:bg-slate-800 active:bg-slate-700 transition-colors" title="Editar">
                                                 <span className="material-symbols-outlined text-[22px]">edit</span>
                                             </button>
                                             <button onClick={(e) => handleOpenQueueSheet(prod, e)} className="flex-1 py-3.5 flex items-center justify-center text-amber-400 hover:bg-amber-500/10 active:bg-amber-500/20 transition-colors" title="Agregar a cola de impresión">
@@ -617,7 +617,7 @@ const MobileCatalog: React.FC = () => {
                         </h3>
                         <p className="text-xs text-slate-500 mb-4">Se acumulará en tu borrador de impresión</p>
 
-                        <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-2xl mb-4 border border-slate-750">
+                        <div className="flex items-center gap-3 bg-slate-800 p-3 rounded-2xl mb-4 border border-slate-700">
                             {queueSheetProduct.image_url ? (
                                 <img src={getThumbnailUrl(queueSheetProduct.image_url, 200)} alt={queueSheetProduct.name} loading="lazy" className="w-14 h-14 rounded-xl object-cover border border-slate-700 shrink-0" />
                             ) : (
@@ -665,7 +665,7 @@ const MobileCatalog: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setQueueSheetProduct(null)}
-                                className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-2xl font-extrabold text-sm active:scale-95 transition-all"
+                                className="flex-1 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl font-extrabold text-sm active:scale-95 transition-all"
                             >
                                 Cancelar
                             </button>

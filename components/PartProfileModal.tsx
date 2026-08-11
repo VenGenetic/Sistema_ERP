@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import {
+  Bike,
+  Plus,
+  Trash2,
+  Warehouse,
+  Wrench,
+  X,
+} from 'lucide-react';
 
 interface PartProfileModalProps {
     isOpen: boolean;
@@ -90,39 +98,39 @@ export const PartProfileModal: React.FC<PartProfileModalProps> = ({ isOpen, onCl
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col max-h-[90vh]">
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-3xl overflow-hidden border border-subtle flex flex-col max-h-[90vh]">
 
                 {/* Header */}
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-start bg-slate-50 dark:bg-slate-800/80">
+                <div className="p-6 border-b border-subtle flex justify-between items-start bg-surface-2">
                     <div className="flex gap-4">
-                        <div className="w-16 h-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-400">
-                            <span className="material-symbols-outlined text-[32px]">construction</span>
+                        <div className="w-16 h-16 bg-surface border border-subtle rounded-xl flex items-center justify-center text-fg-subtle">
+                            <Wrench size={32} aria-hidden="true" />
                         </div>
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-bold uppercase">{prodData?.brands?.name || 'Sin Marca'}</span>
-                                <span className="text-slate-500 font-mono text-sm">{prodData?.sku}</span>
+                                <span className="text-fg-muted font-mono text-sm">{prodData?.sku}</span>
                             </div>
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{prodData?.name}</h2>
-                            <p className="text-slate-500 text-sm mt-1">{prodData?.category || 'Sin categoría'}</p>
+                            <h2 className="text-2xl font-bold text-fg leading-tight">{prodData?.name}</h2>
+                            <p className="text-fg-muted text-sm mt-1">{prodData?.category || 'Sin categoría'}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
-                        <span className="material-symbols-outlined">close</span>
+                    <button onClick={onClose} className="p-2 text-fg-subtle hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex px-6 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex px-6 border-b border-subtle">
                     <button
                         onClick={() => setActiveTab('info')}
-                        className={`py-3 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'info' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`py-3 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'info' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
                         Información y Stock
                     </button>
                     <button
                         onClick={() => setActiveTab('fitment')}
-                        className={`py-3 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'fitment' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`py-3 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === 'fitment' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
                         Compatibilidad (Fitment)
                     </button>
@@ -133,46 +141,46 @@ export const PartProfileModal: React.FC<PartProfileModalProps> = ({ isOpen, onCl
                     {activeTab === 'info' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Stock Box */}
-                            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Disponibilidad</h3>
+                            <div className="bg-surface p-5 rounded-xl border border-subtle shadow-sm">
+                                <h3 className="text-sm font-bold text-fg-subtle mb-4">Disponibilidad</h3>
                                 <div className="flex items-end gap-3 mb-6">
-                                    <span className="text-4xl font-black text-slate-900 dark:text-white leading-none">{globalStock}</span>
-                                    <span className="text-slate-500 pb-1">uds globales</span>
+                                    <span className="text-4xl font-bold text-fg leading-none">{globalStock}</span>
+                                    <span className="text-fg-muted pb-1">uds globales</span>
                                 </div>
 
                                 <div className="space-y-3">
                                     {stockDetails.map((detail: any, idx: number) => (
-                                        <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700/50 rounded-lg">
-                                            <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400">warehouse</span>
+                                        <div key={idx} className="flex justify-between items-center p-3 bg-surface-2 border border-slate-100 dark:border-slate-700/50 rounded-lg">
+                                            <div className="flex items-center gap-2 text-sm text-fg">
+                                                <Warehouse size={16} className="text-fg-subtle" aria-hidden="true" />
                                                 {detail.warehouses?.name}
                                             </div>
-                                            <span className="font-bold text-slate-900 dark:text-white">{detail.current_stock}</span>
+                                            <span className="font-bold text-fg">{detail.current_stock}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
                             {/* Costing Box */}
-                            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Costos y Precios</h3>
+                            <div className="bg-surface p-5 rounded-xl border border-subtle shadow-sm">
+                                <h3 className="text-sm font-bold text-fg-subtle mb-4">Costos y Precios</h3>
 
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-700">
-                                        <span className="text-sm text-slate-500">Costo Base (S/I)</span>
-                                        <span className="font-mono font-medium text-slate-900 dark:text-white">${parseFloat(prodData?.cost_without_vat || 0).toFixed(2)}</span>
+                                        <span className="text-sm text-fg-muted">Costo Base (S/I)</span>
+                                        <span className="font-mono font-medium text-fg">${parseFloat(prodData?.cost_without_vat || 0).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-700">
-                                        <span className="text-sm text-slate-500">IVA</span>
-                                        <span className="font-mono text-slate-900 dark:text-white">{prodData?.vat_percentage || 12}%</span>
+                                        <span className="text-sm text-fg-muted">IVA</span>
+                                        <span className="font-mono text-fg">{prodData?.vat_percentage || 12}%</span>
                                     </div>
                                     <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-700">
-                                        <span className="text-sm text-slate-500">Margen de Ganancia</span>
-                                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{(parseFloat(prodData?.profit_margin || 0.3) * 100).toFixed(0)}%</span>
+                                        <span className="text-sm text-fg-muted">Margen de Ganancia</span>
+                                        <span className="font-mono font-bold text-success">{(parseFloat(prodData?.profit_margin || 0.3) * 100).toFixed(0)}%</span>
                                     </div>
                                     <div className="flex justify-between items-center pt-2">
-                                        <span className="text-sm font-bold text-slate-900 dark:text-white">Precio Venta (PVP)</span>
-                                        <span className="font-mono text-xl font-black text-primary">
+                                        <span className="text-sm font-bold text-fg">Precio Venta (PVP)</span>
+                                        <span className="font-mono text-xl font-bold text-primary">
                                             ${parseFloat(prodData?.price || 0).toFixed(2)}
                                         </span>
                                     </div>
@@ -184,56 +192,56 @@ export const PartProfileModal: React.FC<PartProfileModalProps> = ({ isOpen, onCl
                     {activeTab === 'fitment' && (
                         <div className="flex flex-col gap-6">
                             {/* Add Fitment Form */}
-                            <form onSubmit={handleAddFitment} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">Agregar Vehículo Compatible</h3>
+                            <form onSubmit={handleAddFitment} className="bg-surface p-5 rounded-xl border border-subtle shadow-sm">
+                                <h3 className="text-sm font-bold text-fg mb-4">Agregar Vehículo Compatible</h3>
                                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                                    <input required placeholder="Marca (ej. Yamaha)" className="col-span-2 lg:col-span-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-slate-50 dark:bg-slate-900 dark:text-white" value={newMake} onChange={e => setNewMake(e.target.value)} />
-                                    <input required placeholder="Modelo (ej. MT-07)" className="col-span-2 lg:col-span-2 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-slate-50 dark:bg-slate-900 dark:text-white" value={newModel} onChange={e => setNewModel(e.target.value)} />
-                                    <input required type="number" placeholder="Año Desde" className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-slate-50 dark:bg-slate-900 dark:text-white" value={newYearFrom} onChange={e => setNewYearFrom(e.target.value)} />
-                                    <input required type="number" placeholder="Año Hasta" className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-slate-50 dark:bg-slate-900 dark:text-white" value={newYearTo} onChange={e => setNewYearTo(e.target.value)} />
+                                    <input required placeholder="Marca (ej. Yamaha)" className="col-span-2 lg:col-span-1 border border-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-surface-2 dark:text-white" value={newMake} onChange={e => setNewMake(e.target.value)} />
+                                    <input required placeholder="Modelo (ej. MT-07)" className="col-span-2 lg:col-span-2 border border-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-surface-2 dark:text-white" value={newModel} onChange={e => setNewModel(e.target.value)} />
+                                    <input required type="number" placeholder="Año Desde" className="border border-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-surface-2 dark:text-white" value={newYearFrom} onChange={e => setNewYearFrom(e.target.value)} />
+                                    <input required type="number" placeholder="Año Hasta" className="border border-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none bg-surface-2 dark:text-white" value={newYearTo} onChange={e => setNewYearTo(e.target.value)} />
                                 </div>
                                 <div className="mt-4 flex justify-end">
                                     <button type="submit" disabled={addingFitment} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[18px]">add</span>
+                                        <Plus size={18} aria-hidden="true" />
                                         {addingFitment ? 'Agregando...' : 'Agregar Fitment'}
                                     </button>
                                 </div>
                             </form>
 
                             {/* Fitment List */}
-                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                            <div className="bg-surface rounded-xl border border-subtle shadow-sm overflow-hidden">
                                 {loadingFitment ? (
-                                    <div className="p-8 text-center text-slate-500">Cargando compatibilidades...</div>
+                                    <div className="p-8 text-center text-fg-muted">Cargando compatibilidades...</div>
                                 ) : compatibilities.length === 0 ? (
-                                    <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2">
-                                        <span className="material-symbols-outlined text-4xl text-slate-300">two_wheeler</span>
+                                    <div className="p-8 text-center text-fg-muted flex flex-col items-center gap-2">
+                                        <Bike size={32} className="text-fg-subtle" aria-hidden="true" />
                                         <p>No hay vehículos registrados para este repuesto.</p>
                                     </div>
                                 ) : (
                                     <table className="w-full text-left text-sm">
-                                        <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium">
+                                        <thead className="bg-surface-2 text-fg-muted font-medium">
                                             <tr>
-                                                <th className="px-5 py-3">Marca</th>
-                                                <th className="px-5 py-3">Modelo</th>
-                                                <th className="px-5 py-3 text-center">Años</th>
-                                                <th className="px-5 py-3 text-right">Acción</th>
+                                                <th className="px-4 py-2.5">Marca</th>
+                                                <th className="px-4 py-2.5">Modelo</th>
+                                                <th className="px-4 py-2.5 text-center">Años</th>
+                                                <th className="px-4 py-2.5 text-right">Acción</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                             {compatibilities.map(c => (
-                                                <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                                                    <td className="px-5 py-3 font-medium text-slate-900 dark:text-white">{c.make}</td>
-                                                    <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{c.model}</td>
-                                                    <td className="px-5 py-3 text-center font-mono text-slate-500">
+                                                <tr key={c.id} className="hover:bg-surface-hover">
+                                                    <td className="px-4 py-3 font-medium text-fg">{c.make}</td>
+                                                    <td className="px-4 py-3 text-fg">{c.model}</td>
+                                                    <td className="px-4 py-3 text-center font-mono text-fg-muted">
                                                         {c.year_from} - {c.year_to}
                                                     </td>
-                                                    <td className="px-5 py-3 text-right">
+                                                    <td className="px-4 py-3 text-right">
                                                         <button
                                                             onClick={() => handleDeleteFitment(c.id)}
-                                                            className="text-red-400 hover:text-red-600 transition p-1"
+                                                            className="text-danger hover:text-danger transition p-1"
                                                             title="Eliminar"
                                                         >
-                                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                            <Trash2 size={18} aria-hidden="true" />
                                                         </button>
                                                     </td>
                                                 </tr>

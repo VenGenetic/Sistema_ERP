@@ -8,6 +8,20 @@ import { LabelSizeSelector } from '../components/LabelSizeSelector';
 import { ThermalPrinterSelector } from '../components/ThermalPrinterSelector';
 import { LabelSizePreset } from '../utils/labelPresets';
 import { printLabelsOnThermalPrinter } from '../utils/thermalLabelPrinter';
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  Download,
+  FileText,
+  FileUp,
+  ListPlus,
+  Loader2,
+  Package,
+  Printer,
+  ReceiptText,
+  SquarePlus,
+} from 'lucide-react';
 
 /**
  * Reads a print-range expression -- "1-10", "12", "1-5, 8, 14-16" -- into the
@@ -286,7 +300,7 @@ const InvoiceLabels: React.FC = () => {
         <div className="p-6 md:p-8 max-w-[1100px] mx-auto flex flex-col gap-6">
             <div>
                 <h1 className="text-2xl font-bold dark:text-white tracking-tight">Etiquetas de Factura</h1>
-                <p className="text-slate-500 mt-1">
+                <p className="text-fg-muted mt-1">
                     Sube el PDF de una factura de compra y genera automáticamente todas las etiquetas de los repuestos que vinieron en ella, respetando la cantidad de cada uno.
                 </p>
             </div>
@@ -295,23 +309,21 @@ const InvoiceLabels: React.FC = () => {
                 <div
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={handleDrop}
-                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-white dark:bg-slate-900 text-center"
+                    className="border-2 border-dashed border-strong rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-surface text-center"
                 >
-                    <span className="material-symbols-outlined text-4xl text-slate-400">picture_as_pdf</span>
+                    <FileText size={32} className="text-fg-subtle" aria-hidden="true" />
                     <div>
-                        <p className="font-medium text-slate-700 dark:text-slate-200">
+                        <p className="font-medium text-fg">
                             {fileName ? fileName : 'Arrastra el PDF de la factura aquí'}
                         </p>
-                        <p className="text-sm text-slate-500 mt-1">o haz clic para seleccionar el archivo</p>
+                        <p className="text-sm text-fg-muted mt-1">o haz clic para seleccionar el archivo</p>
                     </div>
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isParsing}
                         className="px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 disabled:opacity-70"
                     >
-                        <span className={`material-symbols-outlined text-[20px] ${isParsing ? 'animate-spin' : ''}`}>
-                            {isParsing ? 'progress_activity' : 'upload_file'}
-                        </span>
+                        {isParsing ? <Loader2 size={20} className={`${isParsing ? 'animate-spin' : ''}`} aria-hidden="true" /> : <FileUp size={20} className={`${isParsing ? 'animate-spin' : ''}`} aria-hidden="true" />}
                         {isParsing ? 'Leyendo factura...' : 'Seleccionar PDF'}
                     </button>
                     <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileInputChange} />
@@ -319,45 +331,45 @@ const InvoiceLabels: React.FC = () => {
             )}
 
             {error && (
-                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm flex items-start gap-2">
-                    <span className="material-symbols-outlined text-[20px]">error</span>
+                <div className="p-4 rounded-lg bg-danger-soft border border-danger/20 text-danger-soft-fg text-sm flex items-start gap-2">
+                    <CircleAlert size={20} aria-hidden="true" />
                     {error}
                 </div>
             )}
 
             {feedback && (
-                <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm flex items-start gap-2">
-                    <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                <div className="p-4 rounded-lg bg-success-soft border border-success/20 text-success-soft-fg text-sm flex items-start gap-2">
+                    <CircleCheck size={20} aria-hidden="true" />
                     {feedback}
                 </div>
             )}
 
             {rows.length > 0 && (
                 <>
-                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                        <div className="text-sm text-slate-600 dark:text-slate-300">
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-surface border border-subtle rounded-xl p-4">
+                        <div className="text-sm text-fg-muted">
                             {invoiceNumber && <span className="font-medium">Factura No: {invoiceNumber} · </span>}
-                            {fileName && <span className="text-slate-400">({fileName}) · </span>}
+                            {fileName && <span className="text-fg-subtle">({fileName}) · </span>}
                             {rows.length} repuesto(s) detectados · {matchedCount} coinciden con el catálogo
                             {matchedCount < rows.length && (
-                                <span className="text-amber-600 dark:text-amber-400"> · {rows.length - matchedCount} sin coincidencia (se imprimen con la descripción de la factura; si los envías a Entrada por Lote se crean como producto nuevo)</span>
+                                <span className="text-warning"> · {rows.length - matchedCount} sin coincidencia (se imprimen con la descripción de la factura; si los envías a Entrada por Lote se crean como producto nuevo)</span>
                             )}
                         </div>
                         <div className="flex items-center gap-3">
-                            <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                            <span className="text-sm font-semibold text-fg">
                                 {totalLabels} etiqueta(s) a imprimir
                             </span>
                             <button
                                 onClick={handleStartOver}
-                                className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline decoration-dotted"
+                                className="text-sm text-fg-muted hover:text-slate-700 dark:hover:text-slate-300 underline decoration-dotted"
                             >
                                 Cargar otra factura
                             </button>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 p-3 bg-surface-2 border border-subtle rounded-xl">
+                        <label className="text-sm font-medium text-fg shrink-0">
                             Imprimir líneas:
                         </label>
                         <input
@@ -366,7 +378,7 @@ const InvoiceLabels: React.FC = () => {
                             onChange={(e) => setRangeText(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') applyRangeSelection(); }}
                             placeholder="ej. 1-10, 12"
-                            className="flex-1 min-w-[160px] px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary/20"
+                            className="flex-1 min-w-[160px] px-3 py-1.5 bg-surface border border-subtle rounded-lg text-fg outline-none focus:ring-2 focus:ring-primary/20"
                         />
                         <button
                             onClick={applyRangeSelection}
@@ -375,24 +387,24 @@ const InvoiceLabels: React.FC = () => {
                         >
                             Aplicar
                         </button>
-                        <span className="text-slate-300 dark:text-slate-600">|</span>
+                        <span className="text-fg-subtle">|</span>
                         <button
                             onClick={() => { setIncluded(rows.map(r => r.key)); setRangeText(''); }}
-                            className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg shrink-0"
+                            className="px-3 py-1.5 text-sm text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg shrink-0"
                         >
                             Todas
                         </button>
                         <button
                             onClick={() => { setIncluded([]); setRangeText(''); }}
-                            className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg shrink-0"
+                            className="px-3 py-1.5 text-sm text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg shrink-0"
                         >
                             Ninguna
                         </button>
                     </div>
 
-                    <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
+                    <div className="border border-subtle rounded-xl overflow-hidden bg-surface">
                         <table className="w-full text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                            <thead className="bg-surface-2 text-fg-muted">
                                 <tr>
                                     <th className="p-3 text-left w-10"></th>
                                     <th className="p-3 text-right w-10">#</th>
@@ -415,16 +427,16 @@ const InvoiceLabels: React.FC = () => {
                                             />
                                         </td>
                                         {/* The number the range box refers to. */}
-                                        <td className="p-3 text-right font-mono text-slate-400 dark:text-slate-500 tabular-nums">
+                                        <td className="p-3 text-right font-mono text-fg-subtle tabular-nums">
                                             {idx + 1}
                                         </td>
-                                        <td className="p-3 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{row.sku}</td>
+                                        <td className="p-3 font-mono text-fg whitespace-nowrap">{row.sku}</td>
                                         <td className="p-3">
                                             <input
                                                 type="text"
                                                 value={row.labelName}
                                                 onChange={(e) => updateName(row.key, e.target.value)}
-                                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-white"
+                                                className="w-full px-2 py-1 bg-surface-2 border border-subtle rounded text-fg"
                                             />
                                         </td>
                                         <td className="p-3">
@@ -433,27 +445,27 @@ const InvoiceLabels: React.FC = () => {
                                                 min={1}
                                                 value={row.quantity}
                                                 onChange={(e) => updateQty(row.key, parseInt(e.target.value, 10))}
-                                                className="w-20 mx-auto block px-2 py-1 text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-900 dark:text-white font-medium"
+                                                className="w-20 mx-auto block px-2 py-1 text-center bg-surface-2 border border-subtle rounded text-fg font-medium"
                                             />
                                         </td>
                                         <td className="p-3 text-center">
                                             {row.productId !== null ? (
-                                                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                                                    <span className="material-symbols-outlined text-[16px]">check_circle</span> En catálogo
+                                                <span className="inline-flex items-center gap-1 text-success text-xs font-medium">
+                                                    <CircleCheck size={16} aria-hidden="true" /> En catálogo
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 text-xs font-medium">
-                                                    <span className="material-symbols-outlined text-[16px]">help</span> No encontrado
+                                                <span className="inline-flex items-center gap-1 text-warning text-xs font-medium">
+                                                    <CircleHelp size={16} aria-hidden="true" /> No encontrado
                                                 </span>
                                             )}
                                         </td>
                                         <td className="p-3 text-center">
                                             {row.addedToInventory ? (
-                                                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                                                    <span className="material-symbols-outlined text-[16px]">inventory_2</span> Ingresado
+                                                <span className="inline-flex items-center gap-1 text-success text-xs font-medium">
+                                                    <Package size={16} aria-hidden="true" /> Ingresado
                                                 </span>
                                             ) : (
-                                                <span className="text-xs text-slate-400">Pendiente</span>
+                                                <span className="text-xs text-fg-subtle">Pendiente</span>
                                             )}
                                         </td>
                                     </tr>
@@ -463,29 +475,29 @@ const InvoiceLabels: React.FC = () => {
                     </div>
 
                     {/* Add to inventory via the existing Batch Entry tool */}
-                    <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                        <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400">inventory_2</span>
-                        <span className="text-sm text-slate-600 dark:text-slate-300 flex-1 min-w-[220px]">
+                    <div className="flex flex-wrap items-center gap-3 bg-surface border border-subtle rounded-xl p-4">
+                        <Package size={18} className="text-success" aria-hidden="true" />
+                        <span className="text-sm text-fg-muted flex-1 min-w-[220px]">
                             Envía estos repuestos (con su costo y cantidad de la factura) a <strong>Entrada por Lote</strong> para registrar la llegada al almacén.
                         </span>
                         <button
                             onClick={() => setIsBatchEntryOpen(true)}
                             disabled={isWorking || pendingInventoryRows.length === 0}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
+                            className="px-4 py-2 bg-success hover:bg-success text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
                         >
-                            <span className="material-symbols-outlined text-[20px]">add_box</span>
+                            <SquarePlus size={20} aria-hidden="true" />
                             {pendingInventoryRows.length === 0
                                 ? 'Ya enviado a Entrada por Lote'
                                 : `Enviar a Entrada por Lote (${pendingInventoryRows.reduce((a, r) => a + r.quantity, 0)})`}
                         </button>
                     </div>
 
-                    <div className="flex flex-col gap-3 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-                        <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                            <span className="material-symbols-outlined">receipt_long</span>
+                    <div className="flex flex-col gap-3 p-4 bg-surface border border-subtle rounded-xl shadow-sm">
+                        <h3 className="font-semibold text-fg flex items-center gap-2">
+                            <ReceiptText size={18} aria-hidden="true" />
                             Impresora Térmica
                         </h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                        <p className="text-sm text-fg-muted">
                             Imprime las {totalLabels} etiqueta(s) directamente, sin generar un PDF. Incluye los
                             repuestos que aún no están en el catálogo.
                         </p>
@@ -496,11 +508,11 @@ const InvoiceLabels: React.FC = () => {
                         <button
                             onClick={handlePrintThermal}
                             disabled={isPrintingThermal || includedRows.length === 0 || !labelSize}
-                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="w-full py-3 bg-success hover:bg-success text-white font-medium rounded-lg shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            <span className={`material-symbols-outlined ${isPrintingThermal ? 'animate-spin' : ''}`}>
-                                {isPrintingThermal ? 'progress_activity' : 'print'}
-                            </span>
+                            {isPrintingThermal
+                                ? <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                                : <Printer size={18} aria-hidden="true" />}
                             {isPrintingThermal ? 'Enviando...' : `Imprimir en Térmica (${totalLabels})`}
                         </button>
                     </div>
@@ -509,18 +521,18 @@ const InvoiceLabels: React.FC = () => {
                         <button
                             onClick={handleAddToQueue}
                             disabled={isWorking || matchedCount === 0}
-                            className="px-4 py-2 text-amber-700 dark:text-amber-300 font-medium hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors flex items-center gap-2 border border-amber-200 dark:border-amber-700 disabled:opacity-50"
+                            className="px-4 py-2 text-warning font-medium hover:bg-warning-soft rounded-lg transition-colors flex items-center gap-2 border border-warning/20 disabled:opacity-50"
                             title="Agrega las etiquetas de los repuestos que sí están en el catálogo a la cola de impresión"
                         >
-                            <span className="material-symbols-outlined text-[20px]">playlist_add</span>
+                            <ListPlus size={20} aria-hidden="true" />
                             Agregar a la Cola
                         </button>
                         <button
                             onClick={handleDownloadPdf}
                             disabled={isWorking || includedRows.length === 0}
-                            className="px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 dark:border-violet-800 dark:text-violet-300 font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
+                            className="px-4 py-2 bg-primary-soft hover:bg-primary-soft text-primary border border-primary/20 font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
                         >
-                            <span className="material-symbols-outlined text-[20px]">download</span>
+                            <Download size={20} aria-hidden="true" />
                             Descargar PDF ({totalLabels})
                         </button>
                         <button
@@ -528,9 +540,7 @@ const InvoiceLabels: React.FC = () => {
                             disabled={isWorking || includedRows.length === 0}
                             className="px-4 py-2 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors disabled:opacity-50"
                         >
-                            <span className={`material-symbols-outlined text-[20px] ${isWorking ? 'animate-spin' : ''}`}>
-                                {isWorking ? 'progress_activity' : 'print'}
-                            </span>
+                            {isWorking ? <Loader2 size={20} className={`${isWorking ? 'animate-spin' : ''}`} aria-hidden="true" /> : <Printer size={20} className={`${isWorking ? 'animate-spin' : ''}`} aria-hidden="true" />}
                             Imprimir PDF
                         </button>
                     </div>

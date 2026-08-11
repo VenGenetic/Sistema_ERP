@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
+import {
+  AtSign,
+  CircleAlert,
+  CircleCheck,
+  CloudUpload,
+  IdCard,
+  Save,
+  Tag,
+} from 'lucide-react';
 
 const ProfilePanel: React.FC = () => {
     const [loading, setLoading] = useState(true);
@@ -135,7 +144,7 @@ const ProfilePanel: React.FC = () => {
                                 )}
                             </div>
                             <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-full">
-                                <span className="material-symbols-outlined text-fg text-3xl">cloud_upload</span>
+                                <CloudUpload size={28} className="text-fg" aria-hidden="true" />
                                 <input
                                     type="file"
                                     className="hidden"
@@ -161,7 +170,7 @@ const ProfilePanel: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre Completo</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 material-symbols-outlined text-text-secondary text-[20px]">badge</span>
+                                    <IdCard size={20} className="absolute left-3 top-2.5 text-text-secondary" aria-hidden="true" />
                                     <input
                                         type="text"
                                         value={fullName}
@@ -174,7 +183,7 @@ const ProfilePanel: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1.5">Apodo (Nickname)</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 material-symbols-outlined text-text-secondary text-[20px]">alternate_email</span>
+                                    <AtSign size={20} className="absolute left-3 top-2.5 text-text-secondary" aria-hidden="true" />
                                     <input
                                         type="text"
                                         value={nickname}
@@ -187,16 +196,16 @@ const ProfilePanel: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-text-secondary mb-1.5">Código de Referido (Promo 3%)</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 material-symbols-outlined text-text-secondary text-[20px]">sell</span>
+                                    <Tag size={20} className="absolute left-3 top-2.5 text-text-secondary" aria-hidden="true" />
                                     <input
                                         type="text"
                                         value={referralCode}
                                         onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all uppercase"
+                                        className="w-full bg-background-dark border border-border-dark rounded-lg text-fg text-sm py-2.5 pl-10 pr-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                                         placeholder="Ej. ALEX2024"
                                     />
                                 </div>
-                                <p className="text-[10px] text-text-secondary mt-1">Este código será usado en el POS para vincular tus ventas.</p>
+                                <p className="text-2xs text-text-secondary mt-1">Este código será usado en el POS para vincular tus ventas.</p>
                             </div>
                         </div>
 
@@ -214,10 +223,8 @@ const ProfilePanel: React.FC = () => {
 
                         <div className="pt-4 flex items-center justify-between">
                             {message && (
-                                <div className={`text-sm flex items-center gap-2 ${message.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                                    <span className="material-symbols-outlined text-[18px]">
-                                        {message.type === 'success' ? 'check_circle' : 'error'}
-                                    </span>
+                                <div className={`text-sm flex items-center gap-2 ${message.type === 'success' ? 'text-success' : 'text-danger'}`}>
+                                    {message.type === 'success' ? <CircleCheck size={18} aria-hidden="true" /> : <CircleAlert size={18} aria-hidden="true" />}
                                     {message.text}
                                 </div>
                             )}
@@ -231,7 +238,7 @@ const ProfilePanel: React.FC = () => {
                                 {loading && !uploading ? (
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                                 ) : (
-                                    <span className="material-symbols-outlined text-[20px]">save</span>
+                                    <Save size={20} aria-hidden="true" />
                                 )}
                                 Guardar Cambios
                             </button>

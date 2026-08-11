@@ -92,11 +92,11 @@ export const POETable: React.FC = () => {
   // Icono para tipo de columna
   const getColumnIcon = (type: POEColumnType) => {
     switch (type) {
-      case 'single_select': return <Tag className="w-3.5 h-3.5 text-blue-500" />;
-      case 'multi_select': return <Tags className="w-3.5 h-3.5 text-emerald-500" />;
-      case 'date': return <Calendar className="w-3.5 h-3.5 text-amber-500" />;
-      case 'number': return <Hash className="w-3.5 h-3.5 text-purple-500" />;
-      default: return <Type className="w-3.5 h-3.5 text-slate-400" />;
+      case 'single_select': return <Tag className="w-3.5 h-3.5 text-primary" />;
+      case 'multi_select': return <Tags className="w-3.5 h-3.5 text-success" />;
+      case 'date': return <Calendar className="w-3.5 h-3.5 text-warning" />;
+      case 'number': return <Hash className="w-3.5 h-3.5 text-primary" />;
+      default: return <Type className="w-3.5 h-3.5 text-fg-subtle" />;
     }
   };
 
@@ -199,12 +199,12 @@ export const POETable: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 w-full bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
+    <div className="flex-1 w-full bg-surface border border-subtle rounded-xl overflow-hidden shadow-sm flex flex-col">
       <div className="overflow-x-auto flex-1 custom-scrollbar">
         <table className="w-full border-collapse text-left">
           {/* ENCABEZADOS ESTILO NOTION / AIRTABLE */}
           <thead>
-            <tr className="bg-slate-50/80 dark:bg-[#161b22] border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 select-none">
+            <tr className="bg-slate-50/80 dark:bg-[#161b22] border-b border-subtle text-xs font-semibold text-fg-muted select-none">
               
               {/* Columna Principal: PROCEDIMIENTO (SOP) */}
               <th 
@@ -214,11 +214,11 @@ export const POETable: React.FC = () => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
                     <span>Procedimiento Estándar (POE)</span>
                   </div>
                   {sortColumnId === 'title' && (
-                    <span className="text-blue-500">
+                    <span className="text-primary">
                       {sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </span>
                   )}
@@ -231,9 +231,9 @@ export const POETable: React.FC = () => {
                 className="py-2.5 px-3 min-w-[160px] max-w-[180px] border-r border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-100/60 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600 dark:text-slate-300 font-semibold">Tipo de Guía</span>
+                  <span className="text-fg-muted font-semibold">Tipo de Guía</span>
                   {sortColumnId === 'sop_type' && (
-                    <span className="text-blue-500">
+                    <span className="text-primary">
                       {sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </span>
                   )}
@@ -251,11 +251,7 @@ export const POETable: React.FC = () => {
                     style={{ minWidth: `${col.width || 180}px` }}
                     onClick={(e) => handleHeaderInteraction(col.id, e, false)}
                     onContextMenu={(e) => handleHeaderInteraction(col.id, e, true)}
-                    className={`py-2.5 px-3 border-r border-slate-200/60 dark:border-slate-800/60 cursor-pointer transition-all group ${
-                      isSidePeekActive 
-                        ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold' 
-                        : 'hover:bg-slate-100/60 dark:hover:bg-slate-800/50'
-                    }`}
+                    className={`py-2.5 px-3 border-r border-slate-200/60 dark:border-slate-800/60 cursor-pointer transition-all group ${ isSidePeekActive ? 'bg-primary-soft text-primary font-bold' : 'hover:bg-slate-100/60 dark:hover:bg-slate-800/50' }`}
                     title="Clic derecho para abrir Consola de Edición de Propiedades"
                   >
                     <div className="flex items-center justify-between gap-1">
@@ -267,11 +263,11 @@ export const POETable: React.FC = () => {
                       <div className="flex items-center gap-1">
                         {hasActiveFilter && (
                           <span title="Filtro activo en esta columna">
-                            <Filter className="w-3 h-3 text-emerald-500 fill-emerald-500" />
+                            <Filter className="w-3 h-3 text-success fill-emerald-500" />
                           </span>
                         )}
                         {sortColumnId === col.id && (
-                          <span className="text-blue-500">
+                          <span className="text-primary">
                             {sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </span>
                         )}
@@ -280,9 +276,7 @@ export const POETable: React.FC = () => {
                             e.stopPropagation();
                             setActiveSidePeekColumnId(isSidePeekActive ? null : col.id);
                           }}
-                          className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
-                            isSidePeekActive ? 'opacity-100 bg-blue-100 dark:bg-blue-900/60 text-blue-600' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'
-                          }`}
+                          className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${ isSidePeekActive ? 'opacity-100 bg-primary-soft text-primary' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500' }`}
                           title="Propiedades y Consola de Edición"
                         >
                           <Settings className="w-3.5 h-3.5" />
@@ -298,7 +292,7 @@ export const POETable: React.FC = () => {
                 <div className="relative" ref={addColRef}>
                   <button
                     onClick={() => setIsAddingColumn(!isAddingColumn)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/60 rounded-md transition-all"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-primary-soft-fg bg-primary-soft hover:bg-primary-soft rounded-lg transition-all"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Columna
@@ -306,11 +300,11 @@ export const POETable: React.FC = () => {
 
                   {/* Popover para Crear Columna */}
                   {isAddingColumn && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-3 z-50 text-left animate-in fade-in zoom-in-95 duration-150">
-                      <h4 className="font-bold text-xs text-slate-900 dark:text-white mb-2 uppercase tracking-wider font-mono">Nueva Columna</h4>
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-surface border border-subtle rounded-xl shadow-xl p-3 z-50 text-left animate-in fade-in zoom-in-95 duration-150">
+                      <h4 className="font-bold text-xs text-fg mb-2 uppercase tracking-wider font-mono">Nueva Columna</h4>
                       <form onSubmit={handleCreateColumn} className="space-y-3">
                         <div>
-                          <label className="block text-[11px] font-medium text-slate-500 mb-1">Nombre</label>
+                          <label className="block text-[11px] font-medium text-fg-muted mb-1">Nombre</label>
                           <input
                             type="text"
                             placeholder="Ej: Sector, Responsable, Estado..."
@@ -318,30 +312,26 @@ export const POETable: React.FC = () => {
                             onChange={(e) => setNewColName(e.target.value)}
                             required
                             autoFocus
-                            className="w-full text-xs px-2.5 py-1.5 bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                            className="w-full text-xs px-2.5 py-1.5 bg-surface-2 border border-subtle rounded-lg text-fg focus:outline-none focus:border-primary"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-medium text-slate-500 mb-1">Tipo de Propiedad</label>
+                          <label className="block text-[11px] font-medium text-fg-muted mb-1">Tipo de Propiedad</label>
                           <div className="grid grid-cols-1 gap-1">
                             {[
-                              { type: 'single_select', name: 'Seleccionar (1 Tag)', icon: <Tag className="w-3.5 h-3.5 text-blue-500" /> },
-                              { type: 'multi_select', name: 'Lista de Tags (Varios)', icon: <Tags className="w-3.5 h-3.5 text-emerald-500" /> },
-                              { type: 'text', name: 'Texto Libre', icon: <Type className="w-3.5 h-3.5 text-slate-400" /> },
-                              { type: 'date', name: 'Fecha de Revisión', icon: <Calendar className="w-3.5 h-3.5 text-amber-500" /> }
+                              { type: 'single_select', name: 'Seleccionar (1 Tag)', icon: <Tag className="w-3.5 h-3.5 text-primary" /> },
+                              { type: 'multi_select', name: 'Lista de Tags (Varios)', icon: <Tags className="w-3.5 h-3.5 text-success" /> },
+                              { type: 'text', name: 'Texto Libre', icon: <Type className="w-3.5 h-3.5 text-fg-subtle" /> },
+                              { type: 'date', name: 'Fecha de Revisión', icon: <Calendar className="w-3.5 h-3.5 text-warning" /> }
                             ].map(opt => (
                               <label
                                 key={opt.type}
                                 onClick={() => setNewColType(opt.type as any)}
-                                className={`flex items-center gap-2 p-1.5 rounded-md text-xs cursor-pointer border ${
-                                  newColType === opt.type 
-                                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 font-medium' 
-                                    : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                                }`}
+                                className={`flex items-center gap-2 p-1.5 rounded-md text-xs cursor-pointer border ${ newColType === opt.type ? 'border-primary bg-primary-soft/50 font-medium' : 'border-transparent hover:bg-surface-hover dark:hover:bg-slate-800/60' }`}
                               >
                                 {opt.icon}
-                                <span className="text-slate-800 dark:text-slate-200">{opt.name}</span>
+                                <span className="text-fg">{opt.name}</span>
                               </label>
                             ))}
                           </div>
@@ -351,13 +341,13 @@ export const POETable: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setIsAddingColumn(false)}
-                            className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                            className="px-2.5 py-1 text-xs text-fg-muted hover:text-slate-700 dark:hover:text-slate-300"
                           >
                             Cancelar
                           </button>
                           <button
                             type="submit"
-                            className="px-3 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-all shadow-sm"
+                            className="px-3 py-1 text-xs font-semibold bg-primary hover:bg-primary text-white rounded-lg transition-all shadow-sm"
                           >
                             Crear
                           </button>
@@ -382,16 +372,16 @@ export const POETable: React.FC = () => {
                     {/* CELDA PRINCIPAL: TITULO */}
                     <td 
                       onClick={() => setSelectedProcedureForModal(proc)}
-                      className="py-2.5 px-4 border-r border-slate-100 dark:border-slate-800/50 cursor-pointer font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="py-2.5 px-4 border-r border-slate-100 dark:border-slate-800/50 cursor-pointer font-medium text-fg hover:text-primary transition-colors"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5 truncate">
                           {proc.sop_type === 'A_LIST' ? (
-                            <div className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 shrink-0" title="SOP Tipo A: Lista Rápida">
+                            <div className="p-1.5 rounded-lg bg-primary-soft text-primary-soft-fg shrink-0" title="SOP Tipo A: Lista Rápida">
                               <ListCheck className="w-4 h-4" />
                             </div>
                           ) : (
-                            <div className="p-1.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0" title="SOP Tipo B: Árbol Sí/No">
+                            <div className="p-1.5 rounded-lg bg-primary-soft text-primary shrink-0" title="SOP Tipo B: Árbol Sí/No">
                               <GitBranch className="w-4 h-4" />
                             </div>
                           )}
@@ -405,7 +395,7 @@ export const POETable: React.FC = () => {
                               deleteProcedure(proc.id);
                             }
                           }}
-                          className="p-1 text-slate-400 hover:text-rose-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1 text-fg-subtle hover:text-danger rounded opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Eliminar POE"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -419,12 +409,12 @@ export const POETable: React.FC = () => {
                       className="py-2 px-3 border-r border-slate-100 dark:border-slate-800/50 cursor-pointer text-xs"
                     >
                       {proc.sop_type === 'A_LIST' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary-soft text-primary-soft-fg border border-primary/20">
                           <ListCheck className="w-3 h-3" />
                           Lista Rápida
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary-soft text-primary border border-primary/20">
                           <GitBranch className="w-3 h-3" />
                           Flowchart Sí/No
                         </span>
@@ -444,12 +434,12 @@ export const POETable: React.FC = () => {
               })
             ) : (
               <tr>
-                <td colSpan={columns.length + 3} className="text-center py-12 text-slate-400 dark:text-slate-500 text-sm">
+                <td colSpan={columns.length + 3} className="text-center py-12 text-fg-subtle text-sm">
                   <div className="max-w-xs mx-auto flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                    <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center text-fg-subtle">
                       <Sparkles className="w-5 h-5" />
                     </div>
-                    <p className="font-semibold text-slate-700 dark:text-slate-300">No se encontraron procedimientos</p>
+                    <p className="font-semibold text-fg">No se encontraron procedimientos</p>
                     <p className="text-xs">Crea el primer procedimiento (POE) o ajusta los filtros de búsqueda.</p>
                   </div>
                 </td>
@@ -460,10 +450,10 @@ export const POETable: React.FC = () => {
       </div>
 
       {/* PIE DE TABLA - BOTÓN NUEVA SOP */}
-      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1117] flex items-center justify-between text-xs text-slate-500">
+      <div className="p-3 border-t border-subtle bg-slate-50/50 dark:bg-[#0d1117] flex items-center justify-between text-xs text-fg-muted">
         <button
           onClick={() => setIsCreatingNewProcedureModal(true, 'A_LIST')}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all shadow-sm active:scale-95"
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold bg-primary hover:bg-primary text-white rounded-lg transition-all shadow-sm active:scale-95"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
           Nuevo Procedimiento Estándar (POE)

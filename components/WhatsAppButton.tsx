@@ -53,7 +53,7 @@ const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
             <button
                 onClick={handleClick}
                 title={`Enviar WhatsApp a ${customerName}`}
-                className="p-2 rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors shadow-sm hover:shadow-md"
+                className="p-2 rounded-lg bg-success hover:bg-success text-white transition-colors shadow-sm hover:shadow-md"
             >
                 <MessageCircle size={18} />
             </button>
@@ -63,7 +63,7 @@ const WhatsAppButton: React.FC<WhatsAppButtonProps> = ({
     return (
         <button
             onClick={handleClick}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold shadow-md hover:shadow-lg transition-all text-sm"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success hover:bg-success text-white font-bold shadow-md hover:shadow-lg transition-all text-sm"
         >
             <MessageCircle size={18} />
             <span>Enviar WhatsApp</span>

@@ -12,9 +12,9 @@ const ProtectedRoute: React.FC = () => {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-sm text-gray-400">Verificando permisos y sesión...</p>
-                    <p className="text-xs text-gray-600 mt-2">Si esto tarda mucho, recarga la página.</p>
+                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-sm text-fg-subtle">Verificando permisos y sesión...</p>
+                    <p className="text-xs text-fg-muted mt-2">Si esto tarda mucho, recarga la página.</p>
                 </div>
             </div>
         );

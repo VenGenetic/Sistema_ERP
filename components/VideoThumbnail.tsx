@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import {
+  CirclePlay,
+  Film,
+} from 'lucide-react';
 
 interface VideoThumbnailProps {
     src: string;
@@ -33,7 +37,7 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, onClick }) 
                 e.stopPropagation();
                 onClick();
             }}
-            className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-black shadow-sm relative cursor-pointer group"
+            className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-black shadow-sm relative cursor-pointer group"
         >
             {shouldLoad ? (
                 <video 
@@ -45,11 +49,11 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, onClick }) 
                 />
             ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[16px] text-slate-400">movie</span>
+                    <Film size={16} className="text-fg-subtle" aria-hidden="true" />
                 </div>
             )}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="material-symbols-outlined text-[20px] text-white opacity-80 group-hover:scale-110 group-hover:opacity-100 transition-all drop-shadow-md">play_circle</span>
+                <CirclePlay size={20} className="text-white opacity-80 group-hover:scale-110 group-hover:opacity-100 transition-all drop-shadow-md" aria-hidden="true" />
             </div>
         </div>
     );

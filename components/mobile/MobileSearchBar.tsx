@@ -215,7 +215,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
 
             {/* PANEL DE SUGERENCIAS */}
             {showSuggestions && (
-                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-750 rounded-2xl shadow-2xl z-50 overflow-hidden animate-slide-down origin-top max-h-[65vh] overflow-y-auto">
+                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-slide-down origin-top max-h-[65vh] overflow-y-auto">
                     
                     {/* Si NO hay búsqueda: Mostrar Populares / Más Buscado */}
                     {!localValue ? (
@@ -253,7 +253,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                                             key={index}
                                             type="button"
                                             onClick={() => handleSuggestionClick(sugerencia)}
-                                            className="w-full text-left px-4 py-3 hover:bg-slate-800/80 flex items-center gap-3 group transition-colors border-l-4 border-transparent hover:border-amber-500 active:bg-slate-750"
+                                            className="w-full text-left px-4 py-3 hover:bg-slate-800/80 flex items-center gap-3 group transition-colors border-l-4 border-transparent hover:border-amber-500 active:bg-slate-700"
                                         >
                                             <div className={`p-1.5 rounded-xl flex items-center justify-center ${
                                                 isCode ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400 group-hover:text-amber-400'

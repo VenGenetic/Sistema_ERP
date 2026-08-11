@@ -211,14 +211,14 @@ export const InventoryMode: React.FC = () => {
     const filteredGroups = groups.filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="p-6 max-w-[1600px] mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-fg flex items-center gap-3">
                         <LayoutDashboard className="w-8 h-8 text-primary" />
                         Modo Inventario
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-fg-muted mt-1">
                         Gestiona grupos de productos para realizar conteos físicos con código de barras y programa frecuencias de inspección.
                     </p>
                 </div>
@@ -232,46 +232,46 @@ export const InventoryMode: React.FC = () => {
                 </button>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden mb-8">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30">
+            <div className="bg-surface rounded-2xl shadow-sm border border-subtle overflow-hidden mb-8">
+                <div className="p-4 border-b border-subtle flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30">
                     <div className="relative max-w-md w-full">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-subtle" />
                         <input
                             type="text"
                             placeholder="Buscar por nombre de grupo..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white text-sm"
+                            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-subtle rounded-xl focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white text-sm"
                         />
                     </div>
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 hidden sm:inline-block">
+                    <span className="text-xs font-semibold text-fg-muted hidden sm:inline-block">
                         Total Grupos: <strong className="text-primary">{filteredGroups.length}</strong>
                     </span>
                 </div>
 
                 {loading ? (
-                    <div className="p-12 flex flex-col items-center justify-center text-slate-400 gap-3">
+                    <div className="p-12 flex flex-col items-center justify-center text-fg-subtle gap-3">
                         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
                         <span className="text-sm font-medium">Cargando grupos y estados...</span>
                     </div>
                 ) : filteredGroups.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500 dark:text-slate-400">
+                    <div className="p-12 text-center text-fg-muted">
                         No se encontraron grupos de inventario que coincidan con la búsqueda.
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider font-extrabold">
-                                    <th className="px-6 py-4">Nombre del Grupo</th>
-                                    <th className="px-5 py-4 text-center">Productos</th>
-                                    <th className="px-5 py-4">Última Vez Aplicado</th>
-                                    <th className="px-5 py-4">Intervalo de Conteo</th>
-                                    <th className="px-5 py-4">Próximo Conteo & Estado</th>
-                                    <th className="px-6 py-4 text-right">Acciones</th>
+                                <tr className="bg-surface-2 text-fg-muted text-xs uppercase tracking-wider font-bold">
+                                    <th className="px-4 py-2.5">Nombre del Grupo</th>
+                                    <th className="px-4 py-2.5 text-center">Productos</th>
+                                    <th className="px-4 py-2.5">Última Vez Aplicado</th>
+                                    <th className="px-4 py-2.5">Intervalo de Conteo</th>
+                                    <th className="px-4 py-2.5">Próximo Conteo & Estado</th>
+                                    <th className="px-4 py-2.5 text-right">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+                            <tbody className="divide-y divide-subtle text-sm">
                                 {filteredGroups.map(group => {
                                     const nextCountInfo = calculateNextCountInfo(
                                         group.last_counted_at, 
@@ -285,33 +285,33 @@ export const InventoryMode: React.FC = () => {
                                             onClick={() => navigate(`/inventory-mode/${group.id}`)}
                                             className="hover:bg-slate-50/80 dark:hover:bg-slate-700/40 cursor-pointer transition-all duration-150 group"
                                         >
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold text-slate-900 dark:text-white text-base group-hover:text-primary transition-colors">
+                                            <td className="px-4 py-3">
+                                                <div className="font-bold text-fg text-base group-hover:text-primary transition-colors">
                                                     {group.name}
                                                 </div>
-                                                <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                                                <div className="text-[11px] font-mono text-fg-subtle mt-0.5">
                                                     ID: {group.id.split('-')[0]}...
                                                 </div>
                                             </td>
-                                            <td className="px-5 py-4 text-center">
-                                                <span className="inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-xl text-xs font-black border border-slate-200 dark:border-slate-700 shadow-2xs">
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="inline-flex items-center justify-center bg-surface-3 text-fg px-3 py-1 rounded-xl text-xs font-bold border border-subtle shadow-2xs">
                                                     {group.inventory_group_items?.[0]?.count || 0} ítems
                                                 </span>
                                             </td>
-                                            <td className="px-5 py-4 text-slate-600 dark:text-slate-300 font-medium">
+                                            <td className="px-4 py-3 text-fg-muted font-medium">
                                                 {group.last_counted_at ? (
                                                     <div className="flex items-center gap-1.5">
-                                                        <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                                        <Clock className="w-4 h-4 text-fg-subtle shrink-0" />
                                                         <span>{new Date(group.last_counted_at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-400 italic">Nunca</span>
+                                                    <span className="text-fg-subtle italic">Nunca</span>
                                                 )}
                                             </td>
                                             
                                             {/* Interval Selector Controls */}
-                                            <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-700 w-fit">
+                                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-900 p-1 rounded-xl border border-subtle w-fit">
                                                     <input
                                                         type="number"
                                                         min="0"
@@ -325,13 +325,13 @@ export const InventoryMode: React.FC = () => {
                                                             const val = parseInt(e.target.value, 10) || 0;
                                                             handleIntervalChange(group.id, val, group.interval_unit ?? 'days');
                                                         }}
-                                                        className="w-14 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono font-black text-center text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary shadow-2xs"
+                                                        className="w-14 px-2 py-1 bg-surface border border-strong rounded-lg text-xs font-mono font-bold text-center text-fg outline-none focus:ring-2 focus:ring-primary shadow-2xs"
                                                         title="Número de días/semanas/meses"
                                                     />
                                                     <select
                                                         value={group.interval_unit ?? 'days'}
                                                         onChange={(e) => handleIntervalChange(group.id, group.interval_value ?? 0, e.target.value)}
-                                                        className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs"
+                                                        className="px-2 py-1 bg-surface border border-strong rounded-lg text-xs font-bold text-fg outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs"
                                                     >
                                                         <option value="days">Días</option>
                                                         <option value="weeks">Semanas</option>
@@ -341,48 +341,48 @@ export const InventoryMode: React.FC = () => {
                                             </td>
 
                                             {/* Next Count & Automated Status Badge */}
-                                            <td className="px-5 py-4">
+                                            <td className="px-4 py-3">
                                                 <div className="flex flex-col items-start gap-1.5">
                                                     {nextCountInfo.status === 'Al día' ? (
-                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 rounded-full text-xs font-black border border-emerald-300 dark:border-emerald-800/80 shadow-2xs">
-                                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-success-soft text-success-soft-fg rounded-full text-xs font-bold border border-success/20 shadow-2xs">
+                                                            <span className="w-2 h-2 rounded-full bg-success" />
                                                             <ShieldCheck className="w-3.5 h-3.5" />
                                                             Al día
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 rounded-full text-xs font-black border border-amber-300 dark:border-amber-800/80 shadow-2xs">
-                                                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-warning-soft text-warning-soft-fg rounded-full text-xs font-bold border border-warning/20 shadow-2xs">
+                                                            <span className="w-2 h-2 rounded-full bg-warning" />
                                                             <AlertCircle className="w-3.5 h-3.5" />
                                                             Por inventariar
                                                         </span>
                                                     )}
-                                                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
-                                                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                                        Límite: <strong className="text-slate-700 dark:text-slate-300">{nextCountInfo.nextDateFormatted}</strong>
+                                                    <span className="text-[11px] text-fg-muted font-medium flex items-center gap-1">
+                                                        <Calendar className="w-3.5 h-3.5 text-fg-subtle" />
+                                                        Límite: <strong className="text-fg">{nextCountInfo.nextDateFormatted}</strong>
                                                     </span>
                                                 </div>
                                             </td>
 
                                             {/* Actions */}
-                                            <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                            <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-end gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                                     <button
                                                         onClick={(e) => handleResetGroup(e, group.id, group.name)}
-                                                        className="p-2 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-xl transition-colors border border-transparent hover:border-amber-200 dark:hover:border-amber-800"
+                                                        className="p-2 text-fg-muted hover:text-warning hover:bg-warning-soft rounded-xl transition-colors border border-transparent hover:border-warning/20"
                                                         title="Resetear conteo activo y sesión"
                                                     >
                                                         <RotateCcw className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={(e) => handleRenameGroup(e, group.id, group.name)}
-                                                        className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-colors border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
+                                                        className="p-2 text-fg-muted hover:text-primary hover:bg-primary-soft rounded-xl transition-colors border border-transparent hover:border-primary/20"
                                                         title="Renombrar grupo"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={(e) => handleDeleteGroup(e, group.id, group.name)}
-                                                        className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-colors border border-transparent hover:border-rose-200 dark:hover:border-rose-800"
+                                                        className="p-2 text-fg-muted hover:text-danger hover:bg-danger-soft rounded-xl transition-colors border border-transparent hover:border-danger/20"
                                                         title="Eliminar grupo"
                                                     >
                                                         <Trash2 className="w-4 h-4" />

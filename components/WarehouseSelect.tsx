@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import {
+  ChevronDown,
+} from 'lucide-react';
 
 interface Warehouse {
     id: number;
@@ -79,13 +82,13 @@ export const WarehouseSelect: React.FC<WarehouseSelectProps> = ({ value, onChang
 
     return (
         <div className="relative" ref={containerRef}>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                {label} {required && <span className="text-red-500">*</span>}
+            <label className="block text-sm font-medium text-fg mb-1">
+                {label} {required && <span className="text-danger">*</span>}
             </label>
             <div className="relative">
                 <input
                     type="text"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                    className="w-full px-3 py-2 bg-surface-2 border border-strong rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                     placeholder="Buscar almacén..."
                     value={searchTerm}
                     onChange={(e) => {
@@ -95,21 +98,21 @@ export const WarehouseSelect: React.FC<WarehouseSelectProps> = ({ value, onChang
                     }}
                     onFocus={() => setIsOpen(true)}
                 />
-                <div className="absolute right-3 top-2.5 text-slate-400 pointer-events-none">
-                    <span className="material-symbols-outlined text-[20px]">expand_more</span>
+                <div className="absolute right-3 top-2.5 text-fg-subtle pointer-events-none">
+                    <ChevronDown size={20} aria-hidden="true" />
                 </div>
             </div>
 
             {isOpen && (
-                <div className="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                <div className="absolute z-30 w-full mt-1 bg-surface border border-subtle rounded-lg shadow-lg max-h-60 overflow-auto">
                     {loading ? (
-                        <div className="p-3 text-center text-slate-500 text-sm">Cargando...</div>
+                        <div className="p-3 text-center text-fg-muted text-sm">Cargando...</div>
                     ) : (
                         <>
                             {filteredWarehouses.map(warehouse => (
                                 <button
                                     key={warehouse.id}
-                                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm transition-colors flex items-center justify-between"
+                                    className="w-full text-left px-4 py-2 hover:bg-surface-hover text-fg text-sm transition-colors flex items-center justify-between"
                                     onClick={() => {
                                         onChange(warehouse.id);
                                         setSearchTerm(warehouse.name);
@@ -117,14 +120,14 @@ export const WarehouseSelect: React.FC<WarehouseSelectProps> = ({ value, onChang
                                     }}
                                 >
                                     <span>{warehouse.name}</span>
-                                    <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded capitalize">
+                                    <span className="text-xs text-fg-subtle bg-surface-3 px-2 py-0.5 rounded capitalize">
                                         {warehouse.type === 'physical' ? 'Físico' : 'Virtual'}
                                     </span>
                                 </button>
                             ))}
 
                             {filteredWarehouses.length === 0 && (
-                                <div className="p-3 text-center text-slate-500 text-sm">
+                                <div className="p-3 text-center text-fg-muted text-sm">
                                     No se encontraron almacenes.
                                 </div>
                             )}

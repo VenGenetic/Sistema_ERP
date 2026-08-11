@@ -1,4 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CirclePlay,
+  Download,
+  ExternalLink,
+  Plus,
+  X,
+} from 'lucide-react';
 
 export interface MediaItem {
     type: 'image' | 'video';
@@ -119,14 +128,14 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
                 title="Abrir en Catálogo"
                 className="absolute top-6 right-36 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md z-10"
             >
-                <span className="material-symbols-outlined">open_in_new</span>
+                <ExternalLink size={18} aria-hidden="true" />
             </button>
             <button 
                 onClick={(e) => { e.stopPropagation(); handleDownload(currentMedia); }}
                 title="Descargar archivo"
                 className="absolute top-6 right-20 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md z-10"
             >
-                <span className="material-symbols-outlined">download</span>
+                <Download size={18} aria-hidden="true" />
             </button>
 
             {/* Close Button */}
@@ -134,7 +143,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
                 onClick={onClose}
                 className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md z-10"
             >
-                <span className="material-symbols-outlined">close</span>
+                <X size={18} aria-hidden="true" />
             </button>
 
             {/* Title (Optional) */}
@@ -152,13 +161,13 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
                         onClick={(e) => { e.stopPropagation(); handlePrev(); }}
                         className="absolute left-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md z-10 hover:scale-110"
                     >
-                        <span className="material-symbols-outlined text-[32px]">chevron_left</span>
+                        <ChevronLeft size={32} aria-hidden="true" />
                     </button>
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleNext(); }}
                         className="absolute right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md z-10 hover:scale-110"
                     >
-                        <span className="material-symbols-outlined text-[32px]">chevron_right</span>
+                        <ChevronRight size={32} aria-hidden="true" />
                     </button>
                 </>
             )}
@@ -173,7 +182,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
                     >
                         {item.type === 'video' ? (
                             <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-emerald-500">play_circle</span>
+                                <CirclePlay size={18} className="text-success" aria-hidden="true" />
                             </div>
                         ) : (
                             <img src={item.url} alt="" className="w-full h-full object-cover" />
@@ -186,7 +195,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
                         className="h-16 w-16 rounded-lg overflow-hidden transition-all duration-300 border-2 border-dashed border-white/30 flex items-center justify-center text-white/50 hover:text-white hover:border-white hover:bg-white/10 flex-shrink-0"
                         title="Añadir foto/video"
                     >
-                        <span className="material-symbols-outlined text-[24px]">add</span>
+                        <Plus size={24} aria-hidden="true" />
                     </button>
                 )}
             </div>
@@ -201,14 +210,14 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
                         src={currentMedia.url} 
                         controls 
                         autoPlay 
-                        className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                        className="max-w-full max-h-full object-contain rounded-xl shadow-xl"
                         key={currentMedia.url} // Force remount if URL changes
                     />
                 ) : (
                     <img 
                         src={currentMedia.url} 
                         alt={currentMedia.title || 'Imagen del producto'} 
-                        className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                        className="max-w-full max-h-full object-contain rounded-xl shadow-xl"
                     />
                 )}
             </div>

@@ -87,21 +87,26 @@
          Verificar con `npm run check-contrast` tras cualquier cambio.
          --------------------------------------------------------------- */
 
-      /* Superficies — gris neutro frío, croma casi nulo */
-      --bg: 247 248 250;
-      /* fondo de página                          */
+      /* Superficies — gris neutro frío, croma casi nulo.
+         Los escalones son AMPLIOS a propósito: si el fondo de página y la
+         tarjeta se diferencian en un 3%, los apartados no se separan y todo
+         se lee como una sola lámina. El fondo es claramente gris para que
+         las superficies blancas se despeguen por sí solas, sin depender de
+         sombras fuertes (que romperían la serenidad). */
+      --bg: 236 239 244;
+      /* fondo de página — gris definido           */
       --surface: 255 255 255;
-      /* tarjetas, tablas, modales                */
-      --surface-2: 247 248 250;
-      /* cabeceras de tabla, pozos                */
-      --surface-3: 237 239 243;
-      /* inset / deshabilitado                    */
-      --surface-hover: 241 243 247;
-      /* hover de fila y de navegación            */
+      /* tarjetas, tablas, modales — blanco puro   */
+      --surface-2: 246 248 251;
+      /* cabecera de tabla / pozo DENTRO de una tarjeta */
+      --surface-3: 226 231 239;
+      /* inset / deshabilitado                     */
+      --surface-hover: 241 244 249;
+      /* hover de fila y de navegación             */
 
       /* Bordes */
-      --border: 227 230 236;
-      /* hairline — separación decorativa         */
+      --border: 216 222 231;
+      /* hairline — algo más marcado, define el canto de cada apartado */
       --border-strong: 134 143 161;
       /* borde de input          3.3:1  croma 13% */
 
@@ -124,15 +129,15 @@
       --primary-soft-fg: 47 85 128;
       /* 6.6:1 */
 
-      --success: 63 122 94;
-      /* verde salvia            4.7:1  croma 32% */
+      --success: 59 115 85;
+      /* verde salvia            4.8:1 sobre página  croma 32% */
       --success-fg: 255 255 255;
       --success-soft: 237 245 241;
       --success-soft-fg: 53 102 78;
       /* 5.8:1 */
 
-      --warning: 133 106 56;
-      /* ocre apagado            5.1:1  croma 41% */
+      --warning: 128 102 54;
+      /* ocre apagado            4.7:1 sobre página  croma 41% */
       --warning-fg: 255 255 255;
       --warning-soft: 250 244 232;
       --warning-soft-fg: 111 89 48;

@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import InviteUserModal from '../components/InviteUserModal';
 
 import { supabase } from '../supabaseClient';
+import {
+  ChevronRight,
+  EllipsisVertical,
+  ListFilter,
+  Plus,
+  Search,
+} from 'lucide-react';
 
 interface User {
   id: string;
@@ -113,7 +120,7 @@ const Team: React.FC = () => {
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 mb-6 text-sm">
         <span className="text-text-secondary hover:text-white transition-colors cursor-pointer">General</span>
-        <span className="material-symbols-outlined text-text-secondary text-base">chevron_right</span>
+        <ChevronRight size={16} className="text-text-secondary" aria-hidden="true" />
         <span className="text-fg font-medium">Equipos y Permisos</span>
       </div>
 
@@ -126,9 +133,9 @@ const Team: React.FC = () => {
         <div className="flex gap-3">
           <button
             onClick={() => setIsInviteModalOpen(true)}
-            className="bg-primary hover:bg-blue-600 text-white font-medium py-2.5 px-5 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap bg-blue-600"
+            className="bg-primary hover:bg-primary text-white font-medium py-2.5 px-5 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-primary/20 whitespace-nowrap bg-primary"
           >
-            <span className="material-symbols-outlined text-[20px]">add</span>
+            <Plus size={20} aria-hidden="true" />
             Invitar Miembro
           </button>
         </div>
@@ -138,13 +145,13 @@ const Team: React.FC = () => {
       <div className="bg-surface-dark border border-border-dark rounded-xl p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
         <div className="relative w-full md:max-w-md group">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span className="material-symbols-outlined text-text-secondary group-focus-within:text-primary transition-colors">search</span>
+            <Search size={18} className="text-text-secondary group-focus-within:text-primary transition-colors" aria-hidden="true" />
           </div>
           <input className="block w-full pl-10 pr-3 py-2.5 bg-background-dark border border-border-dark rounded-lg leading-5 text-fg placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all" placeholder="Buscar por nombre, email o rol..." type="text" />
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
           <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary bg-background-dark border border-border-dark rounded-lg hover:text-white hover:border-gray-500 transition-colors whitespace-nowrap">
-            <span className="material-symbols-outlined text-[18px]">filter_list</span>
+            <ListFilter size={18} aria-hidden="true" />
             <span>Filtros</span>
           </button>
         </div>
@@ -156,33 +163,29 @@ const Team: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border-dark bg-surface-hover/50">
-                <th className="px-6 py-4 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[35%]">Usuario</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[20%]">Rol</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[20%]">Estado</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Último Acceso</th>
-                <th className="px-6 py-4 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[10%] text-right">Acciones</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[35%]">Usuario</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[20%]">Rol</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[20%]">Estado</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[15%]">Último Acceso</th>
+                <th className="px-4 py-2.5 text-xs font-semibold text-text-secondary uppercase tracking-wider w-[10%] text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-dark">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-text-secondary">Cargando equipo...</td>
+                  <td colSpan={5} className="px-4 py-3 text-center text-text-secondary">Cargando equipo...</td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-text-secondary">No hay usuarios registrados.</td>
+                  <td colSpan={5} className="px-4 py-3 text-center text-text-secondary">No hay usuarios registrados.</td>
                 </tr>
               ) : (
                 users.map((user, index) => (
                   <tr key={user.id} className="group hover:bg-surface-hover transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-4">
                         {user.avatarType === 'initials' ? (
-                          <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md
-                            ${index % 3 === 0 ? 'bg-gradient-to-br from-blue-500 to-purple-600' : ''}
-                            ${index % 3 === 1 ? 'bg-surface-hover border border-border-dark text-text-secondary' : ''}
-                            ${index % 3 === 2 ? 'bg-gradient-to-br from-indigo-500 to-blue-600' : ''}
-                          `}>
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md ${index % 3 === 0 ? 'bg-primary' : ''} ${index % 3 === 1 ? 'bg-surface-hover border border-border-dark text-text-secondary' : ''} ${index % 3 === 2 ? 'bg-primary' : ''}`}>
                             {user.initials}
                           </div>
                         ) : (
@@ -194,22 +197,17 @@ const Team: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="relative inline-block text-left">
-                        <span className="inline-flex justify-between items-center w-36 rounded-md border border-border-dark shadow-sm px-3 py-1.5 bg-background-dark text-sm font-medium text-fg">
+                        <span className="inline-flex justify-between items-center w-36 rounded-lg border border-border-dark shadow-sm px-3 py-1.5 bg-background-dark text-sm font-medium text-fg">
                           <span className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full 
-                              ${user.roleColor === 'purple' ? 'bg-purple-500' : ''}
-                              ${user.roleColor === 'emerald' ? 'bg-emerald-500' : ''}
-                              ${user.roleColor === 'amber' ? 'bg-amber-500' : ''}
-                              ${user.roleColor === 'cyan' ? 'bg-cyan-500' : ''}
-                            `}></span>
+                            <span className={`w-2 h-2 rounded-full ${user.roleColor === 'purple' ? 'bg-primary' : ''} ${user.roleColor === 'emerald' ? 'bg-success' : ''} ${user.roleColor === 'amber' ? 'bg-warning' : ''} ${user.roleColor === 'cyan' ? 'bg-primary' : ''}`}></span>
                             {user.role}
                           </span>
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
@@ -223,12 +221,12 @@ const Team: React.FC = () => {
                         </span>
                       </label>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary">
                       {user.lastActive}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                       <button className="text-text-secondary hover:text-white transition-colors p-2 rounded-full hover:bg-background-dark/50">
-                        <span className="material-symbols-outlined">more_vert</span>
+                        <EllipsisVertical size={18} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>

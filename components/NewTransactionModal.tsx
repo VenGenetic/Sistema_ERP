@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Account } from '../types/finance';
 import { getAccountEffect, getAccountNatureLabel } from '../utils/accountNature';
+import {
+  CircleAlert,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 interface NewTransactionModalProps {
     isOpen: boolean;
@@ -122,36 +128,36 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
+            <div className="bg-surface rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-subtle animate-in fade-in zoom-in duration-200">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Nueva Transacción</h2>
-                        <p className="text-sm text-slate-500">Registra un movimiento contable manual o referencia.</p>
+                        <h2 className="text-xl font-bold text-fg">Nueva Transacción</h2>
+                        <p className="text-sm text-fg-muted">Registra un movimiento contable manual o referencia.</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
-                        <span className="material-symbols-outlined">close</span>
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descripción</label>
+                            <label className="block text-sm font-medium text-fg mb-1">Descripción</label>
                             <input
                                 required
                                 type="text"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all dark:text-white"
+                                className="w-full px-4 py-2 bg-surface-2 border border-subtle rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all dark:text-white"
                                 placeholder="Ej: Pago de servicios, Transferencia entre cuentas..."
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo de Ref.</label>
+                            <label className="block text-sm font-medium text-fg mb-1">Tipo de Ref.</label>
                             <select
                                 value={referenceType}
                                 onChange={(e) => setReferenceType(e.target.value)}
-                                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all dark:text-white"
+                                className="w-full px-4 py-2 bg-surface-2 border border-subtle rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all dark:text-white"
                             >
                                 <option value="Manual">Manual</option>
                                 <option value="Order">Orden</option>
@@ -161,14 +167,14 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                         </div>
                         {referenceType === 'Order' && (
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ID Orden/Pedido</label>
+                                <label className="block text-sm font-medium text-fg mb-1">ID Orden/Pedido</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">#</span>
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle font-mono text-xs">#</span>
                                     <input
                                         type="number"
                                         value={orderId}
                                         onChange={(e) => setOrderId(e.target.value)}
-                                        className="w-full pl-6 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all dark:text-white font-mono"
+                                        className="w-full pl-6 pr-4 py-2 bg-surface-2 border border-subtle rounded-lg focus:ring-2 focus:ring-primary/20 outline-none transition-all dark:text-white font-mono"
                                         placeholder="12345"
                                     />
                                 </div>
@@ -179,7 +185,7 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                     <div className="mb-6 overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                                <tr className="text-xs uppercase tracking-wider text-fg-muted font-semibold">
                                     <th className="pb-2 pr-4">Cuenta</th>
                                     <th className="pb-2 px-2 w-32 text-right">Débito</th>
                                     <th className="pb-2 px-2 w-32 text-right">Crédito</th>
@@ -201,7 +207,7 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                 required
                                                 value={line.account_id}
                                                 onChange={(e) => handleLineChange(index, 'account_id', e.target.value)}
-                                                className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-primary transition-all dark:text-white text-sm"
+                                                className="w-full px-3 py-1.5 bg-surface border border-subtle rounded-lg outline-none focus:border-primary transition-all dark:text-white text-sm"
                                             >
                                                 <option value="">Seleccionar cuenta...</option>
                                                 {accounts.map(acc => (
@@ -214,16 +220,12 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                             {selectedAccount && (
                                                 <div className="mt-1 flex items-center gap-1">
                                                     {effect ? (
-                                                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                                            effect.direction === 'increase'
-                                                                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'
-                                                                : 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
-                                                        }`}>
+                                                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${ effect.direction === 'increase' ? 'bg-success-soft text-success dark:text-success' : 'bg-warning-soft text-warning dark:text-warning' }`}>
                                                             <span>{effect.icon}</span>
                                                             {effect.label}
                                                         </span>
                                                     ) : nature ? (
-                                                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                                                        <span className="text-2xs text-fg-subtle">
                                                             Débito {nature.debitEffect} {nature.debitLabel} · Crédito {nature.creditEffect} {nature.creditLabel}
                                                         </span>
                                                     ) : null}
@@ -236,13 +238,7 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                 step="0.01"
                                                 value={line.debit}
                                                 onChange={(e) => handleLineChange(index, 'debit', e.target.value)}
-                                                className={`w-full px-3 py-1.5 bg-white dark:bg-slate-900 border rounded-md outline-none text-right text-sm dark:text-white transition-all ${
-                                                    debitVal > 0 && effect
-                                                        ? effect.direction === 'increase'
-                                                            ? 'border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-200 dark:ring-emerald-800'
-                                                            : 'border-amber-300 dark:border-amber-700 ring-1 ring-amber-200 dark:ring-amber-800'
-                                                        : 'border-slate-200 dark:border-slate-700 focus:border-primary'
-                                                }`}
+                                                className={`w-full px-3 py-1.5 bg-surface border rounded-md outline-none text-right text-sm dark:text-white transition-all ${ debitVal > 0 && effect ? effect.direction === 'increase' ? 'border-success/20 ring-1 ring-success dark:ring-success' : 'border-warning/20 ring-1 ring-warning dark:ring-warning' : 'border-slate-200 dark:border-slate-700 focus:border-primary' }`}
                                                 placeholder="0.00"
                                             />
                                         </td>
@@ -252,13 +248,7 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                 step="0.01"
                                                 value={line.credit}
                                                 onChange={(e) => handleLineChange(index, 'credit', e.target.value)}
-                                                className={`w-full px-3 py-1.5 bg-white dark:bg-slate-900 border rounded-md outline-none text-right text-sm dark:text-white transition-all ${
-                                                    creditVal > 0 && effect
-                                                        ? effect.direction === 'increase'
-                                                            ? 'border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-200 dark:ring-emerald-800'
-                                                            : 'border-amber-300 dark:border-amber-700 ring-1 ring-amber-200 dark:ring-amber-800'
-                                                        : 'border-slate-200 dark:border-slate-700 focus:border-primary'
-                                                }`}
+                                                className={`w-full px-3 py-1.5 bg-surface border rounded-md outline-none text-right text-sm dark:text-white transition-all ${ creditVal > 0 && effect ? effect.direction === 'increase' ? 'border-success/20 ring-1 ring-success dark:ring-success' : 'border-warning/20 ring-1 ring-warning dark:ring-warning' : 'border-slate-200 dark:border-slate-700 focus:border-primary' }`}
                                                 placeholder="0.00"
                                             />
                                         </td>
@@ -267,9 +257,9 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                                                 <button
                                                     type="button"
                                                     onClick={() => removeLine(index)}
-                                                    className="text-slate-400 hover:text-red-500 transition-colors"
+                                                    className="text-fg-subtle hover:text-danger transition-colors"
                                                 >
-                                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                    <Trash2 size={18} aria-hidden="true" />
                                                 </button>
                                             )}
                                         </td>
@@ -279,11 +269,11 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 border-slate-100 dark:border-slate-700 font-bold">
-                                    <td className="py-4 text-right pr-4 text-sm text-slate-500">Totales:</td>
-                                    <td className={`py-4 px-2 text-right ${isBalanced ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
+                                    <td className="py-4 text-right pr-4 text-sm text-fg-muted">Totales:</td>
+                                    <td className={`py-4 px-2 text-right ${isBalanced ? 'text-success' : 'text-slate-900 dark:text-white'}`}>
                                         ${totalDebit.toFixed(2)}
                                     </td>
-                                    <td className={`py-4 px-2 text-right ${isBalanced ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
+                                    <td className={`py-4 px-2 text-right ${isBalanced ? 'text-success' : 'text-slate-900 dark:text-white'}`}>
                                         ${totalCredit.toFixed(2)}
                                     </td>
                                     <td></td>
@@ -297,13 +287,13 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                         onClick={addLine}
                         className="flex items-center gap-1 text-primary hover:text-primary-hover font-medium text-sm transition-colors mb-6"
                     >
-                        <span className="material-symbols-outlined text-[18px]">add</span>
+                        <Plus size={18} aria-hidden="true" />
                         Agregar línea
                     </button>
 
                     {error && (
-                        <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-start gap-2">
-                            <span className="material-symbols-outlined text-[18px]">error</span>
+                        <div className="mb-6 p-3 bg-danger-soft border border-danger/20 rounded-lg text-danger-soft-fg text-sm flex items-start gap-2">
+                            <CircleAlert size={18} aria-hidden="true" />
                             {error}
                         </div>
                     )}
@@ -312,7 +302,7 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ isOpen, onClo
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            className="px-6 py-2 border border-subtle rounded-lg text-fg text-sm font-medium hover:bg-surface-hover transition-colors"
                         >
                             Cancelar
                         </button>

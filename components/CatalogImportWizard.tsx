@@ -1,5 +1,25 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import {
+  ArrowRight,
+  CircleAlert,
+  CircleCheck,
+  CircleCheckBig,
+  CirclePlus,
+  Database,
+  Download,
+  FilePen,
+  FilePlus,
+  FileUp,
+  Loader2,
+  Percent,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  TriangleAlert,
+  Upload,
+  X,
+} from 'lucide-react';
 
 interface CatalogRow {
     id: string;
@@ -296,27 +316,27 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="bg-surface rounded-2xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden border border-subtle">
 
                 {/* ═══════ TOP BAR ═══════ */}
-                <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                <div className="p-6 border-b border-subtle flex justify-between items-center bg-surface-2">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 text-primary rounded-xl">
-                            <span className="material-symbols-outlined text-[24px]">magic_button</span>
+                            <Sparkles size={24} aria-hidden="true" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Master Data Override Wizard</h2>
-                            <p className="text-sm text-slate-500">Sincroniza el catálogo de productos saltando la protección de 3 strikes.</p>
+                            <h2 className="text-xl font-bold text-fg">Master Data Override Wizard</h2>
+                            <p className="text-sm text-fg-muted">Sincroniza el catálogo de productos saltando la protección de 3 strikes.</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
                         {/* Download Template */}
                         <button
                             onClick={handleDownloadTemplate}
-                            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 bg-surface border border-subtle rounded-xl text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors"
                             title="Descargar plantilla Excel"
                         >
-                            <span className="material-symbols-outlined text-[18px]">download</span>
+                            <Download size={18} aria-hidden="true" />
                             Plantilla
                         </button>
                         {/* Upload */}
@@ -329,13 +349,13 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                                 title="Importar Excel"
                             />
-                            <button className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm font-medium hover:bg-emerald-100 transition-colors">
-                                <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                            <button className="flex items-center gap-2 px-3 py-2 bg-success-soft text-success-soft-fg border border-success/20 rounded-xl text-sm font-medium hover:bg-success-soft transition-colors">
+                                <FileUp size={18} aria-hidden="true" />
                                 Cargar Excel
                             </button>
                         </div>
-                        <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors ml-1">
-                            <span className="material-symbols-outlined">close</span>
+                        <button onClick={onClose} className="p-2 text-fg-subtle hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors ml-1">
+                            <X size={18} aria-hidden="true" />
                         </button>
                     </div>
                 </div>
@@ -343,38 +363,38 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                 {/* ═══════ MAIN CONTENT ═══════ */}
                 <div className="flex-1 overflow-auto p-6 bg-slate-50/50 dark:bg-slate-900/50">
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-4">
-                            <span className="material-symbols-outlined animate-spin text-[40px] text-primary">progress_activity</span>
+                        <div className="flex flex-col items-center justify-center h-full text-fg-muted gap-4">
+                            <Loader2 size={40} className="animate-spin text-primary" aria-hidden="true" />
                             <p className="font-medium animate-pulse">Cargando catálogo base...</p>
                         </div>
                     ) : excelRows.length === 0 ? (
                         /* ═══════ EMPTY STATE ═══════ */
                         <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
                             <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mb-6">
-                                <span className="material-symbols-outlined text-[48px] text-primary/40">post_add</span>
+                                <FilePlus size={48} className="text-primary/40" aria-hidden="true" />
                             </div>
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2">Sube tu archivo Excel</h3>
-                            <p className="text-slate-500 mb-4">Columnas obligatorias:</p>
+                            <h3 className="text-xl font-bold text-fg mb-2">Sube tu archivo Excel</h3>
+                            <p className="text-fg-muted mb-4">Columnas obligatorias:</p>
                             <div className="flex flex-wrap gap-2 justify-center mb-2">
-                                <span className="font-mono bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-sm">SKU</span>
-                                <span className="font-mono bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-sm">Nombre</span>
-                                <span className="font-mono bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded text-sm">Costo S/IVA</span>
+                                <span className="font-mono bg-danger-soft text-danger-soft-fg px-2 py-0.5 rounded text-sm">SKU</span>
+                                <span className="font-mono bg-danger-soft text-danger-soft-fg px-2 py-0.5 rounded text-sm">Nombre</span>
+                                <span className="font-mono bg-danger-soft text-danger-soft-fg px-2 py-0.5 rounded text-sm">Costo S/IVA</span>
                             </div>
-                            <p className="text-slate-400 text-xs mb-4">Condicional: <span className="font-mono">Margen</span> (requerido para nuevos)</p>
-                            <p className="text-slate-400 text-xs mb-6">Opcionales: <span className="font-mono">Categoría</span>, <span className="font-mono">IVA %</span></p>
+                            <p className="text-fg-subtle text-xs mb-4">Condicional: <span className="font-mono">Margen</span> (requerido para nuevos)</p>
+                            <p className="text-fg-subtle text-xs mb-6">Opcionales: <span className="font-mono">Categoría</span>, <span className="font-mono">IVA %</span></p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={handleDownloadTemplate}
-                                    className="px-5 py-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                                    className="px-5 py-2.5 bg-surface border border-subtle text-fg-muted rounded-xl font-medium hover:bg-surface-hover transition-colors flex items-center gap-2"
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">download</span>
+                                    <Download size={18} aria-hidden="true" />
                                     Descargar Plantilla
                                 </button>
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
                                     className="px-6 py-2.5 bg-primary text-white rounded-xl shadow-lg shadow-primary/30 font-medium hover:bg-primary/90 transition-all active:scale-95 flex items-center gap-2"
                                 >
-                                    <span className="material-symbols-outlined">upload</span>
+                                    <Upload size={18} aria-hidden="true" />
                                     Seleccionar Archivo
                                 </button>
                             </div>
@@ -385,14 +405,14 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
 
                             {/* ── IVA SMART PROMPT ── */}
                             {showIvaPrompt && rowsWithBlankIva.length > 0 && (
-                                <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-500/50 rounded-2xl p-5 shadow-lg shadow-amber-100 dark:shadow-amber-900/20">
+                                <div className="bg-warning-soft border-2 border-warning rounded-2xl p-5 shadow-lg shadow-warning">
                                     <div className="flex items-start gap-4">
-                                        <div className="bg-amber-100 dark:bg-amber-900/40 p-3 rounded-xl">
-                                            <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[28px]">percent</span>
+                                        <div className="bg-warning-soft p-3 rounded-xl">
+                                            <Percent size={32} className="text-warning" aria-hidden="true" />
                                         </div>
                                         <div className="flex-1">
-                                            <h3 className="text-lg font-bold text-amber-800 dark:text-amber-300 mb-1">IVA sin definir detectado</h3>
-                                            <p className="text-sm text-amber-700 dark:text-amber-400 mb-4">
+                                            <h3 className="text-lg font-bold text-warning mb-1">IVA sin definir detectado</h3>
+                                            <p className="text-sm text-warning mb-4">
                                                 Tienes <span className="font-bold">{rowsWithBlankIva.length}</span> productos con la columna <span className="font-mono font-semibold">IVA %</span> vacía.
                                                 Selecciona un IVA de respaldo para aplicar a estos productos:
                                             </p>
@@ -400,7 +420,7 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                                 <select
                                                     value={ivaFallback}
                                                     onChange={(e) => setIvaFallback(e.target.value)}
-                                                    className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-600 rounded-xl font-medium text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-amber-500 outline-none min-w-[180px]"
+                                                    className="px-4 py-2.5 bg-surface border border-warning/20 rounded-xl font-medium text-fg focus:ring-2 focus:ring-warning outline-none min-w-[180px]"
                                                 >
                                                     <option value="">Seleccionar IVA...</option>
                                                     <option value="15">15%</option>
@@ -412,12 +432,9 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                                 <button
                                                     onClick={handleApplyIvaFallback}
                                                     disabled={ivaFallback === ''}
-                                                    className={`px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${ivaFallback !== ''
-                                                            ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm active:scale-95'
-                                                            : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
-                                                        }`}
+                                                    className={`px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all ${ivaFallback !== '' ? 'bg-warning hover:bg-warning text-white shadow-sm active:scale-95' : 'bg-slate-200 dark:bg-slate-700 text-fg-subtle cursor-not-allowed' }`}
                                                 >
-                                                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                                    <CircleCheck size={18} aria-hidden="true" />
                                                     Aplicar a {rowsWithBlankIva.length} filas
                                                 </button>
                                             </div>
@@ -428,44 +445,44 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
 
                             {/* ── SUMMARY STATS ── */}
                             <div className="grid grid-cols-4 gap-4">
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-rose-200 dark:border-rose-900/50 shadow-sm flex items-center gap-4">
-                                    <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 p-3 rounded-lg"><span className="material-symbols-outlined">error</span></div>
-                                    <div><p className="text-sm text-slate-500">Errores</p><p className="text-2xl font-bold text-slate-900 dark:text-white">{categorizedData.errors.length}</p></div>
+                                <div className="bg-surface p-4 rounded-xl border border-danger/20 shadow-sm flex items-center gap-4">
+                                    <div className="bg-danger-soft text-danger-soft-fg p-3 rounded-lg"><CircleAlert size={18} aria-hidden="true" /></div>
+                                    <div><p className="text-sm text-fg-muted">Errores</p><p className="text-2xl font-bold text-fg">{categorizedData.errors.length}</p></div>
                                 </div>
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 shadow-sm flex items-center gap-4">
-                                    <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 p-3 rounded-lg"><span className="material-symbols-outlined">edit_note</span></div>
-                                    <div><p className="text-sm text-slate-500">Modificados</p><p className="text-2xl font-bold text-slate-900 dark:text-white">{categorizedData.modified.length}</p></div>
+                                <div className="bg-surface p-4 rounded-xl border border-warning/20 shadow-sm flex items-center gap-4">
+                                    <div className="bg-warning-soft text-warning-soft-fg p-3 rounded-lg"><FilePen size={18} aria-hidden="true" /></div>
+                                    <div><p className="text-sm text-fg-muted">Modificados</p><p className="text-2xl font-bold text-fg">{categorizedData.modified.length}</p></div>
                                 </div>
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/50 shadow-sm flex items-center gap-4">
-                                    <div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg"><span className="material-symbols-outlined">fiber_new</span></div>
-                                    <div><p className="text-sm text-slate-500">Nuevos</p><p className="text-2xl font-bold text-slate-900 dark:text-white">{categorizedData.new.length}</p></div>
+                                <div className="bg-surface p-4 rounded-xl border border-success/20 shadow-sm flex items-center gap-4">
+                                    <div className="bg-success-soft text-success-soft-fg p-3 rounded-lg"><Sparkles size={18} aria-hidden="true" /></div>
+                                    <div><p className="text-sm text-fg-muted">Nuevos</p><p className="text-2xl font-bold text-fg">{categorizedData.new.length}</p></div>
                                 </div>
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
-                                    <div className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 p-3 rounded-lg"><span className="material-symbols-outlined">check_circle</span></div>
-                                    <div><p className="text-sm text-slate-500">Sin Cambios</p><p className="text-2xl font-bold text-slate-900 dark:text-white">{categorizedData.unchanged.length}</p></div>
+                                <div className="bg-surface p-4 rounded-xl border border-subtle shadow-sm flex items-center gap-4">
+                                    <div className="bg-surface-3 text-fg-muted p-3 rounded-lg"><CircleCheck size={18} aria-hidden="true" /></div>
+                                    <div><p className="text-sm text-fg-muted">Sin Cambios</p><p className="text-2xl font-bold text-fg">{categorizedData.unchanged.length}</p></div>
                                 </div>
                             </div>
 
                             {/* ── ERRORS SECTION ── */}
                             {categorizedData.errors.length > 0 && (
-                                <div className="bg-white dark:bg-slate-800 border-[2px] border-rose-400 dark:border-rose-500/50 rounded-2xl shadow-lg shadow-rose-100 dark:shadow-rose-900/20 overflow-hidden">
-                                    <div className="bg-rose-50 dark:bg-rose-900/20 px-6 py-4 border-b border-rose-200 dark:border-rose-800 flex items-center justify-between">
+                                <div className="bg-surface border-[2px] border-danger rounded-2xl shadow-lg shadow-danger overflow-hidden">
+                                    <div className="bg-danger-soft px-6 py-4 border-b border-danger/20 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <span className="material-symbols-outlined text-rose-500 text-[28px]">warning</span>
-                                            <h3 className="text-lg font-bold text-rose-700 dark:text-rose-400">Atención Requerida ({categorizedData.errors.length})</h3>
+                                            <TriangleAlert size={32} className="text-danger" aria-hidden="true" />
+                                            <h3 className="text-lg font-bold text-danger">Atención Requerida ({categorizedData.errors.length})</h3>
                                         </div>
-                                        <p className="text-sm text-rose-600 dark:text-rose-300">Corrige los datos para procesarlos.</p>
+                                        <p className="text-sm text-danger">Corrige los datos para procesarlos.</p>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left">
-                                            <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+                                            <thead className="bg-surface-2 border-b border-subtle">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">SKU</th>
-                                                    <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nombre</th>
-                                                    <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Costo</th>
-                                                    <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">Margen</th>
-                                                    <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Motivo</th>
-                                                    <th className="px-3 py-3 w-12"></th>
+                                                    <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider">SKU</th>
+                                                    <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider">Nombre</th>
+                                                    <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-32">Costo</th>
+                                                    <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-28">Margen</th>
+                                                    <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider">Motivo</th>
+                                                    <th className="px-4 py-2.5 w-12"></th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -477,43 +494,43 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                                     const isMarginMissing = row.errorReason?.includes('Margen');
 
                                                     return (
-                                                        <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                                                        <tr key={row.id} className="hover:bg-surface-hover transition-colors">
                                                             <td className="px-4 py-3">
                                                                 <input type="text" value={row.sku}
                                                                     onChange={(e) => handleRowEdit(row.id, 'sku', e.target.value)}
                                                                     placeholder="Requerido"
-                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border font-mono uppercase ${isSkuMissing ? 'border-rose-300 bg-rose-50 dark:border-rose-500/50 dark:bg-rose-900/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
+                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border font-mono ${isSkuMissing ? 'border-danger/20 bg-danger-soft dark:bg-danger/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
                                                                 />
                                                             </td>
                                                             <td className="px-4 py-3">
                                                                 <input type="text" value={row.name}
                                                                     onChange={(e) => handleRowEdit(row.id, 'name', e.target.value)}
                                                                     placeholder="Requerido"
-                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border ${isNameMissing ? 'border-rose-300 bg-rose-50 dark:border-rose-500/50 dark:bg-rose-900/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
+                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border ${isNameMissing ? 'border-danger/20 bg-danger-soft dark:bg-danger/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
                                                                 />
                                                             </td>
                                                             <td className="px-4 py-3">
                                                                 <input type="number" value={row.cost} min="0" step="0.01"
                                                                     onChange={(e) => handleRowEdit(row.id, 'cost', e.target.value)}
                                                                     placeholder="0.00"
-                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border ${isCostBad ? 'border-rose-300 bg-rose-50 dark:border-rose-500/50 dark:bg-rose-900/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
+                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border ${isCostBad ? 'border-danger/20 bg-danger-soft dark:bg-danger/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
                                                                 />
                                                             </td>
                                                             <td className="px-4 py-3">
                                                                 <input type="number" value={row.profitMargin} min="0" step="0.01"
                                                                     onChange={(e) => handleRowEdit(row.id, 'profitMargin', e.target.value)}
                                                                     placeholder="0.30"
-                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border ${isMarginMissing ? 'border-rose-300 bg-rose-50 dark:border-rose-500/50 dark:bg-rose-900/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
+                                                                    className={`w-full px-3 py-2 rounded-lg text-sm border ${isMarginMissing ? 'border-danger/20 bg-danger-soft dark:bg-danger/20' : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'} outline-none focus:ring-2 focus:ring-primary`}
                                                                 />
                                                             </td>
                                                             <td className="px-4 py-3">
-                                                                <span className="text-xs text-rose-600 dark:text-rose-400 font-medium bg-rose-50 dark:bg-rose-900/20 px-2 py-1 rounded-md">{row.errorReason}</span>
+                                                                <span className="text-xs text-danger-soft-fg font-medium bg-danger-soft px-2 py-1 rounded-lg">{row.errorReason}</span>
                                                             </td>
-                                                            <td className="px-3 py-3 text-center">
+                                                            <td className="px-4 py-3 text-center">
                                                                 <button onClick={() => handleRemoveRow(row.id)}
-                                                                    className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors"
+                                                                    className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
                                                                     title="Descartar">
-                                                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                                    <Trash2 size={18} aria-hidden="true" />
                                                                 </button>
                                                             </td>
                                                         </tr>
@@ -527,19 +544,19 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
 
                             {/* ── MODIFIED SECTION ── */}
                             {categorizedData.modified.length > 0 && (
-                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
-                                    <div className="bg-amber-50 dark:bg-amber-900/10 px-6 py-3 border-b border-amber-100 dark:border-amber-900/30 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-amber-500 text-[20px]">change_circle</span>
-                                        <h3 className="font-bold text-amber-700 dark:text-amber-500">Actualizaciones ({categorizedData.modified.length})</h3>
+                                <div className="bg-surface border border-subtle rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="bg-warning-soft px-6 py-3 border-b border-warning/20 flex items-center gap-2">
+                                        <RefreshCw size={20} className="text-warning" aria-hidden="true" />
+                                        <h3 className="font-bold text-warning">Actualizaciones ({categorizedData.modified.length})</h3>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm">
-                                            <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+                                            <thead className="bg-surface-2 border-b border-subtle">
                                                 <tr>
-                                                    <th className="px-6 py-3 font-semibold text-slate-500">SKU</th>
-                                                    <th className="px-6 py-3 font-semibold text-slate-500">Nombre</th>
-                                                    <th className="px-6 py-3 font-semibold text-slate-500">Costo</th>
-                                                    <th className="px-6 py-3 font-semibold text-slate-500">Otros Cambios</th>
+                                                    <th className="px-4 py-2.5 font-semibold text-fg-muted">SKU</th>
+                                                    <th className="px-4 py-2.5 font-semibold text-fg-muted">Nombre</th>
+                                                    <th className="px-4 py-2.5 font-semibold text-fg-muted">Costo</th>
+                                                    <th className="px-4 py-2.5 font-semibold text-fg-muted">Otros Cambios</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -550,40 +567,40 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                                                     if (row.isVatDiff) otherChanges.push(`IVA: ${row.oldVat}% ➔ ${parseFloat(row.vatPercentage)}%`);
 
                                                     return (
-                                                        <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                                                            <td className="px-6 py-3 font-mono text-slate-700 dark:text-slate-300 font-medium">{row.sku}</td>
-                                                            <td className="px-6 py-3">
+                                                        <tr key={row.id} className="hover:bg-surface-hover">
+                                                            <td className="px-4 py-3 font-mono text-fg font-medium">{row.sku}</td>
+                                                            <td className="px-4 py-3">
                                                                 {row.isNameDiff ? (
                                                                     <div className="flex flex-col gap-1">
-                                                                        <span className="text-slate-400 line-through text-xs">{row.oldName}</span>
-                                                                        <span className="text-amber-700 dark:text-amber-400 font-medium bg-amber-100/50 dark:bg-amber-900/20 px-2 py-0.5 rounded inline-block w-fit">{row.name}</span>
+                                                                        <span className="text-fg-subtle line-through text-xs">{row.oldName}</span>
+                                                                        <span className="text-warning font-medium bg-warning-soft/50 px-2 py-0.5 rounded inline-block w-fit">{row.name}</span>
                                                                     </div>
                                                                 ) : (
-                                                                    <span className="text-slate-700 dark:text-slate-300">{row.name}</span>
+                                                                    <span className="text-fg">{row.name}</span>
                                                                 )}
                                                             </td>
-                                                            <td className="px-6 py-3">
+                                                            <td className="px-4 py-3">
                                                                 {row.isCostDiff ? (
                                                                     <div className="flex flex-col gap-1 font-mono">
-                                                                        <span className="text-slate-400 line-through text-xs">${row.oldCost.toFixed(2)}</span>
+                                                                        <span className="text-fg-subtle line-through text-xs">${row.oldCost.toFixed(2)}</span>
                                                                         <div className="flex items-center gap-1">
-                                                                            <span className="material-symbols-outlined text-[14px] text-amber-500">arrow_forward</span>
-                                                                            <span className="text-amber-700 dark:text-amber-400 font-bold bg-amber-100/50 dark:bg-amber-900/20 px-2 py-0.5 rounded inline-block w-fit">${parseFloat(row.cost).toFixed(2)}</span>
+                                                                            <ArrowRight size={14} className="text-warning" aria-hidden="true" />
+                                                                            <span className="text-warning font-bold bg-warning-soft/50 px-2 py-0.5 rounded inline-block w-fit">${parseFloat(row.cost).toFixed(2)}</span>
                                                                         </div>
                                                                     </div>
                                                                 ) : (
-                                                                    <span className="text-slate-700 dark:text-slate-300 font-mono">${parseFloat(row.cost).toFixed(2)}</span>
+                                                                    <span className="text-fg font-mono">${parseFloat(row.cost).toFixed(2)}</span>
                                                                 )}
                                                             </td>
-                                                            <td className="px-6 py-3">
+                                                            <td className="px-4 py-3">
                                                                 {otherChanges.length > 0 ? (
                                                                     <div className="flex flex-wrap gap-1">
                                                                         {otherChanges.map((change, i) => (
-                                                                            <span key={i} className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-md">{change}</span>
+                                                                            <span key={i} className="text-xs bg-surface-3 text-fg-muted px-2 py-1 rounded-lg">{change}</span>
                                                                         ))}
                                                                     </div>
                                                                 ) : (
-                                                                    <span className="text-xs text-slate-400">—</span>
+                                                                    <span className="text-xs text-fg-subtle">—</span>
                                                                 )}
                                                             </td>
                                                         </tr>
@@ -597,25 +614,25 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
 
                             {/* ── NEW PRODUCTS SECTION ── */}
                             {categorizedData.new.length > 0 && (
-                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
-                                    <div className="bg-emerald-50 dark:bg-emerald-900/10 px-6 py-3 border-b border-emerald-100 dark:border-emerald-900/30 flex items-center justify-between">
+                                <div className="bg-surface border border-subtle rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="bg-success-soft px-6 py-3 border-b border-success/20 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-emerald-500 text-[20px]">add_circle</span>
-                                            <h3 className="font-bold text-emerald-700 dark:text-emerald-500">Nuevos Productos ({categorizedData.new.length})</h3>
+                                            <CirclePlus size={20} className="text-success" aria-hidden="true" />
+                                            <h3 className="font-bold text-success">Nuevos Productos ({categorizedData.new.length})</h3>
                                         </div>
-                                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 px-3 py-1 rounded-full">Se crearán con stock 0</span>
+                                        <span className="text-xs font-semibold text-success-soft-fg bg-success-soft px-3 py-1 rounded-full">Se crearán con stock 0</span>
                                     </div>
                                     <div className="p-6">
                                         <div className="flex flex-wrap gap-3">
                                             {categorizedData.new.map((row: any) => (
-                                                <div key={row.id} className="flex flex-col bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl min-w-[200px] flex-1 max-w-[300px]">
-                                                    <span className="font-mono text-xs text-slate-500 mb-1">{row.sku}</span>
-                                                    <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate" title={row.name}>{row.name}</span>
-                                                    <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium mt-2">${parseFloat(row.cost).toFixed(2)}</span>
+                                                <div key={row.id} className="flex flex-col bg-surface-2 border border-subtle p-3 rounded-xl min-w-[200px] flex-1 max-w-[300px]">
+                                                    <span className="font-mono text-xs text-fg-muted mb-1">{row.sku}</span>
+                                                    <span className="font-bold text-fg text-sm truncate" title={row.name}>{row.name}</span>
+                                                    <span className="text-success font-mono font-medium mt-2">${parseFloat(row.cost).toFixed(2)}</span>
                                                     <div className="flex flex-wrap gap-1 mt-2">
-                                                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">Margen: {row.profitMargin}</span>
-                                                        {row.category && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded">{row.category}</span>}
-                                                        {row.vatPercentage && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded">IVA: {row.vatPercentage}%</span>}
+                                                        <span className="text-2xs bg-success-soft text-success-soft-fg px-1.5 py-0.5 rounded">Margen: {row.profitMargin}</span>
+                                                        {row.category && <span className="text-2xs bg-slate-200 dark:bg-slate-700 text-fg-muted px-1.5 py-0.5 rounded">{row.category}</span>}
+                                                        {row.vatPercentage && <span className="text-2xs bg-slate-200 dark:bg-slate-700 text-fg-muted px-1.5 py-0.5 rounded">IVA: {row.vatPercentage}%</span>}
                                                     </div>
                                                 </div>
                                             ))}
@@ -626,8 +643,8 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
 
                             {/* ── UNCHANGED BANNER ── */}
                             {categorizedData.unchanged.length > 0 && (
-                                <div className="flex items-center justify-center gap-3 py-4 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
-                                    <span className="material-symbols-outlined text-slate-400">task_alt</span>
+                                <div className="flex items-center justify-center gap-3 py-4 text-fg-muted bg-surface-3 rounded-xl border border-dashed border-strong">
+                                    <CircleCheckBig size={18} className="text-fg-subtle" aria-hidden="true" />
                                     <span className="text-sm font-medium">{categorizedData.unchanged.length} productos coinciden perfectamente y serán ignorados.</span>
                                 </div>
                             )}
@@ -636,30 +653,27 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
                 </div>
 
                 {/* ═══════ FOOTER ═══════ */}
-                <div className="p-5 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-between items-center shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)]">
-                    <span className="text-sm text-slate-500 font-medium">
+                <div className="p-5 border-t border-subtle bg-surface flex justify-between items-center shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)]">
+                    <span className="text-sm text-fg-muted font-medium">
                         {excelRows.length > 0 ? `${excelRows.length} filas analizadas` : 'Esperando archivo...'}
                     </span>
                     <div className="flex gap-3">
-                        <button onClick={onClose} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+                        <button onClick={onClose} className="px-5 py-2.5 text-fg-muted font-medium hover:bg-surface-hover rounded-xl transition-colors">
                             Cancelar
                         </button>
                         <button
                             disabled={excelRows.length === 0 || categorizedData.errors.length > 0 || syncing || (categorizedData.new.length === 0 && categorizedData.modified.length === 0) || (showIvaPrompt && rowsWithBlankIva.length > 0)}
                             onClick={handleSync}
-                            className={`px-6 py-2.5 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2
-                                ${excelRows.length > 0 && categorizedData.errors.length === 0 && (categorizedData.new.length > 0 || categorizedData.modified.length > 0) && !(showIvaPrompt && rowsWithBlankIva.length > 0)
-                                    ? 'bg-primary hover:bg-primary/90 shadow-primary/30 active:scale-95'
-                                    : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500 dark:text-slate-500 shadow-none'}`}
+                            className={`px-6 py-2.5 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 ${excelRows.length > 0 && categorizedData.errors.length === 0 && (categorizedData.new.length > 0 || categorizedData.modified.length > 0) && !(showIvaPrompt && rowsWithBlankIva.length > 0) ? 'bg-primary hover:bg-primary/90 shadow-primary/30 active:scale-95' : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-fg-muted shadow-none'}`}
                         >
                             {syncing ? (
                                 <>
-                                    <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
+                                    <RefreshCw size={20} className="animate-spin" aria-hidden="true" />
                                     Sincronizando...
                                 </>
                             ) : (
                                 <>
-                                    <span className="material-symbols-outlined text-[20px]">database</span>
+                                    <Database size={20} aria-hidden="true" />
                                     Confirmar y Sincronizar
                                 </>
                             )}

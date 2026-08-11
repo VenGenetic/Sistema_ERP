@@ -4,6 +4,30 @@ import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
 import { TagManager, Tag } from './TagManager';
 import {
+  Banknote,
+  Boxes,
+  CircleMinus,
+  CirclePlay,
+  CirclePlus,
+  ClipboardPaste,
+  Download,
+  History,
+  Image as ImageIcon,
+  ImagePlus,
+  Info,
+  Link2Off,
+  Link as LinkIcon,
+  Loader2,
+  Package,
+  Plus,
+  Search,
+  Settings,
+  Star,
+  Trash2,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
+import {
     ImporterUnavailableDuration,
     computeImporterUnavailableUntil,
     durationFromUntil,
@@ -798,39 +822,39 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-700 my-8">
+            <div className="bg-surface rounded-xl shadow-lg w-full max-w-2xl overflow-hidden border border-subtle my-8">
                 {/* Header */}
-                <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div className="p-5 border-b border-subtle flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
-                            <span className="material-symbols-outlined text-[24px]">inventory_2</span>
+                        <div className="p-2 bg-primary-soft text-primary-soft-fg rounded-lg">
+                            <Package size={24} aria-hidden="true" />
                         </div>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                        <h2 className="text-xl font-bold text-fg">
                             {productToEdit ? 'Editar Producto' : 'Nuevo Producto'}
                         </h2>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined">close</span>
+                    <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
 
                 {productToEdit && (
-                    <div className="flex border-b border-slate-200 dark:border-slate-700 px-6">
+                    <div className="flex border-b border-subtle px-6">
                         <button
                             type="button"
                             onClick={() => setActiveTab('general')}
-                            className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === 'general' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === 'general' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-slate-700 dark:hover:text-slate-300'}`}
                         >
                             General
                         </button>
                         <button
                             type="button"
                             onClick={() => setActiveTab('related')}
-                            className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'related' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'related' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-slate-700 dark:hover:text-slate-300'}`}
                         >
                             Repuestos Relacionados
                             {linkedProducts.length > 0 && (
-                                <span className="bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                <span className="bg-primary/10 text-primary text-2xs px-1.5 py-0.5 rounded-full font-bold">
                                     {linkedProducts.length}
                                 </span>
                             )}
@@ -869,21 +893,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             }
                         }}
                         tabIndex={0}
-                        className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl transition-all duration-200 relative group focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                            isDraggingMain 
-                                ? 'border-primary bg-primary/5 dark:bg-primary/10 scale-[1.02]' 
-                                : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800'
-                        }`}
+                        className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl transition-all duration-200 relative group focus:outline-none focus:ring-2 focus:ring-primary/50 ${ isDraggingMain ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-slate-200 dark:border-slate-700 bg-surface-2 hover:bg-surface-hover dark:hover:bg-slate-800' }`}
                     >
                         {formData.imageUrl ? (
-                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-none">
+                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-subtle shadow-sm pointer-events-none">
                                 <img src={formData.imageUrl} alt="Product" className="w-full h-full object-cover" />
                                 <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleRemoveImage(); }}
-                                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500 backdrop-blur-sm pointer-events-auto"
+                                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-danger backdrop-blur-sm pointer-events-auto"
                                 >
-                                    <span className="material-symbols-outlined text-[16px] leading-none">close</span>
+                                    <X size={16} className="leading-none" aria-hidden="true" />
                                 </button>
                                 {isDraggingMain && (
                                     <div className="absolute inset-0 bg-primary/20 backdrop-blur-[2px] flex items-center justify-center pointer-events-none">
@@ -895,30 +915,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             <div className="flex flex-col items-center justify-center w-full h-full min-h-[128px]">
                                 <div className="flex flex-col items-center justify-center pt-2 pb-4 text-center">
                                     {isUploading ? (
-                                        <span className="material-symbols-outlined text-[32px] text-primary animate-spin">progress_activity</span>
+                                        <Loader2 size={32} className="text-primary animate-spin" aria-hidden="true" />
                                     ) : (
                                         <>
-                                            <span className="material-symbols-outlined text-[32px] text-slate-400 mb-2 group-hover:text-primary transition-colors">
-                                                {isDraggingMain ? 'download' : 'add_photo_alternate'}
-                                            </span>
-                                            <p className="mb-3 text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                            {isDraggingMain ? <Download size={32} className="text-fg-subtle mb-2 group-hover:text-primary transition-colors" aria-hidden="true" /> : <ImagePlus size={32} className="text-fg-subtle mb-2 group-hover:text-primary transition-colors" aria-hidden="true" />}
+                                            <p className="mb-3 text-sm text-fg-muted font-medium">
                                                 {isDraggingMain ? 'Suelta la imagen aquí' : 'Selecciona una opción para subir'}
                                             </p>
                                             <div className="flex gap-2">
                                                 <button
                                                     type="button"
                                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePasteClick('main'); }}
-                                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-700 shadow-sm transition-colors z-10 relative"
+                                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-fg bg-white border border-strong rounded hover:bg-surface-hover dark:bg-slate-800 shadow-sm transition-colors z-10 relative"
                                                 >
-                                                    <span className="material-symbols-outlined text-[14px]">content_paste</span> Pegar
+                                                    <ClipboardPaste size={14} aria-hidden="true" /> Pegar
                                                 </button>
                                                 
                                                 <label className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded hover:bg-primary/90 shadow-sm transition-colors cursor-pointer z-10 relative">
-                                                    <span className="material-symbols-outlined text-[14px]">search</span> Examinar
+                                                    <Search size={14} aria-hidden="true" /> Examinar
                                                     <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
                                                 </label>
                                             </div>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">O arrastra el archivo aquí</p>
+                                            <p className="text-xs text-fg-subtle mt-3">O arrastra el archivo aquí</p>
                                         </>
                                     )}
                                 </div>
@@ -968,17 +986,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             }
                         }}
                         tabIndex={0}
-                        className={`flex flex-col gap-2 p-3 -m-3 rounded-xl border-2 transition-all duration-200 relative focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                            isDraggingGallery ? 'border-primary bg-primary/5 dark:bg-primary/10 border-dashed' : 'border-transparent'
-                        }`}
+                        className={`flex flex-col gap-2 p-3 -m-3 rounded-xl border-2 transition-all duration-200 relative focus:outline-none focus:ring-2 focus:ring-primary/50 ${ isDraggingGallery ? 'border-primary bg-primary/5 dark:bg-primary/10 border-dashed' : 'border-transparent' }`}
                     >
                         <label className={labelClass}>Galería (Max 15) - {gallery.length}/15</label>
                         <div className="flex flex-wrap gap-3 relative z-10">
                             {gallery.map((item, index) => (
-                                <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm group bg-black flex items-center justify-center">
+                                <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-subtle shadow-sm group bg-black flex items-center justify-center">
                                     {item.type === 'video' ? (
                                         <>
-                                            <span className="material-symbols-outlined text-[32px] text-emerald-500 absolute z-0">play_circle</span>
+                                            <CirclePlay size={32} className="text-success absolute z-0" aria-hidden="true" />
                                             <div className="absolute inset-0 bg-black/40"></div>
                                         </>
                                     ) : (
@@ -987,11 +1003,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 backdrop-blur-sm z-10">
                                         {item.type !== 'video' && (
                                             <button type="button" onClick={() => handleSetAsMainImage(index)} title="Hacer principal" className="text-white hover:text-primary transition-colors">
-                                                <span className="material-symbols-outlined text-[18px]">star</span>
+                                                <Star size={18} aria-hidden="true" />
                                             </button>
                                         )}
-                                        <button type="button" onClick={() => handleRemoveGalleryItem(index)} title="Eliminar" className="text-white hover:text-rose-500 transition-colors">
-                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                        <button type="button" onClick={() => handleRemoveGalleryItem(index)} title="Eliminar" className="text-white hover:text-danger transition-colors">
+                                            <Trash2 size={18} aria-hidden="true" />
                                         </button>
                                     </div>
                                 </div>
@@ -999,11 +1015,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
                             {gallery.length < 15 && (
                                 <div className="flex flex-col gap-2">
-                                    <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                    <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-strong rounded-lg cursor-pointer hover:bg-surface-hover transition-colors">
                                         {isVideoUploading ? (
-                                            <span className="material-symbols-outlined text-[24px] text-primary animate-spin">progress_activity</span>
+                                            <Loader2 size={24} className="text-primary animate-spin" aria-hidden="true" />
                                         ) : (
-                                            <span className="material-symbols-outlined text-[24px] text-slate-400">add</span>
+                                            <Plus size={24} className="text-fg-subtle" aria-hidden="true" />
                                         )}
                                         <input type="file" className="hidden" accept="image/*,video/*" onChange={handleGalleryUpload} disabled={isVideoUploading} multiple />
                                     </label>
@@ -1011,9 +1027,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         <button 
                                             type="button" 
                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePasteClick('gallery'); }}
-                                            className="text-[10px] text-slate-500 hover:text-primary flex items-center justify-center gap-1 w-full bg-slate-100 dark:bg-slate-800 rounded py-1"
+                                            className="text-2xs text-fg-muted hover:text-primary flex items-center justify-center gap-1 w-full bg-surface-3 rounded py-1"
                                         >
-                                            <span className="material-symbols-outlined text-[12px]">content_paste</span> Pegar
+                                            <ClipboardPaste size={12} aria-hidden="true" /> Pegar
                                         </button>
                                     )}
                                 </div>
@@ -1034,10 +1050,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             <div className="flex justify-between items-end mb-1">
                                 <label className={labelClass} style={{marginBottom: 0}}>Etiquetas</label>
                                 <button type="button" onClick={() => setIsTagManagerOpen(true)} className="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
-                                    <span className="material-symbols-outlined text-[14px]">settings</span> Gestionar Etiquetas
+                                    <Settings size={14} aria-hidden="true" /> Gestionar Etiquetas
                                 </button>
                             </div>
-                            <div className="flex flex-wrap gap-2 p-2 border border-slate-300 dark:border-slate-700 rounded-lg min-h-[42px] bg-slate-50 dark:bg-slate-900">
+                            <div className="flex flex-wrap gap-2 p-2 border border-strong rounded-lg min-h-[42px] bg-surface-2">
                                 {availableTags.map(tag => {
                                     const isSelected = selectedTags.includes(tag.id);
                                     return (
@@ -1048,7 +1064,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                 if (isSelected) setSelectedTags(prev => prev.filter(id => id !== tag.id));
                                                 else setSelectedTags(prev => [...prev, tag.id]);
                                             }}
-                                            className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all ${isSelected ? 'shadow-sm' : 'opacity-50 hover:opacity-80 grayscale hover:grayscale-0'}`}
+                                            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${isSelected ? 'shadow-sm' : 'opacity-50 hover:opacity-80 grayscale hover:grayscale-0'}`}
                                             style={{ 
                                                 backgroundColor: isSelected ? tag.color + '30' : 'transparent', 
                                                 color: isSelected ? tag.color : '#64748B', 
@@ -1059,7 +1075,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         </button>
                                     );
                                 })}
-                                {availableTags.length === 0 && <span className="text-xs text-slate-400 my-auto ml-1">No hay etiquetas creadas. Usa "Gestionar Etiquetas" para crear una.</span>}
+                                {availableTags.length === 0 && <span className="text-xs text-fg-subtle my-auto ml-1">No hay etiquetas creadas. Usa "Gestionar Etiquetas" para crear una.</span>}
                             </div>
                         </div>
 
@@ -1081,13 +1097,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     </div>
 
                     {/* ═══ Financial Section — auto-linked ═══ */}
-                    <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                        <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
-                            <span className="material-symbols-outlined text-[18px]">payments</span>
+                    <div className="border-t border-subtle pt-4">
+                        <h3 className="text-sm font-semibold text-fg-muted flex items-center gap-2 mb-4">
+                            <Banknote size={18} aria-hidden="true" />
                             Precios y Costos
-                            <span className="text-xs font-normal normal-case text-slate-400 ml-1">— los campos se auto-calculan</span>
+                            <span className="text-xs font-normal normal-case text-fg-subtle ml-1">— los campos se auto-calculan</span>
                             <div className="ml-auto flex items-center gap-2">
-                                <span className={`text-[10px] font-bold uppercase tracking-tight ${!entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Costo</span>
+                                <span className={`text-2xs font-bold uppercase tracking-tight ${!entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Costo</span>
                                 <label className="flex items-center cursor-pointer relative group">
                                     <input type="checkbox" className="sr-only peer"
                                         checked={entryByPrice}
@@ -1095,29 +1111,29 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     />
                                     <div className="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
                                 </label>
-                                <span className={`text-[10px] font-bold uppercase tracking-tight ${entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Precio</span>
+                                <span className={`text-2xs font-bold uppercase tracking-tight ${entryByPrice ? 'text-primary' : 'text-slate-400'}`}>Por Precio</span>
                             </div>
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className={labelClass}>Costo sin IVA ($)</label>
-                                <input type="number" step="0.0001" min="0" className={`${inputClass} ${entryByPrice ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50' : ''}`}
+                                <input type="number" step="0.0001" min="0" className={`${inputClass} ${entryByPrice ? 'bg-warning-soft/50 border-warning/20/50' : ''}`}
                                     value={formData.costWithoutVat}
                                     onChange={e => handleCostChange(parseFloat(e.target.value) || 0)}
                                     readOnly={entryByPrice}
                                 />
-                                {entryByPrice && <p className="text-[10px] text-amber-600 mt-1 italic">Calculado desde el PVP</p>}
+                                {entryByPrice && <p className="text-2xs text-warning mt-1 italic">Calculado desde el PVP</p>}
                             </div>
 
                             <div>
                                 <label className={labelClass}>Costo con IVA ($)</label>
-                                <input type="number" step="0.0001" min="0" className={`${inputClass} ${entryByPrice ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50' : ''}`}
+                                <input type="number" step="0.0001" min="0" className={`${inputClass} ${entryByPrice ? 'bg-warning-soft/50 border-warning/20/50' : ''}`}
                                     value={costoConIva === 0 ? 0 : Math.round(costoConIva * 10000) / 10000}
                                     onChange={e => handleCostWithVatChange(parseFloat(e.target.value) || 0)}
                                     readOnly={entryByPrice}
                                 />
-                                {entryByPrice && <p className="text-[10px] text-amber-600 mt-1 italic">Calculado desde el PVP</p>}
+                                {entryByPrice && <p className="text-2xs text-warning mt-1 italic">Calculado desde el PVP</p>}
                             </div>
 
                             <div>
@@ -1132,17 +1148,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 <input type="number" step="0.01" className={inputClass}
                                     value={formData.profitMargin}
                                     onChange={e => handleMarginChange(parseFloat(e.target.value) || 0)} />
-                                <p className="text-xs text-slate-400 mt-1">
+                                <p className="text-xs text-fg-subtle mt-1">
                                     Ej: 0.65 = 65%. {entryByPrice ? 'Actualiza el costo automáticamente.' : 'Actualiza el PVP automáticamente.'}
                                 </p>
                             </div>
 
                             <div>
                                 <label className={labelClass}>PVP — Precio de Venta ($)</label>
-                                <input type="number" step="0.01" min="0" className={`${inputClass} font-semibold ${!entryByPrice ? 'bg-emerald-50/30 dark:bg-emerald-900/10 border-emerald-200/50' : 'ring-2 ring-primary border-primary'}`}
+                                <input type="number" step="0.01" min="0" className={`${inputClass} font-semibold ${!entryByPrice ? 'bg-success-soft/30 border-success/20/50' : 'ring-2 ring-primary border-primary'}`}
                                     value={formData.price}
                                     onChange={e => handlePriceChange(parseFloat(e.target.value) || 0)} />
-                                <p className="text-xs text-slate-400 mt-1">
+                                <p className="text-xs text-fg-subtle mt-1">
                                     {entryByPrice ? 'Ingresa el precio final; el costo se ajustará.' : 'Al cambiar, el margen se recalcula automáticamente.'}
                                 </p>
                             </div>
@@ -1150,20 +1166,20 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
                         {/* Live summary card */}
                         {formData.costWithoutVat > 0 && (
-                            <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg grid grid-cols-3 gap-4 text-center text-sm">
+                            <div className="mt-4 p-3 bg-surface-2 rounded-lg grid grid-cols-3 gap-4 text-center text-sm">
                                 <div>
-                                    <div className="text-slate-400 text-xs mb-0.5">Costo c/ IVA</div>
-                                    <div className="font-bold text-slate-700 dark:text-slate-200">${costoConIva.toFixed(2)}</div>
+                                    <div className="text-fg-subtle text-xs mb-0.5">Costo c/ IVA</div>
+                                    <div className="font-bold text-fg">${costoConIva.toFixed(2)}</div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-400 text-xs mb-0.5">Margen</div>
-                                    <div className={`font-bold ${formData.profitMargin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    <div className="text-fg-subtle text-xs mb-0.5">Margen</div>
+                                    <div className={`font-bold ${formData.profitMargin >= 0 ? 'text-success' : 'text-danger'}`}>
                                         {(formData.profitMargin * 100).toFixed(1)}%
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-slate-400 text-xs mb-0.5">Ganancia</div>
-                                    <div className={`font-bold ${gananciaAbsoluta >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    <div className="text-fg-subtle text-xs mb-0.5">Ganancia</div>
+                                    <div className={`font-bold ${gananciaAbsoluta >= 0 ? 'text-success' : 'text-danger'}`}>
                                         ${gananciaAbsoluta.toFixed(2)}
                                     </div>
                                 </div>
@@ -1171,9 +1187,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                         )}
 
                         {/* ═══ DESCONTINUADOS ═══ */}
-                        <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-[18px]">warning</span>
+                        <div className="mt-6 pt-4 border-t border-subtle">
+                            <h3 className="text-sm font-semibold text-fg-muted flex items-center gap-2 mb-4">
+                                <TriangleAlert size={18} aria-hidden="true" />
                                 Estado de Continuidad
                             </h3>
                             <div className="flex flex-col gap-4">
@@ -1183,12 +1199,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             checked={formData.isDiscontinued} 
                                             onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })} 
                                         />
-                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.isDiscontinued ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.isDiscontinued ? 'bg-danger' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
                                         <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.isDiscontinued ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
                                     <div>
-                                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Marcar como Descontinuado</span>
-                                        <span className="text-xs text-slate-500">Evita que el producto siga apareciendo como disponible para nuevas listas de espera.</span>
+                                        <span className="text-sm font-bold text-fg block">Marcar como Descontinuado</span>
+                                        <span className="text-xs text-fg-muted">Evita que el producto siga apareciendo como disponible para nuevas listas de espera.</span>
                                     </div>
                                 </label>
 
@@ -1214,12 +1230,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             checked={formData.importerUnavailable}
                                             onChange={(e) => setFormData({ ...formData, importerUnavailable: e.target.checked })}
                                         />
-                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.importerUnavailable ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                                        <div className={`block w-14 h-8 rounded-full transition-colors ${formData.importerUnavailable ? 'bg-warning' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
                                         <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.importerUnavailable ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
                                     <div>
-                                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200 block">Marcar como Agotado en Importadora</span>
-                                        <span className="text-xs text-slate-500">Úsalo cuando el sitio de la importadora diga que hay stock pero en realidad no lo tienen. El sistema tratará el stock de importadora como 0 mientras esté activo.</span>
+                                        <span className="text-sm font-bold text-fg block">Marcar como Agotado en Importadora</span>
+                                        <span className="text-xs text-fg-muted">Úsalo cuando el sitio de la importadora diga que hay stock pero en realidad no lo tienen. El sistema tratará el stock de importadora como 0 mientras esté activo.</span>
                                     </div>
                                 </label>
 
@@ -1242,9 +1258,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                         </div>
 
                         {/* ═══ AJUSTE DE STOCK RÁPIDO ═══ */}
-                        <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-                            <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-4">
-                                <span className="material-symbols-outlined text-[18px]">inventory</span>
+                        <div className="mt-6 pt-4 border-t border-subtle">
+                            <h3 className="text-sm font-semibold text-fg-muted flex items-center gap-2 mb-4">
+                                <Boxes size={18} aria-hidden="true" />
                                 Ajuste de Stock Rápido
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -1262,7 +1278,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         label="Almacén:"
                                         required={stockAdjustment.quantity.toString().trim() !== ''}
                                     />
-                                    <div className="mt-2 text-xs text-slate-500">
+                                    <div className="mt-2 text-xs text-fg-muted">
                                         Selecciona un almacén para modificar el stock de este producto al guardar.
                                     </div>
                                 </div>
@@ -1284,12 +1300,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         const qt = parseInt(stockAdjustment.quantity);
                                         if (isNaN(qt) || currentStock === null) return null;
                                         const diff = qt - currentStock;
-                                        if (diff === 0) return <div className="mt-2 text-xs text-slate-500">El stock no cambiará.</div>;
+                                        if (diff === 0) return <div className="mt-2 text-xs text-fg-muted">El stock no cambiará.</div>;
                                         if (diff > 0) {
                                             return (
                                                 <div className="mt-3 space-y-3">
-                                                    <div className="flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                                                        <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                                                    <div className="flex items-center gap-2 p-2 bg-success-soft border border-success/20 rounded-lg text-xs font-semibold text-success-soft-fg">
+                                                        <CirclePlus size={16} aria-hidden="true" />
                                                         Se añadirán <strong>{diff}</strong> unidades al inventario.
                                                     </div>
                                                     <label className="flex items-center cursor-pointer relative group">
@@ -1297,11 +1313,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                             checked={stockAdjustment.isPurchase}
                                                             onChange={(e) => setStockAdjustment(prev => ({ ...prev, isPurchase: e.target.checked }))}
                                                         />
-                                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                                                        <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Registrar como compra financiera</span>
+                                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-warning"></div>
+                                                        <span className="ml-2 text-sm text-fg-muted font-medium group-hover:text-slate-900 transition-colors">Registrar como compra financiera</span>
                                                     </label>
                                                     {stockAdjustment.isPurchase && (
-                                                        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+                                                        <div className="bg-warning-soft border border-warning/20 rounded-lg p-3">
                                                             <label className={labelClass}>Cuenta de Pago:</label>
                                                             <select className={inputClass}
                                                                 value={stockAdjustment.account_id || ''}
@@ -1313,8 +1329,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                                 ))}
                                                             </select>
                                                             {stockAdjustment.account_id && (
-                                                                <div className="mt-2 text-xs font-semibold text-orange-700 flex items-center gap-1">
-                                                                    <span className="material-symbols-outlined text-[14px]">info</span>
+                                                                <div className="mt-2 text-xs font-semibold text-warning flex items-center gap-1">
+                                                                    <Info size={14} aria-hidden="true" />
                                                                     Se debitarán ${(costoConIva * diff).toFixed(2)} de esta cuenta.
                                                                 </div>
                                                             )}
@@ -1326,8 +1342,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             // diff < 0 — stock reduction
                                             return (
                                                 <div className="mt-3 space-y-3">
-                                                    <div className="flex items-center gap-2 p-2 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-400">
-                                                        <span className="material-symbols-outlined text-[16px]">remove_circle</span>
+                                                    <div className="flex items-center gap-2 p-2 bg-danger-soft border border-danger/20 rounded-lg text-xs font-semibold text-danger-soft-fg">
+                                                        <CircleMinus size={16} aria-hidden="true" />
                                                         Se restarán <strong>{Math.abs(diff)}</strong> unidades del inventario.
                                                     </div>
                                                     <label className="flex items-center cursor-pointer relative group">
@@ -1335,11 +1351,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                             checked={stockAdjustment.isMerma}
                                                             onChange={(e) => setStockAdjustment(prev => ({ ...prev, isMerma: e.target.checked }))}
                                                         />
-                                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500"></div>
-                                                        <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Registrar como merma (pérdida contable)</span>
+                                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-danger"></div>
+                                                        <span className="ml-2 text-sm text-fg-muted font-medium group-hover:text-slate-900 transition-colors">Registrar como merma (pérdida contable)</span>
                                                     </label>
                                                     {stockAdjustment.isMerma && (
-                                                        <div className="bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-lg p-3">
+                                                        <div className="bg-danger-soft border border-danger/20 rounded-lg p-3">
                                                             <label className={labelClass}>Cuenta de Gasto / Pérdida:</label>
                                                             <select className={inputClass}
                                                                 value={stockAdjustment.merma_account_id || ''}
@@ -1351,8 +1367,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                                 ))}
                                                             </select>
                                                             {stockAdjustment.merma_account_id && (
-                                                                <div className="mt-2 text-xs font-semibold text-rose-700 flex items-center gap-1">
-                                                                    <span className="material-symbols-outlined text-[14px]">info</span>
+                                                                <div className="mt-2 text-xs font-semibold text-danger flex items-center gap-1">
+                                                                    <Info size={14} aria-hidden="true" />
                                                                     Se registrará una pérdida de ${(costoConIva * Math.abs(diff)).toFixed(2)} en contabilidad.
                                                                 </div>
                                                             )}
@@ -1371,8 +1387,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     {/* ═══ Related Parts Tab ═══ */}
                     {productToEdit && (
                         <div className={activeTab === 'related' ? 'flex flex-col gap-5' : 'hidden'}>
-                            <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-3 rounded-lg text-sm flex items-start gap-2 border border-blue-200 dark:border-blue-800/30">
-                                <span className="material-symbols-outlined text-[18px] mt-0.5">info</span>
+                            <div className="bg-primary-soft text-primary-soft-fg p-3 rounded-lg text-sm flex items-start gap-2 border border-primary/20">
+                                <Info size={18} className="mt-0.5" aria-hidden="true" />
                                 <div>
                                     Enlaza repuestos que son exactamente el mismo pero en otra marca. Los cambios que realices aquí (enlazar o desenlazar) se guardarán únicamente cuando hagas clic en <strong>Guardar Producto</strong>.
                                 </div>
@@ -1382,7 +1398,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             <div className="flex flex-col gap-3">
                                 <label className={labelClass}>Buscar repuesto para enlazar (Código o Nombre)</label>
                                 <div className="relative">
-                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" aria-hidden="true" />
                                     <input 
                                         type="text" 
                                         className={`${inputClass} pl-10`} 
@@ -1390,41 +1406,41 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
                                     />
-                                    {isSearching && <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin text-[18px]">progress_activity</span>}
+                                    {isSearching && <Loader2 size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle animate-spin" aria-hidden="true" />}
                                 </div>
 
-                                <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-900 shadow-sm max-h-72 overflow-y-auto mt-1">
+                                <div className="border border-subtle rounded-lg overflow-hidden bg-surface shadow-sm max-h-72 overflow-y-auto mt-1">
                                     <table className="w-full text-left border-collapse text-xs">
-                                        <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase sticky top-0 z-10">
+                                        <thead className="bg-surface-2 text-fg-muted font-semibold uppercase sticky top-0 z-10">
                                             <tr>
-                                                <th className="px-3 py-2">Foto</th>
-                                                <th className="px-3 py-2">SKU</th>
-                                                <th className="px-3 py-2">Nombre</th>
-                                                <th className="px-3 py-2 text-center">Stock</th>
-                                                <th className="px-3 py-2 text-right">Acción</th>
+                                                <th className="px-4 py-2.5">Foto</th>
+                                                <th className="px-4 py-2.5">SKU</th>
+                                                <th className="px-4 py-2.5">Nombre</th>
+                                                <th className="px-4 py-2.5 text-center">Stock</th>
+                                                <th className="px-4 py-2.5 text-right">Acción</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-fg">
                                             {searchProducts.map(prod => {
                                                 const isLinked = linkedProducts.some(lp => lp.id === prod.id);
                                                 const totalStock = (prod.local_stock || 0) + (prod.importer_stock || 0);
                                                 return (
-                                                    <tr key={prod.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                        <td className="px-3 py-2">
-                                                            <div className="w-8 h-8 rounded border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
+                                                    <tr key={prod.id} className="hover:bg-surface-hover transition-colors">
+                                                        <td className="px-4 py-3">
+                                                            <div className="w-8 h-8 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
                                                                 {prod.image_url ? (
                                                                     <img src={prod.image_url} alt="" className="w-full h-full object-cover" />
                                                                 ) : (
-                                                                    <span className="material-symbols-outlined text-slate-400 text-base">image</span>
+                                                                    <ImageIcon size={16} className="text-fg-subtle" aria-hidden="true" />
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-2 font-mono font-bold text-xs">{prod.sku}</td>
-                                                        <td className="px-3 py-2 max-w-[150px] truncate" title={prod.name}>{prod.name}</td>
-                                                        <td className="px-3 py-2 text-center font-semibold">{totalStock} u.</td>
-                                                        <td className="px-3 py-2 text-right">
+                                                        <td className="px-4 py-3 font-mono font-bold text-xs">{prod.sku}</td>
+                                                        <td className="px-4 py-3 max-w-[150px] truncate" title={prod.name}>{prod.name}</td>
+                                                        <td className="px-4 py-3 text-center font-semibold">{totalStock} u.</td>
+                                                        <td className="px-4 py-3 text-right">
                                                             {isLinked ? (
-                                                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-200/30">
+                                                                <span className="text-2xs font-semibold text-success-soft-fg bg-success-soft px-2 py-0.5 rounded-full border border-success/20">
                                                                     Enlazado
                                                                 </span>
                                                             ) : (
@@ -1433,7 +1449,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                                     onClick={() => initiateLink(prod)}
                                                                     className="px-2.5 py-1 bg-primary hover:bg-primary/95 text-white text-[11px] font-semibold rounded shadow-sm transition-colors inline-flex items-center gap-0.5"
                                                                 >
-                                                                    <span className="material-symbols-outlined text-[12px]">link</span>
+                                                                    <LinkIcon size={12} aria-hidden="true" />
                                                                     Enlazar
                                                                 </button>
                                                             )}
@@ -1443,7 +1459,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             })}
                                             {searchProducts.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={5} className="text-center py-6 text-slate-400">
+                                                    <td colSpan={5} className="text-center py-6 text-fg-subtle">
                                                         No hay repuestos para mostrar.
                                                     </td>
                                                 </tr>
@@ -1455,13 +1471,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
                             {/* Linked parts */}
                             <div className="mt-2">
-                                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[18px]">link</span>
+                                <h4 className="text-sm font-semibold text-fg mb-3 flex items-center gap-2">
+                                    <LinkIcon size={18} aria-hidden="true" />
                                     Repuestos Enlazados ({linkedProducts.length})
                                 </h4>
                                 {linkedProducts.length === 0 ? (
-                                    <div className="text-center p-6 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 text-sm flex flex-col items-center bg-slate-50/50 dark:bg-slate-900/10">
-                                        <span className="material-symbols-outlined text-[32px] text-slate-300 mb-2">link_off</span>
+                                    <div className="text-center p-6 border border-dashed border-subtle rounded-xl text-fg-subtle text-sm flex flex-col items-center bg-slate-50/50 dark:bg-slate-900/10">
+                                        <Link2Off size={32} className="text-fg-subtle mb-2" aria-hidden="true" />
                                         No hay repuestos relacionados en este grupo temporal.
                                     </div>
                                 ) : (
@@ -1469,27 +1485,27 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                         {linkedProducts.map(lp => {
                                             const totalStock = (lp.local_stock || 0) + (lp.importer_stock || 0);
                                             return (
-                                                <div key={lp.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg group hover:border-slate-300 transition-colors">
+                                                <div key={lp.id} className="flex items-center justify-between p-2 bg-surface-2 border border-subtle rounded-lg group hover:border-slate-300 transition-colors">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded border border-slate-200 dark:border-slate-600 overflow-hidden shrink-0 bg-white flex items-center justify-center shadow-sm">
+                                                        <div className="w-10 h-10 rounded border border-subtle overflow-hidden shrink-0 bg-white flex items-center justify-center shadow-sm">
                                                             {lp.image_url ? (
                                                                 <img src={lp.image_url} alt="" className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <span className="material-symbols-outlined text-slate-400 text-[18px]">image</span>
+                                                                <ImageIcon size={18} className="text-fg-subtle" aria-hidden="true" />
                                                             )}
                                                         </div>
                                                         <div>
-                                                            <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                            <div className="text-xs font-bold text-fg flex items-center gap-1.5">
                                                                 {lp.sku}
-                                                                <span className="bg-slate-100 dark:bg-slate-800 text-[10px] px-1.5 py-0.2 rounded text-slate-500 font-medium">
+                                                                <span className="bg-surface-3 text-2xs px-1.5 py-0.2 rounded text-fg-muted font-medium">
                                                                     Stock: {totalStock} u.
                                                                 </span>
                                                             </div>
-                                                            <div className="text-[10px] text-slate-500 truncate max-w-[250px]">{lp.name}</div>
+                                                            <div className="text-2xs text-fg-muted truncate max-w-[250px]">{lp.name}</div>
                                                         </div>
                                                     </div>
-                                                    <button type="button" onClick={() => handleUnlink(lp.id)} title="Desenlazar este repuesto" className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-200 hover:text-rose-500 text-slate-400 transition-all opacity-70 group-hover:opacity-100">
-                                                        <span className="material-symbols-outlined text-[14px]">link_off</span>
+                                                    <button type="button" onClick={() => handleUnlink(lp.id)} title="Desenlazar este repuesto" className="w-7 h-7 flex items-center justify-center rounded bg-surface border border-subtle hover:bg-danger-soft hover:border-danger/20 hover:text-danger text-fg-subtle transition-all opacity-70 group-hover:opacity-100">
+                                                        <Link2Off size={14} aria-hidden="true" />
                                                     </button>
                                                 </div>
                                             );
@@ -1504,8 +1520,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                     <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                         <div className="flex justify-between items-center w-full">
                             {productToEdit?.last_edited_at ? (
-                                <div className="text-xs text-slate-500 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700">
-                                    <span className="material-symbols-outlined text-[14px]">history</span>
+                                <div className="text-xs text-fg-muted flex items-center gap-1.5 bg-surface-2 px-3 py-1.5 rounded-lg border border-subtle">
+                                    <History size={14} aria-hidden="true" />
                                     <span>
                                         Última modificación por <strong>{productToEdit.profiles?.full_name || 'Desconocido'}</strong> el {new Date(productToEdit.last_edited_at).toLocaleDateString()} a las {new Date(productToEdit.last_edited_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                     </span>
@@ -1515,12 +1531,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             )}
                             <div className="flex justify-end gap-3">
                                 <button type="button" onClick={onClose}
-                                    className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium">
+                                    className="px-4 py-2 text-fg hover:bg-surface-hover rounded-lg transition-colors font-medium">
                                     Cancelar
                                 </button>
                                 <button type="submit" disabled={loading}
                                     className="px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg shadow-sm shadow-primary/30 transition-all font-medium flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-                                    {loading && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
+                                    {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
                                     {loading ? 'Guardando...' : 'Guardar Producto'}
                                 </button>
                             </div>
@@ -1540,16 +1556,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
             {showConfirmModal && productToLink && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200">
-                        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 bg-blue-50/50 dark:bg-blue-900/10">
-                            <span className="material-symbols-outlined text-blue-500 text-[20px]">info</span>
-                            <h3 className="text-base font-bold text-slate-900 dark:text-white">Confirmar Enlace</h3>
+                    <div className="bg-surface rounded-xl shadow-lg w-full max-w-md overflow-hidden border border-subtle animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-subtle flex items-center gap-3 bg-primary-soft/50">
+                            <Info size={20} className="text-primary" aria-hidden="true" />
+                            <h3 className="text-base font-bold text-fg">Confirmar Enlace</h3>
                         </div>
                         <div className="p-5">
-                            <p className="text-slate-700 dark:text-slate-300 mb-3 text-xs font-semibold">
+                            <p className="text-fg mb-3 text-xs font-semibold">
                                 ¿Estás seguro que quieres enlazar estos productos?
                             </p>
-                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-lg text-[11px] mb-4">
+                            <div className="bg-warning-soft border border-warning/20 text-warning-soft-fg p-2.5 rounded-lg text-[11px] mb-4">
                                 <strong>Nota importante:</strong> Esto hará que todos estos productos (y todos los que ya estén vinculados a ellos) se enlacen de forma bidireccional formando un único grupo.
                             </div>
                             
@@ -1557,22 +1573,22 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                 {productsToMerge.map(pm => {
                                     const totalStock = (pm.local_stock || 0) + (pm.importer_stock || 0);
                                     return (
-                                        <div key={pm.id} className="flex items-center gap-2.5 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xs">
-                                            <div className="w-8 h-8 rounded border border-slate-200 bg-white overflow-hidden shrink-0">
+                                        <div key={pm.id} className="flex items-center gap-2.5 p-2 bg-surface-2 border border-subtle rounded-lg shadow-xs">
+                                            <div className="w-8 h-8 rounded border border-subtle bg-white overflow-hidden shrink-0">
                                                 {pm.image_url ? (
                                                     <img src={pm.image_url} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full bg-slate-100 flex items-center justify-center">
-                                                        <span className="material-symbols-outlined text-slate-400 text-sm">image</span>
+                                                        <ImageIcon size={14} className="text-fg-subtle" aria-hidden="true" />
                                                     </div>
                                                 )}
                                             </div>
                                             <div>
-                                                <div className="text-[11px] font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                                <div className="text-[11px] font-bold text-fg flex items-center gap-1.5">
                                                     {pm.sku}
-                                                    <span className="text-[10px] text-slate-500 font-normal">(Stock: {totalStock} u.)</span>
+                                                    <span className="text-2xs text-fg-muted font-normal">(Stock: {totalStock} u.)</span>
                                                 </div>
-                                                <div className="text-[9px] text-slate-500 truncate max-w-[220px]">{pm.name}</div>
+                                                <div className="text-[12px] text-fg-muted truncate max-w-[220px]">{pm.name}</div>
                                             </div>
                                         </div>
                                     );
@@ -1580,7 +1596,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                             </div>
                             
                             <div className="flex justify-end gap-2.5">
-                                <button type="button" onClick={() => { setShowConfirmModal(false); setProductToLink(null); setProductsToMerge([]); }} className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 rounded-lg transition-colors">
+                                <button type="button" onClick={() => { setShowConfirmModal(false); setProductToLink(null); setProductsToMerge([]); }} className="px-3.5 py-1.5 text-xs font-semibold text-fg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors">
                                     Cancelar
                                 </button>
                                 <button type="button" onClick={confirmLink} className="px-4 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg shadow transition-colors flex items-center gap-1.5">

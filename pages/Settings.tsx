@@ -5,6 +5,21 @@ import ProfilePanel from '../components/settings/ProfilePanel';
 import AccountPanel from '../components/settings/AccountPanel';
 import BrandsPanel from '../components/settings/BrandsPanel';
 import ApiKeysPanel from '../components/settings/ApiKeysPanel';
+import {
+  BadgeCheck,
+  Code,
+  Eye,
+  MapPin,
+  MapPinPlus,
+  Network,
+  Plus,
+  Banknote,
+  ShieldCheck,
+  User,
+  Users,
+  Warehouse,
+  Webhook,
+} from 'lucide-react';
 
 // --- Local Panels for Inventory, Finance, Dev (with persistence) ---
 
@@ -57,7 +72,7 @@ const InventoryPanel = () => {
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-fg">Bodegas</h3>
                     <button className="flex items-center gap-2 text-sm bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg transition-colors">
-                        <span className="material-symbols-outlined text-[16px]">add_location</span>
+                        <MapPinPlus size={16} aria-hidden="true" />
                         Añadir Ubicación
                     </button>
                 </div>
@@ -70,10 +85,10 @@ const InventoryPanel = () => {
                         <div key={i} className="bg-surface-dark border border-border-dark rounded-xl p-4 hover:border-primary/50 transition-colors cursor-pointer group">
                             <div className="flex justify-between items-start mb-2">
                                 <h4 className="font-bold text-fg">{w.name}</h4>
-                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${w.type === 'Física' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-purple-500/10 text-purple-500 border-purple-500/20'}`}>{w.type}</span>
+                                <span className={`text-2xs uppercase font-bold px-2 py-0.5 rounded border ${w.type === 'Física' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-primary/10 text-primary border-primary/20'}`}>{w.type}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-text-secondary mb-3">
-                                <span className="material-symbols-outlined text-[16px]">location_on</span>
+                                <MapPin size={16} aria-hidden="true" />
                                 {w.location}
                             </div>
                             <div className="flex items-center justify-between pt-3 border-t border-border-dark">
@@ -152,7 +167,7 @@ const FinancePanel = () => {
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-fg">Plan de Cuentas</h3>
                     <button className="flex items-center gap-2 text-sm bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg transition-colors">
-                        <span className="material-symbols-outlined text-[16px]">add</span>
+                        <Plus size={16} aria-hidden="true" />
                         Añadir Cuenta
                     </button>
                 </div>
@@ -181,8 +196,8 @@ const DevPanel = () => {
                         <div key={i} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 pb-3 border-b border-border-dark last:border-0 last:pb-0">
                             <span className="font-mono text-sm text-text-secondary w-64">{env}</span>
                             <div className="flex-1 bg-background-dark border border-border-dark rounded px-3 py-1.5 flex justify-between items-center">
-                                <span className="text-xs text-slate-500 font-mono">••••••••••••••••••••••••</span>
-                                <span className="material-symbols-outlined text-[16px] text-text-secondary cursor-pointer hover:text-white">visibility</span>
+                                <span className="text-xs text-fg-muted font-mono">••••••••••••••••••••••••</span>
+                                <Eye size={16} className="text-text-secondary cursor-pointer hover:text-white" aria-hidden="true" />
                             </div>
                         </div>
                     ))}
@@ -200,7 +215,7 @@ const PartnersPanel = () => {
                 <h3 className="text-lg font-bold text-fg mb-2">Configuración de Webhooks</h3>
                 <p className="text-text-secondary text-sm mb-4">Endpoints para pedidos dropshipping entrantes.</p>
                 <div className="flex gap-2 items-center bg-background-dark border border-border-dark rounded-lg p-2">
-                    <span className="material-symbols-outlined text-text-secondary pl-2">webhook</span>
+                    <Webhook size={18} className="text-text-secondary pl-2" aria-hidden="true" />
                     <code className="text-sm font-mono text-fg flex-1 overflow-x-auto">https://api.dropshiperp.com/webhooks/v1/orders/inbound</code>
                 </div>
             </div>
@@ -256,15 +271,17 @@ const Settings: React.FC = () => {
         }
     }
 
+    // El icono es la referencia al componente, no una cadena: así el bundler
+    // solo incluye los iconos realmente usados y TypeScript valida el nombre.
     const tabs = [
-        { id: 'general', label: 'Mi Perfil', icon: 'person' },
-        { id: 'account', label: 'Cuenta & Seguridad', icon: 'shield_lock' },
-        { id: 'team', label: 'Equipo', icon: 'group' },
-        { id: 'brands', label: 'Marcas', icon: 'verified' },
-        { id: 'inventory', label: 'Logística', icon: 'warehouse' },
-        { id: 'finance', label: 'Finanzas', icon: 'payments' },
-        { id: 'partners', label: 'Dropshipping', icon: 'hub' },
-        { id: 'advanced', label: 'Desarrollador', icon: 'code' },
+        { id: 'general', label: 'Mi Perfil', icon: User },
+        { id: 'account', label: 'Cuenta & Seguridad', icon: ShieldCheck },
+        { id: 'team', label: 'Equipo', icon: Users },
+        { id: 'brands', label: 'Marcas', icon: BadgeCheck },
+        { id: 'inventory', label: 'Logística', icon: Warehouse },
+        { id: 'finance', label: 'Finanzas', icon: Banknote },
+        { id: 'partners', label: 'Dropshipping', icon: Network },
+        { id: 'advanced', label: 'Desarrollador', icon: Code },
     ];
 
     return (
@@ -278,12 +295,9 @@ const Settings: React.FC = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setSearchParams({ tab: tab.id })}
-                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab.id
-                                    ? 'bg-primary/10 text-primary border border-primary/20'
-                                    : 'text-text-secondary hover:bg-surface-hover hover:text-white'
-                                    }`}
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === tab.id ? 'bg-primary/10 text-primary border border-primary/20' : 'text-fg-muted hover:bg-surface-hover hover:text-fg' }`}
                             >
-                                <span className="material-symbols-outlined text-[20px]">{tab.icon}</span>
+                                <tab.icon size={18} aria-hidden="true" />
                                 {tab.label}
                             </button>
                         ))}

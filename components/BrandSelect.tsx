@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
+import {
+  ChevronDown,
+  Plus,
+} from 'lucide-react';
 
 interface Brand {
     id: number;
@@ -101,13 +105,13 @@ export const BrandSelect: React.FC<BrandSelectProps> = ({ value, onChange, label
 
     return (
         <div className="relative" ref={containerRef}>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                {label} {required && <span className="text-red-500">*</span>}
+            <label className="block text-sm font-medium text-fg mb-1">
+                {label} {required && <span className="text-danger">*</span>}
             </label>
             <div className="relative">
                 <input
                     type="text"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                    className="w-full px-3 py-2 bg-surface-2 border border-strong rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                     placeholder="Buscar o crear marca..."
                     value={searchTerm}
                     onChange={(e) => {
@@ -117,21 +121,21 @@ export const BrandSelect: React.FC<BrandSelectProps> = ({ value, onChange, label
                     }}
                     onFocus={() => setIsOpen(true)}
                 />
-                <div className="absolute right-3 top-2.5 text-slate-400 pointer-events-none">
-                    <span className="material-symbols-outlined text-[20px]">expand_more</span>
+                <div className="absolute right-3 top-2.5 text-fg-subtle pointer-events-none">
+                    <ChevronDown size={20} aria-hidden="true" />
                 </div>
             </div>
 
             {isOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                <div className="absolute z-10 w-full mt-1 bg-surface border border-subtle rounded-lg shadow-lg max-h-60 overflow-auto">
                     {loading ? (
-                        <div className="p-3 text-center text-slate-500 text-sm">Cargando...</div>
+                        <div className="p-3 text-center text-fg-muted text-sm">Cargando...</div>
                     ) : (
                         <>
                             {filteredBrands.map(brand => (
                                 <button
                                     key={brand.id}
-                                    className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm transition-colors"
+                                    className="w-full text-left px-4 py-2 hover:bg-surface-hover text-fg text-sm transition-colors"
                                     onClick={() => {
                                         onChange(brand.id);
                                         setSearchTerm(brand.name);
@@ -144,17 +148,17 @@ export const BrandSelect: React.FC<BrandSelectProps> = ({ value, onChange, label
 
                             {showCreateOption && (
                                 <button
-                                    className="w-full text-left px-4 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium border-t border-slate-100 dark:border-slate-700 transition-colors flex items-center gap-2 sticky bottom-0"
+                                    className="w-full text-left px-4 py-2 bg-primary-soft hover:bg-primary-soft text-primary-soft-fg text-sm font-medium border-t border-slate-100 dark:border-slate-700 transition-colors flex items-center gap-2 sticky bottom-0"
                                     onClick={handleCreateBrand}
                                     disabled={creating}
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">add</span>
+                                    <Plus size={18} aria-hidden="true" />
                                     {creating ? 'Creando...' : `AGREGAR NUEVA MARCA "${searchTerm}"`}
                                 </button>
                             )}
 
                             {!showCreateOption && filteredBrands.length === 0 && (
-                                <div className="p-3 text-center text-slate-500 text-sm">
+                                <div className="p-3 text-center text-fg-muted text-sm">
                                     No hay resultados.
                                 </div>
                             )}

@@ -2,20 +2,39 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
+import {
+  ArrowRight,
+  Banknote,
+  Boxes,
+  CircleCheck,
+  FilePen,
+  Info,
+  LayoutGrid,
+  Loader2,
+  PackageX,
+  Percent,
+  SquarePlus,
+  Tag,
+  TicketX,
+  TrendingUp,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 
 // ─── Editable fields config ───
+// El icono es la referencia al componente, no una cadena.
 const BULK_FIELDS = [
-    { key: 'category', label: 'Categoría', type: 'text', icon: 'category' },
-    { key: 'brand_id', label: 'Marca', type: 'brand', icon: 'sell' },
-    { key: 'add_tag', label: 'Añadir Etiqueta', type: 'tag', icon: 'label' },
-    { key: 'remove_tag', label: 'Quitar Etiqueta', type: 'tag', icon: 'label_off' },
-    { key: 'min_stock_threshold', label: 'Stock Mínimo', type: 'number', icon: 'inventory' },
-    { key: 'cost_without_vat', label: 'Costo sin IVA ($)', type: 'currency', icon: 'payments' },
-    { key: 'vat_percentage', label: 'IVA (%)', type: 'percent', icon: 'percent' },
-    { key: 'profit_margin', label: 'Margen de Ganancia', type: 'margin', icon: 'trending_up' },
-    { key: 'add_stock', label: 'Añadir Stock', type: 'stock', icon: 'add_box' },
-    { key: 'is_discontinued', label: 'Descontinuar Producto', type: 'discontinued', icon: 'warning' },
-    { key: 'importer_unavailable_override', label: 'Agotado en Importadora', type: 'importer_unavailable', icon: 'production_quantity_limits' }
+    { key: 'category', label: 'Categoría', type: 'text', icon: LayoutGrid },
+    { key: 'brand_id', label: 'Marca', type: 'brand', icon: Tag },
+    { key: 'add_tag', label: 'Añadir Etiqueta', type: 'tag', icon: Tag },
+    { key: 'remove_tag', label: 'Quitar Etiqueta', type: 'tag', icon: TicketX },
+    { key: 'min_stock_threshold', label: 'Stock Mínimo', type: 'number', icon: Boxes },
+    { key: 'cost_without_vat', label: 'Costo sin IVA ($)', type: 'currency', icon: Banknote },
+    { key: 'vat_percentage', label: 'IVA (%)', type: 'percent', icon: Percent },
+    { key: 'profit_margin', label: 'Margen de Ganancia', type: 'margin', icon: TrendingUp },
+    { key: 'add_stock', label: 'Añadir Stock', type: 'stock', icon: SquarePlus },
+    { key: 'is_discontinued', label: 'Descontinuar Producto', type: 'discontinued', icon: TriangleAlert },
+    { key: 'importer_unavailable_override', label: 'Agotado en Importadora', type: 'importer_unavailable', icon: PackageX }
 ] as const;
 
 type BulkFieldKey = typeof BULK_FIELDS[number]['key'];
@@ -327,8 +346,8 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                     checked={applyToAll}
                     onChange={e => setApplyToAll(e.target.checked)}
                 />
-                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500" />
-                <span className="ml-2 text-sm text-slate-600 font-medium">Aplicar a todo el sistema (¡Cuidado!)</span>
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-warning" />
+                <span className="ml-2 text-sm text-fg-muted font-medium">Aplicar a todo el sistema (¡Cuidado!)</span>
             </label>
         </div>
     );
@@ -370,20 +389,20 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-xl overflow-hidden border border-slate-200 dark:border-slate-700 my-8">
+            <div className="bg-surface rounded-xl shadow-lg w-full max-w-xl overflow-hidden border border-subtle my-8">
                 {/* Header */}
-                <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10">
+                <div className="p-5 border-b border-subtle flex justify-between items-center bg-warning-soft">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg">
-                            <span className="material-symbols-outlined text-[24px]">edit_note</span>
+                        <div className="p-2 bg-warning-soft text-warning-soft-fg rounded-lg">
+                            <FilePen size={24} aria-hidden="true" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Edición Rápida</h2>
-                            <p className="text-xs text-slate-500">{selectedProducts.length} producto{selectedProducts.length !== 1 ? 's' : ''} seleccionado{selectedProducts.length !== 1 ? 's' : ''}</p>
+                            <h2 className="text-lg font-bold text-fg">Edición Rápida</h2>
+                            <p className="text-xs text-fg-muted">{selectedProducts.length} producto{selectedProducts.length !== 1 ? 's' : ''} seleccionado{selectedProducts.length !== 1 ? 's' : ''}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined">close</span>
+                    <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
 
@@ -393,7 +412,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
 
                     {/* Step 1: Pick the field */}
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        <label className="block text-sm font-semibold text-fg mb-2">
                             1. ¿Qué propiedad deseas cambiar?
                         </label>
                         <div className="grid grid-cols-2 gap-2">
@@ -401,12 +420,9 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                 <button
                                     key={f.key}
                                     onClick={() => { setSelectedField(f.key); setValue(''); }}
-                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${selectedField === f.key
-                                        ? 'bg-primary/10 border-primary text-primary ring-2 ring-primary/20'
-                                        : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400'
-                                        }`}
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${selectedField === f.key ? 'bg-primary/10 border-primary text-primary ring-2 ring-primary/20' : 'bg-slate-50 dark:bg-slate-700/50 border-subtle text-fg-muted hover:border-slate-400' }`}
                                 >
-                                    <span className="material-symbols-outlined text-[18px]">{f.icon}</span>
+                                    <f.icon size={18} aria-hidden="true" />
                                     {f.label}
                                 </button>
                             ))}
@@ -416,7 +432,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                     {/* Step 2: Enter the new value */}
                     {selectedField && (
                         <div className="animate-in fade-in">
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                            <label className="block text-sm font-semibold text-fg mb-2">
                                 2. Nuevo valor para "{fieldConfig?.label}"
                             </label>
 
@@ -432,7 +448,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
 
                             {fieldConfig?.type === 'currency' && (
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">$</span>
+                                    <span className="absolute left-3 top-2.5 text-fg-subtle text-sm">$</span>
                                     <input type="number" step="0.01" min="0" className={`${inputClass} pl-7`} placeholder="0.00"
                                         value={value} onChange={e => setValue(e.target.value)} autoFocus />
                                 </div>
@@ -442,7 +458,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                 <div className="relative">
                                     <input type="number" step="0.1" min="0" className={inputClass} placeholder="Ej: 12"
                                         value={value} onChange={e => setValue(e.target.value)} autoFocus />
-                                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">%</span>
+                                    <span className="absolute right-3 top-2.5 text-fg-subtle text-sm">%</span>
                                 </div>
                             )}
 
@@ -450,7 +466,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                 <>
                                     <input type="number" step="0.01" className={inputClass} placeholder="Ej: 0.30"
                                         value={value} onChange={e => setValue(e.target.value)} autoFocus />
-                                    <p className="text-xs text-slate-400 mt-1">Ej: 0.30 = 30% de margen sobre costo con IVA</p>
+                                    <p className="text-xs text-fg-subtle mt-1">Ej: 0.30 = 30% de margen sobre costo con IVA</p>
                                 </>
                             )}
 
@@ -476,7 +492,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                     <input type="number" className={inputClass} placeholder="Cantidad a sumar (Ej: 10 o -5)"
                                         value={value} onChange={e => setValue(e.target.value)} autoFocus />
 
-                                    <div className="bg-slate-50 dark:bg-slate-700/30 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-4">
+                                    <div className="bg-surface-2 p-4 rounded-lg border border-subtle space-y-4">
                                         <WarehouseSelect
                                             value={stockAdjustment.warehouse_id}
                                             onChange={(val) => setStockAdjustment(prev => ({ ...prev, warehouse_id: val }))}
@@ -491,14 +507,14 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                                     checked={stockAdjustment.isPurchase}
                                                     onChange={(e) => setStockAdjustment(prev => ({ ...prev, isPurchase: e.target.checked }))}
                                                 />
-                                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                                                <span className="ml-2 text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Es una compra financiera</span>
+                                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-warning"></div>
+                                                <span className="ml-2 text-sm text-fg-muted font-medium group-hover:text-slate-900 transition-colors">Es una compra financiera</span>
                                             </label>
                                         </div>
 
                                         {stockAdjustment.isPurchase && (
-                                            <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-3 animate-in fade-in slide-in-from-top-2">
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            <div className="bg-warning-soft border border-warning/20 rounded-lg p-3 animate-in fade-in slide-in-from-top-2">
+                                                <label className="block text-sm font-medium text-fg mb-1">
                                                     Cuenta de Pago (De donde sale el dinero):
                                                 </label>
                                                 <select
@@ -515,8 +531,8 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                                 </select>
 
                                                 {stockAdjustment.account_id && Number(value) > 0 && (
-                                                    <div className="mt-2 text-xs font-semibold text-orange-700 flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-[14px]">info</span>
+                                                    <div className="mt-2 text-xs font-semibold text-warning flex items-center gap-1">
+                                                        <Info size={14} aria-hidden="true" />
                                                         Se debitarán aprox. ${getStockPreviewTotal().toFixed(2)} de esta cuenta.
                                                     </div>
                                                 )}
@@ -541,7 +557,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                         <option value="12">⏳ Descontinuado Temporal (1 Año)</option>
                                     </select>
                                     {value && value !== 'falso_activo' && (
-                                        <p className="text-xs text-rose-500 font-medium mt-2">⚠️ Al descontinuar, todas las listas de espera activas asociadas a estos productos pasarán a estado "Descontinuado" para ser notificadas.</p>
+                                        <p className="text-xs text-danger font-medium mt-2">⚠️ Al descontinuar, todas las listas de espera activas asociadas a estos productos pasarán a estado "Descontinuado" para ser notificadas.</p>
                                     )}
                                 </div>
                             )}
@@ -561,7 +577,7 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                                         <option value="12">⏳ Agotado en Importadora (1 Año)</option>
                                     </select>
                                     {value && value !== 'falso_activo' && (
-                                        <p className="text-xs text-amber-600 font-medium mt-2">⚠️ El stock de importadora se mostrará como 0 en todo el sistema (Sourcing, Reposición, Demandas) aunque la importadora reporte otra cosa. Las listas de espera marcadas como "Disponible" volverán a "Pendiente" automáticamente.</p>
+                                        <p className="text-xs text-warning font-medium mt-2">⚠️ El stock de importadora se mostrará como 0 en todo el sistema (Sourcing, Reposición, Demandas) aunque la importadora reporte otra cosa. Las listas de espera marcadas como "Disponible" volverán a "Pendiente" automáticamente.</p>
                                     )}
                                 </div>
                             )}
@@ -570,27 +586,27 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
 
                     {/* Financial field preview */}
                     {isFinancialField && value && (
-                        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[14px]">info</span>
+                        <div className="bg-warning-soft border border-warning/20 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-warning mb-2 flex items-center gap-1">
+                                <Info size={14} aria-hidden="true" />
                                 PVP se recalculará automáticamente:
                             </p>
                             <div className="space-y-1.5">
                                 {getPreviewRows().map((row, i) => (
                                     <div key={i} className="flex items-center justify-between text-xs">
-                                        <span className="text-slate-600 dark:text-slate-400 truncate max-w-[200px]" title={row.name}>
-                                            <span className="font-mono text-slate-400 mr-1">{row.sku}</span>
+                                        <span className="text-fg-muted truncate max-w-[200px]" title={row.name}>
+                                            <span className="font-mono text-fg-subtle mr-1">{row.sku}</span>
                                             {row.name}
                                         </span>
                                         <span className="flex items-center gap-1 shrink-0">
-                                            <span className="text-slate-400">${row.oldPvp.toFixed(2)}</span>
-                                            <span className="material-symbols-outlined text-[14px] text-amber-500">arrow_forward</span>
-                                            <span className="font-bold text-amber-700 dark:text-amber-300">${row.newPvp.toFixed(2)}</span>
+                                            <span className="text-fg-subtle">${row.oldPvp.toFixed(2)}</span>
+                                            <ArrowRight size={14} className="text-warning" aria-hidden="true" />
+                                            <span className="font-bold text-warning">${row.newPvp.toFixed(2)}</span>
                                         </span>
                                     </div>
                                 ))}
                                 {selectedProducts.length > 5 && (
-                                    <p className="text-xs text-slate-400 text-center">...y {selectedProducts.length - 5} más</p>
+                                    <p className="text-xs text-fg-subtle text-center">...y {selectedProducts.length - 5} más</p>
                                 )}
                             </div>
                         </div>
@@ -598,25 +614,20 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
 
                     {/* Result message */}
                     {result && (
-                        <div className={`p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${result.failed === 0
-                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
-                            : 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400'
-                            }`}>
-                            <span className="material-symbols-outlined text-[18px]">
-                                {result.failed === 0 ? 'check_circle' : 'warning'}
-                            </span>
+                        <div className={`p-3 rounded-lg text-sm font-medium flex items-center gap-2 ${result.failed === 0 ? 'bg-success-soft text-success dark:text-success' : 'bg-danger-soft text-danger dark:text-danger' }`}>
+                            {result.failed === 0 ? <CircleCheck size={18} aria-hidden="true" /> : <TriangleAlert size={18} aria-hidden="true" />}
                             {result.success} actualizado{result.success !== 1 ? 's' : ''}
                             {result.failed > 0 && `, ${result.failed} fallido${result.failed !== 1 ? 's' : ''}`}
                         </div>
                     )}
 
                     {/* Selected products summary */}
-                    <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-slate-500 mb-1.5">Productos seleccionados:</p>
+                    <div className="bg-surface-2 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-fg-muted mb-1.5">Productos seleccionados:</p>
                         <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
                             {selectedProducts.map(p => (
-                                <span key={p.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-md text-xs text-slate-600 dark:text-slate-300">
-                                    <span className="font-mono text-slate-400">{p.sku}</span>
+                                <span key={p.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-surface border border-subtle rounded-lg text-xs text-fg-muted">
+                                    <span className="font-mono text-fg-subtle">{p.sku}</span>
                                     {p.name?.length > 25 ? p.name.substring(0, 25) + '…' : p.name}
                                 </span>
                             ))}
@@ -625,17 +636,17 @@ export const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, o
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end gap-3 p-5 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
+                <div className="flex justify-end gap-3 p-5 border-t border-subtle bg-slate-50/50 dark:bg-slate-900/30">
                     <button type="button" onClick={onClose}
-                        className="px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium text-sm">
+                        className="px-4 py-2 text-fg hover:bg-surface-hover rounded-lg transition-colors font-medium text-sm">
                         Cancelar
                     </button>
                     <button
                         onClick={handleApply}
                         disabled={loading || !selectedField || (!value && value !== 0)}
-                        className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg shadow-sm shadow-amber-500/30 transition-all font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        className="px-6 py-2 bg-warning hover:bg-warning text-white rounded-lg shadow-sm shadow-warning/30 transition-all font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
-                        {loading && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+                        {loading && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
                         {loading ? 'Aplicando...' : `Aplicar a ${selectedProducts.length} producto${selectedProducts.length !== 1 ? 's' : ''}`}
                     </button>
                 </div>

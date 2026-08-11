@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, DollarSign, AlertTriangle, ArrowLeft, LogOut, Package, Search, Trash2, Tag, CheckCircle, XCircle, Edit3 } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle,
+  DollarSign,
+  Edit3,
+  LogOut,
+  MapPin,
+  Package,
+  Pencil,
+  Search,
+  Tag,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
 import { supabase } from '../supabaseClient';
 import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
@@ -792,7 +806,7 @@ const POS: React.FC = () => {
     const hasDraftItems = cart.some(item => item.product.sku.startsWith('DRAFT-'));
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-slate-800 font-sans">
+        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-fg font-sans">
             <PaymentModal
                 isOpen={isPaymentModalOpen}
                 onClose={() => setIsPaymentModalOpen(false)}
@@ -803,36 +817,36 @@ const POS: React.FC = () => {
             {/* Till Open Modal Blocking Overlay */}
             {isTillModalOpen && !activeTill && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="bg-amber-100 p-3 rounded-full text-amber-600">
+                            <div className="bg-warning-soft p-3 rounded-full text-warning-soft-fg">
                                 <AlertTriangle size={28} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-slate-800">Caja Cerrada</h2>
-                                <p className="text-sm text-slate-500">Debes abrir una caja para iniciar ventas.</p>
+                                <h2 className="text-xl font-bold text-fg">Caja Cerrada</h2>
+                                <p className="text-sm text-fg-muted">Debes abrir una caja para iniciar ventas.</p>
                             </div>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Fecha de la Caja</label>
+                                <label className="block text-sm font-semibold text-fg mb-1">Fecha de la Caja</label>
                                 <input
                                     type="date"
                                     value={tillDate}
                                     onChange={(e) => setTillDate(e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-amber-500 transition-shadow"
+                                    className="w-full border border-strong rounded-lg p-3 outline-none focus:ring-2 focus:ring-warning transition-shadow"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Efectivo Inicial ($)</label>
+                                <label className="block text-sm font-semibold text-fg mb-1">Efectivo Inicial ($)</label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     min="0"
                                     value={tillInitialCash}
                                     onChange={(e) => setTillInitialCash(e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-amber-500 font-mono text-lg"
+                                    className="w-full border border-strong rounded-lg p-3 outline-none focus:ring-2 focus:ring-warning font-mono text-lg"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -840,13 +854,13 @@ const POS: React.FC = () => {
                             <div className="pt-4 flex gap-3">
                                 <button 
                                     onClick={handleExit}
-                                    className="flex-1 py-3 px-4 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                    className="flex-1 py-3 px-4 border border-strong rounded-xl font-bold text-fg-muted hover:bg-surface-hover transition-colors"
                                 >
                                     Salir del POS
                                 </button>
                                 <button
                                     onClick={handleOpenTill}
-                                    className="flex-1 py-3 px-4 bg-amber-600 hover:bg-amber-700 rounded-xl font-bold text-white shadow-md transition-colors"
+                                    className="flex-1 py-3 px-4 bg-warning hover:bg-warning rounded-xl font-bold text-white shadow-md transition-colors"
                                 >
                                     Abrir Caja
                                 </button>
@@ -859,31 +873,31 @@ const POS: React.FC = () => {
             {/* Stock Edit Modal */}
             {isStockEditModalOpen && stockEditItem && (
                 <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="font-bold text-slate-800 text-lg">Ajuste de Stock Rápido</h2>
-                            <button onClick={() => setIsStockEditModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                            <h2 className="font-bold text-fg text-lg">Ajuste de Stock Rápido</h2>
+                            <button onClick={() => setIsStockEditModalOpen(false)} className="text-fg-subtle hover:text-slate-600">✕</button>
                         </div>
-                        <div className="mb-4 text-sm text-slate-600">
+                        <div className="mb-4 text-sm text-fg-muted">
                             <strong>{stockEditItem.product.name}</strong><br />
                             Bodega: {stockEditItem.warehouse_name}<br />
                             Stock Actual: {stockEditItem.current_stock}
                         </div>
                         <div className="mb-4">
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nuevo Stock Real</label>
+                            <label className="block text-xs font-bold text-fg-muted uppercase mb-1">Nuevo Stock Real</label>
                             <input
                                 type="number"
                                 min="0"
                                 autoFocus
                                 value={stockEditNewValue}
                                 onChange={e => setStockEditNewValue(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                                className="w-full border-2 border-blue-400 rounded-lg p-2 text-lg font-bold outline-none"
+                                className="w-full border-2 border-primary rounded-lg p-2 text-lg font-bold outline-none"
                             />
                         </div>
                         <button
                             onClick={handleSaveStockCorrection}
                             disabled={isSavingStock || typeof stockEditNewValue !== 'number'}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow flex items-center justify-center disabled:opacity-50"
+                            className="w-full py-3 bg-primary hover:bg-primary text-white font-bold rounded-lg transition-colors shadow flex items-center justify-center disabled:opacity-50"
                         >
                             {isSavingStock ? 'Guardando...' : 'Guardar Ajuste'}
                         </button>
@@ -896,19 +910,19 @@ const POS: React.FC = () => {
                 <div className="flex items-center gap-2 md:gap-4">
                     {!isCashier ? (
                         <>
-                            <button onClick={handleExit} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors">
+                            <button onClick={handleExit} className="flex items-center gap-2 text-fg-muted hover:text-slate-800 transition-colors">
                                 <ArrowLeft size={20} />
                                 <span className="font-medium text-sm hidden sm:inline">Volver</span>
                             </button>
-                            <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-md text-sm font-semibold">
+                            <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-fg-muted hover:text-primary transition-colors bg-slate-100 hover:bg-primary-soft px-3 py-1.5 rounded-lg text-sm font-semibold">
                                 Dashboard
                             </button>
-                            <button onClick={() => navigate('/orders')} className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-md text-sm font-semibold">
+                            <button onClick={() => navigate('/orders')} className="flex items-center gap-1 text-fg-muted hover:text-primary transition-colors bg-slate-100 hover:bg-primary-soft px-3 py-1.5 rounded-lg text-sm font-semibold">
                                 Pipeline Pedidos
                             </button>
                         </>
                     ) : (
-                        <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 md:px-3 md:py-1.5 rounded-md">
+                        <button onClick={handleLogout} className="flex items-center gap-2 text-danger hover:text-danger bg-danger-soft px-2 py-1 md:px-3 md:py-1.5 rounded-lg">
                             <LogOut size={18} />
                             <span className="font-medium text-sm hidden sm:inline">Salir</span>
                         </button>
@@ -916,24 +930,24 @@ const POS: React.FC = () => {
                     <div className="h-6 w-px bg-slate-300 mx-1 md:mx-2"></div>
 
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2">
-                        <span className="text-[10px] md:text-sm font-semibold text-slate-500 uppercase hidden md:inline">Cliente:</span>
+                        <span className="text-2xs md:text-sm font-semibold text-fg-muted hidden md:inline">Cliente:</span>
                         <div
                             onClick={() => setIsCustomerModalOpen(true)}
-                            className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 px-2 py-1 md:px-3 md:py-1.5 rounded-md border border-slate-200 cursor-pointer transition-colors"
+                            className="flex items-center gap-2 bg-slate-50 hover:bg-surface-hover px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-subtle cursor-pointer transition-colors"
                         >
-                            <span className="font-bold text-slate-800 text-xs md:text-sm truncate max-w-[120px] md:max-w-xs">{customer.name}</span>
+                            <span className="font-bold text-fg text-xs md:text-sm truncate max-w-[120px] md:max-w-xs">{customer.name}</span>
                             {customer.claimed_by && (
-                                <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                <span className="bg-primary-soft text-primary-soft-fg text-2xs font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
                                     Referido 2%
                                 </span>
                             )}
-                            <span className="material-symbols-outlined text-slate-400 ml-1 text-[16px]">edit</span>
+                            <Pencil size={16} className="text-fg-subtle ml-1" aria-hidden="true" />
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] md:text-sm font-semibold text-slate-500 uppercase hidden md:inline">Cajero_POS</span>
+                    <span className="text-2xs md:text-sm font-semibold text-fg-muted hidden md:inline">Cajero_POS</span>
                 </div>
             </header>
 
@@ -944,15 +958,15 @@ const POS: React.FC = () => {
                 <div className="flex-1 flex flex-col p-4 md:p-6 pb-2 md:pb-4 overflow-y-auto">
 
                     {/* Search Bar / Manual Toggle */}
-                    <div className="mb-4 z-10 bg-white p-1 rounded-lg border border-slate-200 inline-flex shadow-sm">
+                    <div className="mb-4 z-10 bg-white p-1 rounded-lg border border-subtle inline-flex shadow-sm">
                         <button 
-                            className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${!isManualMode ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${!isManualMode ? 'bg-primary-soft text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                             onClick={() => setIsManualMode(false)}
                         >
                             Catálogo
                         </button>
                         <button 
-                            className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${isManualMode ? 'bg-amber-50 text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${isManualMode ? 'bg-warning-soft text-warning shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                             onClick={() => setIsManualMode(true)}
                         >
                             Venta Manual
@@ -961,30 +975,30 @@ const POS: React.FC = () => {
 
                     <div className="mb-4 relative z-10">
                         {isManualMode ? (
-                            <form onSubmit={handleAddManualProduct} className="bg-white p-4 border border-amber-200 rounded-xl shadow-sm text-left">
-                                <h3 className="font-bold text-amber-800 mb-3 text-sm flex items-center gap-2">
+                            <form onSubmit={handleAddManualProduct} className="bg-white p-4 border border-warning/20 rounded-xl shadow-sm text-left">
+                                <h3 className="font-bold text-warning mb-3 text-sm flex items-center gap-2">
                                     <AlertTriangle size={16} /> Agregar Producto No Registrado
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                                     <div className="md:col-span-2">
-                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Nombre / Descripción</label>
-                                        <input type="text" required autoFocus value={manualProductName} onChange={e => setManualProductName(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 uppercase" placeholder="Ej: ESPEJO GRANDE" />
+                                        <label className="block text-xs font-semibold text-fg-muted mb-1">Nombre / Descripción</label>
+                                        <input type="text" required autoFocus value={manualProductName} onChange={e => setManualProductName(e.target.value)} className="w-full border border-strong rounded-lg p-2 text-sm outline-none focus:border-warning" placeholder="Ej: ESPEJO GRANDE" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Costo S/I ($)</label>
-                                        <input type="number" step="0.01" min="0" required value={manualProductCost} onChange={e => setManualProductCost(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 font-mono" placeholder="0.00" />
+                                        <label className="block text-xs font-semibold text-fg-muted mb-1">Costo S/I ($)</label>
+                                        <input type="number" step="0.01" min="0" required value={manualProductCost} onChange={e => setManualProductCost(e.target.value)} className="w-full border border-strong rounded-lg p-2 text-sm outline-none focus:border-warning font-mono" placeholder="0.00" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Precio Final ($)</label>
-                                        <input type="number" step="0.01" min="0" required value={manualProductPrice} onChange={e => setManualProductPrice(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 font-mono" placeholder="0.00" />
+                                        <label className="block text-xs font-semibold text-fg-muted mb-1">Precio Final ($)</label>
+                                        <input type="number" step="0.01" min="0" required value={manualProductPrice} onChange={e => setManualProductPrice(e.target.value)} className="w-full border border-strong rounded-lg p-2 text-sm outline-none focus:border-warning font-mono" placeholder="0.00" />
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-end gap-3 mt-4">
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-500 mb-1">Cantidad</label>
-                                        <input type="number" min="1" required value={manualProductQty} onChange={e => setManualProductQty(parseInt(e.target.value) || 1)} className="w-20 border border-slate-300 rounded-lg p-2 text-sm outline-none focus:border-amber-500 font-mono text-center" />
+                                        <label className="block text-xs font-semibold text-fg-muted mb-1">Cantidad</label>
+                                        <input type="number" min="1" required value={manualProductQty} onChange={e => setManualProductQty(parseInt(e.target.value) || 1)} className="w-20 border border-strong rounded-lg p-2 text-sm outline-none focus:border-warning font-mono text-center" />
                                     </div>
-                                    <button disabled={isAddingManual || !manualProductName.trim()} type="submit" className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-6 rounded-lg text-sm transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center">
+                                    <button disabled={isAddingManual || !manualProductName.trim()} type="submit" className="bg-warning hover:bg-warning text-white font-bold py-2 px-6 rounded-lg text-sm transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center">
                                         {isAddingManual ? 'Agregando...' : 'Agregar a la Venta'}
                                     </button>
                                 </div>
@@ -993,9 +1007,9 @@ const POS: React.FC = () => {
                             <div className="relative flex-1">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     {isSearching ? (
-                                        <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                        <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
                                     ) : (
-                                        <Search className="h-5 w-5 text-slate-400" />
+                                        <Search className="h-5 w-5 text-fg-subtle" />
                                     )}
                                 </div>
                                 <input
@@ -1004,7 +1018,7 @@ const POS: React.FC = () => {
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Buscar producto (F2)"
-                                    className="block w-full pl-10 pr-3 py-3 md:py-4 border border-slate-300 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-lg shadow-sm"
+                                    className="block w-full pl-10 pr-3 py-3 md:py-4 border border-strong rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary text-sm md:text-lg shadow-sm"
                                     autoFocus
                                 />
                             </div>
@@ -1012,39 +1026,39 @@ const POS: React.FC = () => {
 
                         {/* Search Results Dropdown */}
                         {!isManualMode && searchQuery.trim().length > 0 && (
-                            <div className="absolute top-full mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-96 overflow-y-auto">
+                            <div className="absolute top-full mt-2 w-full bg-white border border-subtle rounded-xl shadow-lg overflow-hidden max-h-96 overflow-y-auto">
                                 {searchResults.length > 0 ? (
                                     <ul className="divide-y divide-slate-100">
                                         {searchResults.map((result, idx) => (
                                             <li
                                                 key={idx}
-                                                className="p-3 hover:bg-blue-50 cursor-pointer transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-2"
+                                                className="p-3 hover:bg-primary-soft cursor-pointer transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-2"
                                                 onClick={() => handleAddToCart(result)}
                                             >
                                                 <div>
-                                                    <div className="font-bold text-slate-800 flex items-center gap-2">
+                                                    <div className="font-bold text-fg flex items-center gap-2">
                                                         {result.product.name}
                                                         {isProductDiscontinued(result.product) && (
-                                                            <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5" title="No habrá reposición de stock una vez agotado.">
+                                                            <span className="bg-danger-soft text-danger-soft-fg text-2xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5" title="No habrá reposición de stock una vez agotado.">
                                                                 <AlertTriangle size={10} /> Descontinuado
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-xs font-mono text-slate-500">{result.product.sku}</div>
+                                                    <div className="text-xs font-mono text-fg-muted">{result.product.sku}</div>
                                                     <div className="flex items-center gap-3 mt-1.5">
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                                                        <span className="inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded bg-slate-100 text-fg-muted">
                                                             <MapPin size={10} /> {result.warehouse_name}
                                                         </span>
-                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded ${result.current_stock > 5 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                        <span className={`inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded ${result.current_stock > 5 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
                                                             <Package size={10} /> {result.current_stock} u.
                                                         </span>
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                                                        <span className="inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded bg-primary-soft text-primary">
                                                             <DollarSign size={10} /> Costo: ${(result.product.final_cost_with_vat || 0).toFixed(2)}
                                                         </span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2">
-                                                    <div className="font-bold text-blue-600 text-lg">
+                                                    <div className="font-bold text-primary text-lg">
                                                         ${result.product.price.toFixed(2)}
                                                     </div>
                                                     <button 
@@ -1054,7 +1068,7 @@ const POS: React.FC = () => {
                                                             setStockEditNewValue(result.current_stock);
                                                             setIsStockEditModalOpen(true); 
                                                         }}
-                                                        className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors"
+                                                        className="text-2xs bg-slate-200 hover:bg-slate-300 text-fg-muted font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors"
                                                     >
                                                         <Edit3 size={10} /> Corregir Stock
                                                     </button>
@@ -1063,10 +1077,10 @@ const POS: React.FC = () => {
                                         ))}
                                     </ul>
                                 ) : !isSearching ? (
-                                    <div className="p-6 text-center text-slate-500">
-                                        <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-2" />
+                                    <div className="p-6 text-center text-fg-muted">
+                                        <AlertTriangle className="mx-auto h-8 w-8 text-warning mb-2" />
                                         <p>No se encontraron resultados.</p>
-                                        <p className="text-xs text-slate-400 mt-1 mb-4">Se ha registrado esta demanda automáticamente.</p>
+                                        <p className="text-xs text-fg-subtle mt-1 mb-4">Se ha registrado esta demanda automáticamente.</p>
 
                                     </div>
                                 ) : null}
@@ -1075,37 +1089,37 @@ const POS: React.FC = () => {
                     </div>
 
                     {/* Cart Items (Mobile Stack / Desktop Table) */}
-                    <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                    <div className="flex-1 bg-white border border-subtle rounded-xl shadow-sm overflow-hidden flex flex-col">
 
                         {/* Desktop Table Header */}
-                        <div className="hidden md:flex bg-slate-50 border-b border-slate-200 px-4 py-3 sticky top-0">
-                            <div className="flex-1 text-xs font-bold text-slate-500 uppercase tracking-wider">Producto</div>
-                            <div className="w-24 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Precio</div>
-                            <div className="w-28 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Cant</div>
-                            <div className="w-28 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Subtotal</div>
-                            <div className="w-12 text-center text-xs font-bold text-slate-500 uppercase tracking-wider"></div>
+                        <div className="hidden md:flex bg-slate-50 border-b border-subtle px-4 py-3 sticky top-0">
+                            <div className="flex-1 text-xs font-bold text-fg-muted uppercase tracking-wider">Producto</div>
+                            <div className="w-24 text-center text-xs font-bold text-fg-muted uppercase tracking-wider">Precio</div>
+                            <div className="w-28 text-center text-xs font-bold text-fg-muted uppercase tracking-wider">Cant</div>
+                            <div className="w-28 text-right text-xs font-bold text-fg-muted uppercase tracking-wider">Subtotal</div>
+                            <div className="w-12 text-center text-xs font-bold text-fg-muted uppercase tracking-wider"></div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto w-full">
                             {cart.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center p-6 text-slate-400">
+                                <div className="h-full flex flex-col items-center justify-center p-6 text-fg-subtle">
                                     <Search className="h-12 w-12 text-slate-200 mb-3" />
-                                    <p className="text-lg font-medium text-slate-500">El carrito está vacío</p>
+                                    <p className="text-lg font-medium text-fg-muted">El carrito está vacío</p>
                                     <p className="text-sm">Busca y selecciona productos para agregarlos</p>
                                 </div>
                             ) : (
                                 <div className="divide-y divide-slate-100">
                                     {cart.map((item) => (
-                                        <div key={item.id} className="p-3 md:px-4 md:py-3 hover:bg-slate-50 flex flex-col md:flex-row md:items-center gap-3">
+                                        <div key={item.id} className="p-3 md:px-4 md:py-3 hover:bg-surface-hover flex flex-col md:flex-row md:items-center gap-3">
                                             {/* Mobile & Desktop Info Layer */}
                                             <div className="flex-1">
-                                                <div className="text-sm font-bold text-slate-900">{item.product.name}</div>
+                                                <div className="text-sm font-bold text-fg">{item.product.name}</div>
                                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded">{item.product.sku}</span>
-                                                    <span className="text-[10px] text-slate-400">{item.warehouse_name}</span>
+                                                    <span className="text-2xs bg-slate-100 text-fg-muted px-1.5 rounded">{item.product.sku}</span>
+                                                    <span className="text-2xs text-fg-subtle">{item.warehouse_name}</span>
                                                     {item.warehouse_id !== 0 && !item.product.sku.startsWith('DRAFT-') && (
                                                         <>
-                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${item.current_stock >= item.quantity ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                            <span className={`inline-flex items-center gap-1 text-2xs font-bold px-1.5 py-0.5 rounded ${item.current_stock >= item.quantity ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
                                                                 <Package size={10} /> Stock: {item.current_stock}
                                                             </span>
                                                             <button
@@ -1114,7 +1128,7 @@ const POS: React.FC = () => {
                                                                     setStockEditNewValue(item.current_stock);
                                                                     setIsStockEditModalOpen(true);
                                                                 }}
-                                                                className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors"
+                                                                className="text-2xs bg-slate-200 hover:bg-slate-300 text-fg-muted font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors"
                                                                 title="Corregir stock antes de cerrar la venta"
                                                             >
                                                                 <Edit3 size={10} /> Editar
@@ -1129,7 +1143,7 @@ const POS: React.FC = () => {
                                                 <div className="md:w-28 text-center">
                                                     {editingPriceId === item.id ? (
                                                         <div className="relative">
-                                                            <span className="absolute left-1.5 top-1 text-slate-400 text-xs">$</span>
+                                                            <span className="absolute left-1.5 top-1 text-fg-subtle text-xs">$</span>
                                                             <input
                                                                 type="number"
                                                                 step="0.01"
@@ -1149,28 +1163,22 @@ const POS: React.FC = () => {
                                                                     }
                                                                     if (e.key === 'Escape') setEditingPriceId(null);
                                                                 }}
-                                                                className="w-20 pl-4 pr-1 py-1 text-right text-sm font-bold border-2 border-blue-400 rounded outline-none bg-blue-50"
+                                                                className="w-20 pl-4 pr-1 py-1 text-right text-sm font-bold border-2 border-primary rounded outline-none bg-primary-soft"
                                                             />
                                                         </div>
                                                     ) : (
                                                         <button
                                                             onClick={() => setEditingPriceId(item.id)}
-                                                            className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded cursor-pointer transition-colors ${item.unitPrice < item.product.price
-                                                                ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                                                                : item.unitPrice > item.product.price
-                                                                    ? 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
-                                                                    : 'text-slate-500 hover:bg-slate-100 border border-transparent'
-                                                                }`}
+                                                            className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded cursor-pointer transition-colors ${item.unitPrice < item.product.price ? 'bg-warning-soft text-warning border border-warning/20 hover:bg-warning-soft' : item.unitPrice > item.product.price ? 'bg-primary-soft text-primary border border-primary/20 hover:bg-primary-soft' : 'text-slate-500 hover:bg-surface-hover border border-transparent' }`}
                                                             title="Click para editar precio"
                                                         >
-                                                            <span className="md:hidden text-xs text-slate-400 mr-0.5">Pu:</span>
+                                                            <span className="md:hidden text-xs text-fg-subtle mr-0.5">Pu:</span>
                                                             ${item.unitPrice.toFixed(2)}
                                                             <Edit3 size={10} className="opacity-50" />
                                                         </button>
                                                     )}
                                                     {item.unitPrice !== item.product.price && (
-                                                        <div className={`text-[9px] font-bold mt-0.5 ${item.unitPrice < item.product.price ? 'text-amber-500' : 'text-purple-500'
-                                                            }`}>
+                                                        <div className={`text-[9px] font-bold mt-0.5 ${item.unitPrice < item.product.price ? 'text-warning' : 'text-primary' }`}>
                                                             PVP: ${item.product.price.toFixed(2)}
                                                             {' '}({item.unitPrice < item.product.price ? '-' : '+'}
                                                             {Math.abs(((item.unitPrice - item.product.price) / item.product.price) * 100).toFixed(1)}%)
@@ -1179,10 +1187,10 @@ const POS: React.FC = () => {
                                                 </div>
 
                                                 <div className="md:w-28 flex justify-center">
-                                                    <div className="flex items-center border border-slate-300 rounded overflow-hidden">
+                                                    <div className="flex items-center border border-strong rounded overflow-hidden">
                                                         <button
                                                             onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                                                            className="px-2 py-1 bg-slate-50 text-slate-600 hover:bg-slate-200"
+                                                            className="px-2 py-1 bg-slate-50 text-fg-muted hover:bg-slate-200"
                                                         >-</button>
                                                         <input
                                                             type="number"
@@ -1193,18 +1201,18 @@ const POS: React.FC = () => {
                                                         />
                                                         <button
                                                             onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                                                            className="px-2 py-1 bg-slate-50 text-slate-600 hover:bg-slate-200"
+                                                            className="px-2 py-1 bg-slate-50 text-fg-muted hover:bg-slate-200"
                                                         >+</button>
                                                     </div>
                                                 </div>
 
-                                                <div className="text-base font-bold text-slate-900 md:w-28 md:text-right">
+                                                <div className="text-base font-bold text-fg md:w-28 md:text-right">
                                                     ${item.subtotal.toFixed(2)}
                                                 </div>
 
                                                 <button
                                                     onClick={() => handleRemoveFromCart(item.id)}
-                                                    className="md:w-12 flex justify-center text-red-400 hover:text-red-600 p-2 ml-2"
+                                                    className="md:w-12 flex justify-center text-danger hover:text-danger p-2 ml-2"
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
@@ -1218,20 +1226,20 @@ const POS: React.FC = () => {
                 </div>
 
                 {/* Right Side / Bottom: Total & Checkout */}
-                <div className="md:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 shadow-lg md:shadow-none flex flex-col z-20 shrink-0">
+                <div className="md:w-96 bg-white border-t md:border-t-0 md:border-l border-subtle shadow-lg md:shadow-none flex flex-col z-20 shrink-0">
                     <div className="p-5 flex-1 bg-slate-50/50">
-                        <h2 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-wider flex items-center justify-between">
+                        <h2 className="text-sm font-bold text-fg-muted mb-4 flex items-center justify-between">
                             Resumen de Venta
                         </h2>
 
                         <div className="space-y-3 mb-6">
-                            <div className="flex justify-between items-center text-slate-500 font-medium">
+                            <div className="flex justify-between items-center text-fg-muted font-medium">
                                 <span>Subtotal</span>
                                 <span>${subtotal.toFixed(2)}</span>
                             </div>
 
                             {customer.discount_percentage && customer.discount_percentage > 0 ? (
-                                <div className="flex justify-between items-center text-emerald-600 font-semibold text-sm">
+                                <div className="flex justify-between items-center text-success font-semibold text-sm">
                                     <span>Descuento ({customer.discount_percentage}%)</span>
                                     <span>-${(subtotal * (customer.discount_percentage / 100)).toFixed(2)}</span>
                                 </div>
@@ -1241,10 +1249,10 @@ const POS: React.FC = () => {
 
                         </div>
 
-                        <div className="mt-4 pt-4 border-t border-slate-200">
+                        <div className="mt-4 pt-4 border-t border-subtle">
                             <div className="flex justify-between items-center">
-                                <span className="text-lg font-black text-slate-800 uppercase">Total</span>
-                                <span className="text-4xl font-black text-blue-600 tracking-tighter">${orderTotal.toFixed(2)}</span>
+                                <span className="text-lg font-bold text-fg">Total</span>
+                                <span className="text-4xl font-bold text-primary tracking-tighter">${orderTotal.toFixed(2)}</span>
                             </div>
                         </div>
 
@@ -1252,26 +1260,26 @@ const POS: React.FC = () => {
 
                     </div>
 
-                    <div className="p-4 bg-white border-t border-slate-200">
+                    <div className="p-4 bg-white border-t border-subtle">
                         <button
                             onClick={handleSaveDraft}
                             disabled={cart.length === 0 || isSearching}
-                            className="w-full h-12 md:h-14 mb-3 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-sm md:text-md uppercase rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+                            className="w-full h-12 md:h-14 mb-3 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-sm md:text-md rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
                         >
                             <span>💾 Guardar Borrador</span>
                         </button>
                         <button
                             onClick={handleCheckoutClick}
                             disabled={cart.length === 0 || isSearching || hasDraftItems}
-                            className="w-full h-16 md:h-20 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl md:text-2xl uppercase rounded-xl shadow-lg transition-transform active:scale-95 flex flex-col items-center justify-center gap-0.5"
+                            className="w-full h-16 md:h-20 bg-primary hover:bg-primary disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xl md:text-2xl rounded-xl shadow-lg transition-transform active:scale-95 flex flex-col items-center justify-center gap-0.5"
                         >
                             <span>Facturar</span>
                             {hasDraftItems ? (
-                                <span className="text-[10px] md:text-xs font-semibold uppercase tracking-wider bg-red-500 px-2 py-0.5 rounded text-white mt-1">
+                                <span className="text-2xs md:text-xs font-semibold uppercase tracking-wider bg-danger px-2 py-0.5 rounded text-white mt-1">
                                     No Facturable (Contiene Drafts)
                                 </span>
                             ) : (
-                                <span className="text-[10px] md:text-xs font-semibold opacity-70 tracking-wider hidden md:inline">(F12)</span>
+                                <span className="text-2xs md:text-xs font-semibold opacity-70 tracking-wider hidden md:inline">(F12)</span>
                             )}
                         </button>
                     </div>
@@ -1281,10 +1289,10 @@ const POS: React.FC = () => {
             {/* Customer Lookup Modal */}
             {isCustomerModalOpen && (
                 <div className="fixed inset-0 z-[150] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                            <h2 className="font-bold text-slate-800 uppercase tracking-tight">Vincular Cliente al Carrito</h2>
-                            <button onClick={() => setIsCustomerModalOpen(false)} className="text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded hover:bg-slate-200 transition-colors">
+                    <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                        <div className="p-4 border-b border-subtle flex justify-between items-center bg-slate-50">
+                            <h2 className="font-bold text-fg uppercase tracking-tight">Vincular Cliente al Carrito</h2>
+                            <button onClick={() => setIsCustomerModalOpen(false)} className="text-fg-muted hover:text-slate-800 font-bold px-2 py-1 rounded hover:bg-slate-200 transition-colors">
                                 ✕
                             </button>
                         </div>
@@ -1292,7 +1300,7 @@ const POS: React.FC = () => {
                             <input
                                 autoFocus
                                 type="text"
-                                className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-blue-500 outline-none mb-4"
+                                className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-primary outline-none mb-4"
                                 placeholder="Buscar por nombre o cédula..."
                                 value={customerSearchQuery}
                                 onChange={(e) => setCustomerSearchQuery(e.target.value)}
@@ -1308,22 +1316,22 @@ const POS: React.FC = () => {
                                             setCustomerSearchQuery('');
                                             setCustomerSearchResults([]);
                                         }}
-                                        className="p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-colors"
+                                        className="p-3 border border-subtle rounded-lg hover:border-primary hover:bg-primary-soft cursor-pointer transition-colors"
                                     >
-                                        <div className="font-bold text-slate-800">{c.name}</div>
-                                        <div className="text-xs text-slate-500 flex justify-between mt-1 items-center">
+                                        <div className="font-bold text-fg">{c.name}</div>
+                                        <div className="text-xs text-fg-muted flex justify-between mt-1 items-center">
                                             <span>{c.identification_number || 'Sin Doc'}</span>
                                             <div className="flex gap-2 items-center">
-                                                {c.claimed_by && <span className="bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-bold text-[9px]">REFERIDO</span>}
+                                                {c.claimed_by && <span className="bg-primary-soft text-primary-soft-fg px-1 py-0.5 rounded font-bold text-[12px]">REFERIDO</span>}
                                                 {c.phone && <span>📞 {c.phone}</span>}
-                                                {c.customer_type && <span className="uppercase text-[10px] font-bold text-slate-400 border border-slate-200 px-1 py-0.5 rounded bg-white">{c.customer_type}</span>}
+                                                {c.customer_type && <span className="uppercase text-2xs font-bold text-fg-subtle border border-subtle px-1 py-0.5 rounded bg-white">{c.customer_type}</span>}
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                                 {customerSearchQuery.length >= 3 && customerSearchResults.length === 0 && (
-                                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-center">
-                                        <p className="text-sm text-blue-800 font-medium mb-3">No se encontró el cliente "{customerSearchQuery}".</p>
+                                    <div className="p-4 bg-primary-soft border border-primary/20 rounded-lg text-center">
+                                        <p className="text-sm text-primary font-medium mb-3">No se encontró el cliente "{customerSearchQuery}".</p>
                                         <button
                                             onClick={async () => {
                                                 const newIdNum = prompt("Ingrese Cédula/RUC:");
@@ -1344,7 +1352,7 @@ const POS: React.FC = () => {
                                                     }
                                                 }
                                             }}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors shadow-sm w-full"
+                                            className="bg-primary hover:bg-primary text-white font-bold py-2 px-4 rounded text-sm transition-colors shadow-sm w-full"
                                         >
                                             Crear Rápidamente
                                         </button>
@@ -1352,15 +1360,15 @@ const POS: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 border-t border-slate-200 text-center flex justify-between items-center">
-                            <span className="text-xs text-slate-400">Selecciona "Consumidor Final" si no requiere datos.</span>
+                        <div className="p-4 bg-slate-50 border-t border-subtle text-center flex justify-between items-center">
+                            <span className="text-xs text-fg-subtle">Selecciona "Consumidor Final" si no requiere datos.</span>
                             <button
                                 onClick={() => {
                                     setCustomer(defaultConsumidorFinal);
                                     setIsCustomerModalOpen(false);
                                     setCustomerSearchQuery('');
                                 }}
-                                className="text-xs text-blue-600 font-bold hover:underline"
+                                className="text-xs text-primary font-bold hover:underline"
                             >
                                 Usar C. Final
                             </button>
@@ -1372,34 +1380,34 @@ const POS: React.FC = () => {
             {/* Lost Demand Modal */}
             {isLostDemandModalOpen && (
                 <div className="fixed inset-0 z-[160] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-amber-50">
-                            <h2 className="font-bold text-amber-800 uppercase tracking-tight flex items-center gap-2">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-subtle flex justify-between items-center bg-warning-soft">
+                            <h2 className="font-bold text-warning uppercase tracking-tight flex items-center gap-2">
                                 <AlertTriangle className="w-5 h-5" />
                                 Registrar Demanda Perdida
                             </h2>
-                            <button onClick={() => setIsLostDemandModalOpen(false)} className="text-amber-500 hover:text-amber-800 font-bold px-2 py-1 rounded hover:bg-amber-200 transition-colors">
+                            <button onClick={() => setIsLostDemandModalOpen(false)} className="text-warning hover:text-warning font-bold px-2 py-1 rounded hover:bg-warning transition-colors">
                                 ✕
                             </button>
                         </div>
                         <form onSubmit={handleManualLostDemandSubmit} className="p-5 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Repuesto Buscado</label>
+                                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Repuesto Buscado</label>
                                 <input
                                     type="text"
                                     disabled
-                                    className="w-full bg-slate-100 border border-slate-200 rounded-lg p-3 text-sm font-medium text-slate-600 outline-none"
+                                    className="w-full bg-slate-100 border border-subtle rounded-lg p-3 text-sm font-medium text-fg-muted outline-none"
                                     value={searchQuery}
                                 />
                             </div>
 
                             {/* Potential Future DB expansions below. For now UI only. */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Marca de Moto (Opcional)</label>
+                                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Marca de Moto (Opcional)</label>
                                 <input
                                     autoFocus
                                     type="text"
-                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: Yamaha"
                                     value={lostDemandBrand}
                                     onChange={(e) => setLostDemandBrand(e.target.value)}
@@ -1407,10 +1415,10 @@ const POS: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
+                                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: FZ16 2015"
                                     value={lostDemandBikeModel}
                                     onChange={(e) => setLostDemandBikeModel(e.target.value)}
@@ -1419,7 +1427,7 @@ const POS: React.FC = () => {
 
                             <button
                                 type="submit"
-                                className="w-full py-3 px-4 bg-amber-500 text-white font-black uppercase rounded-lg hover:bg-amber-600 shadow-md transition-all active:scale-95"
+                                className="w-full py-3 px-4 bg-warning text-white font-bold uppercase rounded-lg hover:bg-warning shadow-md transition-all active:scale-95"
                             >
                                 Registrar Demanda
                             </button>

@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  Activity,
+  Banknote,
+  Calendar,
+  CalendarRange,
+  ChevronRight,
+  CircleAlert,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 
 interface Expense {
     id: string;
@@ -197,80 +207,80 @@ const Expenses: React.FC = () => {
     return (
         <div className="p-6 md:p-8 max-w-[1400px] mx-auto flex flex-col gap-6">
             {/* Breadcrumbs */}
-            <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
+            <div className="flex items-center gap-2 text-sm text-fg-muted mb-2">
                 <span className="hover:text-primary transition-colors cursor-pointer" onClick={() => window.location.hash = '/'}>Inicio</span>
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                <span className="text-slate-900 dark:text-white font-medium">Registro de Gastos</span>
+                <ChevronRight size={16} aria-hidden="true" />
+                <span className="text-fg font-medium">Registro de Gastos</span>
             </div>
 
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-subtle pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-red-500 text-[28px]">payments</span>
+                    <h1 className="text-2xl font-bold text-fg flex items-center gap-2">
+                        <Banknote size={32} className="text-danger" aria-hidden="true" />
                         Registro de Gastos Diarios
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">Control rápido del dinero que sale diario, semanal y mensual.</p>
+                    <p className="text-sm text-fg-muted mt-1">Control rápido del dinero que sale diario, semanal y mensual.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <label className="text-sm text-slate-500 font-medium">Mes:</label>
+                    <label className="text-sm text-fg-muted font-medium">Mes:</label>
                     <input
                         type="month"
                         value={filterMonth}
                         onChange={(e) => setFilterMonth(e.target.value)}
-                        className="px-3 py-1.5 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg text-sm dark:text-white outline-none focus:ring-1 focus:ring-primary"
+                        className="px-3 py-1.5 bg-surface border border-subtle rounded-lg text-sm dark:text-white outline-none focus:ring-1 focus:ring-primary"
                     />
                 </div>
             </div>
 
             {/* Stats Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gastado Hoy</p>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                        <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Gastado Hoy</p>
+                        <h3 className="text-2xl font-bold text-fg mt-1">
                             ${stats.today.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </h3>
                     </div>
-                    <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-500 rounded-xl">
-                        <span className="material-symbols-outlined text-[24px]">calendar_today</span>
+                    <div className="p-3 bg-danger-soft text-danger rounded-xl">
+                        <Calendar size={24} aria-hidden="true" />
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gasto esta Semana</p>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                        <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Gasto esta Semana</p>
+                        <h3 className="text-2xl font-bold text-fg mt-1">
                             ${stats.week.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </h3>
                     </div>
-                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 text-amber-500 rounded-xl">
-                        <span className="material-symbols-outlined text-[24px]">date_range</span>
+                    <div className="p-3 bg-warning-soft text-warning rounded-xl">
+                        <CalendarRange size={24} aria-hidden="true" />
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gasto este Mes</p>
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                        <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Gasto este Mes</p>
+                        <h3 className="text-2xl font-bold text-fg mt-1">
                             ${stats.month.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </h3>
                     </div>
-                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 text-blue-500 rounded-xl">
-                        <span className="material-symbols-outlined text-[24px]">monitoring</span>
+                    <div className="p-3 bg-primary-soft text-primary rounded-xl">
+                        <Activity size={24} aria-hidden="true" />
                     </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Form Card */}
-                <div className="lg:col-span-1 bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-4">
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                <div className="lg:col-span-1 bg-surface border border-subtle rounded-2xl p-6 shadow-sm flex flex-col gap-4">
+                    <h2 className="text-lg font-bold text-fg border-b border-slate-100 dark:border-slate-800 pb-2">
                         Nuevo Registro
                     </h2>
                     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                 Descripción (DATO)
                             </label>
                             <input
@@ -279,16 +289,16 @@ const Expenses: React.FC = () => {
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="Ej: COMPRAS TUTI, ENVIO A GUAYAQUIL"
-                                className="w-full px-4 py-2 bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+                                className="w-full px-4 py-2 bg-surface-2 border border-subtle rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                 Monto (GASTO)
                             </label>
                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">$</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle font-mono text-sm">$</span>
                                 <input
                                     required
                                     type="number"
@@ -297,19 +307,19 @@ const Expenses: React.FC = () => {
                                     value={amount}
                                     onChange={(e) => setAmount(e.target.value)}
                                     placeholder="0.00"
-                                    className="w-full pl-7 pr-4 py-2 bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm font-mono"
+                                    className="w-full pl-7 pr-4 py-2 bg-surface-2 border border-subtle rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm font-mono"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                 Categoría
                             </label>
                             <select
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value)}
-                                className="w-full px-4 py-2 bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+                                className="w-full px-4 py-2 bg-surface-2 border border-subtle rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
                             >
                                 <option value="Envíos">ENVÍOS</option>
                                 <option value="Gastos Casa">GASTOS CASA</option>
@@ -322,7 +332,7 @@ const Expenses: React.FC = () => {
 
                         {category === 'Personalizada' && (
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                     Nombre de Categoría Personalizada
                                 </label>
                                 <input
@@ -331,13 +341,13 @@ const Expenses: React.FC = () => {
                                     value={customCategory}
                                     onChange={(e) => setCustomCategory(e.target.value)}
                                     placeholder="Ej: GASOLINA, TRANSPORTE"
-                                    className="w-full px-4 py-2 bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+                                    className="w-full px-4 py-2 bg-surface-2 border border-subtle rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
                                 />
                             </div>
                         )}
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                            <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wider mb-1">
                                 Fecha
                             </label>
                             <input
@@ -345,13 +355,13 @@ const Expenses: React.FC = () => {
                                 type="date"
                                 value={date}
                                 onChange={(e) => setDate(e.target.value)}
-                                className="w-full px-4 py-2 bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+                                className="w-full px-4 py-2 bg-surface-2 border border-subtle rounded-lg dark:text-white focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
                             />
                         </div>
 
                         {error && (
-                            <div className="p-3 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs rounded-lg border border-red-200 dark:border-red-900/50 flex items-start gap-1">
-                                <span className="material-symbols-outlined text-[16px]">error</span>
+                            <div className="p-3 bg-danger-soft text-danger-soft-fg text-xs rounded-lg border border-danger/20 flex items-start gap-1">
+                                <CircleAlert size={16} aria-hidden="true" />
                                 {error}
                             </div>
                         )}
@@ -365,7 +375,7 @@ const Expenses: React.FC = () => {
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             ) : (
                                 <>
-                                    <span className="material-symbols-outlined text-[18px]">add</span>
+                                    <Plus size={18} aria-hidden="true" />
                                     Registrar Gasto
                                 </>
                             )}
@@ -376,32 +386,32 @@ const Expenses: React.FC = () => {
                 {/* Categorized Excel-like View */}
                 <div className="lg:col-span-2 flex flex-col gap-6">
                     {/* Resumen por Categorías estilo Excel */}
-                    <div className="bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">
+                    <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-sm">
+                        <h2 className="text-lg font-bold text-fg border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">
                             Resumen de Categorías (Estilo Excel)
                         </h2>
                         {Object.keys(categoryGroups).length === 0 ? (
-                            <p className="text-sm text-slate-500 text-center py-6">No hay gastos registrados para este mes.</p>
+                            <p className="text-sm text-fg-muted text-center py-6">No hay gastos registrados para este mes.</p>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {Object.entries(categoryGroups).map(([catName, data]) => (
                                     <div key={catName} className="border border-slate-100 dark:border-slate-800 rounded-xl p-4 bg-slate-50/50 dark:bg-[#161b22]/30 flex flex-col">
-                                        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2 mb-3">
-                                            <span className="text-sm font-bold text-slate-850 dark:text-slate-200 tracking-wider">
+                                        <div className="flex justify-between items-center border-b border-subtle pb-2 mb-3">
+                                            <span className="text-sm font-bold text-fg dark:text-slate-200 tracking-wider">
                                                 {catName}
                                             </span>
-                                            <span className="text-sm font-extrabold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded font-mono">
+                                            <span className="text-sm font-bold text-danger bg-danger-soft px-2 py-0.5 rounded font-mono">
                                                 ${data.total.toFixed(2)}
                                             </span>
                                         </div>
                                         <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
                                             {data.items.map((item) => (
-                                                <div key={item.id} className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                                                <div key={item.id} className="flex justify-between items-center text-xs text-fg-muted">
                                                     <span className="truncate pr-4 flex items-center gap-1.5">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-600"></span>
                                                         {item.description}
                                                     </span>
-                                                    <span className="font-mono text-slate-700 dark:text-slate-300 font-semibold shrink-0">
+                                                    <span className="font-mono text-fg font-semibold shrink-0">
                                                         ${item.amount.toFixed(2)}
                                                     </span>
                                                 </div>
@@ -414,8 +424,8 @@ const Expenses: React.FC = () => {
                     </div>
 
                     {/* Historical Log */}
-                    <div className="bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">
+                    <div className="bg-surface border border-subtle rounded-2xl p-6 shadow-sm">
+                        <h2 className="text-lg font-bold text-fg border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">
                             Historial de Gastos
                         </h2>
                         {loading ? (
@@ -423,12 +433,12 @@ const Expenses: React.FC = () => {
                                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                             </div>
                         ) : expenses.length === 0 ? (
-                            <p className="text-sm text-slate-500 text-center py-6">No hay historial para este período.</p>
+                            <p className="text-sm text-fg-muted text-center py-6">No hay historial para este período.</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-sm border-collapse">
                                     <thead>
-                                        <tr className="text-slate-400 font-medium border-b border-slate-200 dark:border-slate-800 pb-2">
+                                        <tr className="text-fg-subtle font-medium border-b border-subtle pb-2">
                                             <th className="py-2">Fecha</th>
                                             <th className="py-2">Descripción (DATO)</th>
                                             <th className="py-2">Categoría</th>
@@ -438,22 +448,22 @@ const Expenses: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         {expenses.map((exp) => (
-                                            <tr key={exp.id} className="border-b border-slate-100 dark:border-slate-850 hover:bg-slate-50/50 dark:hover:bg-[#161b22]/30 transition-colors">
-                                                <td className="py-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{exp.date}</td>
-                                                <td className="py-3 font-semibold text-slate-800 dark:text-slate-200">{exp.description}</td>
+                                            <tr key={exp.id} className="border-b border-slate-100 dark:border-subtle hover:bg-slate-50/50 dark:hover:bg-[#161b22]/30 transition-colors">
+                                                <td className="py-3 text-fg-muted font-mono text-xs">{exp.date}</td>
+                                                <td className="py-3 font-semibold text-fg">{exp.description}</td>
                                                 <td className="py-3">
-                                                    <span className="inline-block text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded">
+                                                    <span className="inline-block text-2xs font-bold bg-surface-3 text-fg-muted px-2 py-0.5 rounded">
                                                         {exp.category}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 text-right font-bold text-slate-800 dark:text-slate-200 font-mono">${exp.amount.toFixed(2)}</td>
+                                                <td className="py-3 text-right font-bold text-fg font-mono">${exp.amount.toFixed(2)}</td>
                                                 <td className="py-3 text-center">
                                                     <button
                                                         onClick={() => handleDelete(exp.id)}
-                                                        className="text-slate-400 hover:text-red-500 p-1 rounded transition-colors"
+                                                        className="text-fg-subtle hover:text-danger p-1 rounded transition-colors"
                                                         title="Eliminar gasto"
                                                     >
-                                                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                        <Trash2 size={18} aria-hidden="true" />
                                                     </button>
                                                 </td>
                                             </tr>

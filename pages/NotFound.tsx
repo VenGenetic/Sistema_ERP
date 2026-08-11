@@ -10,11 +10,11 @@ const NotFound: React.FC = () => {
             <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-500">
                 {/* Error Code */}
                 <div className="relative">
-                    <h1 className="text-[150px] font-black leading-none tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-primary/25 to-primary/5 select-none">
+                    <h1 className="text-[150px] font-bold leading-none tracking-tighter text-transparent bg-clip-text bg-primary select-none">
                         404
                     </h1>
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-32 h-32 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+                        <div className="w-32 h-32 bg-primary/10 rounded-full blur-3xl"></div>
                     </div>
                 </div>
 
@@ -49,8 +49,8 @@ const NotFound: React.FC = () => {
 
                 {/* Decorative elements */}
                 <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
-                    <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-blue-600/5 rounded-full blur-[120px]"></div>
-                    <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-purple-600/5 rounded-full blur-[120px]"></div>
+                    <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]"></div>
+                    <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]"></div>
                 </div>
             </div>
         </div>

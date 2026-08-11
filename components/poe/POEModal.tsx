@@ -88,19 +88,19 @@ export const POEModal: React.FC = () => {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-        <div className="bg-white dark:bg-[#111720] border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="bg-surface border border-subtle rounded-2xl max-w-xl w-full p-6 md:p-8 shadow-xl space-y-6 animate-in zoom-in-95 duration-200">
           
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
             <div>
-              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-500" />
+              <h3 className="text-xl font-bold text-fg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
                 Nuevo Procedimiento Estándar (POE)
               </h3>
-              <p className="text-xs text-slate-500 mt-1">Elige la estructura de tu guía o protocolo operativo.</p>
+              <p className="text-xs text-fg-muted mt-1">Elige la estructura de tu guía o protocolo operativo.</p>
             </div>
             <button
               onClick={() => setIsCreatingNewProcedureModal(false)}
-              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+              className="text-fg-subtle hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-surface-hover transition-all"
             >
               <X className="w-5 h-5" />
             </button>
@@ -109,7 +109,7 @@ export const POEModal: React.FC = () => {
           <form onSubmit={handleCreate} className="space-y-6">
             {/* SELECTOR DE TIPO DE SOP */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3 font-mono">
+              <label className="block text-xs font-bold text-fg uppercase tracking-wider mb-3 font-mono">
                 1. Selecciona el Tipo de Procedimiento
               </label>
               
@@ -117,21 +117,17 @@ export const POEModal: React.FC = () => {
                 {/* OPCIÓN TIPO A: LISTA */}
                 <div
                   onClick={() => setSelectedType('A_LIST')}
-                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between group ${
-                    selectedType === 'A_LIST'
-                      ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/40 shadow-md ring-2 ring-blue-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] hover:border-blue-400/50'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between group ${ selectedType === 'A_LIST' ? 'border-primary bg-primary-soft/50 shadow-md ring-2 ring-primary/20' : 'border-slate-200 dark:border-slate-800 bg-surface hover:border-primary/50' }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 group-hover:scale-110 transition-transform">
+                      <div className="p-2.5 rounded-xl bg-primary-soft text-primary-soft-fg group-hover:scale-110 transition-transform">
                         <ListCheck className="w-6 h-6" />
                       </div>
-                      {selectedType === 'A_LIST' && <span className="text-blue-500 font-bold text-sm">✔ Elegido</span>}
+                      {selectedType === 'A_LIST' && <span className="text-primary font-bold text-sm">✔ Elegido</span>}
                     </div>
-                    <h4 className="font-bold text-slate-900 dark:text-white text-base">Tipo A: Lista Rápida</h4>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    <h4 className="font-bold text-fg text-base">Tipo A: Lista Rápida</h4>
+                    <p className="text-xs text-fg-muted mt-1 leading-relaxed">
                       Ideal para tareas cortas, checklists rutinarios, apertura/cierre o auditorías sin bifurcaciones ni desvíos.
                     </p>
                   </div>
@@ -140,21 +136,17 @@ export const POEModal: React.FC = () => {
                 {/* OPCIÓN TIPO B: FLOWCHART SÍ/NO */}
                 <div
                   onClick={() => setSelectedType('B_DECISION')}
-                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between group ${
-                    selectedType === 'B_DECISION'
-                      ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-950/40 shadow-md ring-2 ring-purple-500/20'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#161b22] hover:border-purple-400/50'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between group ${ selectedType === 'B_DECISION' ? 'border-primary bg-primary-soft/50 shadow-md ring-2 ring-primary/20' : 'border-slate-200 dark:border-slate-800 bg-surface hover:border-primary/50' }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <div className="p-2.5 rounded-xl bg-purple-100 dark:bg-purple-900/60 text-purple-600 dark:text-purple-300 group-hover:scale-110 transition-transform">
+                      <div className="p-2.5 rounded-xl bg-primary-soft text-primary group-hover:scale-110 transition-transform">
                         <GitBranch className="w-6 h-6" />
                       </div>
-                      {selectedType === 'B_DECISION' && <span className="text-purple-500 font-bold text-sm">✔ Elegido</span>}
+                      {selectedType === 'B_DECISION' && <span className="text-primary font-bold text-sm">✔ Elegido</span>}
                     </div>
-                    <h4 className="font-bold text-slate-900 dark:text-white text-base">Tipo B: Flowchart Sí/No</h4>
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    <h4 className="font-bold text-fg text-base">Tipo B: Flowchart Sí/No</h4>
+                    <p className="text-xs text-fg-muted mt-1 leading-relaxed">
                       Crea árboles de decisión visuales y guía al trabajador paso a paso con botones Sí/No hasta resolver la tarea.
                     </p>
                   </div>
@@ -165,8 +157,8 @@ export const POEModal: React.FC = () => {
             {/* CAMPOS DE DATOS */}
             <div className="space-y-4 pt-2">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  2. Título de la Guía o Procedimiento <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-fg mb-1">
+                  2. Título de la Guía o Procedimiento <span className="text-danger">*</span>
                 </label>
                 <input
                   type="text"
@@ -175,12 +167,12 @@ export const POEModal: React.FC = () => {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   autoFocus
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0c1117] border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+                  className="w-full px-4 py-2.5 bg-surface-2 border border-subtle rounded-xl text-fg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary transition-all shadow-inner"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-fg mb-1">
                   3. Descripción u Objetivo del Procedimiento (Opcional)
                 </label>
                 <textarea
@@ -188,7 +180,7 @@ export const POEModal: React.FC = () => {
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0c1117] border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-all shadow-inner"
+                  className="w-full px-4 py-2.5 bg-surface-2 border border-subtle rounded-xl text-fg text-xs focus:outline-none focus:ring-2 focus:ring-primary resize-none transition-all shadow-inner"
                 />
               </div>
             </div>
@@ -197,13 +189,13 @@ export const POEModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsCreatingNewProcedureModal(false)}
-                className="px-5 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"
+                className="px-5 py-2.5 text-xs font-bold text-fg-muted hover:text-slate-800 dark:hover:text-white transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 font-bold text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all flex items-center gap-2"
+                className="px-6 py-2.5 font-bold text-xs bg-primary hover:from-primary hover:to-primary text-white rounded-xl shadow-lg shadow-primary/25 active:scale-[0.98] transition-all flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
                 Crear y Comenzar Diseño
@@ -294,29 +286,29 @@ export const POEModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-2 md:p-6 animate-in fade-in duration-150 overflow-y-auto">
-      <div className="bg-white dark:bg-[#0c1117] border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-surface border border-subtle rounded-2xl w-full max-w-5xl h-[92vh] flex flex-col shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* BARRA SUPERIOR DEL MODAL */}
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 bg-slate-50/70 dark:bg-[#111720]/80">
+        <div className="px-6 py-4 border-b border-subtle flex flex-wrap items-center justify-between gap-4 bg-slate-50/70 dark:bg-[#111720]/80">
           <div className="flex items-center gap-3 flex-1 min-w-[280px]">
             {isEditing ? (
               <select
                 value={proc.sop_type}
                 onChange={(e) => handleToggleSopType(e.target.value as SOPType)}
-                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                className="px-3 py-1.5 bg-surface border border-subtle rounded-xl text-xs font-bold text-fg focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
               >
                 <option value="A_LIST">📋 Lista Rápida (Tipo A)</option>
                 <option value="B_DECISION">🌿 Flowchart Sí/No (Tipo B)</option>
               </select>
             ) : (
               proc.sop_type === 'A_LIST' ? (
-                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-extrabold rounded-xl text-xs flex items-center gap-1.5 border border-blue-200 dark:border-blue-800/60 shadow-xs shrink-0">
-                  <ListCheck className="w-4 h-4 text-blue-500" />
+                <span className="px-3 py-1 bg-primary-soft text-primary-soft-fg font-bold rounded-xl text-xs flex items-center gap-1.5 border border-primary/20 shadow-xs shrink-0">
+                  <ListCheck className="w-4 h-4 text-primary" />
                   Lista Rápida (Tipo A)
                 </span>
               ) : (
-                <span className="px-3 py-1 bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-extrabold rounded-xl text-xs flex items-center gap-1.5 border border-purple-200 dark:border-purple-800/60 shadow-xs shrink-0">
-                  <GitBranch className="w-4 h-4 text-purple-500" />
+                <span className="px-3 py-1 bg-primary-soft text-primary font-bold rounded-xl text-xs flex items-center gap-1.5 border border-primary/20 shadow-xs shrink-0">
+                  <GitBranch className="w-4 h-4 text-primary" />
                   Flowchart Sí/No (Tipo B)
                 </span>
               )
@@ -329,10 +321,10 @@ export const POEModal: React.FC = () => {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onBlur={handleSaveTitleDescription}
-                  className="w-full font-extrabold text-lg bg-white dark:bg-slate-900 px-3 py-1 border border-blue-500 rounded-xl text-slate-900 dark:text-white focus:outline-none"
+                  className="w-full font-bold text-lg bg-surface px-3 py-1 border border-primary rounded-xl text-fg focus:outline-none"
                 />
               ) : (
-                <h2 className="font-extrabold text-lg md:text-xl text-slate-900 dark:text-white truncate" title={proc.title}>
+                <h2 className="font-bold text-lg md:text-xl text-fg truncate" title={proc.title}>
                   {proc.title}
                 </h2>
               )}
@@ -346,11 +338,7 @@ export const POEModal: React.FC = () => {
                 if (isEditing) handleSaveTitleDescription();
                 setIsEditing(!isEditing);
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${
-                isEditing
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 animate-pulse'
-                  : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs ${ isEditing ? 'bg-success hover:bg-success text-white shadow-success/20 animate-pulse' : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-fg dark:text-slate-200' }`}
             >
               {isEditing ? (
                 <>
@@ -359,7 +347,7 @@ export const POEModal: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <Edit3 className="w-4 h-4 text-blue-500" />
+                  <Edit3 className="w-4 h-4 text-primary" />
                   Editar Procedimiento
                 </>
               )}
@@ -367,7 +355,7 @@ export const POEModal: React.FC = () => {
 
             <button
               onClick={() => setSelectedProcedureForModal(null)}
-              className="p-2 text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-all"
+              className="p-2 text-fg-subtle hover:text-slate-800 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-all"
               title="Cerrar ventana"
             >
               <X className="w-6 h-6" />
@@ -376,7 +364,7 @@ export const POEModal: React.FC = () => {
         </div>
 
         {/* SUB-BARRA DE DESCRIPCIÓN Y TAGS ASOCIADOS */}
-        <div className="px-6 py-2.5 border-b border-slate-100 dark:border-slate-800/60 bg-white dark:bg-[#0c1117] flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-2.5 border-b border-slate-100 dark:border-slate-800/60 bg-surface flex items-center justify-between text-xs text-fg-muted">
           {isEditing ? (
             <input
               type="text"
@@ -384,7 +372,7 @@ export const POEModal: React.FC = () => {
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleSaveTitleDescription}
               placeholder="Descripción u objetivo del procedimiento..."
-              className="w-full text-xs px-3 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none"
+              className="w-full text-xs px-3 py-1 bg-surface-2 border border-subtle rounded-lg text-fg focus:outline-none"
             />
           ) : (
             <p className="truncate italic max-w-2xl">{proc.description || 'Sin descripción adicional programada para este estándar.'}</p>
@@ -413,14 +401,14 @@ export const POEModal: React.FC = () => {
         </div>
 
         {/* PIE CON RECORDATORIO RÁPIDO */}
-        <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-[#111720] flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-3 border-t border-subtle bg-slate-50/80 dark:bg-[#111720] flex items-center justify-between text-xs text-fg-muted">
           <div className="flex items-center gap-2">
-            <TagIcon className="w-3.5 h-3.5 text-slate-400" />
+            <TagIcon className="w-3.5 h-3.5 text-fg-subtle" />
             <span>Los tags de clasificación (Área, Roles, etc.) se editan en tiempo real directamente sobre las celdas y en la Consola de Edición (Side Peek).</span>
           </div>
           <button
             onClick={() => setSelectedProcedureForModal(null)}
-            className="px-4 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-lg transition-all"
+            className="px-4 py-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-fg font-bold rounded-lg transition-all"
           >
             Cerrar Vista
           </button>

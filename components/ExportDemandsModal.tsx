@@ -1,4 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import {
+  Download,
+  X,
+} from 'lucide-react';
 
 interface ProductDemand {
     id: number;
@@ -193,32 +197,32 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-[#0c1117] rounded-xl shadow-2xl overflow-hidden flex flex-col w-[500px] border border-slate-200 dark:border-slate-800 max-h-[90vh]">
+            <div className="bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col w-[500px] border border-subtle max-h-[90vh]">
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#161b22]">
-                    <h2 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px] text-emerald-500">download</span>
+                <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
+                    <h2 className="text-lg font-bold tracking-tight text-fg flex items-center gap-2">
+                        <Download size={20} className="text-success" aria-hidden="true" />
                         Exportar a CSV
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                    <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 
                 {/* Form Content */}
                 <div className="p-6 flex flex-col gap-4 overflow-y-auto">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-fg-muted">
                         Configure los filtros para exportar la lista de productos en demanda perdida. Los filtros se inicializan automáticamente con los que tiene aplicados en la vista actual.
                     </p>
 
                     {/* Estado */}
                     <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Estado de Solicitudes</label>
+                        <label className="block text-xs font-semibold text-fg-muted mb-1.5">Estado de Solicitudes</label>
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as any)}
-                            className="w-full bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                            className="w-full bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
                         >
                             <option value="all">Todos los estados</option>
                             <option value="active">Activas (Cola)</option>
@@ -233,11 +237,11 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
 
                     {/* Filtro Stock */}
                     <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Filtro de Stock</label>
+                        <label className="block text-xs font-semibold text-fg-muted mb-1.5">Filtro de Stock</label>
                         <select
                             value={stockFilter}
                             onChange={(e) => setStockFilter(e.target.value as any)}
-                            className="w-full bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                            className="w-full bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
                         >
                             <option value="all">Todos</option>
                             <option value="importer_only">Con stock en la importadora y no en local</option>
@@ -249,21 +253,21 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
 
                     {/* Término de búsqueda */}
                     <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Buscar por Cliente, Teléfono, SKU o Nombre</label>
+                        <label className="block text-xs font-semibold text-fg-muted mb-1.5">Buscar por Cliente, Teléfono, SKU o Nombre</label>
                         <input
                             type="text"
                             placeholder="Ej. Daytona, 099..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                            className="w-full bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
                         />
                     </div>
 
                     {/* Separador de campos */}
                     <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Separador de Campos</label>
+                        <label className="block text-xs font-semibold text-fg-muted mb-2">Separador de Campos</label>
                         <div className="flex flex-col sm:flex-row gap-3">
-                            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <label className="flex items-center gap-2 text-sm text-fg cursor-pointer">
                                 <input
                                     type="radio"
                                     name="csvSeparator"
@@ -274,7 +278,7 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                                 />
                                 Punto y coma ( ; ) - Excel en Español (Recomendado)
                             </label>
-                            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <label className="flex items-center gap-2 text-sm text-fg cursor-pointer">
                                 <input
                                     type="radio"
                                     name="csvSeparator"
@@ -289,27 +293,27 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                     </div>
 
                     {/* Resumen */}
-                    <div className="bg-slate-50 dark:bg-[#161b22] p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 flex flex-col gap-1.5">
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">Resumen de Exportación:</span>
+                    <div className="bg-surface-2 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-xs text-fg-muted flex flex-col gap-1.5">
+                        <span className="font-semibold text-fg">Resumen de Exportación:</span>
                         <span>• Solicitudes encontradas: <strong className="text-primary">{filteredAndGroupedData.totalDemands}</strong></span>
-                        <span>• Productos únicos a exportar: <strong className="text-emerald-600 dark:text-emerald-400">{filteredAndGroupedData.totalProducts}</strong></span>
+                        <span>• Productos únicos a exportar: <strong className="text-success">{filteredAndGroupedData.totalProducts}</strong></span>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#161b22] flex justify-end gap-3">
+                <div className="p-4 border-t border-subtle bg-surface-2 flex justify-end gap-3">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleExport}
                         disabled={filteredAndGroupedData.totalProducts === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-emerald-600/10"
+                        className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-success/10"
                     >
-                        <span className="material-symbols-outlined text-[18px]">download</span>
+                        <Download size={18} aria-hidden="true" />
                         Exportar CSV
                     </button>
                 </div>

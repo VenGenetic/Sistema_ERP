@@ -159,7 +159,7 @@ const Layout: React.FC = () => {
         <button
           onClick={() => setIsMobileMenuOpen(false)}
           aria-label="Cerrar menú"
-          className="rounded-md p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors"
+          className="rounded-lg p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors"
         >
           <X size={18} aria-hidden="true" />
         </button>
@@ -279,7 +279,7 @@ const Layout: React.FC = () => {
       <header className={nav.header}>
         <div className="flex items-center gap-3 md:gap-5 min-w-0">
           <button
-            className="md:hidden rounded-md p-1.5 text-fg-muted hover:bg-surface-hover hover:text-fg transition-colors"
+            className="md:hidden rounded-lg p-1.5 text-fg-muted hover:bg-surface-hover hover:text-fg transition-colors"
             onClick={() => setIsMobileMenuOpen(true)}
             aria-label="Abrir menú"
           >
@@ -354,7 +354,7 @@ const Layout: React.FC = () => {
             onClick={handleSwitchToMobile}
             title="Ir a Modo Móvil"
             aria-label="Ir a Modo Móvil"
-            className="md:hidden rounded-md p-1.5 text-primary hover:bg-primary-soft transition-colors"
+            className="md:hidden rounded-lg p-1.5 text-primary hover:bg-primary-soft transition-colors"
           >
             <Smartphone size={18} aria-hidden="true" />
           </button>
@@ -376,7 +376,7 @@ const Layout: React.FC = () => {
         {/* Sidebar móvil */}
         {isMobileMenuOpen && (
           <div className="print:hidden fixed inset-0 z-50 flex md:hidden">
-            <div className="w-64 bg-surface border-r border-subtle flex flex-col h-full shadow-2xl animate-scale-in">
+            <div className="w-64 bg-surface border-r border-subtle flex flex-col h-full shadow-xl animate-scale-in">
               <NavigationContent />
             </div>
             <div

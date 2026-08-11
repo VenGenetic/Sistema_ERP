@@ -107,7 +107,7 @@ export const StatCard: React.FC<StatCardProps> = ({
       </span>
 
       {loading ? (
-        <div className="h-8 w-24 animate-pulse rounded-md bg-surface-3" aria-hidden="true" />
+        <div className="h-8 w-24 animate-pulse rounded-lg bg-surface-3" aria-hidden="true" />
       ) : (
         <span className={emphasis ? stat.valueLg : stat.value}>{value}</span>
       )}

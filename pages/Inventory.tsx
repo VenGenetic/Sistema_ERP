@@ -10,14 +10,36 @@ import { getThumbnailUrl } from '../utils/image';
 import { Button, Input } from '../components/ui';
 import { cn, page, table as t } from '../components/ui/styles';
 import {
-    ArrowLeftRight,
-    CloudUpload,
-    Database,
-    Loader2,
-    RefreshCw,
-    Search,
-    TriangleAlert,
-    X,
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowRight,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
+  Cloud,
+  CloudUpload,
+  Copy,
+  Database,
+  Download,
+  History,
+  Image as ImageIcon,
+  Loader2,
+  MapPin,
+  Package,
+  Pencil,
+  RefreshCw,
+  Search,
+  SearchX,
+  ShoppingCart,
+  Store,
+  Table,
+  TriangleAlert,
+  Warehouse,
+  X,
 } from 'lucide-react';
 
 // Define types based on our join queries
@@ -597,20 +619,20 @@ const Inventory: React.FC = () => {
             {/* Export IVA Modal */}
             {showExportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                        <div className="flex items-center gap-3 p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                            <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg">
-                                <span className="material-symbols-outlined text-[22px]">table_view</span>
+                    <div className="bg-surface rounded-2xl shadow-lg w-full max-w-sm border border-subtle overflow-hidden">
+                        <div className="flex items-center gap-3 p-5 border-b border-subtle bg-surface-2">
+                            <div className="p-2 bg-success-soft text-success-soft-fg rounded-lg">
+                                <Table size={24} aria-hidden="true" />
                             </div>
                             <div>
-                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Exportar a Excel</h3>
-                                <p className="text-xs text-slate-500">Configura el IVA para el cálculo de costos</p>
+                                <h3 className="text-base font-bold text-fg">Exportar a Excel</h3>
+                                <p className="text-xs text-fg-muted">Configura el IVA para el cálculo de costos</p>
                             </div>
                         </div>
                         <div className="p-5 flex flex-col gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                    IVA para calcular <span className="font-mono text-slate-500">Costo S/I</span> (%)
+                                <label className="block text-sm font-medium text-fg mb-1">
+                                    IVA para calcular <span className="font-mono text-fg-muted">Costo S/I</span> (%)
                                 </label>
                                 <input
                                     type="number"
@@ -618,32 +640,30 @@ const Inventory: React.FC = () => {
                                     step="0.01"
                                     value={exportIvaPercent}
                                     onChange={e => setExportIvaPercent(parseFloat(e.target.value) || 0)}
-                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm"
+                                    className="w-full px-3 py-2 bg-surface-2 border border-strong rounded-lg focus:ring-2 focus:ring-success focus:border-success outline-none text-sm"
                                 />
-                                <p className="text-xs text-slate-400 mt-1.5">
+                                <p className="text-xs text-fg-subtle mt-1.5">
                                     <span className="font-mono">Costo S/I = Costo C/IVA ÷ (1 + {exportIvaPercent}%)</span>
                                 </p>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-3 text-xs text-slate-500 space-y-1">
-                                <p>Se exportarán <span className="font-semibold text-slate-700 dark:text-slate-300">{groupedStockItems.length}</span> productos visibles.</p>
+                            <div className="bg-surface-2 rounded-lg p-3 text-xs text-fg-muted space-y-1">
+                                <p>Se exportarán <span className="font-semibold text-fg">{groupedStockItems.length}</span> productos visibles.</p>
                                 <p>Columnas: SKU · Nombre · Cantidad · Costo S/IVA · Costo Desc. · Margen · Categoría · IVA % · Costo C/IVA</p>
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 px-5 pb-5">
                             <button
                                 onClick={() => setShowExportModal(false)}
-                                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                className="px-4 py-2 text-sm font-medium text-fg hover:bg-surface-hover rounded-lg transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleExportToExcel}
                                 disabled={exportLoading}
-                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                                className="flex items-center gap-2 px-4 py-2 bg-success hover:bg-success disabled:bg-success text-white rounded-lg text-sm font-semibold transition-colors shadow-sm"
                             >
-                                <span className={`material-symbols-outlined text-[18px] ${exportLoading ? 'animate-spin' : ''}`}>
-                                    {exportLoading ? 'progress_activity' : 'download'}
-                                </span>
+                                {exportLoading ? <Loader2 size={18} className={`${exportLoading ? 'animate-spin' : ''}`} aria-hidden="true" /> : <Download size={18} className={`${exportLoading ? 'animate-spin' : ''}`} aria-hidden="true" />}
                                 {exportLoading ? 'Exportando...' : 'Descargar'}
                             </button>
                         </div>
@@ -667,14 +687,14 @@ const Inventory: React.FC = () => {
             {/* Product Entry Modal (Surtir) */}
             {isProductEntryOpen && selectedProductId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden relative">
-                        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+                    <div className="bg-surface rounded-2xl shadow-lg w-full max-w-2xl overflow-hidden relative">
+                        <div className="flex justify-between items-center p-4 border-b border-subtle">
                             <h3 className="text-lg font-bold dark:text-white">Registrar Costo y Entrada</h3>
                             <button
                                 onClick={() => setIsProductEntryOpen(false)}
-                                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                className="p-1 rounded-full hover:bg-surface-hover transition"
                             >
-                                <span className="material-symbols-outlined text-slate-500">close</span>
+                                <X size={18} className="text-fg-muted" aria-hidden="true" />
                             </button>
                         </div>
                         <ProductEntryForm
@@ -708,10 +728,10 @@ const Inventory: React.FC = () => {
 
             {/* Header ... */}
             <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2 text-sm text-slate-500">
+                <div className="flex items-center gap-2 text-sm text-fg-muted">
                     <span className="hover:text-primary transition-colors cursor-pointer">Inicio</span>
-                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                    <span className="text-slate-900 dark:text-white font-medium">Inventario y Logística</span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                    <span className="text-fg font-medium">Inventario y Logística</span>
                 </div>
                 <div className={page.header}>
                     <div>
@@ -792,7 +812,7 @@ const Inventory: React.FC = () => {
             {activeTab === 'stock' && selectedWarehouseId && (
                 <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/20 rounded-xl mb-2">
                     <div className="flex items-center gap-2 text-primary font-medium text-sm">
-                        <span className="material-symbols-outlined text-[20px]">location_on</span>
+                        <MapPin size={20} aria-hidden="true" />
                         <span>
                             Mostrando inventario en: <span className="font-bold">{warehouses.find(w => w.id === selectedWarehouseId)?.name}</span>
                         </span>
@@ -802,7 +822,7 @@ const Inventory: React.FC = () => {
                         className="p-1 hover:bg-primary/20 rounded-full transition-colors text-primary flex items-center justify-center"
                         title="Quitar filtro"
                     >
-                        <span className="material-symbols-outlined text-[18px]">close</span>
+                        <X size={18} aria-hidden="true" />
                     </button>
                 </div>
             )}
@@ -831,7 +851,7 @@ const Inventory: React.FC = () => {
                             <button
                                 onClick={() => setSearchTerm('')}
                                 aria-label="Limpiar búsqueda"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors"
                             >
                                 <X size={15} aria-hidden="true" />
                             </button>
@@ -842,30 +862,30 @@ const Inventory: React.FC = () => {
 
 
             {/* Tabs */}
-            <div className="border-b border-slate-200 dark:border-slate-700">
+            <div className="border-b border-subtle">
                 <nav className="flex gap-6">
                     <button
                         onClick={() => {
                             setActiveTab('warehouses');
                             setSelectedWarehouseId(null);
                         }}
-                        className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'warehouses' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'warehouses' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-slate-700 dark:hover:text-slate-200'}`}
                     >
-                        <span className="material-symbols-outlined text-[20px]">warehouse</span>
+                        <Warehouse size={20} aria-hidden="true" />
                         Almacenes
                     </button>
                     <button
                         onClick={() => setActiveTab('stock')}
-                        className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'stock' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'stock' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-slate-700 dark:hover:text-slate-200'}`}
                     >
-                        <span className="material-symbols-outlined text-[20px]">inventory_2</span>
+                        <Package size={20} aria-hidden="true" />
                         Inventario Global
                     </button>
                     <button
                         onClick={() => setActiveTab('movements')}
-                        className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'movements' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'movements' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-slate-700 dark:hover:text-slate-200'}`}
                     >
-                        <span className="material-symbols-outlined text-[20px]">history</span>
+                        <History size={20} aria-hidden="true" />
                         Historial de Movimientos
                     </button>
                 </nav>
@@ -875,7 +895,7 @@ const Inventory: React.FC = () => {
                 {activeTab === 'warehouses' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {warehouses.length === 0 && !loading && (
-                            <div className="col-span-full text-center py-10 text-slate-500">
+                            <div className="col-span-full text-center py-10 text-fg-muted">
                                 No se encontraron almacenes.
                             </div>
                         )}
@@ -883,24 +903,24 @@ const Inventory: React.FC = () => {
                             <div
                                 key={wh.id}
                                 onClick={() => handleWarehouseClick(wh.id)}
-                                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 flex flex-col shadow-sm hover:shadow-md transition-all cursor-pointer group ring-offset-2 hover:ring-2 ring-primary/50"
+                                className="bg-surface rounded-xl border border-subtle p-6 flex flex-col shadow-sm hover:shadow-md transition-all cursor-pointer group ring-offset-2 hover:ring-2 ring-primary/50"
                             >
                                 <div className="flex justify-between items-start mb-4">
-                                    <div className={`p-3 rounded-lg ${wh.type === 'physical' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400'}`}>
-                                        <span className="material-symbols-outlined text-[24px]">{wh.type === 'physical' ? 'store' : 'cloud'}</span>
+                                    <div className={`p-3 rounded-lg ${wh.type === 'physical' ? 'bg-primary-soft text-primary dark:text-primary' : 'bg-primary-soft text-primary dark:text-primary'}`}>
+                                        {wh.type === 'physical' ? <Store size={24} aria-hidden="true" /> : <Cloud size={24} aria-hidden="true" />}
                                     </div>
-                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${wh.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-slate-100 text-slate-600'}`}>
+                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${wh.is_active ? 'bg-success-soft text-success dark:text-success' : 'bg-slate-100 text-slate-600'}`}>
                                         {wh.is_active ? 'Activo' : 'Inactivo'}
                                     </span>
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1 group-hover:text-primary transition-colors">{wh.name}</h3>
-                                <p className="text-sm text-slate-500 flex items-center gap-1 mb-4">
-                                    <span className="material-symbols-outlined text-[16px]">location_on</span>
+                                <h3 className="text-lg font-bold text-fg mb-1 group-hover:text-primary transition-colors">{wh.name}</h3>
+                                <p className="text-sm text-fg-muted flex items-center gap-1 mb-4">
+                                    <MapPin size={16} aria-hidden="true" />
                                     {wh.location || 'N/A'}
                                 </p>
                                 <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Ver inventario</span>
-                                    <span className="material-symbols-outlined text-primary">arrow_forward</span>
+                                    <span className="text-sm font-medium text-fg-muted">Ver inventario</span>
+                                    <ArrowRight size={18} className="text-primary" aria-hidden="true" />
                                 </div>
                             </div>
                         ))}
@@ -935,9 +955,13 @@ const Inventory: React.FC = () => {
                                                     <div className={cn('flex flex-col gap-1.5', isNum ? 'items-end' : 'items-start')}>
                                                         <span className="inline-flex items-center gap-1">
                                                             {col.label}
-                                                            <span className="flex flex-col leading-none" aria-hidden="true">
-                                                                <span className={cn('material-symbols-outlined text-[10px] leading-none', sorted && sortConfig.direction === 'asc' ? 'text-primary' : 'text-fg-subtle/50')}>arrow_drop_up</span>
-                                                                <span className={cn('material-symbols-outlined text-[10px] leading-none', sorted && sortConfig.direction === 'desc' ? 'text-primary' : 'text-fg-subtle/50')}>arrow_drop_down</span>
+                                                            {/* Tres estados en un solo icono: sin ordenar, ascendente, descendente. */}
+                                                            <span aria-hidden="true">
+                                                                {!sorted
+                                                                    ? <ChevronsUpDown size={12} className="text-fg-subtle/60" />
+                                                                    : sortConfig.direction === 'asc'
+                                                                        ? <ChevronUp size={12} className="text-primary" />
+                                                                        : <ChevronDown size={12} className="text-primary" />}
                                                             </span>
                                                         </span>
                                                         {col.key !== 'stock' && (
@@ -964,7 +988,7 @@ const Inventory: React.FC = () => {
                                         <tr>
                                             <td colSpan={7} className={t.empty}>
                                                 <div className="flex flex-col items-center gap-2">
-                                                    <span className="material-symbols-outlined text-[32px] text-fg-subtle" aria-hidden="true">search_off</span>
+                                                    <SearchX size={32} className="text-fg-subtle" aria-hidden="true" />
                                                     <span>No hay registros que coincidan con tu búsqueda.</span>
                                                 </div>
                                             </td>
@@ -986,11 +1010,11 @@ const Inventory: React.FC = () => {
                                         return (
                                             <React.Fragment key={group.product_id}>
                                                 <tr className={`transition-colors group cursor-pointer ${isContextuallyDimmed ? 'opacity-60 bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`} onClick={() => handleOpenPartProfile(group)}>
-                                                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                                                    <td className="px-4 py-3 font-medium text-fg">
                                                         <div className="flex items-center gap-3">
                                                             {group.product?.image_url ? (
-                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white shadow-sm relative">
-                                                                    <span className="material-symbols-outlined text-[20px] text-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">image</span>
+                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white shadow-sm relative">
+                                                                    <ImageIcon size={20} className="text-fg-subtle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0" aria-hidden="true" />
                                                                     <img 
                                                                        src={getThumbnailUrl(group.product.image_url, 80, 80)} 
                                                                        alt="" 
@@ -1011,55 +1035,49 @@ const Inventory: React.FC = () => {
                                                                     />
                                                                 </div>
                                                             ) : (
-                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
-                                                                    <span className="material-symbols-outlined text-[20px] text-slate-400">image</span>
+                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 flex items-center justify-center">
+                                                                    <ImageIcon size={20} className="text-fg-subtle" aria-hidden="true" />
                                                                 </div>
                                                             )}
                                                             <div className="hover:text-primary transition-colors">
                                                                 {group.product?.name}
-                                                                <div className="text-xs text-slate-500 mt-0.5">{group.product?.category}</div>
+                                                                <div className="text-xs text-fg-muted mt-0.5">{group.product?.category}</div>
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
+                                                    <td className="px-4 py-3 text-fg-muted text-sm">
                                                         {group.product?.brands?.name || '-'}
                                                     </td>
-                                                     <td className="px-6 py-4 text-slate-500 font-mono text-sm">
+                                                     <td className="px-4 py-3 text-fg-muted font-mono text-sm">
                                                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                              <span>{group.product?.sku}</span>
                                                              <button
                                                                  type="button"
                                                                  onClick={(e) => handleCopySku(group.product?.sku || '', e)}
-                                                                 className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${
-                                                                     copiedSku === group.product?.sku
-                                                                         ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-                                                                         : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                                                                 }`}
+                                                                 className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${ copiedSku === group.product?.sku ? 'text-success bg-success-soft dark:bg-success/20' : 'text-slate-400 hover:text-primary hover:bg-primary-soft dark:hover:bg-primary/20' }`}
                                                                  title={copiedSku === group.product?.sku ? "¡Copiado!" : "Copiar Código"}
                                                              >
-                                                                 <span className="material-symbols-outlined text-[15px]">
-                                                                     {copiedSku === group.product?.sku ? 'check' : 'content_copy'}
-                                                                 </span>
+                                                                 {copiedSku === group.product?.sku ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
                                                              </button>
                                                          </div>
                                                      </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <div className="text-sm font-bold text-slate-900 dark:text-white">${(group.product?.price || 0).toFixed(2)}</div>
-                                                        <div className="text-xs text-slate-500">C/I: ${(group.product?.cost_without_vat * (1 + (group.product?.vat_percentage||15)/100)).toFixed(2)}</div>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="text-sm font-bold text-fg">${(group.product?.price || 0).toFixed(2)}</div>
+                                                        <div className="text-xs text-fg-muted">C/I: ${(group.product?.cost_without_vat * (1 + (group.product?.vat_percentage||15)/100)).toFixed(2)}</div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-right font-bold text-[16px] text-slate-900 dark:text-white">{group.global_stock}</td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${group.global_stock < (group.product?.min_stock_threshold || 10) ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
+                                                    <td className="px-4 py-3 text-right font-bold text-[16px] text-fg">{group.global_stock}</td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${group.global_stock < (group.product?.min_stock_threshold || 10) ? 'bg-warning-soft text-warning border-warning/20 dark:text-warning' : 'bg-success-soft text-success border-success/20 dark:text-success'}`}>
                                                             {group.global_stock < (group.product?.min_stock_threshold || 10) ? 'Bajo Stock' : 'En Stock'}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
+                                                    <td className="px-4 py-3 text-center">
                                                         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                             <button
                                                                 onClick={() => handleOpenProductEntry(group.product_id)}
-                                                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${isContextuallyDimmed ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/10 dark:text-blue-400' : 'bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50'}`}
+                                                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isContextuallyDimmed ? 'bg-primary-soft text-primary dark:text-primary' : 'bg-primary-soft hover:bg-primary text-primary dark:hover:bg-primary/50'}`}
                                                             >
-                                                                <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+                                                                <ShoppingCart size={14} aria-hidden="true" />
                                                                 Surtir
                                                             </button>
                                                             <button
@@ -1068,10 +1086,10 @@ const Inventory: React.FC = () => {
                                                                     setProductToEdit(group.product); 
                                                                     setIsProductEditOpen(true); 
                                                                 }}
-                                                                className="p-1 flex items-center justify-center text-slate-400 hover:text-primary transition-colors hover:bg-primary/10 rounded-lg"
+                                                                className="p-1 flex items-center justify-center text-fg-subtle hover:text-primary transition-colors hover:bg-primary/10 rounded-lg"
                                                                 title="Editar Valores Maestro / Foto"
                                                             >
-                                                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                                <Pencil size={18} aria-hidden="true" />
                                                             </button>
                                                         </div>
                                                     </td>
@@ -1085,9 +1103,9 @@ const Inventory: React.FC = () => {
 
                         {/* ═══════ PAGINATION FOOTER ═══════ */}
                         {pagination.totalRecords > 0 && (
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-                                <div className="text-sm text-slate-500">
-                                    Mostrando <span className="font-semibold text-slate-700 dark:text-slate-300">{showingFrom}–{showingTo}</span> de <span className="font-semibold text-slate-700 dark:text-slate-300">{pagination.totalRecords.toLocaleString()}</span> registros
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-subtle bg-slate-50/50 dark:bg-slate-900/30">
+                                <div className="text-sm text-fg-muted">
+                                    Mostrando <span className="font-semibold text-fg">{showingFrom}–{showingTo}</span> de <span className="font-semibold text-fg">{pagination.totalRecords.toLocaleString()}</span> registros
                                 </div>
 
                                 <div className="flex items-center gap-2">
@@ -1095,7 +1113,7 @@ const Inventory: React.FC = () => {
                                     <select
                                         value={pagination.pageSize}
                                         onChange={(e) => setPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value), page: 1 }))}
-                                        className="px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-primary"
+                                        className="px-2 py-1.5 text-sm border border-subtle rounded-lg bg-surface text-fg focus:outline-none focus:ring-1 focus:ring-primary"
                                     >
                                         <option value={20}>20 / pág</option>
                                         <option value={50}>50 / pág</option>
@@ -1106,14 +1124,14 @@ const Inventory: React.FC = () => {
                                     <button
                                         disabled={pagination.page === 1}
                                         onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                        className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="flex items-center gap-1 px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                                        <ChevronLeft size={16} aria-hidden="true" />
                                         Anterior
                                     </button>
 
                                     {/* Page indicator */}
-                                    <span className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg">
+                                    <span className="px-3 py-1.5 text-sm font-medium text-fg bg-surface border border-subtle rounded-lg">
                                         {pagination.page} / {totalPages || 1}
                                     </span>
 
@@ -1121,10 +1139,10 @@ const Inventory: React.FC = () => {
                                     <button
                                         disabled={pagination.page >= totalPages || totalPages === 0}
                                         onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                        className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="flex items-center gap-1 px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         Siguiente
-                                        <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                                        <ChevronRight size={16} aria-hidden="true" />
                                     </button>
                                 </div>
                             </div>
@@ -1133,58 +1151,58 @@ const Inventory: React.FC = () => {
                 )}
 
                 {activeTab === 'movements' && (
-                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="bg-surface rounded-xl border border-subtle shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
-                                <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
+                                <thead className="bg-surface-2 text-fg-muted font-medium text-xs uppercase tracking-wider">
                                     <tr>
-                                        <th className="px-6 py-3">Fecha</th>
-                                        <th className="px-6 py-3">Tipo</th>
-                                        <th className="px-6 py-3">Producto</th>
-                                        <th className="px-6 py-3">Almacén</th>
-                                        <th className="px-6 py-3">Motivo</th>
-                                        <th className="px-6 py-3">Ref</th>
-                                        <th className="px-6 py-3 text-right">Cantidad</th>
-                                        <th className="px-6 py-3">Usuario</th>
+                                        <th className="px-4 py-2.5">Fecha</th>
+                                        <th className="px-4 py-2.5">Tipo</th>
+                                        <th className="px-4 py-2.5">Producto</th>
+                                        <th className="px-4 py-2.5">Almacén</th>
+                                        <th className="px-4 py-2.5">Motivo</th>
+                                        <th className="px-4 py-2.5">Ref</th>
+                                        <th className="px-4 py-2.5 text-right">Cantidad</th>
+                                        <th className="px-4 py-2.5">Usuario</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                <tbody className="divide-y divide-subtle">
                                     {movements.length === 0 && !loading && (
                                         <tr>
-                                            <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
+                                            <td colSpan={8} className="px-4 py-3 text-center text-fg-muted">
                                                 No hay movimientos registrados.
                                             </td>
                                         </tr>
                                     )}
                                     {movements.map(mov => (
-                                        <tr key={mov.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-300 text-sm">
+                                        <tr key={mov.id} className="hover:bg-surface-hover transition-colors">
+                                            <td className="px-4 py-3 text-fg-muted text-sm">
                                                 {new Date(mov.created_at).toLocaleString()}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`flex items-center gap-1 text-sm font-medium ${mov.quantity_change > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                    <span className="material-symbols-outlined text-[16px]">{mov.quantity_change > 0 ? 'arrow_downward' : 'arrow_upward'}</span>
+                                            <td className="px-4 py-3">
+                                                <span className={`flex items-center gap-1 text-sm font-medium ${mov.quantity_change > 0 ? 'text-success dark:text-success' : 'text-danger dark:text-danger'}`}>
+                                                    {mov.quantity_change > 0 ? <ArrowDown size={16} aria-hidden="true" /> : <ArrowUp size={16} aria-hidden="true" />}
                                                     {mov.quantity_change > 0 ? 'Entrada' : 'Salida'}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
+                                            <td className="px-4 py-3 font-medium text-fg">
                                                 {/* @ts-ignore */}
                                                 {mov.products?.name}
                                             </td>
-                                            <td className="px-6 py-4 text-slate-900 dark:text-white">
+                                            <td className="px-4 py-3 text-fg">
                                                 {/* @ts-ignore */}
                                                 {mov.warehouses?.name}
                                             </td>
-                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-300 text-sm">{mov.reason}</td>
-                                            <td className="px-6 py-4 text-slate-500 text-sm whitespace-nowrap">
+                                            <td className="px-4 py-3 text-fg-muted text-sm">{mov.reason}</td>
+                                            <td className="px-4 py-3 text-fg-muted text-sm whitespace-nowrap">
                                                 {mov.reference_type ? (
-                                                    <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs font-mono">
+                                                    <span className="bg-surface-3 px-2 py-0.5 rounded text-xs font-mono">
                                                         {mov.reference_type} #{mov.reference_id}
                                                     </span>
                                                 ) : '-'}
                                             </td>
-                                            <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-white">{Math.abs(mov.quantity_change)}</td>
-                                            <td className="px-6 py-4 text-slate-500 text-sm">{mov.user_id?.substring(0, 8)}...</td>
+                                            <td className="px-4 py-3 text-right font-bold text-fg">{Math.abs(mov.quantity_change)}</td>
+                                            <td className="px-4 py-3 text-fg-muted text-sm">{mov.user_id?.substring(0, 8)}...</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1197,22 +1215,22 @@ const Inventory: React.FC = () => {
             {/* Lost Demand Modal */}
             {isLostDemandModalOpen && (
                 <div className="fixed inset-0 z-[160] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-amber-50">
-                            <h2 className="font-bold text-amber-800 uppercase tracking-tight flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[20px]">warning</span>
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-subtle flex justify-between items-center bg-warning-soft">
+                            <h2 className="font-bold text-warning uppercase tracking-tight flex items-center gap-2">
+                                <TriangleAlert size={20} aria-hidden="true" />
                                 Registrar Demanda Perdida
                             </h2>
-                            <button onClick={() => setIsLostDemandModalOpen(false)} className="text-amber-500 hover:text-amber-800 font-bold px-2 py-1 rounded hover:bg-amber-200 transition-colors">
+                            <button onClick={() => setIsLostDemandModalOpen(false)} className="text-warning hover:text-warning font-bold px-2 py-1 rounded hover:bg-warning transition-colors">
                                 ✕
                             </button>
                         </div>
                         <form onSubmit={handleManualLostDemandSubmit} className="p-5 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Repuesto Buscado</label>
+                                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Repuesto Buscado</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-slate-100 border border-slate-200 rounded-lg p-3 text-sm font-medium text-slate-600 outline-none focus:border-amber-500 focus:bg-white transition-colors"
+                                    className="w-full bg-slate-100 border border-subtle rounded-lg p-3 text-sm font-medium text-fg-muted outline-none focus:border-warning focus:bg-white transition-colors"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     placeholder="Ej: Filtro de aceite"
@@ -1221,11 +1239,11 @@ const Inventory: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Marca de Moto (Opcional)</label>
+                                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Marca de Moto (Opcional)</label>
                                 <input
                                     autoFocus
                                     type="text"
-                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: Yamaha"
                                     value={lostDemandBrand}
                                     onChange={(e) => setLostDemandBrand(e.target.value)}
@@ -1233,10 +1251,10 @@ const Inventory: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
+                                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm focus:border-amber-500 outline-none"
+                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: FZ16 2015"
                                     value={lostDemandBikeModel}
                                     onChange={(e) => setLostDemandBikeModel(e.target.value)}
@@ -1245,7 +1263,7 @@ const Inventory: React.FC = () => {
 
                             <button
                                 type="submit"
-                                className="w-full py-3 px-4 bg-amber-500 text-white font-black uppercase rounded-lg hover:bg-amber-600 shadow-md transition-all active:scale-95"
+                                className="w-full py-3 px-4 bg-warning text-white font-bold uppercase rounded-lg hover:bg-warning shadow-md transition-all active:scale-95"
                             >
                                 Registrar Demanda
                             </button>

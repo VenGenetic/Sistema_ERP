@@ -42,9 +42,7 @@ const AdminSetup: React.FC = () => {
                 {message && (
                     <div
                         role="alert"
-                        className={`mb-4 p-3 rounded-lg text-sm border ${message.type === 'success'
-                            ? 'bg-success-soft text-success-soft-fg border-success/20'
-                            : 'bg-danger-soft text-danger-soft-fg border-danger/20'}`}
+                        className={`mb-4 p-3 rounded-lg text-sm border ${message.type === 'success' ? 'bg-success-soft text-success-soft-fg border-success/20' : 'bg-danger-soft text-danger-soft-fg border-danger/20'}`}
                     >
                         {message.text}
                     </div>

@@ -1,4 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import {
+  BadgeCheck,
+  CircleAlert,
+  Info,
+  Key,
+  KeyRound,
+  Lock,
+  Mail,
+  TriangleAlert,
+} from 'lucide-react';
 import { supabase } from '../../supabaseClient'; // Adjusted path if moved to components/settings
 
 const AccountPanel: React.FC = () => {
@@ -99,13 +109,8 @@ const AccountPanel: React.FC = () => {
         <div className="flex flex-col gap-8 animate-fade-in max-w-3xl">
             {/* Feedback Message */}
             {message && (
-                <div className={`p-4 rounded-lg flex items-start gap-3 border ${message.type === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' :
-                    message.type === 'info' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
-                        'bg-red-500/10 border-red-500/20 text-red-400'
-                    }`}>
-                    <span className="material-symbols-outlined text-[20px] mt-0.5">
-                        {message.type === 'success' ? 'check_circle' : message.type === 'info' ? 'info' : 'error'}
-                    </span>
+                <div className={`p-4 rounded-lg flex items-start gap-3 border ${message.type === 'success' ? 'bg-success/10 border-success/20 text-success' : message.type === 'info' ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-danger/10 border-danger/20 text-danger' }`}>
+                    {message.type === 'success' ? 'check_circle' : message.type === 'info' ? <Info size={20} className="mt-0.5" aria-hidden="true" /> : <CircleAlert size={20} className="mt-0.5" aria-hidden="true" />}
                     <p className="text-sm">{message.text}</p>
                 </div>
             )}
@@ -118,14 +123,14 @@ const AccountPanel: React.FC = () => {
                         <p className="text-sm text-text-secondary">Tu dirección de correo actual es <span className="text-fg font-mono">{email}</span></p>
                     </div>
                     {user?.email_confirmed_at ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
-                            <span className="material-symbols-outlined text-[16px]">verified</span>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-success/10 text-success text-xs font-bold border border-success/20">
+                            <BadgeCheck size={16} aria-hidden="true" />
                             Verificado
                         </span>
                     ) : (
                         <div className="flex flex-col items-end gap-2">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 text-xs font-bold border border-amber-500/20">
-                                <span className="material-symbols-outlined text-[16px]">warning</span>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-bold border border-warning/20">
+                                <TriangleAlert size={16} aria-hidden="true" />
                                 No Verificado
                             </span>
                             <button
@@ -147,7 +152,7 @@ const AccountPanel: React.FC = () => {
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-text-secondary mb-1.5">Nuevo Correo</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-2.5 material-symbols-outlined text-text-secondary text-[20px]">mail</span>
+                            <Mail size={20} className="absolute left-3 top-2.5 text-text-secondary" aria-hidden="true" />
                             <input
                                 type="email"
                                 required
@@ -179,7 +184,7 @@ const AccountPanel: React.FC = () => {
                         <div>
                             <label className="block text-sm font-medium text-text-secondary mb-1.5">Nueva Contraseña</label>
                             <div className="relative">
-                                <span className="absolute left-3 top-2.5 material-symbols-outlined text-text-secondary text-[20px]">lock</span>
+                                <Lock size={20} className="absolute left-3 top-2.5 text-text-secondary" aria-hidden="true" />
                                 <input
                                     type="password"
                                     required
@@ -194,7 +199,7 @@ const AccountPanel: React.FC = () => {
                         <div>
                             <label className="block text-sm font-medium text-text-secondary mb-1.5">Confirmar Contraseña</label>
                             <div className="relative">
-                                <span className="absolute left-3 top-2.5 material-symbols-outlined text-text-secondary text-[20px]">lock_reset</span>
+                                <KeyRound size={20} className="absolute left-3 top-2.5 text-text-secondary" aria-hidden="true" />
                                 <input
                                     type="password"
                                     required
@@ -216,7 +221,7 @@ const AccountPanel: React.FC = () => {
                             {loadingPass ? (
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                             ) : (
-                                <span className="material-symbols-outlined text-[20px]">key</span>
+                                <Key size={20} aria-hidden="true" />
                             )}
                             Cambiar Contraseña
                         </button>

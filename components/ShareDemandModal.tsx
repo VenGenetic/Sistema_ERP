@@ -1,5 +1,14 @@
 import React, { useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
+import {
+  Copy,
+  Loader2,
+  Package,
+  Phone,
+  Share2,
+  User,
+  X,
+} from 'lucide-react';
 
 interface ProductDemand {
     id: number;
@@ -86,16 +95,16 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-[#0c1117] rounded-xl shadow-2xl overflow-hidden flex flex-col w-[550px]">
+            <div className="bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col w-[550px]">
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-[#161b22]">
-                    <h2 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[20px] text-blue-500">share</span>
+                <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
+                    <h2 className="text-lg font-bold tracking-tight text-fg flex items-center gap-2">
+                        <Share2 size={20} className="text-primary" aria-hidden="true" />
                         Compartir Solicitud
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">close</span>
+                    <button onClick={onClose} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                        <X size={20} aria-hidden="true" />
                     </button>
                 </div>
 
@@ -108,15 +117,15 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                         style={{ width: '500px', height: '500px', padding: '24px', boxSizing: 'border-box' }}
                     >
                         {/* Tarjeta del Ticket interna */}
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden w-full h-full relative">
+                        <div className="bg-white rounded-xl shadow-sm border border-subtle flex flex-col overflow-hidden w-full h-full relative">
                             {/* Decorative Top Border */}
-                            <div className="h-2 w-full bg-blue-500"></div>
+                            <div className="h-2 w-full bg-primary"></div>
                             
                             <div className="flex-1 flex flex-col p-6">
                             
                             {/* Ticket Title */}
                             <div className="text-center mb-3">
-                                <span className={`text-[13px] font-black tracking-widest uppercase ${importerStock > 0 ? 'text-blue-600' : 'text-amber-600'}`}>
+                                <span className={`text-[14px] font-bold tracking-widest uppercase ${importerStock > 0 ? 'text-primary' : 'text-warning'}`}>
                                     {importerStock > 0 ? 'TICKET DE PEDIDO' : 'YA ESTAS EN LA LISTA DE ESPERA'}
                                 </span>
                             </div>
@@ -133,21 +142,21 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                         />
                                     </div>
                                 ) : (
-                                    <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 border border-slate-200 text-slate-400">
-                                        <span className="material-symbols-outlined text-4xl">inventory_2</span>
+                                    <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 border border-subtle text-fg-subtle">
+                                        <Package size={32} aria-hidden="true" />
                                     </div>
                                 )}
                                 
                                 <div className="flex flex-col min-w-0 flex-1">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="text-[11px] font-bold text-blue-500 tracking-wider uppercase">{demand.product?.sku}</span>
-                                        <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">Ticket #{demand.id}</span>
+                                        <span className="text-[11px] font-bold text-primary tracking-wider uppercase">{demand.product?.sku}</span>
+                                        <span className="text-2xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold">Ticket #{demand.id}</span>
                                     </div>
-                                    <h3 className="text-[13px] font-semibold text-slate-800 leading-tight">{demand.product?.name || 'Producto Desconocido'}</h3>
+                                    <h3 className="text-[14px] font-semibold text-fg leading-tight">{demand.product?.name || 'Producto Desconocido'}</h3>
                                     {demand.product?.price != null && (
                                         <div className="mt-1 flex items-baseline gap-1">
-                                            <span className="text-[15px] font-bold text-emerald-600">${Math.ceil(demand.product.price)}</span>
-                                            {importerStock <= 0 && <span className="text-[11px] font-medium text-slate-500">(precio estimado)</span>}
+                                            <span className="text-[15px] font-bold text-success">${Math.ceil(demand.product.price)}</span>
+                                            {importerStock <= 0 && <span className="text-[11px] font-medium text-fg-muted">(precio estimado)</span>}
                                         </div>
                                     )}
                                 </div>
@@ -158,16 +167,16 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                             {/* Client Info Section */}
                             <div className="py-2 flex-1 flex flex-col justify-center">
                                 <div className="flex items-center gap-2 mb-1.5">
-                                    <span className="material-symbols-outlined text-slate-400 text-[13px]">person</span>
+                                    <User size={14} className="text-fg-subtle" aria-hidden="true" />
                                     {demand.customer_name && demand.customer_name.trim() !== '' ? (
-                                        <span className="text-slate-700 font-medium text-sm">{demand.customer_name}</span>
+                                        <span className="text-fg font-medium text-sm">{demand.customer_name}</span>
                                     ) : (
-                                        <span className="text-slate-300 italic text-sm">No registrado</span>
+                                        <span className="text-fg-subtle italic text-sm">No registrado</span>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-slate-400 text-[13px]">call</span>
-                                    <span className="text-slate-700 font-bold font-mono text-sm">{demand.phone_number}</span>
+                                    <Phone size={14} className="text-fg-subtle" aria-hidden="true" />
+                                    <span className="text-fg font-bold font-mono text-sm">{demand.phone_number}</span>
                                 </div>
                             </div>
 
@@ -176,27 +185,27 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                             {/* Footer Info Section */}
                             <div className="pt-2 grid grid-cols-2 gap-x-2 gap-y-3">
                                 <div className="flex flex-col">
-                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Estado</span>
-                                    <span className="text-[13px] font-semibold text-slate-700">{getStatusText(demand.status)}</span>
+                                    <span className="text-[12px] uppercase tracking-wider text-fg-subtle font-bold mb-0.5">Estado</span>
+                                    <span className="text-[14px] font-semibold text-fg">{getStatusText(demand.status)}</span>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Fecha Solicitud</span>
+                                    <span className="text-[12px] uppercase tracking-wider text-fg-subtle font-bold mb-0.5">Fecha Solicitud</span>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[13px] text-slate-600">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                                        <span className="text-[11px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded" title="Fecha de Vencimiento">
+                                        <span className="text-[14px] text-fg-muted">{new Date(demand.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                        <span className="text-[11px] font-bold text-danger bg-danger-soft px-1.5 py-0.5 rounded" title="Fecha de Vencimiento">
                                             Vence: {new Date(new Date(demand.created_at).getTime() + 60 * 24 * 60 * 60 * 1000).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
                                         </span>
                                     </div>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Stock Local</span>
-                                    <span className={`text-[13px] font-bold ${localStock > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                    <span className="text-[12px] uppercase tracking-wider text-fg-subtle font-bold mb-0.5">Stock Local</span>
+                                    <span className={`text-[14px] font-bold ${localStock > 0 ? 'text-success' : 'text-danger'}`}>
                                         {localStock > 0 ? `${localStock} un.` : 'Agotado'}
                                     </span>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-0.5">Stock Importadora</span>
-                                    <span className={`text-[13px] font-bold ${importerStock > 0 ? 'text-indigo-600' : 'text-rose-500'}`}>
+                                    <span className="text-[12px] uppercase tracking-wider text-fg-subtle font-bold mb-0.5">Stock Importadora</span>
+                                    <span className={`text-[14px] font-bold ${importerStock > 0 ? 'text-primary' : 'text-danger'}`}>
                                         {importerStock > 0 ? `${importerStock} un.` : 'Agotado'}
                                     </span>
                                 </div>
@@ -204,12 +213,12 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
 
                             {/* Disclaimer & Website */}
                             <div className="mt-auto pt-3 border-t border-slate-100 flex flex-col items-center text-center">
-                                <span className="text-[12px] text-slate-700 font-semibold leading-snug max-w-[95%] mb-2">
+                                <span className="text-[12px] text-fg font-semibold leading-snug max-w-[95%] mb-2">
                                     {importerStock > 0 
                                         ? "Este es tu ticket de pedido. Los pedidos se suelen demorar DE 6 A 15 DIAS LABORABLES. Gracias por confiar en nosotros."
                                         : "Estas en la lista de espera. Nosotros le daremos seguimiento a tu repuesto y solicitud. Apenas el repuesto vuelva a estar disponible, NOSOTROS NOS COMUNICAREMOS CONTIGO."}
                                 </span>
-                                <span className="text-[13px] font-bold text-blue-600">https://www.lvparts.ec/</span>
+                                <span className="text-[14px] font-bold text-primary">https://www.lvparts.ec/</span>
                             </div>
                             
                         </div>
@@ -218,12 +227,12 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 bg-white dark:bg-[#0c1117]">
+                <div className="px-6 py-4 border-t border-subtle flex justify-end gap-3 bg-surface">
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={loading}
-                        className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                        className="px-4 py-2 text-sm font-medium text-fg-muted bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
                         Cancelar
                     </button>
@@ -231,16 +240,16 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                         type="button"
                         onClick={handleCopyImage}
                         disabled={loading}
-                        className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-primary hover:bg-primary rounded-lg transition-colors shadow-sm disabled:opacity-50"
                     >
                         {loading ? (
                             <>
-                                <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                                 Generando...
                             </>
                         ) : (
                             <>
-                                <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                                <Copy size={18} aria-hidden="true" />
                                 Copiar como Imagen
                             </>
                         )}

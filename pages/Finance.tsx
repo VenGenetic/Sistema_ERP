@@ -4,6 +4,9 @@ import FinanceDashboard from '../components/FinanceDashboard';
 import FinanceConfig from '../components/FinanceConfig';
 import AccountDetails from '../components/AccountDetails';
 import { supabase } from '../supabaseClient';
+import {
+  ChevronRight,
+} from 'lucide-react';
 
 const FinanceBreadcrumbs: React.FC = () => {
     const location = useLocation();
@@ -33,14 +36,14 @@ const FinanceBreadcrumbs: React.FC = () => {
     }, [accountId]);
 
     return (
-        <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
+        <div className="flex items-center gap-2 text-sm text-fg-muted mb-2">
             <span
                 className="hover:text-primary transition-colors cursor-pointer"
                 onClick={() => navigate('/')}
             >
                 Inicio
             </span>
-            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+            <ChevronRight size={16} aria-hidden="true" />
             <span
                 className={`transition-colors cursor-pointer ${isDashboard ? 'text-slate-900 dark:text-white font-medium' : 'hover:text-primary'}`}
                 onClick={() => navigate('/finance')}
@@ -50,15 +53,15 @@ const FinanceBreadcrumbs: React.FC = () => {
 
             {isConfig && (
                 <>
-                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                    <span className="text-slate-900 dark:text-white font-medium">Configuración</span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                    <span className="text-fg font-medium">Configuración</span>
                 </>
             )}
 
             {isAccount && (
                 <>
-                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                    <span className="text-slate-900 dark:text-white font-medium">
+                    <ChevronRight size={16} aria-hidden="true" />
+                    <span className="text-fg font-medium">
                         {accountName || 'Cuenta'}
                     </span>
                 </>

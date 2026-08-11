@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Link } from 'react-router-dom';
+import {
+  Wifi,
+} from 'lucide-react';
 
 const TestConnection: React.FC = () => {
     const [status, setStatus] = useState<string>('Probando...');
@@ -62,27 +65,27 @@ const TestConnection: React.FC = () => {
     return (
         <div className="min-h-screen bg-gray-900 text-white p-8">
             <div className="max-w-2xl mx-auto bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
-                <h1 className="text-2xl font-bold mb-6 text-blue-400 flex items-center gap-2">
-                    <span className="material-symbols-outlined">network_check</span>
+                <h1 className="text-2xl font-bold mb-6 text-primary flex items-center gap-2">
+                    <Wifi size={18} aria-hidden="true" />
                     Diagnóstico de Conexión
                 </h1>
 
                 <div className="space-y-6">
                     {/* Estado General */}
-                    <div className={`p-4 rounded-lg border ${error ? 'bg-red-900/30 border-red-500/50' : 'bg-green-900/30 border-green-500/50'}`}>
+                    <div className={`p-4 rounded-lg border ${error ? 'bg-danger/30 border-danger/50' : 'bg-success/30 border-success/50'}`}>
                         <h2 className="text-lg font-semibold mb-2">Estado de Autenticación</h2>
                         <p className="text-xl">{status}</p>
-                        {error && <p className="mt-2 text-red-300 font-mono text-sm break-all">{error}</p>}
+                        {error && <p className="mt-2 text-danger font-mono text-sm break-all">{error}</p>}
                     </div>
 
                     {/* Variables de Entorno */}
                     <div className="bg-gray-700/50 p-4 rounded-lg">
-                        <h2 className="text-lg font-semibold mb-2 text-gray-300">Variables de Entorno</h2>
+                        <h2 className="text-lg font-semibold mb-2 text-fg-subtle">Variables de Entorno</h2>
                         <ul className="space-y-1 font-mono text-sm">
                             {Object.entries(envCheck).map(([key, val]) => (
                                 <li key={key} className="flex justify-between">
-                                    <span className="text-gray-400">{key}:</span>
-                                    <span className={val === 'Faltante' ? 'text-red-400' : 'text-green-400'}>{val as string}</span>
+                                    <span className="text-fg-subtle">{key}:</span>
+                                    <span className={val === 'Faltante' ? 'text-danger' : 'text-success'}>{val as string}</span>
                                 </li>
                             ))}
                         </ul>
@@ -90,14 +93,14 @@ const TestConnection: React.FC = () => {
 
                     {/* Prueba de Red Directa */}
                     <div className="bg-gray-700/50 p-4 rounded-lg">
-                        <h2 className="text-lg font-semibold mb-2 text-gray-300">Prueba de Red Directa (Fetch)</h2>
+                        <h2 className="text-lg font-semibold mb-2 text-fg-subtle">Prueba de Red Directa (Fetch)</h2>
                         <p className="font-mono text-sm">{pingResult}</p>
                     </div>
 
                     <div className="flex gap-4 pt-4">
                         <button
                             onClick={checkConnection}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+                            className="px-4 py-2 bg-primary hover:bg-primary rounded-lg font-medium transition-colors"
                         >
                             Reintentar
                         </button>
