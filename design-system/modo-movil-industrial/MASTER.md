@@ -17,20 +17,48 @@
 
 ### Color Palette
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#334155` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#475569` | `--color-secondary` |
-| Accent/CTA | `#059669` | `--color-accent` |
-| Background | `#F8FAFC` | `--color-background` |
-| Foreground | `#0F172A` | `--color-foreground` |
-| Muted | `#F2F3F4` | `--color-muted` |
-| Border | `#E6E8EA` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| Ring | `#334155` | `--color-ring` |
+> **Actualizado 2026-08-11.** Esta tabla describía una interfaz clara con acento
+> verde que nunca llegó a implementarse: el modo móvil se construyó **oscuro y
+> con acento ámbar**, y así se quedó en Catálogo, Inventario y Etiquetas. Se
+> corrige el documento para que refleje el código, no al revés — reescribir tres
+> pantallas para perseguir un spec que nadie siguió no aporta nada. El ámbar
+> además funciona mejor aquí: es el color de la impresión de etiquetas, que es
+> la acción central de este modo, y destaca sobre fondo oscuro sin competir con
+> el verde de "hay stock" ni con el rojo de "agotado".
 
-**Color Notes:** Industrial slate + stock green
+| Role | Hex | Uso |
+|------|-----|-----|
+| Background | `#020617` (slate-950) | Fondo de la aplicación |
+| Surface | `#0F172A` (slate-900) | Tarjetas, hojas inferiores, barras |
+| Surface alt | `#1E293B` (slate-800) | Controles, fichas, campos |
+| Border | `#1E293B` / `#334155` | Canto de tarjeta / canto de control |
+| Foreground | `#FFFFFF` | Títulos y descripciones |
+| Foreground muted | `#CBD5E1` (slate-300) | Dato secundario |
+| Foreground subtle | `#64748B` (slate-500) | Etiquetas, pistas |
+| **Accent / CTA** | `#F59E0B` (amber-500) | Acción principal, selección, etiquetas |
+| On accent | `#020617` | Texto sobre ámbar (13.9:1) |
+| Success / stock | `#10B981` (emerald-500) | Hay existencias |
+| Destructive | `#F43F5E` (rose-500) | Eliminar, agotado, descontinuado |
+| Info | `#22D3EE` (cyan-400) | Repuestos equivalentes |
+
+**Color Notes:** Slate industrial oscuro + acento ámbar de impresión. El verde
+queda reservado para "hay stock", nunca para acciones.
+
+### Tamaños táctiles y de texto
+
+Reglas duras, comprobadas en el Catálogo:
+
+| Regla | Valor | Motivo |
+|-------|-------|--------|
+| Zona táctil mínima | **44 × 44 px** | Por debajo se falla el toque y se dispara la acción vecina |
+| Texto de cuerpo | **15 px** | Descripciones de repuesto |
+| Texto secundario | **12 px mínimo** | Marca, contadores, metadatos |
+| Peso máximo | **700 (bold)** | `font-black`/`extrabold` a 11px se empasta y se lee peor |
+| Radio de tarjeta | **16 px** (`rounded-2xl`) | 24px comía ancho útil en pantallas de 360px |
+
+> **No hay `hover` en una pantalla táctil.** Un botón cuya única explicación sea
+> el atributo `title` es un botón sin explicación: si la acción no es evidente
+> por el icono, lleva texto al lado.
 
 ### Typography
 
@@ -71,91 +99,86 @@
 
 ## Component Specs
 
-### Buttons
+> Se documentan con clases de Tailwind porque es lo que usa el código. Las
+> versiones anteriores describían botones claros con `:hover` y `translateY`,
+> que en una pantalla táctil no ocurre nunca: el estado que sí existe es
+> `:active`, y es el que debe dar la respuesta al dedo.
 
-```css
-/* Primary Button */
-.btn-primary {
-  background: #059669;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+### Botones
 
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
+```jsx
+/* Principal — una sola por pantalla */
+className="min-h-[48px] px-4 rounded-xl bg-amber-500 text-slate-950
+           font-bold text-sm active:bg-amber-600"
 
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #334155;
-  border: 2px solid #334155;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
+/* Secundario — el caballo de batalla */
+className="min-h-[48px] px-4 rounded-xl bg-slate-900 border border-slate-700
+           text-slate-200 font-semibold text-sm active:bg-slate-800"
+
+/* Dentro de una hoja o tarjeta */
+className="min-h-[52px] px-3 rounded-xl bg-slate-800 border border-slate-700
+           text-slate-200 font-semibold text-sm active:bg-slate-700"
+
+/* Destructivo */
+className="min-h-[52px] px-3 rounded-xl bg-rose-500/10 border border-rose-500/30
+           text-rose-300 font-semibold active:bg-rose-500/20"
+
+/* Solo icono — nunca por debajo de 44px */
+className="min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center"
 ```
 
-### Cards
+### Tarjetas
 
-```css
-.card {
-  background: #F8FAFC;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
+```jsx
+className="bg-slate-900 rounded-2xl border border-slate-800"
+/* Seleccionada: tinte + borde, sin mover nada de sitio */
+className="bg-amber-500/5 border-amber-500"
 ```
 
-### Inputs
+Sin `:hover` y sin `transform`: desplazar una tarjeta bajo el dedo mientras se
+recorre la lista se lee como un fallo, no como una respuesta.
 
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
+### Campos
 
-.input:focus {
-  border-color: #334155;
-  outline: none;
-  box-shadow: 0 0 0 3px #33415520;
-}
+```jsx
+className="min-h-[48px] px-4 bg-slate-800 border border-slate-700 rounded-xl
+           text-slate-200 text-base focus:border-amber-500 outline-none"
 ```
 
-### Modals
+`font-size` de 16px como mínimo: por debajo, iOS hace zoom automático al enfocar
+el campo y descoloca toda la pantalla.
 
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
+**Preferir fichas a `<select>`.** Un desplegable nativo abre la rueda del sistema
+operativo — tres gestos para elegir entre tres opciones. Un grupo de fichas se
+resuelve en un toque y además deja ver qué hay elegido sin abrir nada.
 
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
+### Hojas inferiores (en vez de modales centrados)
+
+```jsx
+/* Fondo */
+className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm"
+/* Panel */
+className="bg-slate-900 rounded-t-3xl border-t border-slate-700
+           max-h-[85vh] flex flex-col"
 ```
+
+Todo lo que se pueda tocar entra por abajo. Un diálogo centrado deja sus botones
+en mitad de la pantalla, fuera del arco del pulgar; una hoja inferior los deja
+justo donde está la mano.
+
+### Zonas de alcance
+
+El tercio inferior es la zona cómoda. Ahí van buscar-filtrar-ordenar-crear y las
+acciones en lote. La cabecera sirve para leer (título, contador) y para el campo
+de búsqueda, que se enfoca por teclado o por lector físico, no por pulgar.
+
+### Gestos
+
+| Gesto | Acción | Nota |
+|-------|--------|------|
+| Tirar hacia abajo desde arriba | Recargar el catálogo | Con resistencia (÷2.2) para que no se dispare solo |
+| Deslizar la tarjeta a la izquierda | Descubre "Cola" e "Imprimir" | Sólo engancha si `abs(dx) > abs(dy) * 1.4`, si no se abriría al hacer scroll |
+| Tocar la tarjeta | Desplegar / plegar | La zona de selección va aparte, con sus 44px |
 
 ---
 
@@ -213,15 +236,19 @@ gsap.from('.grid-item', { opacity: 0, scale: 0.92, y: 16, duration: 0.4, stagger
 
 ## Pre-Delivery Checklist
 
-Before delivering any UI code, verify:
+Reescrita para una interfaz **táctil y oscura**. La versión anterior pedía
+comprobar el modo claro, los estados `:hover` y anchos de 1024/1440px: nada de
+eso existe aquí.
 
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+- [ ] Cero emoji haciendo de icono — todos de **lucide-react**, el mismo set que el escritorio
+- [ ] Toda zona táctil mide **44 × 44 px** como mínimo
+- [ ] Ningún botón depende de `title` para explicarse: si el icono no basta, lleva texto
+- [ ] Respuesta al dedo con `active:`, no con `hover:`
+- [ ] Texto de cuerpo ≥ 15px; ningún texto por debajo de 12px
+- [ ] Campos de texto a 16px (por debajo, iOS hace zoom al enfocar)
+- [ ] Contraste 4.5:1 sobre fondo oscuro
+- [ ] `prefers-reduced-motion` respetado
+- [ ] Nada tapado por la barra inferior **ni por su botón central**, que sobresale hasta ~108px
+- [ ] Probado a 360px de ancho (no sólo 375px: el Android más común es más estrecho)
+- [ ] Sin scroll horizontal
+- [ ] Las acciones frecuentes caen en el tercio inferior de la pantalla
