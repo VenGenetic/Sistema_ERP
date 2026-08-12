@@ -156,18 +156,30 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                     : 'bg-slate-900/90 border-slate-700 shadow-sm hover:border-slate-600'
             }`}>
                 {/* Icono Lupa o Escaner */}
-                <div className="pl-4 text-slate-400 dark:text-slate-400 flex items-center pointer-events-none">
+                <div className="pl-4 text-slate-400 flex items-center pointer-events-none">
                     <span className="material-symbols-outlined text-[24px]">
                         {localValue ? 'search' : 'qr_code_scanner'}
                     </span>
                 </div>
 
-                {/* Campo de Texto */}
+                {/*
+                    Campo de Texto.
+
+                    Sin variantes `dark:`. El modo móvil es SIEMPRE oscuro —su fondo
+                    está fijo en `bg-slate-950`, no depende del tema— pero `dark:`
+                    sólo se activa cuando la clase `dark` está puesta en <html>, que
+                    es cosa del tema del escritorio (ver utils/theme.ts).
+
+                    Con el tema claro activo, `text-slate-800 dark:text-white` caía
+                    en el gris casi negro sobre el fondo `bg-slate-900` de la barra:
+                    se escribía a ciegas. `text-base` (16px) además es obligatorio,
+                    porque por debajo iOS hace zoom automático al enfocar el campo.
+                */}
                 <input
                     ref={inputRef}
                     type="text"
                     placeholder={placeholder}
-                    className="w-full px-3 py-3.5 bg-transparent text-slate-800 dark:text-white text-base placeholder:text-slate-400 dark:placeholder:text-slate-400 outline-none border-none focus:ring-0 rounded-2xl font-medium"
+                    className="w-full px-3 py-3.5 bg-transparent text-white text-base placeholder:text-slate-500 outline-none border-none focus:ring-0 rounded-2xl font-medium"
                     value={localValue}
                     onChange={handleInputChange}
                     onFocus={() => setIsFocused(true)}
@@ -183,7 +195,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                         <button
                             type="button"
                             onClick={handleClearClick}
-                            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center justify-center active:scale-90"
+                            className="p-2 text-slate-400 active:text-white rounded-full active:bg-slate-700 transition-colors flex items-center justify-center active:scale-90"
                             title="Limpiar"
                         >
                             <span className="material-symbols-outlined text-[20px]">close</span>
@@ -191,7 +203,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                     )}
 
                     {/* Divisor vertical */}
-                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
+                    <div className="h-6 w-px bg-slate-700 mx-0.5"></div>
 
                     {/* Botón de Voz */}
                     {hasSpeechSupport && (
@@ -215,12 +227,18 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
 
             {/* PANEL DE SUGERENCIAS */}
             {showSuggestions && (
-                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-slide-down origin-top max-h-[65vh] overflow-y-auto">
+                /*
+                    Mismo fallo que en el campo: era `bg-white dark:bg-slate-900`
+                    con el contenido fijo en tonos claros (`text-slate-200`,
+                    fichas `bg-slate-800`). Con el tema claro el panel salía blanco
+                    y las coincidencias resultaban ilegibles encima.
+                */
+                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-slide-down origin-top max-h-[65vh] overflow-y-auto">
                     
                     {/* Si NO hay búsqueda: Mostrar Populares / Más Buscado */}
                     {!localValue ? (
                         <div className="p-4">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider mb-3">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
                                 <span className="material-symbols-outlined text-[16px]">trending_up</span>
                                 Búsqueda Rápida / Populares
                             </div>
@@ -240,12 +258,12 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                     ) : (
                         /* Si HAY búsqueda: Mostrar Coincidencias Rápida */
                         <div className="py-2">
-                            <div className="px-4 py-2 text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                            <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Coincidencias Rápida</span>
                                 <span className="text-amber-400 font-extrabold">{sugerencias.length} resultados</span>
                             </div>
                             
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                            <div className="divide-y divide-slate-800/50">
                                 {sugerencias.map((sugerencia, index) => {
                                     const isCode = sugerencia.startsWith('"');
                                     return (

@@ -287,7 +287,7 @@ const MobileLabels: React.FC = () => {
                         {/* Sin Resultados */}
                         {searchTerm.trim().length >= 2 && matchedProducts.length === 0 && !catalogLoading && (
                             <div className="animate-fade-in bg-slate-900 rounded-3xl p-8 text-center border border-slate-800 my-2 shadow-sm">
-                                <span className="material-symbols-outlined text-5xl text-slate-300 dark:text-slate-600 mb-2">search_off</span>
+                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-2">search_off</span>
                                 <h3 className="text-base font-bold text-slate-200">No se encontró repuesto</h3>
                                 <p className="text-xs text-slate-400 mt-1 max-w-[240px] mx-auto">
                                     Verifica si el nombre o código está bien escrito, o intenta con palabras clave más cortas.
@@ -298,9 +298,9 @@ const MobileLabels: React.FC = () => {
                         {/* Lista de Resultados de Búsqueda */}
                         {matchedProducts.length > 0 && (
                             <div className="animate-fade-in flex flex-col gap-4 my-1">
-                                <div className="flex items-center justify-between px-1 text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                <div className="flex items-center justify-between px-1 text-xs font-extrabold text-slate-400 uppercase tracking-wider">
                                     <span>{matchedProducts.length} repuesto(s) encontrado(s)</span>
-                                    <span className="text-emerald-600 dark:text-emerald-400">Listo para imprimir</span>
+                                    <span className="text-emerald-400">Listo para imprimir</span>
                                 </div>
 
                                 {matchedProducts.map((prod) => {
@@ -316,10 +316,10 @@ const MobileLabels: React.FC = () => {
                                                         src={getThumbnailUrl(prod.image_url, 200)}
                                                         alt={prod.name}
                                                         loading="lazy"
-                                                        className="w-[72px] h-[72px] object-cover rounded-2xl border border-slate-100 dark:border-slate-700 shrink-0 shadow-sm"
+                                                        className="w-[72px] h-[72px] object-cover rounded-2xl border border-slate-700 shrink-0 shadow-sm"
                                                     />
                                                 ) : (
-                                                    <div className="w-[72px] h-[72px] bg-slate-100 dark:bg-slate-700/60 rounded-2xl flex items-center justify-center text-slate-400 shrink-0">
+                                                    <div className="w-[72px] h-[72px] bg-slate-700/60 rounded-2xl flex items-center justify-center text-slate-400 shrink-0">
                                                         <span className="material-symbols-outlined text-3xl">image</span>
                                                     </div>
                                                 )}
@@ -329,7 +329,7 @@ const MobileLabels: React.FC = () => {
                                                             {prod.sku}
                                                         </span>
                                                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${
-                                                            stock > 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400'
+                                                            stock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-rose-900/30 text-rose-400'
                                                         }`}>
                                                             Stock: {stock}
                                                         </span>
@@ -377,13 +377,13 @@ const MobileLabels: React.FC = () => {
                                             </div>
 
                                             {/* Fila Cantidad Personalizada */}
-                                            <div className="bg-slate-50 dark:bg-slate-900/80 p-2 px-3 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-3 mt-0.5">
-                                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Otro número:</span>
+                                            <div className="bg-slate-900/80 p-2 px-3 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 mt-0.5">
+                                                <span className="text-xs font-bold text-slate-400">Otro número:</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
+                                                    <div className="flex items-center border border-slate-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
                                                         <button 
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
                                                             onClick={() => setProductCustomQty(String(prod.id), currentQty - 3)}
                                                         >
                                                             -
@@ -394,11 +394,11 @@ const MobileLabels: React.FC = () => {
                                                             step="3"
                                                             value={currentQty}
                                                             onChange={(e) => setProductCustomQty(String(prod.id), parseInt(e.target.value) || 3)}
-                                                            className="w-12 text-center bg-transparent border-none focus:ring-0 text-slate-800 dark:text-white font-bold text-sm p-0"
+                                                            className="w-12 text-center bg-transparent border-none focus:ring-0 text-white font-bold text-sm p-0"
                                                         />
                                                         <button 
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
                                                             onClick={() => setProductCustomQty(String(prod.id), currentQty + 3)}
                                                         >
                                                             +
@@ -407,7 +407,7 @@ const MobileLabels: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handlePrint(prod, currentQty)}
-                                                        className="active:scale-95 transition-transform bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                                                        className="active:scale-95 transition-transform bg-slate-200 hover:bg-white text-slate-900 px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
                                                     >
                                                         <span>Imprimir</span>
                                                     </button>
@@ -447,33 +447,33 @@ const MobileLabels: React.FC = () => {
                                                         src={getThumbnailUrl(item.image_url, 200)}
                                                         alt={item.name}
                                                         loading="lazy"
-                                                        className="w-12 h-12 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0"
+                                                        className="w-12 h-12 object-cover rounded-xl border border-slate-700 shrink-0"
                                                     />
                                                 ) : (
-                                                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+                                                    <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                                         <span className="material-symbols-outlined text-xl">image</span>
                                                     </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-mono font-extrabold text-slate-600 dark:text-slate-300 truncate">
+                                                        <span className="text-xs font-mono font-extrabold text-slate-300 truncate">
                                                             {item.sku}
                                                         </span>
                                                         <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap ml-auto">
                                                             {timeAgo(item.printedAt)}
                                                         </span>
                                                     </div>
-                                                    <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate mt-0.5">
+                                                    <p className="font-bold text-xs text-slate-100 truncate mt-0.5">
                                                         {item.name}
                                                     </p>
-                                                    <span className="inline-block text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md mt-1">
+                                                    <span className="inline-block text-[10px] font-extrabold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-md mt-1">
                                                         {item.quantity} etiquetas
                                                     </span>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleReprint(item)}
-                                                    className="active:scale-90 p-3 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 rounded-2xl transition-all shrink-0 border border-emerald-200/60 dark:border-emerald-800"
+                                                    className="active:scale-90 p-3 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300 rounded-2xl transition-all shrink-0 border border-emerald-800"
                                                     title={`Reimprimir ${item.quantity} etiquetas`}
                                                 >
                                                     <span className="material-symbols-outlined text-xl">print</span>
@@ -515,9 +515,9 @@ const MobileLabels: React.FC = () => {
                         {/* Search Results → Add to Queue */}
                         {queueMatchedProducts.length > 0 && (
                             <div className="animate-fade-in flex flex-col gap-3">
-                                <div className="flex items-center justify-between px-1 text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                <div className="flex items-center justify-between px-1 text-xs font-extrabold text-slate-400 uppercase tracking-wider">
                                     <span>{queueMatchedProducts.length} resultado(s)</span>
-                                    <span className="text-amber-600 dark:text-amber-400">Agregar a la cola</span>
+                                    <span className="text-amber-400">Agregar a la cola</span>
                                 </div>
 
                                 {queueMatchedProducts.map((prod) => {
@@ -529,9 +529,9 @@ const MobileLabels: React.FC = () => {
                                         <div key={prod.id} className="bg-slate-900 p-3.5 rounded-2xl shadow-sm border border-slate-800 flex flex-col gap-2.5 transition-all">
                                             <div className="flex gap-3 items-center">
                                                 {prod.image_url ? (
-                                                    <img src={getThumbnailUrl(prod.image_url, 200)} alt={prod.name} loading="lazy" className="w-14 h-14 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 shadow-sm" />
+                                                    <img src={getThumbnailUrl(prod.image_url, 200)} alt={prod.name} loading="lazy" className="w-14 h-14 object-cover rounded-xl border border-slate-700 shrink-0 shadow-sm" />
                                                 ) : (
-                                                    <div className="w-14 h-14 bg-slate-100 dark:bg-slate-700/60 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+                                                    <div className="w-14 h-14 bg-slate-700/60 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                                         <span className="material-symbols-outlined text-2xl">image</span>
                                                     </div>
                                                 )}
@@ -540,11 +540,11 @@ const MobileLabels: React.FC = () => {
                                                         <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[11px] font-mono font-extrabold rounded-lg border border-amber-500/20">
                                                             {prod.sku}
                                                         </span>
-                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${stock > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${stock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-rose-900/30 text-rose-400'}`}>
                                                             Stock: {stock}
                                                         </span>
                                                         {alreadyInQueue && (
-                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-amber-900/30 text-amber-400">
                                                                 Ya en cola: {alreadyInQueue.quantity}
                                                             </span>
                                                         )}
@@ -554,13 +554,13 @@ const MobileLabels: React.FC = () => {
                                             </div>
 
                                             {/* Quantity selector + Add button */}
-                                            <div className="flex items-center justify-between gap-2 bg-amber-50/60 dark:bg-amber-900/10 p-2 px-3 rounded-xl border border-amber-200/60 dark:border-amber-800/40">
-                                                <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Cantidad:</span>
+                                            <div className="flex items-center justify-between gap-2 bg-amber-900/10 p-2 px-3 rounded-xl border border-amber-800/40">
+                                                <span className="text-xs font-bold text-amber-400">Cantidad:</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center border border-amber-300/60 dark:border-amber-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
+                                                    <div className="flex items-center border border-amber-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
                                                             onClick={() => setQueueProductQty(String(prod.id), currentQty - 1)}
                                                         >
                                                             −
@@ -571,11 +571,11 @@ const MobileLabels: React.FC = () => {
                                                             step="1"
                                                             value={currentQty}
                                                             onChange={(e) => setQueueProductQty(String(prod.id), parseInt(e.target.value) || 1)}
-                                                            className="w-12 text-center bg-transparent border-none focus:ring-0 text-slate-800 dark:text-white font-bold text-sm p-0"
+                                                            className="w-12 text-center bg-transparent border-none focus:ring-0 text-white font-bold text-sm p-0"
                                                         />
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
                                                             onClick={() => setQueueProductQty(String(prod.id), currentQty + 1)}
                                                         >
                                                             +
@@ -600,7 +600,7 @@ const MobileLabels: React.FC = () => {
                         {/* No search results */}
                         {queueSearchTerm.trim().length >= 2 && queueMatchedProducts.length === 0 && !catalogLoading && (
                             <div className="animate-fade-in bg-slate-900 rounded-3xl p-6 text-center border border-slate-800 my-1 shadow-sm">
-                                <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600 mb-1">search_off</span>
+                                <span className="material-symbols-outlined text-4xl text-slate-600 mb-1">search_off</span>
                                 <h3 className="text-sm font-bold text-slate-200">No se encontró repuesto</h3>
                             </div>
                         )}
@@ -613,7 +613,7 @@ const MobileLabels: React.FC = () => {
                                         <span className="material-symbols-outlined text-amber-500">playlist_add_check</span>
                                         Cola de Impresión
                                         {queue.length > 0 && (
-                                            <span className="text-[11px] font-extrabold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-lg">
+                                            <span className="text-[11px] font-extrabold bg-amber-900/30 text-amber-400 px-2 py-0.5 rounded-lg">
                                                 {queue.length} item{queue.length !== 1 ? 's' : ''}
                                             </span>
                                         )}
@@ -621,13 +621,13 @@ const MobileLabels: React.FC = () => {
                                 </div>
 
                                 {queue.length === 0 ? (
-                                    <div className="text-center py-10 px-4 bg-slate-900 rounded-3xl border-2 border-dashed border-amber-300/60 dark:border-amber-800/40 shadow-xs">
-                                        <span className="material-symbols-outlined text-5xl text-amber-300 dark:text-amber-700 mb-2">queue</span>
+                                    <div className="text-center py-10 px-4 bg-slate-900 rounded-3xl border-2 border-dashed border-amber-800/40 shadow-xs">
+                                        <span className="material-symbols-outlined text-5xl text-amber-700 mb-2">queue</span>
                                         <h3 className="font-bold text-sm text-slate-200">La cola está vacía</h3>
                                         <p className="text-xs text-slate-400 mt-1 max-w-[260px] mx-auto leading-relaxed">
                                             Busca repuestos arriba, elige la cantidad que necesitas de cada uno, y agrégalos a la cola. Cuando termines, genera un solo PDF con todas las etiquetas.
                                         </p>
-                                        <div className="mt-4 flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400">
+                                        <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
                                             <span className="material-symbols-outlined text-sm">info</span>
                                             <span className="text-[11px] font-semibold">La cola se guarda automáticamente</span>
                                         </div>
@@ -641,9 +641,9 @@ const MobileLabels: React.FC = () => {
                                                 style={{ animationDelay: `${idx * 40}ms` }}
                                             >
                                                 {item.image_url ? (
-                                                    <img src={getThumbnailUrl(item.image_url, 200)} alt={item.name} loading="lazy" className="w-12 h-12 object-cover rounded-xl border border-slate-100 dark:border-slate-700 shrink-0" />
+                                                    <img src={getThumbnailUrl(item.image_url, 200)} alt={item.name} loading="lazy" className="w-12 h-12 object-cover rounded-xl border border-slate-700 shrink-0" />
                                                 ) : (
-                                                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
+                                                    <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
                                                         <span className="material-symbols-outlined text-xl">image</span>
                                                     </div>
                                                 )}
@@ -652,14 +652,14 @@ const MobileLabels: React.FC = () => {
                                                     <span className="text-[11px] font-mono font-extrabold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
                                                         {item.sku}
                                                     </span>
-                                                    <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate mt-0.5" title={item.name}>{item.name}</p>
+                                                    <p className="font-bold text-xs text-slate-100 truncate mt-0.5" title={item.name}>{item.name}</p>
 
                                                     {/* Inline qty editor */}
                                                     <div className="flex items-center gap-2 mt-1.5">
                                                         <button
                                                             type="button"
                                                             onClick={() => handleUpdateQueueQty(item.id, item.quantity - 1)}
-                                                            className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
+                                                            className="w-10 h-10 rounded-lg bg-slate-700 text-slate-300 flex items-center justify-center active:bg-slate-600 active:scale-95 transition-all font-bold text-sm"
                                                         >
                                                             −
                                                         </button>
@@ -669,12 +669,12 @@ const MobileLabels: React.FC = () => {
                                                             step="1"
                                                             value={item.quantity}
                                                             onChange={(e) => handleUpdateQueueQty(item.id, parseInt(e.target.value) || 1)}
-                                                            className="w-10 h-10 text-center bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 dark:border-amber-700/60 rounded-lg text-amber-800 dark:text-amber-300 font-black text-xs focus:ring-0 p-0"
+                                                            className="w-10 h-10 text-center bg-amber-900/20 border border-amber-700/60 rounded-lg text-amber-300 font-black text-xs focus:ring-0 p-0"
                                                         />
                                                         <button
                                                             type="button"
                                                             onClick={() => handleUpdateQueueQty(item.id, item.quantity + 1)}
-                                                            className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all font-bold text-sm"
+                                                            className="w-10 h-10 rounded-lg bg-slate-700 text-slate-300 flex items-center justify-center active:bg-slate-600 active:scale-95 transition-all font-bold text-sm"
                                                         >
                                                             +
                                                         </button>
@@ -686,7 +686,7 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveFromQueue(item.id)}
-                                                    className="active:scale-90 p-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 text-rose-500 dark:text-rose-400 rounded-xl transition-all shrink-0 border border-rose-200/60 dark:border-rose-800/50"
+                                                    className="active:scale-90 p-2.5 bg-rose-900/20 hover:bg-rose-900/40 text-rose-400 rounded-xl transition-all shrink-0 border border-rose-800/50"
                                                     title="Eliminar de la cola"
                                                 >
                                                     <span className="material-symbols-outlined text-lg">delete</span>
