@@ -4,6 +4,7 @@ import { getThumbnailUrl } from '../../utils/image';
 import { printLabelsQuick, addToPrintHistory, getPrintHistory, PrintHistoryItem } from '../../utils/mobileLabelPrinter';
 import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngine';
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
+import { CheckCircle2, Eye, History, ImageOff, Info, Layers, ListChecks, Plus, Printer, Receipt, SearchX, Trash2, Zap } from 'lucide-react';
 import {
     getPrintQueue, addToQueue, removeFromQueue, updateQueueItemQty,
     clearQueue, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF,
@@ -193,7 +194,7 @@ const MobileLabels: React.FC = () => {
     const totalPages = getQueuePageCount(queue);
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-950 pb-56 font-sans">
+        <div className="flex flex-col min-h-full bg-slate-950 pb-56 font-sans">
             <style>{`
                 @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 @keyframes slide-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
@@ -208,7 +209,7 @@ const MobileLabels: React.FC = () => {
             {/* Header */}
             <div className="bg-gradient-to-r from-amber-500 to-amber-400 p-4 pt-6 shadow-lg text-slate-950 rounded-b-3xl mb-1 z-20">
                 <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight">
-                    <span className="material-symbols-outlined text-[28px] font-variation-fill-1">print</span>
+                    <Printer size={28} aria-hidden="true" />
                     Impresión de Etiquetas
                 </h1>
                 <p className="text-slate-950/70 text-xs mt-1 font-semibold">
@@ -224,10 +225,10 @@ const MobileLabels: React.FC = () => {
                         className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
                             activeTab === 'quick'
                                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                                : 'text-slate-400 hover:bg-slate-800'
+                                : 'text-slate-400 active:bg-slate-800'
                         }`}
                     >
-                        <span className="material-symbols-outlined text-[16px]">bolt</span>
+                        <Zap size={16} aria-hidden="true" />
                         Rápida
                     </button>
                     <button
@@ -235,10 +236,10 @@ const MobileLabels: React.FC = () => {
                         className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 relative ${
                             activeTab === 'queue'
                                 ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                                : 'text-slate-400 hover:bg-slate-800'
+                                : 'text-slate-400 active:bg-slate-800'
                         }`}
                     >
-                        <span className="material-symbols-outlined text-[16px]">queue</span>
+                        <Layers size={16} aria-hidden="true" />
                         Cola
                         {queue.length > 0 && activeTab !== 'queue' && (
                             <span className="absolute -top-1.5 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-amber-500 text-slate-950 text-[10px] font-black rounded-full border-2 border-slate-900 animate-pulse-glow">
@@ -252,7 +253,7 @@ const MobileLabels: React.FC = () => {
             {/* Toast de Éxito (shared) */}
             {successMessage && (
                 <div className="mx-4 mt-2 animate-slide-down bg-emerald-500 text-white px-4 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 z-40 border border-emerald-400">
-                    <span className="material-symbols-outlined text-[24px]">check_circle</span>
+                    <CheckCircle2 size={24} aria-hidden="true" />
                     <span className="font-bold text-sm">{successMessage}</span>
                 </div>
             )}
@@ -287,7 +288,7 @@ const MobileLabels: React.FC = () => {
                         {/* Sin Resultados */}
                         {searchTerm.trim().length >= 2 && matchedProducts.length === 0 && !catalogLoading && (
                             <div className="animate-fade-in bg-slate-900 rounded-3xl p-8 text-center border border-slate-800 my-2 shadow-sm">
-                                <span className="material-symbols-outlined text-5xl text-slate-600 mb-2">search_off</span>
+                                <SearchX size={48} className="text-slate-600 mb-2" aria-hidden="true" />
                                 <h3 className="text-base font-bold text-slate-200">No se encontró repuesto</h3>
                                 <p className="text-xs text-slate-400 mt-1 max-w-[240px] mx-auto">
                                     Verifica si el nombre o código está bien escrito, o intenta con palabras clave más cortas.
@@ -320,7 +321,7 @@ const MobileLabels: React.FC = () => {
                                                     />
                                                 ) : (
                                                     <div className="w-[72px] h-[72px] bg-slate-700/60 rounded-2xl flex items-center justify-center text-slate-400 shrink-0">
-                                                        <span className="material-symbols-outlined text-3xl">image</span>
+                                                        <ImageOff size={30} aria-hidden="true" />
                                                     </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
@@ -350,27 +351,27 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handlePrint(prod, 3)}
-                                                    className="active:scale-95 transition-all bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-amber-500/25 shadow-xs"
+                                                    className="active:scale-95 transition-all bg-amber-500/10 active:bg-amber-500/20 text-amber-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-amber-500/25 shadow-xs"
                                                 >
-                                                    <span className="material-symbols-outlined text-xl">print</span>
+                                                    <Printer size={20} aria-hidden="true" />
                                                     <span className="font-black text-base">3</span>
                                                     <span className="text-[9px] uppercase tracking-tighter opacity-75">etiquetas</span>
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handlePrint(prod, 6)}
-                                                    className="active:scale-95 transition-all bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-cyan-500/25 shadow-xs"
+                                                    className="active:scale-95 transition-all bg-cyan-500/10 active:bg-cyan-500/20 text-cyan-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-cyan-500/25 shadow-xs"
                                                 >
-                                                    <span className="material-symbols-outlined text-xl">print</span>
+                                                    <Printer size={20} aria-hidden="true" />
                                                     <span className="font-black text-base">6</span>
                                                     <span className="text-[9px] uppercase tracking-tighter opacity-75">etiquetas</span>
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handlePrint(prod, 21)}
-                                                    className="active:scale-95 transition-all bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-emerald-500/25 shadow-xs"
+                                                    className="active:scale-95 transition-all bg-emerald-500/10 active:bg-emerald-500/20 text-emerald-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-emerald-500/25 shadow-xs"
                                                 >
-                                                    <span className="material-symbols-outlined text-xl">print</span>
+                                                    <Printer size={20} aria-hidden="true" />
                                                     <span className="font-black text-base">21</span>
                                                     <span className="text-[9px] uppercase tracking-tighter opacity-75">hoja A4</span>
                                                 </button>
@@ -383,7 +384,7 @@ const MobileLabels: React.FC = () => {
                                                     <div className="flex items-center border border-slate-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
                                                         <button 
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
                                                             onClick={() => setProductCustomQty(String(prod.id), currentQty - 3)}
                                                         >
                                                             -
@@ -398,7 +399,7 @@ const MobileLabels: React.FC = () => {
                                                         />
                                                         <button 
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
                                                             onClick={() => setProductCustomQty(String(prod.id), currentQty + 3)}
                                                         >
                                                             +
@@ -407,7 +408,7 @@ const MobileLabels: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handlePrint(prod, currentQty)}
-                                                        className="active:scale-95 transition-transform bg-slate-200 hover:bg-white text-slate-900 px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                                                        className="active:scale-95 transition-transform bg-slate-200 active:bg-white text-slate-900 px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
                                                     >
                                                         <span>Imprimir</span>
                                                     </button>
@@ -424,7 +425,7 @@ const MobileLabels: React.FC = () => {
                             <div className="mt-4 animate-fade-in z-10">
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <h2 className="text-base font-bold text-slate-200 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-slate-400">history</span>
+                                        <History size={20} className="text-slate-400" aria-hidden="true" />
                                         Impresiones Recientes
                                     </h2>
                                     {printHistory.length > 0 && (
@@ -434,14 +435,14 @@ const MobileLabels: React.FC = () => {
                                 
                                 {printHistory.length === 0 ? (
                                     <div className="text-center py-8 px-4 text-slate-400 bg-slate-900 rounded-3xl border border-slate-800 shadow-xs">
-                                        <span className="material-symbols-outlined text-4xl opacity-30 mb-1">print_disabled</span>
+                                        <Printer size={36} className="opacity-30 mb-1" aria-hidden="true" />
                                         <p className="font-semibold text-sm">No hay impresiones recientes</p>
                                         <p className="text-xs text-slate-400 mt-0.5">Cuando imprimas etiquetas, aparecerán aquí para fácil acceso.</p>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-2.5">
                                         {printHistory.map((item, index) => (
-                                            <div key={`${item.id}-${index}`} className="bg-slate-900 p-3 rounded-2xl shadow-sm border border-slate-800 flex items-center gap-3 transition-colors hover:border-emerald-500/50">
+                                            <div key={`${item.id}-${index}`} className="bg-slate-900 p-3 rounded-2xl shadow-sm border border-slate-800 flex items-center gap-3 transition-colors active:border-emerald-500/50">
                                                 {item.image_url ? (
                                                     <img
                                                         src={getThumbnailUrl(item.image_url, 200)}
@@ -451,7 +452,7 @@ const MobileLabels: React.FC = () => {
                                                     />
                                                 ) : (
                                                     <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
-                                                        <span className="material-symbols-outlined text-xl">image</span>
+                                                        <ImageOff size={20} aria-hidden="true" />
                                                     </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
@@ -473,10 +474,10 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleReprint(item)}
-                                                    className="active:scale-90 p-3 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300 rounded-2xl transition-all shrink-0 border border-emerald-800"
+                                                    className="active:scale-90 p-3 bg-emerald-900/30 active:bg-emerald-900/50 text-emerald-300 rounded-2xl transition-all shrink-0 border border-emerald-800"
                                                     title={`Reimprimir ${item.quantity} etiquetas`}
                                                 >
-                                                    <span className="material-symbols-outlined text-xl">print</span>
+                                                    <Printer size={20} aria-hidden="true" />
                                                 </button>
                                             </div>
                                         ))}
@@ -532,7 +533,7 @@ const MobileLabels: React.FC = () => {
                                                     <img src={getThumbnailUrl(prod.image_url, 200)} alt={prod.name} loading="lazy" className="w-14 h-14 object-cover rounded-xl border border-slate-700 shrink-0 shadow-sm" />
                                                 ) : (
                                                     <div className="w-14 h-14 bg-slate-700/60 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
-                                                        <span className="material-symbols-outlined text-2xl">image</span>
+                                                        <ImageOff size={24} aria-hidden="true" />
                                                     </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
@@ -560,7 +561,7 @@ const MobileLabels: React.FC = () => {
                                                     <div className="flex items-center border border-amber-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
                                                             onClick={() => setQueueProductQty(String(prod.id), currentQty - 1)}
                                                         >
                                                             −
@@ -575,7 +576,7 @@ const MobileLabels: React.FC = () => {
                                                         />
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 hover:bg-slate-700 active:bg-slate-600 font-bold"
+                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
                                                             onClick={() => setQueueProductQty(String(prod.id), currentQty + 1)}
                                                         >
                                                             +
@@ -584,9 +585,9 @@ const MobileLabels: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleAddToQueue(prod)}
-                                                        className="active:scale-95 transition-all bg-amber-500 hover:bg-amber-600 text-white px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                                                        className="active:scale-95 transition-all bg-amber-500 active:bg-amber-600 text-white px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
                                                     >
-                                                        <span className="material-symbols-outlined text-[16px]">add</span>
+                                                        <Plus size={16} aria-hidden="true" />
                                                         Agregar
                                                     </button>
                                                 </div>
@@ -600,7 +601,7 @@ const MobileLabels: React.FC = () => {
                         {/* No search results */}
                         {queueSearchTerm.trim().length >= 2 && queueMatchedProducts.length === 0 && !catalogLoading && (
                             <div className="animate-fade-in bg-slate-900 rounded-3xl p-6 text-center border border-slate-800 my-1 shadow-sm">
-                                <span className="material-symbols-outlined text-4xl text-slate-600 mb-1">search_off</span>
+                                <SearchX size={36} className="text-slate-600 mb-1" aria-hidden="true" />
                                 <h3 className="text-sm font-bold text-slate-200">No se encontró repuesto</h3>
                             </div>
                         )}
@@ -610,7 +611,7 @@ const MobileLabels: React.FC = () => {
                             <div className="mt-2 animate-fade-in">
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <h2 className="text-base font-bold text-slate-200 flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-amber-500">playlist_add_check</span>
+                                        <ListChecks size={20} className="text-amber-500" aria-hidden="true" />
                                         Cola de Impresión
                                         {queue.length > 0 && (
                                             <span className="text-[11px] font-extrabold bg-amber-900/30 text-amber-400 px-2 py-0.5 rounded-lg">
@@ -622,13 +623,13 @@ const MobileLabels: React.FC = () => {
 
                                 {queue.length === 0 ? (
                                     <div className="text-center py-10 px-4 bg-slate-900 rounded-3xl border-2 border-dashed border-amber-800/40 shadow-xs">
-                                        <span className="material-symbols-outlined text-5xl text-amber-700 mb-2">queue</span>
+                                        <Layers size={48} className="text-amber-700 mb-2" aria-hidden="true" />
                                         <h3 className="font-bold text-sm text-slate-200">La cola está vacía</h3>
                                         <p className="text-xs text-slate-400 mt-1 max-w-[260px] mx-auto leading-relaxed">
                                             Busca repuestos arriba, elige la cantidad que necesitas de cada uno, y agrégalos a la cola. Cuando termines, genera un solo PDF con todas las etiquetas.
                                         </p>
                                         <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
-                                            <span className="material-symbols-outlined text-sm">info</span>
+                                            <Info size={14} aria-hidden="true" />
                                             <span className="text-[11px] font-semibold">La cola se guarda automáticamente</span>
                                         </div>
                                     </div>
@@ -644,7 +645,7 @@ const MobileLabels: React.FC = () => {
                                                     <img src={getThumbnailUrl(item.image_url, 200)} alt={item.name} loading="lazy" className="w-12 h-12 object-cover rounded-xl border border-slate-700 shrink-0" />
                                                 ) : (
                                                     <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
-                                                        <span className="material-symbols-outlined text-xl">image</span>
+                                                        <ImageOff size={20} aria-hidden="true" />
                                                     </div>
                                                 )}
 
@@ -686,10 +687,10 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveFromQueue(item.id)}
-                                                    className="active:scale-90 p-2.5 bg-rose-900/20 hover:bg-rose-900/40 text-rose-400 rounded-xl transition-all shrink-0 border border-rose-800/50"
+                                                    className="active:scale-90 p-2.5 bg-rose-900/20 active:bg-rose-900/40 text-rose-400 rounded-xl transition-all shrink-0 border border-rose-800/50"
                                                     title="Eliminar de la cola"
                                                 >
-                                                    <span className="material-symbols-outlined text-lg">delete</span>
+                                                    <Trash2 size={18} aria-hidden="true" />
                                                 </button>
                                             </div>
                                         ))}
@@ -700,12 +701,12 @@ const MobileLabels: React.FC = () => {
 
                         {/* ── Floating Bottom Bar (when queue has items) ── */}
                         {queue.length > 0 && (
-                            <div className="fixed bottom-[88px] left-2 right-2 z-40 animate-slide-up">
+                            <div style={{ bottom: 'calc(88px + env(safe-area-inset-bottom))' }} className="fixed left-2 right-2 z-40 animate-slide-up">
                                 <div className="max-w-md mx-auto bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 p-3 px-4">
                                     {/* Summary row */}
                                     <div className="flex items-center justify-between mb-2.5">
                                         <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-400 text-lg">receipt_long</span>
+                                            <Receipt size={18} className="text-amber-400" aria-hidden="true" />
                                             <div>
                                                 <span className="text-xs font-black text-white">{totalLabels} etiqueta{totalLabels !== 1 ? 's' : ''}</span>
                                                 <span className="text-[10px] text-slate-500 ml-1.5">({totalPages} hoja{totalPages !== 1 ? 's' : ''} A4)</span>
@@ -716,9 +717,9 @@ const MobileLabels: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowClearConfirm(true)}
-                                                className="text-[11px] font-bold text-rose-400 hover:text-rose-300 active:opacity-70 flex items-center gap-0.5"
+                                                className="text-[11px] font-bold text-rose-400 active:text-rose-300 active:opacity-70 flex items-center gap-0.5"
                                             >
-                                                <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                                                <Trash2 size={14} aria-hidden="true" />
                                                 Vaciar
                                             </button>
                                         ) : (
@@ -734,9 +735,9 @@ const MobileLabels: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={() => setIsPreviewModalOpen(true)}
-                                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-slate-950 rounded-xl font-extrabold text-sm shadow-lg shadow-amber-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-400 active:from-amber-600 active:to-amber-500 text-slate-950 rounded-xl font-extrabold text-sm shadow-lg shadow-amber-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                                     >
-                                        <span className="material-symbols-outlined text-lg">visibility</span>
+                                        <Eye size={18} aria-hidden="true" />
                                         Vista Previa e Imprimir ({totalLabels} etiq.)
                                     </button>
                                 </div>

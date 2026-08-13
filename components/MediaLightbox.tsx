@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import {
   ChevronLeft,
   ChevronRight,
@@ -23,8 +24,16 @@ interface MediaLightboxProps {
     onAddMedia?: () => void;
 }
 
+/** Recorrido mínimo del dedo para que el gesto cuente como cambio de imagen. */
+const SWIPE_THRESHOLD = 56;
+
 export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, initialIndex = 0, onClose, onAddMedia }) => {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+    // Arrastre horizontal: en el teléfono se pasa de foto deslizando, no buscando
+    // una flecha de 32px con el pulgar.
+    const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+    const [dragX, setDragX] = useState(0);
 
     // Reset index when opened
     useEffect(() => {
@@ -51,6 +60,9 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, currentIndex, media.length]);
 
+    // El botón «atrás» del teléfono cierra el visor en lugar de salir del catálogo.
+    useBackDismiss(isOpen, onClose);
+
     if (!isOpen || media.length === 0) return null;
 
     // Prevención de error: si currentIndex está fuera del rango porque la lista de media cambió
@@ -71,6 +83,34 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
             const current = prev >= media.length ? 0 : prev;
             return current === media.length - 1 ? 0 : current + 1;
         });
+    };
+
+    /* ── Deslizar para cambiar de imagen ── */
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (media.length < 2) return;
+        // En un vídeo el dedo es para la barra de reproducción, no para navegar.
+        if ((e.target as HTMLElement).tagName === 'VIDEO') return;
+        const touch = e.touches[0];
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!touchStartRef.current) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - touchStartRef.current.x;
+        const dy = touch.clientY - touchStartRef.current.y;
+        // Si el gesto es más vertical que horizontal, es un scroll: no lo secuestramos.
+        if (Math.abs(dx) < Math.abs(dy)) return;
+        setDragX(dx);
+    };
+
+    const handleTouchEnd = () => {
+        if (!touchStartRef.current) return;
+        if (dragX <= -SWIPE_THRESHOLD) handleNext();
+        else if (dragX >= SWIPE_THRESHOLD) handlePrev();
+        touchStartRef.current = null;
+        setDragX(0);
     };
 
     const handleDownload = async (item: MediaItem) => {
@@ -201,9 +241,18 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
             </div>
 
             {/* Media Content */}
-            <div 
-                className="w-full h-full max-w-6xl max-h-[85vh] p-8 flex items-center justify-center animate-in fade-in zoom-in-95 duration-300"
+            <div
+                className="w-full h-full max-w-6xl max-h-[85vh] p-8 flex items-center justify-center animate-in fade-in zoom-in-95 duration-300 touch-pan-y"
                 onClick={(e) => e.stopPropagation()} // Prevent click from closing when clicking inside media area
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                style={{
+                    transform: dragX ? `translateX(${dragX}px)` : undefined,
+                    // Durante el arrastre la imagen sigue al dedo; al soltar, vuelve con animación.
+                    transition: dragX ? 'none' : 'transform 200ms ease-out',
+                }}
             >
                 {currentMedia.type === 'video' ? (
                     <video 

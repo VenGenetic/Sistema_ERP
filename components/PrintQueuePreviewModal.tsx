@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import {
     getPrintQueue,
     updateQueueItemQty,
@@ -189,6 +190,9 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
             setIsProcessing(false);
         }
     };
+
+    // El «atrás» del teléfono cierra este modal en vez de dejar la pantalla.
+    useBackDismiss(isOpen, onClose);
 
     if (!isOpen) return null;
 

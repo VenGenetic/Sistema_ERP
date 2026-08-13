@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { ShareDemandModal } from './ShareDemandModal';
@@ -172,6 +173,9 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
             alert('No se pudo acceder al portapapeles. Asegúrate de dar los permisos necesarios.');
         }
     };
+
+    // El «atrás» del teléfono cierra este modal en vez de dejar la pantalla.
+    useBackDismiss(isOpen && !!product, onClose);
 
     if (!isOpen || !product) return null;
 

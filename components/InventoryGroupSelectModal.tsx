@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Search, Plus, CheckCircle, Package, ArrowRight, X, Layers, AlertCircle } from 'lucide-react';
@@ -176,6 +177,9 @@ export const InventoryGroupSelectModal: React.FC<InventoryGroupSelectModalProps>
             setSaving(false);
         }
     };
+
+    // El «atrás» del teléfono cierra este modal en vez de dejar la pantalla.
+    useBackDismiss(isOpen, onClose);
 
     if (!isOpen) return null;
 

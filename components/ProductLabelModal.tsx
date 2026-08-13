@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import { jsPDF } from 'jspdf';
 import { addToQueue } from '../utils/mobilePrintQueue';
 import { renderLabelToCanvas } from '../utils/mobileLabelPrinter';
@@ -143,6 +144,9 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
             return () => clearTimeout(t);
         }
     }, [isOpen, product, renderPreview]);
+
+    // El «atrás» del teléfono cierra este modal en vez de dejar la pantalla.
+    useBackDismiss(isOpen && !!product, onClose);
 
     if (!isOpen || !product) return null;
 

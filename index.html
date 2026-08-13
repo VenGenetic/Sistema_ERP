@@ -41,7 +41,9 @@
     })();
   </script>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- viewport-fit=cover: sin esto env(safe-area-inset-*) devuelve 0 en iOS y la
+       barra inferior del móvil queda debajo del notch / la barra de gestos. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>DropshipERP Suite</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
@@ -441,6 +443,31 @@
 
       .scrollbar-hide::-webkit-scrollbar {
         display: none;
+      }
+
+      /* Alto real de la ventana en el teléfono. 100vh cuenta la barra de URL de
+         Chrome/Safari aunque esté retraída, así que la barra inferior del modo
+         móvil quedaba cortada al hacer scroll. La primera línea es el respaldo
+         para navegadores sin dvh. */
+      .h-dvh-screen {
+        height: 100vh;
+        height: 100dvh;
+      }
+
+      .min-h-dvh-screen {
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+
+      /* Zona segura inferior: notch del iPhone y barra de gestos de Android. */
+      .pb-safe {
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      }
+
+      /* Hueco para que el contenido no quede debajo de la barra de navegación
+         móvil (72px) ni de la zona de gestos del sistema. */
+      .pb-nav-safe {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
       }
 
       /* Numeric columns: fixed-width digits so decimals line up down the column. */

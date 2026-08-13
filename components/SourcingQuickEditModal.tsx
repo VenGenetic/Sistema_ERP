@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import { supabase } from '../supabaseClient';
 import {
   Telescope,
@@ -21,6 +22,9 @@ export const SourcingQuickEditModal: React.FC<SourcingQuickEditModalProps> = ({
     const [status, setStatus] = useState<string>(product?.investigation_status || 'pending');
     const [autoOrderDisabled, setAutoOrderDisabled] = useState<boolean>(product?.auto_order_disabled || false);
     const [loading, setLoading] = useState(false);
+
+    // El «atrás» del teléfono cierra este modal en vez de dejar la pantalla.
+    useBackDismiss(isOpen && !!product, onClose);
 
     if (!isOpen || !product) return null;
 

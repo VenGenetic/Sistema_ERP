@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import { supabase } from '../supabaseClient';
 import { Tag } from './TagManager';
 import {
@@ -83,6 +84,9 @@ export const QuickTagAssignModal: React.FC<QuickTagAssignModalProps> = ({ isOpen
             setSaving(false);
         }
     };
+
+    // El «atrás» del teléfono cierra este modal en vez de dejar la pantalla.
+    useBackDismiss(isOpen, onClose);
 
     if (!isOpen) return null;
 

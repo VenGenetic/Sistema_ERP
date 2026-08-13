@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBackDismiss } from '../hooks/useBackDismiss';
 import { supabase } from '../supabaseClient';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
@@ -814,6 +815,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
             setLoading(false);
         }
     };
+
+    // El «atrás» del teléfono cierra este modal en vez de dejar la pantalla.
+    useBackDismiss(isOpen, onClose);
 
     if (!isOpen) return null;
 

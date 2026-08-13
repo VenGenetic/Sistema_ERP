@@ -4,6 +4,7 @@ import { getThumbnailUrl } from '../../utils/image';
 import { isProductDiscontinued } from '../../utils/discontinuedHelper';
 import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngine';
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
+import { useBackDismiss } from '../../hooks/useBackDismiss';
 
 // Modals
 import { ProductModal } from '../../components/ProductModal';
@@ -145,15 +146,86 @@ const money = (v: number | null | undefined) =>
    SUB-COMPONENTES
    ──────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Congela el scroll del modo móvil mientras haya hojas abiertas.
+ *
+ * El scroll no vive en <body> sino en el <main> del layout, así que el truco
+ * habitual (`document.body.style.overflow`) no hacía nada: la lista de repuestos
+ * seguía corriendo bajo el dedo con la hoja encima. Se cuenta cuántas hojas hay
+ * abiertas para no descongelar de más al cerrar una sobre otra.
+ */
+let openSheetCount = 0;
+
+const useMobileScrollLock = (active: boolean) => {
+    useEffect(() => {
+        if (!active) return;
+
+        const scroller = document.querySelector<HTMLElement>('[data-mobile-scroll]');
+        const previousOverflow = scroller?.style.overflow ?? '';
+
+        openSheetCount += 1;
+        if (scroller) scroller.style.overflow = 'hidden';
+
+        return () => {
+            openSheetCount -= 1;
+            if (openSheetCount === 0 && scroller) scroller.style.overflow = previousOverflow;
+        };
+    }, [active]);
+};
+
+/** Recorrido del dedo, hacia abajo, que baja la hoja del todo. */
+const SHEET_DISMISS_DISTANCE = 96;
+
 /** Hoja inferior. Toda ventana del móvil entra por abajo, al alcance del pulgar. */
 const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string; icon?: React.ElementType; children: React.ReactNode }> =
 ({ open, onClose, title, icon: Icon, children }) => {
+    // El «atrás» del teléfono baja la hoja; antes se llevaba por delante la pantalla entera.
+    useBackDismiss(open, onClose);
+    useMobileScrollLock(open);
+
+    // Arrastre desde la cabecera: el asa era decorativa, ahora tira de verdad.
+    const dragStartRef = useRef<number | null>(null);
+    const [dragY, setDragY] = useState(0);
+
+    useEffect(() => {
+        if (!open) setDragY(0);
+    }, [open]);
+
+    const onDragStart = (e: React.TouchEvent) => {
+        dragStartRef.current = e.touches[0].clientY;
+    };
+
+    const onDragMove = (e: React.TouchEvent) => {
+        if (dragStartRef.current === null) return;
+        // Solo hacia abajo: tirar hacia arriba no debe despegar la hoja del borde.
+        setDragY(Math.max(0, e.touches[0].clientY - dragStartRef.current));
+    };
+
+    const onDragEnd = () => {
+        if (dragStartRef.current === null) return;
+        dragStartRef.current = null;
+        if (dragY >= SHEET_DISMISS_DISTANCE) onClose();
+        else setDragY(0);
+    };
+
     if (!open) return null;
     return (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={title}>
             <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-            <div className="relative bg-slate-900 rounded-t-3xl shadow-2xl animate-slide-up border-t border-slate-700 max-h-[85vh] flex flex-col">
-                <div className="shrink-0 px-5 pt-3 pb-2">
+            <div
+                className="relative bg-slate-900 rounded-t-3xl shadow-2xl animate-slide-up border-t border-slate-700 max-h-[85vh] flex flex-col"
+                style={{
+                    transform: dragY ? `translateY(${dragY}px)` : undefined,
+                    transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.32, 0.72, 0, 1)',
+                }}
+            >
+                <div
+                    className="shrink-0 px-5 pt-3 pb-2 touch-none cursor-grab active:cursor-grabbing"
+                    onTouchStart={onDragStart}
+                    onTouchMove={onDragMove}
+                    onTouchEnd={onDragEnd}
+                    onTouchCancel={onDragEnd}
+                >
                     <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4" />
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -165,7 +237,9 @@ const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string; icon?
                         </button>
                     </div>
                 </div>
-                <div className="overflow-y-auto px-5 pb-8 pt-2">{children}</div>
+                <div className="overflow-y-auto px-5 pt-2" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+                    {children}
+                </div>
             </div>
         </div>
     );
@@ -713,8 +787,18 @@ const MobileCatalog: React.FC = () => {
     };
 
     /* ── Acciones ── */
+
+    /** Recarga volviendo al principio. Solo para gestos que ya parten de arriba:
+     *  tirar para actualizar y el botón de reintentar. */
     const handleRefresh = async () => {
         setPage(1);
+        await refreshCatalog();
+    };
+
+    /** Recarga sin mover al usuario de sitio. Tras editar, eliminar o subir una foto
+     *  la lista se refresca pero se mantienen las páginas ya cargadas: antes se volvía
+     *  a la primera y el usuario perdía su posición después de cada operación. */
+    const refreshInPlace = async () => {
         await refreshCatalog();
     };
 
@@ -758,7 +842,7 @@ const MobileCatalog: React.FC = () => {
             } else {
                 notify('Repuesto eliminado');
             }
-            handleRefresh();
+            refreshInPlace();
         } catch (error: any) {
             alert('Error: ' + error.message);
         }
@@ -772,7 +856,7 @@ const MobileCatalog: React.FC = () => {
             const { error } = await supabase.from('products').insert([{ ...rest, sku: newSku.trim(), is_active: true }]);
             if (error) throw error;
             notify(`Creado ${newSku.trim()}`);
-            handleRefresh();
+            refreshInPlace();
         } catch (error: any) {
             alert('No se pudo duplicar: ' + error.message);
         }
@@ -861,7 +945,7 @@ const MobileCatalog: React.FC = () => {
 
             buzz(60);
             notify(`Foto actualizada en ${prod.sku}`);
-            await handleRefresh();
+            await refreshInPlace();
         } catch (err: any) {
             alert('No se pudo subir la foto: ' + err.message);
         } finally {
@@ -919,7 +1003,7 @@ const MobileCatalog: React.FC = () => {
             notify(`${selectedProducts.length} repuestos eliminados`);
             setSelectedIds(new Set());
             setIsBulkSheetOpen(false);
-            handleRefresh();
+            refreshInPlace();
         } catch (error: any) {
             alert('Error: ' + error.message);
         }
@@ -1009,7 +1093,7 @@ const MobileCatalog: React.FC = () => {
 
             {/* ── TOAST ── */}
             {toast && (
-                <div role="status" className="fixed bottom-[168px] left-4 right-4 z-[70] bg-slate-100 text-slate-900 py-3 px-4 rounded-xl shadow-2xl flex items-center gap-2 font-semibold text-sm animate-slide-up">
+                <div role="status" style={{ bottom: 'calc(168px + env(safe-area-inset-bottom))' }} className="fixed left-4 right-4 z-[70] bg-slate-100 text-slate-900 py-3 px-4 rounded-xl shadow-2xl flex items-center gap-2 font-semibold text-sm animate-slide-up">
                     <Check size={18} className="text-emerald-600 shrink-0" aria-hidden="true" />
                     <span className="leading-snug">{toast}</span>
                 </div>
@@ -1155,7 +1239,8 @@ const MobileCatalog: React.FC = () => {
             {showScrollTop && selectedIds.size === 0 && (
                 <button
                     onClick={scrollToTop}
-                    className="fixed right-4 bottom-[216px] z-30 w-11 h-11 rounded-full bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-200 shadow-lg flex items-center justify-center active:bg-slate-700 animate-fade-in"
+                    style={{ bottom: 'calc(216px + env(safe-area-inset-bottom))' }}
+                    className="fixed right-4 z-30 w-11 h-11 rounded-full bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-200 shadow-lg flex items-center justify-center active:bg-slate-700 animate-fade-in"
                     aria-label="Volver arriba"
                 >
                     <ArrowUp size={20} aria-hidden="true" />
@@ -1168,12 +1253,13 @@ const MobileCatalog: React.FC = () => {
                 mano cada vez, que es justo lo que hace incómodo el uso prolongado. */}
             {selectedIds.size === 0 ? (
                 /*
-                    `bottom-[108px]`: la barra de navegación mide ~91px y su botón
-                    central de impresión sobresale por encima (`-top-5`), llegando a
-                    unos 100px. A menos altura, la barra de herramientas quedaría
-                    partida por ese botón justo en el centro.
+                    108px: la barra de navegación mide ~91px y su botón central de
+                    impresión sobresale por encima (`-top-5`), llegando a unos 100px.
+                    A menos altura, la barra de herramientas quedaría partida por ese
+                    botón justo en el centro. Se le suma la zona de gestos del sistema,
+                    que empuja la barra de navegación hacia arriba.
                 */
-                <div className="fixed bottom-[108px] inset-x-0 z-30 px-4">
+                <div style={{ bottom: 'calc(108px + env(safe-area-inset-bottom))' }} className="fixed inset-x-0 z-30 px-4">
                     <div className="max-w-md mx-auto flex gap-2">
                         <button
                             onClick={() => setIsFiltersOpen(true)}
@@ -1205,7 +1291,7 @@ const MobileCatalog: React.FC = () => {
                 </div>
             ) : (
                 /* ── BARRA DE SELECCIÓN ── */
-                <div className="fixed bottom-[108px] inset-x-0 z-30 px-4 animate-slide-up">
+                <div style={{ bottom: 'calc(108px + env(safe-area-inset-bottom))' }} className="fixed inset-x-0 z-30 px-4 animate-slide-up">
                     <div className="max-w-md mx-auto flex items-center gap-2 bg-amber-500 rounded-xl p-2 shadow-2xl">
                         <span className="pl-2 font-bold text-sm text-slate-950 tabular-nums shrink-0">
                             {selectedIds.size} sel.
@@ -1378,14 +1464,14 @@ const MobileCatalog: React.FC = () => {
             </Sheet>
 
             {/* ── MODALES COMPARTIDOS CON ESCRITORIO ── */}
-            {isModalOpen && <ProductModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={handleRefresh} productToEdit={productToEdit} />}
+            {isModalOpen && <ProductModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={refreshInPlace} productToEdit={productToEdit} />}
             {isGroupModalOpen && groupModalProduct && (
                 <ProductGroupModal
                     isOpen={isGroupModalOpen}
                     onClose={() => { setIsGroupModalOpen(false); setSelectedGroupId(null); setGroupModalProduct(null); }}
                     groupId={selectedGroupId}
                     initialProduct={groupModalProduct}
-                    onSuccess={handleRefresh}
+                    onSuccess={refreshInPlace}
                     onEditProduct={(p: any) => { setIsGroupModalOpen(false); setProductToEdit(p); setIsModalOpen(true); }}
                 />
             )}
@@ -1405,7 +1491,7 @@ const MobileCatalog: React.FC = () => {
                 <QuickTagAssignModal
                     isOpen={!!selectedProductForTags}
                     onClose={() => setSelectedProductForTags(null)}
-                    onSuccess={handleRefresh}
+                    onSuccess={refreshInPlace}
                     productId={selectedProductForTags.id}
                     productName={selectedProductForTags.name}
                 />
@@ -1417,14 +1503,14 @@ const MobileCatalog: React.FC = () => {
                     isOpen={!!sourcingProduct}
                     onClose={() => setSourcingProduct(null)}
                     product={sourcingProduct}
-                    onSuccess={handleRefresh}
+                    onSuccess={refreshInPlace}
                 />
             )}
             {isBulkEditOpen && (
                 <BulkEditModal
                     isOpen={isBulkEditOpen}
                     onClose={() => setIsBulkEditOpen(false)}
-                    onSuccess={() => { setSelectedIds(new Set()); handleRefresh(); }}
+                    onSuccess={() => { setSelectedIds(new Set()); refreshInPlace(); }}
                     selectedProducts={selectedProducts}
                 />
             )}

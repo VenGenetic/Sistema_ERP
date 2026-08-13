@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { ChevronRight, History, Mic, MicOff, ScanLine, Search, TrendingUp, X } from 'lucide-react';
 import { getSuggestions } from '../../utils/mobileSearchEngine';
 
 declare global {
@@ -153,13 +154,13 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
             <div className={`relative flex items-center transition-all duration-300 rounded-2xl border ${
                 isFocused
                     ? 'bg-slate-900 border-amber-500 shadow-lg ring-2 ring-amber-500/20'
-                    : 'bg-slate-900/90 border-slate-700 shadow-sm hover:border-slate-600'
+                    : 'bg-slate-900/90 border-slate-700 shadow-sm'
             }`}>
                 {/* Icono Lupa o Escaner */}
                 <div className="pl-4 text-slate-400 flex items-center pointer-events-none">
-                    <span className="material-symbols-outlined text-[24px]">
-                        {localValue ? 'search' : 'qr_code_scanner'}
-                    </span>
+                    {localValue
+                        ? <Search size={22} aria-hidden="true" />
+                        : <ScanLine size={22} aria-hidden="true" />}
                 </div>
 
                 {/*
@@ -197,8 +198,9 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                             onClick={handleClearClick}
                             className="p-2 text-slate-400 active:text-white rounded-full active:bg-slate-700 transition-colors flex items-center justify-center active:scale-90"
                             title="Limpiar"
+                            aria-label="Limpiar búsqueda"
                         >
-                            <span className="material-symbols-outlined text-[20px]">close</span>
+                            <X size={19} aria-hidden="true" />
                         </button>
                     )}
 
@@ -213,13 +215,15 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                             className={`p-2 rounded-xl transition-all flex items-center justify-center active:scale-90 ${
                                 isListening
                                     ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 animate-pulse'
-                                    : 'text-slate-400 hover:text-amber-400 hover:bg-slate-700'
+                                    : 'text-slate-400 active:text-amber-400 active:bg-slate-700'
                             }`}
                             title="Buscar por voz"
+                            aria-label={isListening ? 'Detener búsqueda por voz' : 'Buscar por voz'}
+                            aria-pressed={isListening}
                         >
-                            <span className="material-symbols-outlined text-[22px]">
-                                {isListening ? 'mic_off' : 'mic'}
-                            </span>
+                            {isListening
+                                ? <MicOff size={21} aria-hidden="true" />
+                                : <Mic size={21} aria-hidden="true" />}
                         </button>
                     )}
                 </div>
@@ -239,7 +243,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                     {!localValue ? (
                         <div className="p-4">
                             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                                <span className="material-symbols-outlined text-[16px]">trending_up</span>
+                                <TrendingUp size={15} aria-hidden="true" />
                                 Búsqueda Rápida / Populares
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -248,7 +252,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                                         key={term}
                                         type="button"
                                         onClick={() => handleSuggestionClick(term)}
-                                        className="px-3.5 py-2 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 text-sm font-semibold rounded-xl transition-all active:scale-95 border border-slate-700 shadow-xs"
+                                        className="px-3.5 py-2 bg-slate-800 active:bg-amber-500 active:text-slate-950 text-slate-200 text-sm font-semibold rounded-xl transition-all active:scale-95 border border-slate-700 shadow-xs"
                                     >
                                         {term}
                                     </button>
@@ -271,23 +275,25 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                                             key={index}
                                             type="button"
                                             onClick={() => handleSuggestionClick(sugerencia)}
-                                            className="w-full text-left px-4 py-3 hover:bg-slate-800/80 flex items-center gap-3 group transition-colors border-l-4 border-transparent hover:border-amber-500 active:bg-slate-700"
+                                            className="w-full text-left px-4 py-3 flex items-center gap-3 group transition-colors border-l-4 border-transparent active:bg-slate-700 active:border-amber-500"
                                         >
                                             <div className={`p-1.5 rounded-xl flex items-center justify-center ${
-                                                isCode ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400 group-hover:text-amber-400'
+                                                isCode ? 'bg-amber-500/10 text-amber-400' : 'bg-slate-800 text-slate-400'
                                             }`}>
-                                                <span className="material-symbols-outlined text-[18px]">
-                                                    {isCode ? 'history' : 'search'}
-                                                </span>
+                                                {isCode
+                                                    ? <History size={17} aria-hidden="true" />
+                                                    : <Search size={17} aria-hidden="true" />}
                                             </div>
                                             <span className={`flex-1 text-sm ${
                                                 isCode ? 'font-mono font-bold text-amber-400' : 'text-slate-200 font-semibold'
                                             }`}>
                                                 {sugerencia.replace(/"/g, '')}
                                             </span>
-                                            <span className="material-symbols-outlined text-slate-600 group-hover:text-amber-400 text-[18px] transition-transform group-hover:translate-x-1">
-                                                chevron_right
-                                            </span>
+                                            <ChevronRight
+                                                size={17}
+                                                className="text-slate-600 transition-transform group-active:translate-x-1 group-active:text-amber-400"
+                                                aria-hidden="true"
+                                            />
                                         </button>
                                     );
                                 })}

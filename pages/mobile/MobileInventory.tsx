@@ -3,6 +3,12 @@ import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
 import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngine';
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
+import { AlertCircle, CheckCircle2, ImageOff, Minus, Package, Plus, SearchX } from 'lucide-react';
+
+const LAST_WAREHOUSE_KEY = 'mobile:lastWarehouseId';
+
+/** Saltos de cantidad más habituales al recibir o sacar mercadería. */
+const STEP_PRESETS = [1, 5, 10];
 
 const MobileInventory: React.FC = () => {
     const { products: allProducts, loading: catalogLoading } = useMobileProducts();
@@ -12,6 +18,8 @@ const MobileInventory: React.FC = () => {
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    // Unidades que mueve cada pulsación. Recibir 20 piezas eran 20 toques.
+    const [step, setStep] = useState(1);
 
     // Fetch Warehouses
     useEffect(() => {
@@ -19,11 +27,20 @@ const MobileInventory: React.FC = () => {
             const { data } = await supabase.from('warehouses').select('*').order('id');
             if (data && data.length > 0) {
                 setWarehouses(data);
-                setSelectedWarehouseId(data[0].id.toString());
+                // Se recuerda el último almacén: en bodega siempre se trabaja en el mismo
+                // y volver a elegirlo en cada repuesto era trabajo repetido.
+                const remembered = localStorage.getItem(LAST_WAREHOUSE_KEY);
+                const isValid = remembered && data.some(w => w.id.toString() === remembered);
+                setSelectedWarehouseId(isValid ? remembered! : data[0].id.toString());
             }
         };
         fetchWarehouses();
     }, []);
+
+    const handleWarehouseChange = (id: string) => {
+        setSelectedWarehouseId(id);
+        localStorage.setItem(LAST_WAREHOUSE_KEY, id);
+    };
 
     // Búsqueda inteligente
     const matchedProducts = useMemo(() => {
@@ -50,13 +67,24 @@ const MobileInventory: React.FC = () => {
         }
     }, [matchedProducts, searchTerm]);
 
+    // Los avisos se retiran solos. El error antes se quedaba pegado hasta cambiar de
+    // producto, porque solo el mensaje de éxito tenía temporizador.
+    useEffect(() => {
+        if (!message) return;
+        const timer = setTimeout(() => setMessage(null), message.type === 'success' ? 2000 : 4000);
+        return () => clearTimeout(timer);
+    }, [message]);
+
     const handleMovement = async (type: 'IN' | 'OUT') => {
         if (!selectedProduct || !selectedWarehouseId) return;
 
         setProcessing(true);
         setMessage(null);
         try {
-            const qtyChange = type === 'IN' ? 1 : -1;
+            // Nunca se saca más de lo que hay: con salto 10 y 3 en almacén, salen 3.
+            const amount = type === 'IN' ? step : Math.min(step, currentStockInSelectedWarehouse);
+            if (amount <= 0) return;
+            const qtyChange = type === 'IN' ? amount : -amount;
             const { error } = await supabase.rpc('process_inventory_movement', {
                 p_product_id: parseInt(selectedProduct.id),
                 p_warehouse_id: parseInt(selectedWarehouseId),
@@ -68,15 +96,19 @@ const MobileInventory: React.FC = () => {
 
             if (error) throw error;
 
-            // Optimistic update
+            // Optimistic update.
+            // Cada nivel se reemplaza por un objeto nuevo: los productos vienen de la caché
+            // compartida de useMobileProducts, así que mutarlos en sitio corrompía el stock
+            // que ve el catálogo sin que nada lo volviera a refrescar.
             setSelectedProduct((prev: any) => {
                 if (!prev) return prev;
-                const levels = [...(prev.inventory_levels || [])];
                 const wId = parseInt(selectedWarehouseId);
-                const idx = levels.findIndex(l => l.warehouse_id === wId);
-                if (idx >= 0) {
-                    levels[idx].current_stock += qtyChange;
-                } else {
+                const levels = (prev.inventory_levels || []).map((l: any) =>
+                    l.warehouse_id === wId
+                        ? { ...l, current_stock: (l.current_stock || 0) + qtyChange }
+                        : l
+                );
+                if (!levels.some((l: any) => l.warehouse_id === wId)) {
                     levels.push({ warehouse_id: wId, current_stock: qtyChange > 0 ? qtyChange : 0 });
                 }
                 return { ...prev, inventory_levels: levels };
@@ -86,8 +118,7 @@ const MobileInventory: React.FC = () => {
                 navigator.vibrate(type === 'IN' ? 50 : [50, 50, 50]);
             }
 
-            setMessage({ type: 'success', text: `Stock actualizado (${type === 'IN' ? '+1' : '-1'})` });
-            setTimeout(() => setMessage(null), 2000);
+            setMessage({ type: 'success', text: `Stock actualizado (${qtyChange > 0 ? '+' : ''}${qtyChange})` });
         } catch (err: any) {
             console.error(err);
             setMessage({ type: 'error', text: 'Error al actualizar stock' });
@@ -101,12 +132,12 @@ const MobileInventory: React.FC = () => {
     const imageUrl = selectedProduct?.image_url ? getThumbnailUrl(selectedProduct.image_url, 300) : null;
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-950 animate-fade-in pb-28 font-sans">
+        <div className="flex flex-col min-h-full bg-slate-950 animate-fade-in pb-28 font-sans">
             {/* Header */}
             <div className="bg-slate-900 border-b border-slate-800 rounded-b-[36px] px-6 pt-8 pb-6 shadow-lg shadow-black/20 mb-3 text-white relative overflow-hidden z-20">
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl"></div>
                 <h1 className="text-3xl font-extrabold mb-1 relative z-10 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-3xl text-cyan-400 font-variation-fill-1">inventory_2</span>
+                    <Package size={30} className="text-cyan-400" aria-hidden="true" />
                     Inventario Móvil
                 </h1>
                 <p className="text-slate-400 text-xs font-semibold relative z-10">Ajuste rápido en almacén. Escanea código o busca repuesto.</p>
@@ -141,9 +172,9 @@ const MobileInventory: React.FC = () => {
                             ? 'bg-emerald-500 text-white border border-emerald-400'
                             : 'bg-rose-500 text-white border border-rose-400'
                     }`}>
-                        <span className="material-symbols-outlined">
-                            {message.type === 'success' ? 'check_circle' : 'error'}
-                        </span>
+                        {message.type === 'success'
+                            ? <CheckCircle2 size={20} aria-hidden="true" />
+                            : <AlertCircle size={20} aria-hidden="true" />}
                         {message.text}
                     </div>
                 )}
@@ -160,13 +191,13 @@ const MobileInventory: React.FC = () => {
                                 <div
                                     key={prod.id}
                                     onClick={() => setSelectedProduct(prod)}
-                                    className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center gap-3.5 shadow-xs cursor-pointer active:scale-95 transition-all hover:border-cyan-500/50"
+                                    className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center gap-3.5 shadow-xs cursor-pointer active:scale-95 active:border-cyan-500/50 transition-all"
                                 >
                                     {prod.image_url ? (
                                         <img src={getThumbnailUrl(prod.image_url, 150)} alt={prod.name} loading="lazy" className="w-12 h-12 rounded-xl object-cover border border-slate-700 shrink-0" />
                                     ) : (
                                         <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 shrink-0">
-                                            <span className="material-symbols-outlined text-xl">image</span>
+                                            <ImageOff size={20} aria-hidden="true" />
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0">
@@ -190,7 +221,7 @@ const MobileInventory: React.FC = () => {
                 {/* Si no hay resultados */}
                 {searchTerm.trim().length >= 2 && matchedProducts.length === 0 && !catalogLoading && (
                     <div className="text-center py-12 px-6 text-slate-400 bg-slate-900 rounded-3xl border border-slate-800 my-4 shadow-sm">
-                        <span className="material-symbols-outlined text-5xl opacity-40 mb-2">search_off</span>
+                        <SearchX size={48} className="opacity-40 mb-2 mx-auto" aria-hidden="true" />
                         <p className="font-bold text-sm text-slate-200">Producto no encontrado</p>
                         <p className="text-xs text-slate-400 mt-1 max-w-[240px] mx-auto">Verifica las palabras clave o el código SKU. El buscador inteligente busca por doble filtro.</p>
                     </div>
@@ -205,7 +236,7 @@ const MobileInventory: React.FC = () => {
                             <select
                                 className="w-full bg-transparent p-1.5 text-slate-100 font-extrabold outline-none focus:ring-0 border-none text-right cursor-pointer"
                                 value={selectedWarehouseId}
-                                onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                                onChange={(e) => handleWarehouseChange(e.target.value)}
                             >
                                 {warehouses.map(w => (
                                     <option key={w.id} value={w.id} className="bg-slate-800 text-slate-100">
@@ -231,7 +262,7 @@ const MobileInventory: React.FC = () => {
                                 {imageUrl ? (
                                     <img src={imageUrl} alt={selectedProduct.name} className="w-full h-full object-contain" />
                                 ) : (
-                                    <span className="material-symbols-outlined text-5xl text-slate-600">image</span>
+                                    <ImageOff size={48} className="text-slate-600" aria-hidden="true" />
                                 )}
                             </div>
 
@@ -242,15 +273,45 @@ const MobileInventory: React.FC = () => {
                                 {selectedProduct.name}
                             </h2>
 
+                            {/* Salto de cantidad */}
+                            <div className="w-full mt-5 flex items-center justify-center gap-2">
+                                <span className="text-[11px] text-slate-500 font-extrabold uppercase tracking-widest">Por toque</span>
+                                {STEP_PRESETS.map((preset) => (
+                                    <button
+                                        key={preset}
+                                        type="button"
+                                        onClick={() => setStep(preset)}
+                                        aria-pressed={step === preset}
+                                        className={`min-w-[44px] min-h-[38px] px-3 rounded-xl text-sm font-black border transition-colors ${
+                                            step === preset
+                                                ? 'bg-cyan-500 border-cyan-400 text-slate-950'
+                                                : 'bg-slate-800 border-slate-700 text-slate-300 active:bg-slate-700'
+                                        }`}
+                                    >
+                                        {preset}
+                                    </button>
+                                ))}
+                                <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={1}
+                                    value={step}
+                                    onChange={(e) => setStep(Math.max(1, parseInt(e.target.value) || 1))}
+                                    aria-label="Cantidad personalizada por toque"
+                                    className="w-16 min-h-[38px] px-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-center text-sm font-black outline-none focus:border-cyan-500"
+                                />
+                            </div>
+
                             {/* Stock Controls */}
-                            <div className="w-full mt-6 bg-slate-950/60 p-4 rounded-3xl flex items-center justify-between border border-slate-800 shadow-inner">
+                            <div className="w-full mt-3 bg-slate-950/60 p-4 rounded-3xl flex items-center justify-between border border-slate-800 shadow-inner">
                                 <button
                                     type="button"
                                     onClick={() => handleMovement('OUT')}
                                     disabled={processing || currentStockInSelectedWarehouse <= 0}
                                     className="w-16 h-16 rounded-2xl bg-slate-800 shadow-md border border-rose-500/30 flex items-center justify-center text-rose-400 active:scale-90 transition-transform disabled:opacity-30 disabled:active:scale-100"
+                                    aria-label={`Sacar ${step} del almacén`}
                                 >
-                                    <span className="material-symbols-outlined text-4xl font-extrabold">remove</span>
+                                    <Minus size={36} strokeWidth={3} aria-hidden="true" />
                                 </button>
 
                                 <div className="flex flex-col items-center">
@@ -265,9 +326,10 @@ const MobileInventory: React.FC = () => {
                                     type="button"
                                     onClick={() => handleMovement('IN')}
                                     disabled={processing}
-                                    className="w-16 h-16 rounded-2xl bg-cyan-500 hover:bg-cyan-400 shadow-lg shadow-cyan-500/30 flex items-center justify-center text-slate-950 active:scale-90 transition-transform disabled:opacity-50 disabled:active:scale-100"
+                                    className="w-16 h-16 rounded-2xl bg-cyan-500 active:bg-cyan-400 shadow-lg shadow-cyan-500/30 flex items-center justify-center text-slate-950 active:scale-90 transition-transform disabled:opacity-50 disabled:active:scale-100"
+                                    aria-label={`Ingresar ${step} al almacén`}
                                 >
-                                    <span className="material-symbols-outlined text-4xl font-black">add</span>
+                                    <Plus size={36} strokeWidth={3} aria-hidden="true" />
                                 </button>
                             </div>
                         </div>

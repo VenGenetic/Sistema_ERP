@@ -65,6 +65,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               id,
               role_id,
               current_session_id,
+              full_name,
+              nickname,
               roles (
                 name,
                 permissions

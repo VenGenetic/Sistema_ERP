@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { cn, modal } from './styles';
 
 const FOCUSABLE =
@@ -33,7 +34,8 @@ export interface ModalProps {
  *   - atrapa el Tab dentro del panel;
  *   - devuelve el foco al elemento que lo abrió al cerrarse;
  *   - enfoca el primer control al abrir;
- *   - cierra con Escape.
+ *   - cierra con Escape;
+ *   - cierra con el botón «atrás» del teléfono en vez de dejar la pantalla.
  */
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -51,6 +53,10 @@ export const Modal: React.FC<ModalProps> = ({
   const panelRef = React.useRef<HTMLDivElement>(null);
   const restoreFocusRef = React.useRef<HTMLElement | null>(null);
   const titleId = React.useId();
+
+  // El «atrás» del teléfono se trata igual que Escape: los flujos que no deben
+  // abortarse (dismissOnEscape={false}) tampoco se cierran por gesto.
+  useBackDismiss(isOpen && dismissOnEscape, onClose);
 
   // Bloqueo de scroll del documento mientras haya algún modal abierto.
   React.useEffect(() => {
