@@ -55,7 +55,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="p-6 bg-slate-50 border-b border-subtle text-center">
                     <h2 className="text-2xl font-bold text-fg tracking-tight">Cobrar Venta</h2>

@@ -1289,7 +1289,7 @@ const POS: React.FC = () => {
             {/* Customer Lookup Modal */}
             {isCustomerModalOpen && (
                 <div className="fixed inset-0 z-[150] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                    <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90dvh]">
                         <div className="p-4 border-b border-subtle flex justify-between items-center bg-slate-50">
                             <h2 className="font-bold text-fg uppercase tracking-tight">Vincular Cliente al Carrito</h2>
                             <button onClick={() => setIsCustomerModalOpen(false)} className="text-fg-muted hover:text-slate-800 font-bold px-2 py-1 rounded hover:bg-slate-200 transition-colors">

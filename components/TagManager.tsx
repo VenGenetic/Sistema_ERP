@@ -286,7 +286,7 @@ export const TagManager: React.FC<Props> = ({ onClose, embedded }) => {
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md h-[80vh] shadow-xl">
+            <div className="w-full max-w-md h-[80dvh] shadow-xl">
                 {content}
             </div>
         </div>

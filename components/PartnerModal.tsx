@@ -21,7 +21,7 @@ const PartnerModal: React.FC<PartnerModalProps> = ({ isOpen, onClose, partner })
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-surface rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90dvh] animate-in fade-in zoom-in duration-200">
 
                 {/* Header */}
                 <div className="p-6 border-b border-subtle flex justify-between items-center bg-surface-2">

@@ -182,7 +182,7 @@ export const ProformaPanel: React.FC = () => {
 
             {/* Expanded Panel */}
             {isOpen && (
-                <div className="fixed top-6 right-6 z-40 w-[380px] max-h-[70vh] bg-surface rounded-2xl shadow-xl border border-subtle flex flex-col overflow-hidden animate-in slide-in-from-top-4">
+                <div className="fixed top-6 right-6 z-40 w-[380px] max-h-[70dvh] bg-surface rounded-2xl shadow-xl border border-subtle flex flex-col overflow-hidden animate-in slide-in-from-top-4">
                     {/* Panel Header */}
                     <div className="flex items-center justify-between p-4 border-b border-subtle bg-success-soft">
                         <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export const ProformaPanel: React.FC = () => {
                     </div>
 
                     {/* Items */}
-                    <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 max-h-[40vh]">
+                    <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 max-h-[40dvh]">
                         {items.map((item) => (
                             <div key={item.id} className="flex items-center gap-2.5 p-2.5 bg-surface-2 rounded-xl border border-slate-200/60 dark:border-subtle">
                                 <div className="flex-1 min-w-0">

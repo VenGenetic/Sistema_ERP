@@ -438,7 +438,7 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                 </div>
 
                 {/* Table content */}
-                <div className="p-6 overflow-x-auto max-h-[45vh] overflow-y-auto">
+                <div className="p-6 overflow-x-auto max-h-[45dvh] overflow-y-auto">
                     <h4 className="text-xs font-semibold text-fg mb-2 flex items-center gap-1.5">
                         <List size={16} aria-hidden="true" />
                         Repuestos en este grupo ({products.length})

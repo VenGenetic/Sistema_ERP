@@ -345,7 +345,7 @@ export const modal = {
   overlay:
     'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in',
   panel:
-    'w-full bg-surface rounded-2xl shadow-2xl border border-subtle flex flex-col max-h-[90vh] animate-scale-in',
+    'w-full bg-surface rounded-2xl shadow-2xl border border-subtle flex flex-col max-h-[90dvh] animate-scale-in',
 
   width: {
     sm: 'max-w-sm',

@@ -967,7 +967,7 @@ const ProductDemands: React.FC = () => {
                                     <span className="bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded-full text-xs">{colItems.length}</span>
                                 </h3>
                             </div>
-                            <div className="p-3 flex flex-col gap-3 max-h-[70vh] overflow-y-auto">
+                            <div className="p-3 flex flex-col gap-3 max-h-[70dvh] overflow-y-auto">
                                 {colItems.map(demand => (
                                     <div
                                         key={demand.id}

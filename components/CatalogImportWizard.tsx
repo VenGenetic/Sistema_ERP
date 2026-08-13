@@ -316,7 +316,7 @@ export const CatalogImportWizard: React.FC<CatalogImportWizardProps> = ({ isOpen
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-surface rounded-2xl shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden border border-subtle">
+            <div className="bg-surface rounded-2xl shadow-xl w-full max-w-6xl h-[90dvh] flex flex-col overflow-hidden border border-subtle">
 
                 {/* ═══════ TOP BAR ═══════ */}
                 <div className="p-6 border-b border-subtle flex justify-between items-center bg-surface-2">

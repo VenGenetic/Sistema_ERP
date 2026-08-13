@@ -2254,11 +2254,11 @@ const Products: React.FC = () => {
             <div className="bg-surface border border-subtle rounded-xl shadow-sm overflow-hidden">
                 {viewMode === 'table' ? (
                     /*
-                        `max-h-[70vh]` + `overflow-auto` habilitan la cabecera pegajosa:
+                        `max-h-[70dvh]` + `overflow-auto` habilitan la cabecera pegajosa:
                         con 100 productos por página se perdía de vista qué columna era
                         cuál a mitad de scroll.
                     */
-                    <div className="overflow-auto max-h-[70vh]">
+                    <div className="overflow-auto max-h-[70dvh]">
                         <table className="w-full text-left border-collapse table-fixed">
                             {/*
                                 Anchos declarados. Sin esto el navegador reparte según el
@@ -2732,7 +2732,7 @@ const Products: React.FC = () => {
 
                         {/* Expanded Queue Panel */}
                         {isQueuePanelOpen && (
-                            <div className="fixed bottom-6 right-6 z-40 w-[380px] max-h-[70vh] bg-surface rounded-2xl shadow-xl border border-subtle flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+                            <div className="fixed bottom-6 right-6 z-40 w-[380px] max-h-[70dvh] bg-surface rounded-2xl shadow-xl border border-subtle flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
                                 {/* Panel Header */}
                                 <div className="flex items-center justify-between p-4 border-b border-subtle bg-warning-soft">
                                     <div className="flex items-center gap-2">
@@ -2749,7 +2749,7 @@ const Products: React.FC = () => {
                                 </div>
 
                                 {/* Queue Items */}
-                                <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 max-h-[45vh]">
+                                <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 max-h-[45dvh]">
                                     {printQueue.map((item) => (
                                         <div key={item.sku} className="flex items-center gap-2.5 p-2.5 bg-surface-2 rounded-xl border border-subtle">
                                             <div className="flex-1 min-w-0">

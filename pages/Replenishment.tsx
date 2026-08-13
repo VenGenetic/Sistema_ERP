@@ -974,7 +974,7 @@ const Replenishment: React.FC = () => {
             {isManageDraftsOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsManageDraftsOpen(false)}></div>
-                    <div className="relative bg-surface rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-subtle flex flex-col max-h-[80vh]">
+                    <div className="relative bg-surface rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-subtle flex flex-col max-h-[80dvh]">
                         {/* Header */}
                         <div className="px-5 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
                             <div className="flex items-center gap-2">

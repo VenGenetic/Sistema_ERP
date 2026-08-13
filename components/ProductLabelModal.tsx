@@ -243,7 +243,7 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-            <div className="bg-surface rounded-2xl shadow-lg w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-surface rounded-2xl shadow-lg w-full max-w-3xl overflow-hidden flex flex-col max-h-[90dvh]">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-subtle shrink-0">
                     <h2 className="text-xl font-bold text-fg flex items-center gap-2">

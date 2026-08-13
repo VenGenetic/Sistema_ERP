@@ -213,7 +213,7 @@ const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string; icon?
         <div className="fixed inset-0 z-[60] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={title}>
             <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-fade-in" onClick={onClose} />
             <div
-                className="relative bg-slate-900 rounded-t-3xl shadow-2xl animate-slide-up border-t border-slate-700 max-h-[85vh] flex flex-col"
+                className="relative bg-slate-900 rounded-t-3xl shadow-2xl animate-slide-up border-t border-slate-700 max-h-[85dvh] flex flex-col"
                 style={{
                     transform: dragY ? `translateY(${dragY}px)` : undefined,
                     transition: dragY ? 'none' : 'transform 220ms cubic-bezier(0.32, 0.72, 0, 1)',
@@ -669,6 +669,7 @@ const MobileCatalog: React.FC = () => {
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const cameraProductRef = useRef<any>(null);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [loadingEdit, setLoadingEdit] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -809,6 +810,26 @@ const MobileCatalog: React.FC = () => {
             setCopiedSku(sku);
             setTimeout(() => setCopiedSku(prev => (prev === sku ? null : prev)), 2000);
         });
+    };
+
+    /**
+     * La lista solo trae las columnas que usa la tarjeta (ver useMobileProducts).
+     * ProductModal necesita la fila completa: si le faltan margen, stock mínimo,
+     * marca, etc., los inicializa con sus valores por defecto y el guardado los
+     * sobreescribe en la base de datos. Se pide la fila entera justo antes de
+     * abrir el editor — una sola fila, no pesa nada — en vez de arrastrar esos
+     * campos en cada carga del catálogo completo.
+     */
+    const handleEditProduct = async (prod: any) => {
+        if (loadingEdit) return;
+        setLoadingEdit(true);
+        try {
+            const { data, error } = await supabase.from('products').select('*').eq('id', prod.id).single();
+            setProductToEdit(error || !data ? prod : data);
+        } finally {
+            setLoadingEdit(false);
+            setIsModalOpen(true);
+        }
     };
 
     const handleOpenLightbox = (prod: any) => {
@@ -1028,7 +1049,7 @@ const MobileCatalog: React.FC = () => {
     */
     const handlersRef = useRef<Record<string, (prod: any) => void>>({});
     handlersRef.current = {
-        edit: (prod) => { setProductToEdit(prod); setIsModalOpen(true); },
+        edit: (prod) => handleEditProduct(prod),
         proforma: handleAddToProforma,
         queue: (prod) => { setQueueSheetProduct(prod); setQueueSheetQty(1); },
         print: (prod) => handleQuickPrint(prod, { stopPropagation() {} } as any),
@@ -1103,6 +1124,13 @@ const MobileCatalog: React.FC = () => {
                 <div className="fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
                     <Loader2 size={32} className="animate-spin text-amber-400" aria-hidden="true" />
                     <span className="text-sm font-semibold text-slate-300">Subiendo foto…</span>
+                </div>
+            )}
+
+            {loadingEdit && (
+                <div className="fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+                    <Loader2 size={32} className="animate-spin text-amber-400" aria-hidden="true" />
+                    <span className="text-sm font-semibold text-slate-300">Cargando repuesto…</span>
                 </div>
             )}
 
@@ -1472,7 +1500,7 @@ const MobileCatalog: React.FC = () => {
                     groupId={selectedGroupId}
                     initialProduct={groupModalProduct}
                     onSuccess={refreshInPlace}
-                    onEditProduct={(p: any) => { setIsGroupModalOpen(false); setProductToEdit(p); setIsModalOpen(true); }}
+                    onEditProduct={(p: any) => { setIsGroupModalOpen(false); handleEditProduct(p); }}
                 />
             )}
             {lightbox.isOpen && (

@@ -8,7 +8,7 @@ const Tags: React.FC = () => {
                 <h1 className="text-2xl font-bold dark:text-white tracking-tight">Etiquetas</h1>
                 <p className="text-fg-muted mt-1">Gestiona las etiquetas (tags) para categorizar y organizar los repuestos del catálogo.</p>
             </div>
-            <div className="h-[70vh] border border-subtle rounded-xl overflow-hidden shadow-sm">
+            <div className="h-[70dvh] border border-subtle rounded-xl overflow-hidden shadow-sm">
                 <TagManager embedded={true} />
             </div>
         </div>

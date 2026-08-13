@@ -205,7 +205,7 @@ export const BulkMediaUploadModal: React.FC<BulkMediaUploadModalProps> = ({ isOp
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="bg-surface rounded-xl shadow-xl w-full max-w-4xl overflow-hidden border border-subtle flex flex-col max-h-[90vh]">
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-4xl overflow-hidden border border-subtle flex flex-col max-h-[90dvh]">
                 {/* Header */}
                 <div className="p-5 border-b border-subtle flex justify-between items-center bg-surface-2">
                     <div className="flex items-center gap-3">

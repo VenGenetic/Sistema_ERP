@@ -242,7 +242,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
 
             {/* Media Content */}
             <div
-                className="w-full h-full max-w-6xl max-h-[85vh] p-8 flex items-center justify-center animate-in fade-in zoom-in-95 duration-300 touch-pan-y"
+                className="w-full h-full max-w-6xl max-h-[85dvh] p-8 flex items-center justify-center animate-in fade-in zoom-in-95 duration-300 touch-pan-y"
                 onClick={(e) => e.stopPropagation()} // Prevent click from closing when clicking inside media area
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}

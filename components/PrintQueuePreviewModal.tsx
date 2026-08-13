@@ -201,7 +201,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
             className={`fixed inset-0 z-50 flex ${ isMobile ? 'flex-col bg-surface-2 w-full h-full' : 'items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4' }`}
         >
             <div 
-                className={`bg-surface flex flex-col overflow-hidden shadow-2xl ${ isMobile ? 'w-full h-full border-none rounded-none' : 'w-full max-w-6xl max-h-[90vh] rounded-3xl border border-subtle dark:border-slate-800' }`}
+                className={`bg-surface flex flex-col overflow-hidden shadow-2xl ${ isMobile ? 'w-full h-full border-none rounded-none' : 'w-full max-w-6xl max-h-[90dvh] rounded-3xl border border-subtle dark:border-slate-800' }`}
             >
                 {/* ── Header ────────────────────────────────────────── */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-subtle bg-gradient-to-r from-slate-50 to-slate-100/50 shrink-0">

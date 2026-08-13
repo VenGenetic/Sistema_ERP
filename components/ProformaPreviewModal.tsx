@@ -102,7 +102,7 @@ export const ProformaPreviewModal: React.FC<ProformaPreviewModalProps> = ({ isOp
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-surface rounded-xl shadow-xl w-full max-w-[750px] max-h-[90vh] overflow-y-auto">
+            <div className="bg-surface rounded-xl shadow-xl w-full max-w-[750px] max-h-[90dvh] overflow-y-auto">
 
                 {/* Header */}
                 <div className="sticky top-0 z-10 px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">

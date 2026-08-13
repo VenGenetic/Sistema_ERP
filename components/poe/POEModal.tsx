@@ -286,7 +286,7 @@ export const POEModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-2 md:p-6 animate-in fade-in duration-150 overflow-y-auto">
-      <div className="bg-surface border border-subtle rounded-2xl w-full max-w-5xl h-[92vh] flex flex-col shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-surface border border-subtle rounded-2xl w-full max-w-5xl h-[92dvh] flex flex-col shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* BARRA SUPERIOR DEL MODAL */}
         <div className="px-6 py-4 border-b border-subtle flex flex-wrap items-center justify-between gap-4 bg-slate-50/70 dark:bg-[#111720]/80">

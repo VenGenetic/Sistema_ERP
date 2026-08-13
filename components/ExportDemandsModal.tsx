@@ -197,7 +197,7 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col w-[500px] border border-subtle max-h-[90vh]">
+            <div className="bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col w-[500px] border border-subtle max-h-[90dvh]">
                 
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">

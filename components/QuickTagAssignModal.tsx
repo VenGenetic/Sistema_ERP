@@ -106,7 +106,7 @@ export const QuickTagAssignModal: React.FC<QuickTagAssignModalProps> = ({ isOpen
                     </button>
                 </div>
                 
-                <div className="p-4 max-h-[60vh] overflow-y-auto">
+                <div className="p-4 max-h-[60dvh] overflow-y-auto">
                     {loading ? (
                         <div className="flex justify-center py-6">
                             <Loader2 size={18} className="animate-spin text-primary" aria-hidden="true" />

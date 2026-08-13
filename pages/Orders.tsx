@@ -384,7 +384,7 @@ const OrdersPipeline: React.FC = () => {
             {isModalOpen && selectedOrder && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-                    <div className="relative bg-surface rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-subtle">
+                    <div className="relative bg-surface rounded-xl shadow-xl w-full max-w-5xl max-h-[90dvh] flex flex-col overflow-hidden border border-subtle">
                         {/* Modal Header */}
                         <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
                             <h2 className="text-lg font-bold text-fg flex items-center gap-2">

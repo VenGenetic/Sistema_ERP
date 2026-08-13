@@ -12,7 +12,7 @@ import { cn, table } from './styles';
  */
 export const TableWrapper: React.FC<{
   className?: string;
-  /** Alto máximo; habilita la cabecera pegajosa. Ej. "max-h-[70vh]". */
+  /** Alto máximo; habilita la cabecera pegajosa. Ej. "max-h-[70dvh]". */
   maxHeight?: string;
   children: React.ReactNode;
 }> = ({ className, maxHeight, children }) => (

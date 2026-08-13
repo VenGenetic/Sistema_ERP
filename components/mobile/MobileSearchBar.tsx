@@ -237,7 +237,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                     fichas `bg-slate-800`). Con el tema claro el panel salía blanco
                     y las coincidencias resultaban ilegibles encima.
                 */
-                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-slide-down origin-top max-h-[65vh] overflow-y-auto">
+                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-slide-down origin-top max-h-[65dvh] overflow-y-auto">
                     
                     {/* Si NO hay búsqueda: Mostrar Populares / Más Buscado */}
                     {!localValue ? (
