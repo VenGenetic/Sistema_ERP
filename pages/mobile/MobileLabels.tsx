@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
-import { printLabelsQuick, addToPrintHistory, getPrintHistory, PrintHistoryItem } from '../../utils/mobileLabelPrinter';
+import { addToPrintHistory, getPrintHistory, PrintHistoryItem } from '../../utils/mobileLabelPrinter';
 import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngine';
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
 import { CheckCircle2, Eye, History, ImageOff, Info, Layers, ListChecks, Plus, Printer, Receipt, SearchX, Trash2, Zap } from 'lucide-react';
@@ -67,23 +67,27 @@ const MobileLabels: React.FC = () => {
 
     const handlePrint = async (prod: any, qty: number) => {
         try {
-            await printLabelsQuick(prod, qty);
+            const updated = await addToQueue(
+                { id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url },
+                qty
+            );
+            setQueue(updated);
             addToPrintHistory(prod, qty);
             loadHistory();
-            
+
             if (navigator.vibrate) {
                 navigator.vibrate(50);
             }
 
-            setSuccessMessage(`✓ ${qty} etiquetas de ${prod.sku} descargadas`);
-            
+            setSuccessMessage(`✓ ${qty} etiqueta${qty !== 1 ? 's' : ''} de ${prod.sku} agregada${qty !== 1 ? 's' : ''} a la cola`);
+
             setTimeout(() => {
                 setSuccessMessage(null);
                 handleClear();
             }, 1500);
         } catch (err) {
-            console.error('Error printing:', err);
-            alert('Error al imprimir etiquetas');
+            console.error('Error al agregar a la cola:', err);
+            alert('Error al agregar a la cola');
         }
     };
 
@@ -128,9 +132,9 @@ const MobileLabels: React.FC = () => {
         return prod.inventory_levels.reduce((acc: number, curr: any) => acc + (curr.current_stock || 0), 0);
     };
 
-    const getCustomQty = (id: string) => customQtyMap[id] || 3;
+    const getCustomQty = (id: string) => customQtyMap[id] || 1;
     const setProductCustomQty = (id: string, val: number) => {
-        setCustomQtyMap(prev => ({ ...prev, [id]: Math.max(3, val) }));
+        setCustomQtyMap(prev => ({ ...prev, [id]: Math.max(1, val) }));
     };
 
     // ── Queue Logic ────────────────────────────────────
@@ -213,7 +217,7 @@ const MobileLabels: React.FC = () => {
                     Impresión de Etiquetas
                 </h1>
                 <p className="text-slate-950/70 text-xs mt-1 font-semibold">
-                    Impresión rápida o arma tu cola de impresión personalizada
+                    Agrega repuestos a la cola, rápido o con cantidad personalizada
                 </p>
             </div>
 
@@ -301,7 +305,7 @@ const MobileLabels: React.FC = () => {
                             <div className="animate-fade-in flex flex-col gap-4 my-1">
                                 <div className="flex items-center justify-between px-1 text-xs font-extrabold text-slate-400 uppercase tracking-wider">
                                     <span>{matchedProducts.length} repuesto(s) encontrado(s)</span>
-                                    <span className="text-emerald-400">Listo para imprimir</span>
+                                    <span className="text-emerald-400">Listo para agregar</span>
                                 </div>
 
                                 {matchedProducts.map((prod) => {
@@ -373,7 +377,7 @@ const MobileLabels: React.FC = () => {
                                                 >
                                                     <Printer size={20} aria-hidden="true" />
                                                     <span className="font-black text-base">21</span>
-                                                    <span className="text-[9px] uppercase tracking-tighter opacity-75">hoja A4</span>
+                                                    <span className="text-[9px] uppercase tracking-tighter opacity-75">etiquetas</span>
                                                 </button>
                                             </div>
 
@@ -382,25 +386,25 @@ const MobileLabels: React.FC = () => {
                                                 <span className="text-xs font-bold text-slate-400">Otro número:</span>
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex items-center border border-slate-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
-                                                        <button 
+                                                        <button
                                                             type="button"
                                                             className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
-                                                            onClick={() => setProductCustomQty(String(prod.id), currentQty - 3)}
+                                                            onClick={() => setProductCustomQty(String(prod.id), currentQty - 1)}
                                                         >
                                                             -
                                                         </button>
-                                                        <input 
+                                                        <input
                                                             type="number"
-                                                            min="3"
-                                                            step="3"
+                                                            min="1"
+                                                            step="1"
                                                             value={currentQty}
-                                                            onChange={(e) => setProductCustomQty(String(prod.id), parseInt(e.target.value) || 3)}
+                                                            onChange={(e) => setProductCustomQty(String(prod.id), parseInt(e.target.value) || 1)}
                                                             className="w-12 text-center bg-transparent border-none focus:ring-0 text-white font-bold text-sm p-0"
                                                         />
-                                                        <button 
+                                                        <button
                                                             type="button"
                                                             className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
-                                                            onClick={() => setProductCustomQty(String(prod.id), currentQty + 3)}
+                                                            onClick={() => setProductCustomQty(String(prod.id), currentQty + 1)}
                                                         >
                                                             +
                                                         </button>
@@ -410,7 +414,7 @@ const MobileLabels: React.FC = () => {
                                                         onClick={() => handlePrint(prod, currentQty)}
                                                         className="active:scale-95 transition-transform bg-slate-200 active:bg-white text-slate-900 px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
                                                     >
-                                                        <span>Imprimir</span>
+                                                        <span>Agregar</span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -426,18 +430,18 @@ const MobileLabels: React.FC = () => {
                                 <div className="flex items-center justify-between mb-3 px-1">
                                     <h2 className="text-base font-bold text-slate-200 flex items-center gap-2">
                                         <History size={20} className="text-slate-400" aria-hidden="true" />
-                                        Impresiones Recientes
+                                        Agregados Recientemente
                                     </h2>
                                     {printHistory.length > 0 && (
-                                        <span className="text-[11px] font-semibold text-slate-400">Toca 🖨️ para reimprimir</span>
+                                        <span className="text-[11px] font-semibold text-slate-400">Toca 🖨️ para agregar de nuevo</span>
                                     )}
                                 </div>
-                                
+
                                 {printHistory.length === 0 ? (
                                     <div className="text-center py-8 px-4 text-slate-400 bg-slate-900 rounded-3xl border border-slate-800 shadow-xs">
                                         <Printer size={36} className="opacity-30 mb-1" aria-hidden="true" />
-                                        <p className="font-semibold text-sm">No hay impresiones recientes</p>
-                                        <p className="text-xs text-slate-400 mt-0.5">Cuando imprimas etiquetas, aparecerán aquí para fácil acceso.</p>
+                                        <p className="font-semibold text-sm">No hay agregados recientes</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">Cuando agregues etiquetas a la cola, aparecerán aquí para fácil acceso.</p>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-2.5">
@@ -475,7 +479,7 @@ const MobileLabels: React.FC = () => {
                                                     type="button"
                                                     onClick={() => handleReprint(item)}
                                                     className="active:scale-90 p-3 bg-emerald-900/30 active:bg-emerald-900/50 text-emerald-300 rounded-2xl transition-all shrink-0 border border-emerald-800"
-                                                    title={`Reimprimir ${item.quantity} etiquetas`}
+                                                    title={`Agregar ${item.quantity} etiquetas de nuevo a la cola`}
                                                 >
                                                     <Printer size={20} aria-hidden="true" />
                                                 </button>

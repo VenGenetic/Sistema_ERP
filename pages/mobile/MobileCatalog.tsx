@@ -17,7 +17,7 @@ import { SourcingQuickEditModal } from '../../components/SourcingQuickEditModal'
 import { BulkEditModal } from '../../components/BulkEditModal';
 import { InventoryGroupSelectModal } from '../../components/InventoryGroupSelectModal';
 
-import { printLabelsQuick, addToPrintHistory } from '../../utils/mobileLabelPrinter';
+import { addToPrintHistory } from '../../utils/mobileLabelPrinter';
 import { addToQueue } from '../../utils/mobilePrintQueue';
 import { useProformaStore } from '../../store/useProformaStore';
 
@@ -383,7 +383,7 @@ const ProductCard: React.FC<CardProps> = React.memo(({
                     className="w-[76px] bg-emerald-600 text-white flex flex-col items-center justify-center gap-1 font-bold text-xs active:bg-emerald-700"
                 >
                     <Printer size={20} aria-hidden="true" />
-                    Imprimir
+                    +1
                 </button>
             </div>
 
@@ -914,9 +914,9 @@ const MobileCatalog: React.FC = () => {
     const handleQuickPrint = (prod: any, e: React.MouseEvent) => {
         e.stopPropagation();
         buzz(50);
-        printLabelsQuick({ sku: prod.sku, name: prod.name }, 3);
-        addToPrintHistory({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 3);
-        notify(`3 etiquetas de ${prod.sku} enviadas`);
+        addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+        addToPrintHistory({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+        notify(`${prod.sku} agregado a la cola de impresión`);
     };
 
     const handleAddToQueueConfirm = () => {
@@ -981,19 +981,10 @@ const MobileCatalog: React.FC = () => {
         [allProducts, selectedIds]
     );
 
-    const handleBulkPrint = () => {
-        selectedProducts.forEach(prod => {
-            printLabelsQuick({ sku: prod.sku, name: prod.name }, 3);
-            addToPrintHistory({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 3);
-        });
-        notify(`Etiquetas de ${selectedProducts.length} repuestos enviadas`);
-        setSelectedIds(new Set());
-        setIsBulkSheetOpen(false);
-    };
-
     const handleBulkQueue = async () => {
         for (const prod of selectedProducts) {
             await addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+            addToPrintHistory({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
         }
         notify(`${selectedProducts.length} repuestos en la cola`);
         setSelectedIds(new Set());
@@ -1070,7 +1061,7 @@ const MobileCatalog: React.FC = () => {
             { key: 'edit', label: 'Editar', icon: Pencil, onClick: run('edit') },
             { key: 'proforma', label: 'A proforma', icon: FileText, tone: 'accent', onClick: run('proforma') },
             { key: 'queue', label: 'Cola etiquetas', icon: ListPlus, onClick: run('queue') },
-            { key: 'print', label: 'Imprimir 3', icon: Printer, onClick: run('print') },
+            { key: 'print', label: '+1 a la cola', icon: Printer, onClick: run('print') },
             { key: 'photo', label: 'Foto con cámara', icon: Camera, onClick: run('photo') },
             { key: 'tags', label: 'Etiquetas', icon: Tag, onClick: run('tags') },
             { key: 'demand', label: prod.demand_count > 0 ? `Demanda (${prod.demand_count})` : 'Registrar demanda', icon: BellRing, onClick: run('demand') },
@@ -1325,11 +1316,11 @@ const MobileCatalog: React.FC = () => {
                             {selectedIds.size} sel.
                         </span>
                         <button
-                            onClick={handleBulkPrint}
+                            onClick={handleBulkQueue}
                             className="flex-1 min-h-[44px] rounded-lg bg-slate-950 text-amber-400 font-bold text-sm flex items-center justify-center gap-1.5 active:opacity-80"
                         >
                             <Printer size={16} aria-hidden="true" />
-                            Imprimir 3
+                            Agregar a cola
                         </button>
                         <button
                             onClick={() => setIsBulkSheetOpen(true)}
@@ -1420,7 +1411,6 @@ const MobileCatalog: React.FC = () => {
             {/* ── HOJA: ACCIONES EN LOTE ── */}
             <Sheet open={isBulkSheetOpen} onClose={() => setIsBulkSheetOpen(false)} title={`${selectedIds.size} seleccionados`} icon={Boxes}>
                 <div className="flex flex-col gap-2">
-                    <CardAction icon={ListPlus} label="Agregar todos a la cola de etiquetas" onClick={handleBulkQueue} />
                     <CardAction icon={FileText} label="Agregar todos a la proforma" tone="accent" onClick={handleBulkProforma} />
                     <CardAction icon={Boxes} label="Asignar a grupo de inventario" onClick={() => { setIsBulkSheetOpen(false); setIsInventoryGroupOpen(true); }} />
                     <CardAction icon={FilePen} label="Edición rápida en lote" onClick={() => { setIsBulkSheetOpen(false); setIsBulkEditOpen(true); }} />

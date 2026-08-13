@@ -4,7 +4,6 @@
  * No modals, no new tabs — generates PDF and triggers download directly.
  */
 import JsBarcode from 'jsbarcode';
-import { jsPDF } from 'jspdf';
 import { loadBrandLogo, drawLabelBrandHeader } from './brandLogo';
 
 export interface LabelCanvasSize {
@@ -161,51 +160,6 @@ export const renderLabelToCanvas = async (
     return canvas;
 };
 
-// --- Generate PDF with N labels and trigger download (no new tabs) ---
-export const printLabelsQuick = async (
-    product: { sku: string; name: string },
-    quantity: number = 3
-): Promise<void> => {
-    const canvas = await renderLabelToCanvas(product);
-    const imgData = canvas.toDataURL('image/png', 1.0);
-
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const cols = 3;
-    const rows = 7;
-    const LABEL_W = 210 / cols;
-    const LABEL_H = 297 / rows;
-
-    let currentItem = 0;
-    while (currentItem < quantity) {
-        if (currentItem > 0 && currentItem % (cols * rows) === 0) {
-            pdf.addPage();
-        }
-
-        const indexOnPage = currentItem % (cols * rows);
-        const col = indexOnPage % cols;
-        const row = Math.floor(indexOnPage / cols);
-
-        const x = col * LABEL_W;
-        const y = row * LABEL_H;
-
-        pdf.setDrawColor(0, 0, 0);
-        pdf.setLineWidth(0.2);
-        pdf.setLineDashPattern([2, 1.5], 0);
-        pdf.rect(x, y, LABEL_W, LABEL_H);
-        pdf.setLineDashPattern([], 0);
-
-        pdf.addImage(imgData, 'PNG', x, y, LABEL_W, LABEL_H);
-        currentItem++;
-    }
-
-    // Download directly — no window.open, no new tabs
-    pdf.save(`etiquetas_${product.sku}_x${quantity}.pdf`);
-
-    // Haptic feedback if available
-    if (navigator.vibrate) {
-        navigator.vibrate([50, 30, 50]);
-    }
-};
 
 // --- Print history management (localStorage) ---
 const HISTORY_KEY = 'mobile_print_history';
