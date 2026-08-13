@@ -69,7 +69,16 @@ const MobileLayout: React.FC = () => {
             </main>
 
             {/* Bottom Navigation Bar */}
-            <nav className="fixed bottom-0 left-0 w-full z-50 px-2 pb-safe pt-2">
+            {/*
+                z-[45]: por encima de la cabecera pegajosa y las barras flotantes de
+                la página (z-30/z-40), pero por debajo de CUALQUIER modal (z-50+).
+                Los modales del catálogo (registrar demanda, editar, etiquetas...) no
+                usan un portal — se renderizan dentro de <main>, antes que este <nav>
+                en el DOM — así que con el mismo z-index ganaba esta barra por venir
+                después en el árbol: tapaba media pantalla del modal sin que hubiera
+                nada que desplazar para alcanzar el botón de abajo.
+            */}
+            <nav className="fixed bottom-0 left-0 w-full z-[45] px-2 pb-safe pt-2">
                 <div className="max-w-md mx-auto relative">
                     <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-xl border border-slate-800/70 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.5)] rounded-3xl"></div>
                 {/*
