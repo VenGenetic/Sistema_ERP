@@ -71,6 +71,16 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
         }
     }, [isOpen]);
 
+    // Mientras el modal está abierto la cola puede seguir creciendo desde el
+    // teléfono, así que se refresca con lo que avise Realtime en vez de quedar
+    // congelada en la foto de cuando se abrió.
+    useEffect(() => {
+        if (!isOpen) return;
+        const syncQueue = async () => setQueue(await getPrintQueue());
+        window.addEventListener('print-queue-changed', syncQueue);
+        return () => window.removeEventListener('print-queue-changed', syncQueue);
+    }, [isOpen]);
+
     // Generar y cachear imágenes PNG en base64 para los lienzos de las etiquetas.
     // Usa el updater funcional de setState (en vez de leer `labelImages` del
     // closure) para no tener que incluir `labelImages` en las dependencias:

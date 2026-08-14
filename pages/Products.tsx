@@ -445,6 +445,13 @@ const Products: React.FC = () => {
         loadQueue();
     }, [loadQueue]);
 
+    // La cola se arma casi siempre desde el teléfono; Realtime avisa acá para
+    // no tener que recargar el catálogo antes de imprimir.
+    useEffect(() => {
+        window.addEventListener('print-queue-changed', loadQueue);
+        return () => window.removeEventListener('print-queue-changed', loadQueue);
+    }, [loadQueue]);
+
 
     // Export ZIP
     const [isExporting, setIsExporting] = useState(false);

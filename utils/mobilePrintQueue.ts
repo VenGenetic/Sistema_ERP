@@ -40,6 +40,56 @@ const notifyQueueChanged = () => {
     }
 };
 
+// ── Sincronización en vivo entre dispositivos ──────────
+// La cola se arma desde el teléfono y se imprime desde la computadora, así que
+// los dos tienen que ver la misma lista sin recargar. Un canal de Realtime
+// escucha los cambios de las filas propias y, ante cualquiera, tira la caché y
+// avisa por el mismo evento que ya usan las pantallas locales -- de modo que a
+// los consumidores les da igual si el cambio vino de este dispositivo o del
+// otro.
+//
+// Requiere que print_queue_items esté en la publicación supabase_realtime
+// (migración 20260814090000): sin eso el canal se suscribe igual pero no llega
+// ningún evento.
+let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let realtimeUserId: string | null = null;
+
+const teardownRealtime = () => {
+    if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+    }
+    realtimeUserId = null;
+};
+
+const ensureRealtime = (userId: string) => {
+    // Un solo canal por usuario: getPrintQueue() llama aquí en cada lectura y
+    // varias pantallas leen a la vez.
+    if (realtimeChannel && realtimeUserId === userId) return;
+    teardownRealtime();
+
+    realtimeUserId = userId;
+    realtimeChannel = supabase
+        .channel(`print-queue-${userId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'print_queue_items',
+                filter: `user_id=eq.${userId}`,
+            },
+            () => {
+                // Se invalida en vez de aplicar el payload: la fila cruda trae
+                // product_id, no el sku/nombre/imagen que la lista muestra
+                // (vienen del join con products).
+                cachedQueue = null;
+                notifyQueueChanged();
+            }
+        )
+        .subscribe();
+};
+
 // La caché vive en el módulo, así que sobrevive a un cambio de sesión: entrar
 // y salir no recarga la SPA. Sin invalidarla aquí, la cola leída con la sesión
 // anterior seguía sirviéndose después -- vacía tras un cierre de sesión, o
@@ -48,6 +98,9 @@ if (typeof window !== 'undefined') {
     supabase.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
             cachedQueue = null;
+            // El canal queda atado al usuario anterior; se recrea en la
+            // siguiente lectura ya con la sesión nueva.
+            if (event === 'SIGNED_OUT') teardownRealtime();
             notifyQueueChanged();
         }
     });
@@ -103,9 +156,11 @@ export const getPrintQueue = async (force = false): Promise<PrintQueueItem[]> =>
             // toda lectura posterior, y la cola parecía borrada al volver a
             // entrar (el login no recarga la SPA, la caché del módulo sigue viva).
             cachedQueue = null;
+            teardownRealtime();
             return [];
         }
 
+        ensureRealtime(userData.user.id);
         await migrateLocalQueueToSupabase(userData.user.id);
 
         const { data, error } = await supabase

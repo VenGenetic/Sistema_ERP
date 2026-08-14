@@ -41,14 +41,22 @@ const MobileLabels: React.FC = () => {
         return () => { if (queueDebounceRef.current) clearTimeout(queueDebounceRef.current); };
     }, [queueSearchTerm]);
 
+    const loadQueue = useCallback(async () => {
+        const q = await getPrintQueue();
+        setQueue(q);
+    }, []);
+
     useEffect(() => {
         loadHistory();
-        const loadQueue = async () => {
-            const q = await getPrintQueue();
-            setQueue(q);
-        };
         loadQueue();
-    }, []);
+    }, [loadQueue]);
+
+    // La cola es compartida con la computadora: si allá se imprime o se vacía,
+    // el cambio llega por Realtime y se refleja acá sin recargar.
+    useEffect(() => {
+        window.addEventListener('print-queue-changed', loadQueue);
+        return () => window.removeEventListener('print-queue-changed', loadQueue);
+    }, [loadQueue]);
 
     const loadHistory = () => {
         setPrintHistory(getPrintHistory());
