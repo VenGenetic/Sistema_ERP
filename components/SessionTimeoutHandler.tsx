@@ -34,10 +34,22 @@ const SessionTimeoutHandler: React.FC = () => {
 
     // Effect to set initial time and listen for user activity
     useEffect(() => {
-        // Initialize if not present
-        if (!localStorage.getItem(STORAGE_KEY)) {
-            localStorage.setItem(STORAGE_KEY, Date.now().toString());
-        }
+        // Abrir la app cuenta como actividad, así que el sello se reescribe
+        // siempre -- no sólo cuando falta.
+        //
+        // El valor guardado es el de la visita anterior y sobrevive al cierre
+        // del navegador. Si esa visita fue hace más de INACTIVITY_LIMIT_MS, el
+        // intervalo de abajo lo leía en su primer tick y cerraba la sesión al
+        // segundo de entrar, sin que el usuario alcanzara a hacer nada. El
+        // updateActivity() del cambio de ruta no lo evitaba: su throttle
+        // descarta cualquier escritura durante el primer segundo de vida del
+        // componente, que es exactamente cuando corre ese primer tick.
+        //
+        // Se escribe directo (no vía updateActivity) y se adelanta
+        // lastUpdateRef para que el throttle mida desde este momento.
+        const now = Date.now();
+        localStorage.setItem(STORAGE_KEY, now.toString());
+        lastUpdateRef.current = now;
 
         const handleActivity = () => {
             updateActivity();

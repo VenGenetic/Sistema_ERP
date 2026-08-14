@@ -40,6 +40,19 @@ const notifyQueueChanged = () => {
     }
 };
 
+// La caché vive en el módulo, así que sobrevive a un cambio de sesión: entrar
+// y salir no recarga la SPA. Sin invalidarla aquí, la cola leída con la sesión
+// anterior seguía sirviéndose después -- vacía tras un cierre de sesión, o
+// peor, la de otro usuario si dos personas usan la misma máquina.
+if (typeof window !== 'undefined') {
+    supabase.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+            cachedQueue = null;
+            notifyQueueChanged();
+        }
+    });
+}
+
 // ── Migration from Local Storage ───────────────────────
 export const migrateLocalQueueToSupabase = async (userId: string) => {
     try {
@@ -85,8 +98,12 @@ export const getPrintQueue = async (force = false): Promise<PrintQueueItem[]> =>
     try {
         const { data: userData } = await supabase.auth.getUser();
         if (!userData.user) {
-            cachedQueue = [];
-            return cachedQueue;
+            // Sin sesión no se sabe de quién es la cola, así que se devuelve
+            // vacía sin guardarla: cachear ese [] lo volvía la respuesta a
+            // toda lectura posterior, y la cola parecía borrada al volver a
+            // entrar (el login no recarga la SPA, la caché del módulo sigue viva).
+            cachedQueue = null;
+            return [];
         }
 
         await migrateLocalQueueToSupabase(userData.user.id);
