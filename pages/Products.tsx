@@ -17,6 +17,7 @@ import { ProductLabelModal } from '../components/ProductLabelModal';
 import { InventoryGroupSelectModal } from '../components/InventoryGroupSelectModal';
 import { PrintQueuePreviewModal } from '../components/PrintQueuePreviewModal';
 import { addToQueue, getPrintQueue, clearQueue, removeFromQueue, updateQueueItemQty, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF, PrintQueueItem } from '../utils/mobilePrintQueue';
+import { shareProductCard } from '../utils/productShareCard';
 import { ProformaPanel } from '../components/ProformaPanel';
 import { useProformaStore } from '../store/useProformaStore';
 import { cn, badge, button, input, focusRing, skeleton } from '../components/ui/styles';
@@ -34,7 +35,6 @@ import {
   CirclePlay,
   Copy,
   EllipsisVertical,
-  ExternalLink,
   Eye,
   FilePen,
   FileText,
@@ -43,6 +43,7 @@ import {
   FolderUp,
   Hourglass,
   Image as ImageIcon,
+  ImageDown,
   ImageOff,
   LayoutGrid,
   Link as LinkIcon,
@@ -397,6 +398,10 @@ const Products: React.FC = () => {
     const [isQueueGenerating, setIsQueueGenerating] = useState(false);
     const [showQueueClearConfirm, setShowQueueClearConfirm] = useState(false);
 
+    // Compartir ficha del repuesto (imagen para WhatsApp)
+    const [shareToast, setShareToast] = useState<string | null>(null);
+    const [sharingSku, setSharingSku] = useState<string | null>(null);
+
     // Menú "Acciones" de la cabecera: agrupa importar / multimedia / exportar
     // para que sólo quede un botón primario visible en la pantalla.
     const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
@@ -485,6 +490,32 @@ const Products: React.FC = () => {
         }).catch(err => {
             console.error('Error al copiar SKU: ', err);
         });
+    };
+
+    // Deja la ficha del repuesto en el portapapeles para pegarla en WhatsApp,
+    // con la misma tarjeta que ve el cliente en el catálogo público.
+    const handleShareCard = async (prod: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSharingSku(prod.sku);
+        setShareToast(`Generando ficha de ${prod.sku}...`);
+        try {
+            const outcome = await shareProductCard(prod);
+            if (outcome === 'cancelled') {
+                setShareToast(null);
+                return;
+            }
+            setShareToast(
+                outcome === 'copied' ? 'Ficha copiada: pégala en WhatsApp'
+                : outcome === 'shared' ? 'Ficha compartida'
+                : 'Ficha descargada'
+            );
+            setTimeout(() => setShareToast(null), 2600);
+        } catch (err: any) {
+            setShareToast('No se pudo generar la ficha: ' + (err?.message || 'error'));
+            setTimeout(() => setShareToast(null), 3200);
+        } finally {
+            setSharingSku(null);
+        }
     };
 
     const navigate = useNavigate();
@@ -1389,19 +1420,21 @@ const Products: React.FC = () => {
                         >
                             {copiedSku === prod.sku ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
                         </button>
-                        <a
-                            href={`https://www.lvparts.ec/catalogo?q=${encodeURIComponent(prod.sku)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            type="button"
+                            onClick={(e) => handleShareCard(prod, e)}
+                            disabled={sharingSku === prod.sku}
                             className={cn(
                                 'p-1.5 rounded-md flex items-center justify-center transition-colors',
-                                'text-fg-subtle hover:text-primary hover:bg-primary-soft',
+                                'text-fg-subtle hover:text-primary hover:bg-primary-soft disabled:opacity-60',
                                 focusRing
                             )}
-                            title="Buscar en catálogo LV Parts"
+                            title="Copiar ficha del repuesto (imagen para WhatsApp)"
                         >
-                            <ExternalLink size={15} aria-hidden="true" />
-                        </a>
+                            {sharingSku === prod.sku
+                                ? <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                                : <ImageDown size={15} aria-hidden="true" />}
+                        </button>
                     </div>
                 </td>
                 <td className="px-4 py-3 align-top">
@@ -1683,19 +1716,21 @@ const Products: React.FC = () => {
                             >
                                 {copiedSku === prod.sku ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                             </button>
-                            <a
-                                href={`https://www.lvparts.ec/catalogo?q=${encodeURIComponent(prod.sku)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <button
+                                type="button"
+                                onClick={(e) => handleShareCard(prod, e)}
+                                disabled={sharingSku === prod.sku}
                                 className={cn(
                                     'p-1 rounded-md transition-colors flex items-center justify-center shrink-0',
-                                    'text-fg-subtle hover:text-primary hover:bg-primary-soft',
+                                    'text-fg-subtle hover:text-primary hover:bg-primary-soft disabled:opacity-60',
                                     focusRing
                                 )}
-                                title="Buscar en catálogo LV Parts"
+                                title="Copiar ficha del repuesto (imagen para WhatsApp)"
                             >
-                                <ExternalLink size={14} aria-hidden="true" />
-                            </a>
+                                {sharingSku === prod.sku
+                                    ? <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                                    : <ImageDown size={14} aria-hidden="true" />}
+                            </button>
                         </div>
 
                         {/*
@@ -2707,6 +2742,14 @@ const Products: React.FC = () => {
                 <div role="status" className="fixed top-6 right-6 z-50 bg-warning text-warning-fg py-3 px-5 rounded-xl shadow-xl flex items-center gap-2 font-semibold text-sm animate-in slide-in-from-top-2">
                     <ListChecks size={18} aria-hidden="true" />
                     {queueToast}
+                </div>
+            )}
+
+            {/* ═══════ SHARE CARD TOAST ═══════ */}
+            {shareToast && (
+                <div role="status" className="fixed top-6 right-6 z-50 bg-primary text-white py-3 px-5 rounded-xl shadow-xl flex items-center gap-2 font-semibold text-sm animate-in slide-in-from-top-2">
+                    <ImageDown size={18} aria-hidden="true" />
+                    {shareToast}
                 </div>
             )}
 

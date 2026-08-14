@@ -19,6 +19,7 @@ import { InventoryGroupSelectModal } from '../../components/InventoryGroupSelect
 
 import { addToPrintHistory } from '../../utils/mobileLabelPrinter';
 import { addToQueue } from '../../utils/mobilePrintQueue';
+import { shareProductCard } from '../../utils/productShareCard';
 import { useProformaStore } from '../../store/useProformaStore';
 
 import {
@@ -31,11 +32,11 @@ import {
     Check,
     ChevronDown,
     Copy,
-    ExternalLink,
     FilePen,
     FileText,
     Hourglass,
     Image as ImageIcon,
+    ImageDown,
     ImageOff,
     Link as LinkIcon,
     ListPlus,
@@ -930,6 +931,22 @@ const MobileCatalog: React.FC = () => {
         setQueueSheetProduct(null);
     };
 
+    const handleShareCard = async (prod: any) => {
+        buzz(40);
+        notify(`Generando ficha de ${prod.sku}...`);
+        try {
+            const outcome = await shareProductCard(prod);
+            if (outcome === 'cancelled') return;
+            notify(
+                outcome === 'shared' ? 'Ficha compartida'
+                : outcome === 'copied' ? 'Ficha copiada, ya puedes pegarla'
+                : 'Ficha descargada'
+            );
+        } catch (err: any) {
+            notify('No se pudo generar la ficha: ' + (err?.message || 'error desconocido'));
+        }
+    };
+
     const handleAddToProforma = (prod: any) => {
         useProformaStore.getState().addItem({ id: prod.id, sku: prod.sku, name: prod.name, price: prod.price }, 1);
         buzz(40);
@@ -1051,7 +1068,7 @@ const MobileCatalog: React.FC = () => {
         group: (prod) => { setGroupModalProduct(prod); setSelectedGroupId(prod.group_id); setIsGroupModalOpen(true); },
         label: (prod) => { setLabelProduct(prod); setIsLabelModalOpen(true); },
         duplicate: handleDuplicateProduct,
-        lv: (prod) => window.open(`https://www.lvparts.ec/catalogo?q=${encodeURIComponent(prod.sku)}`, '_blank', 'noopener'),
+        share: (prod) => handleShareCard(prod),
         remove: handleDeleteProduct,
     };
 
@@ -1069,7 +1086,7 @@ const MobileCatalog: React.FC = () => {
             { key: 'group', label: 'Equivalentes', icon: LinkIcon, onClick: run('group') },
             { key: 'label', label: 'Etiqueta avanzada', icon: ScanBarcode, onClick: run('label') },
             { key: 'duplicate', label: 'Duplicar', icon: Copy, onClick: run('duplicate') },
-            { key: 'lv', label: 'Ver en LV Parts', icon: ExternalLink, onClick: run('lv') },
+            { key: 'share', label: 'Compartir ficha', icon: ImageDown, onClick: run('share') },
             { key: 'delete', label: 'Eliminar', icon: Trash2, tone: 'danger', onClick: run('remove') },
         ];
     }, []);
