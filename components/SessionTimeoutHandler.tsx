@@ -5,8 +5,13 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'; // Assuming react-router-dom is used
 import { supabase } from '../supabaseClient'; // Adjust path if needed
 
-const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
-const WARNING_LIMIT_MS = 28 * 60 * 1000; // 28 minutes
+// 3 horas: el local lo atiende el dueño y un familiar, así que el riesgo de
+// que alguien más se siente frente a una sesión abierta es bajo, y el corte a
+// los 30 minutos interrumpía jornadas normales de mostrador.
+const INACTIVITY_LIMIT_MS = 3 * 60 * 60 * 1000;
+// El aviso se define contra el límite para que los dos se muevan juntos si se
+// vuelve a ajustar el tiempo.
+const WARNING_LIMIT_MS = INACTIVITY_LIMIT_MS - 2 * 60 * 1000; // avisa 2 min antes
 const CHECK_CX_INTERVAL_MS = 1000; // Check every second
 const THROTTLE_Limit_MS = 1000; // Throttle activity updates to once per second
 
