@@ -20,6 +20,7 @@ import { InventoryGroupSelectModal } from '../../components/InventoryGroupSelect
 import { addToPrintHistory } from '../../utils/mobileLabelPrinter';
 import { addToQueue } from '../../utils/mobilePrintQueue';
 import { shareProductCard } from '../../utils/productShareCard';
+import { compressImageForUpload } from '../../utils/imageCompression';
 import { useProformaStore } from '../../store/useProformaStore';
 
 import {
@@ -970,11 +971,13 @@ const MobileCatalog: React.FC = () => {
 
         setUploadingPhoto(true);
         try {
-            const ext = file.name?.split('.').pop() || 'jpg';
+            // La foto sale de la cámara con 3-5 MB; se sube ya reducida.
+            const compressed = await compressImageForUpload(file);
+            const ext = compressed.name?.split('.').pop() || 'jpg';
             const path = `products/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
             const { error: upErr } = await supabase.storage
                 .from('product_images')
-                .upload(path, file, { cacheControl: '31536000', upsert: true });
+                .upload(path, compressed, { cacheControl: '31536000', upsert: true });
             if (upErr) throw upErr;
 
             const { data } = supabase.storage.from('product_images').getPublicUrl(path);

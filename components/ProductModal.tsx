@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBackDismiss } from '../hooks/useBackDismiss';
 import { supabase } from '../supabaseClient';
+import { compressImageForUpload } from '../utils/imageCompression';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
 import { TagManager, Tag } from './TagManager';
@@ -427,13 +428,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const uploadMainImageFile = async (file: File) => {
         setIsUploading(true);
         try {
-            const fileExt = file.name ? (file.name.split('.').pop() || 'png') : 'png';
+            const upload = await compressImageForUpload(file);
+            const fileExt = upload.name ? (upload.name.split('.').pop() || 'png') : 'png';
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const filePath = `products/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('product_images')
-                .upload(filePath, file, {
+                .upload(filePath, upload, {
                     cacheControl: '31536000',
                     upsert: true
                 });
@@ -467,14 +469,16 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         const isVideo = file.type.startsWith('video/');
         setIsVideoUploading(true);
         try {
-            const fileExt = file.name ? (file.name.split('.').pop() || (isVideo ? 'mp4' : 'png')) : (isVideo ? 'mp4' : 'png');
+            // compressImageForUpload deja pasar los videos sin tocarlos.
+            const upload = await compressImageForUpload(file);
+            const fileExt = upload.name ? (upload.name.split('.').pop() || (isVideo ? 'mp4' : 'png')) : (isVideo ? 'mp4' : 'png');
             const fileName = `${formData.sku || 'NUEVO'}_gallery_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             const bucket = isVideo ? 'product_videos' : 'product_images';
             const filePath = isVideo ? fileName : `products/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
                 .from(bucket)
-                .upload(filePath, file, {
+                .upload(filePath, upload, {
                     cacheControl: '31536000',
                     upsert: true
                 });

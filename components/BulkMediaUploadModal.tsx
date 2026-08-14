@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { compressImageForUpload } from '../utils/imageCompression';
 import {
   CircleAlert,
   CircleCheck,
@@ -147,13 +148,18 @@ export const BulkMediaUploadModal: React.FC<BulkMediaUploadModalProps> = ({ isOp
             try {
                 const bucket = f.type === 'video' ? 'product_videos' : 'product_images';
                 const folder = f.type === 'video' ? '' : 'products/';
-                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${f.extension}`;
+                // Se comprime cada foto antes de subirla (los videos pasan
+                // intactos). Aquí importa más que en el resto: por este camino
+                // entran decenas de imágenes de una sola vez.
+                const upload = await compressImageForUpload(f.file);
+                const extension = upload.name?.split('.').pop() || f.extension;
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
                 const filePath = `${folder}${fileName}`;
 
                 // Upload
                 const { error: uploadError } = await supabase.storage
                     .from(bucket)
-                    .upload(filePath, f.file, {
+                    .upload(filePath, upload, {
                         cacheControl: '31536000',
                         upsert: true
                     });

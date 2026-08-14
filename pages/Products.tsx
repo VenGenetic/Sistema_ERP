@@ -1457,19 +1457,15 @@ const Products: React.FC = () => {
                                        decoding="async"
                                        className="h-full w-full object-contain transition-opacity duration-300 relative z-10"
                                        onError={(e) => {
+                                           // Ya no hay reintento contra la URL original: las imágenes se
+                                           // sirven directo desde Storage, así que un fallo aquí significa
+                                           // que el objeto no existe.
                                            const target = e.currentTarget;
-                                           if (target.src.includes('render/image')) {
-                                               try {
-                                                   localStorage.setItem('supabase_transform_unsupported', 'true');
-                                               } catch (err) {}
-                                               target.src = prod.image_url || '';
-                                           } else {
-                                               target.style.display = 'none';
-                                               if (target.parentElement) {
-                                                   // SVG inline (mismo trazo que Lucide) en vez de la webfont de iconos
-                                                   target.parentElement.innerHTML = PLACEHOLDER_IMAGE_SVG(18);
-                                                   target.parentElement.className = "h-11 w-11 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 relative flex items-center justify-center text-fg-subtle";
-                                               }
+                                           target.style.display = 'none';
+                                           if (target.parentElement) {
+                                               // SVG inline (mismo trazo que Lucide) en vez de la webfont de iconos
+                                               target.parentElement.innerHTML = PLACEHOLDER_IMAGE_SVG(18);
+                                               target.parentElement.className = "h-11 w-11 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 relative flex items-center justify-center text-fg-subtle";
                                            }
                                        }}
                                     />
@@ -1665,14 +1661,9 @@ const Products: React.FC = () => {
                                 className="w-full h-full object-contain p-2 transition-transform duration-200 group-hover:scale-[1.04]"
                                 onError={(e) => {
                                     const target = e.currentTarget;
-                                    if (target.src.includes('render/image')) {
-                                        try { localStorage.setItem('supabase_transform_unsupported', 'true'); } catch (err) {}
-                                        target.src = prod.image_url || '';
-                                    } else {
-                                        target.style.display = 'none';
-                                        if (target.parentElement) {
-                                            target.parentElement.innerHTML = PLACEHOLDER_IMAGE_SVG(40);
-                                        }
+                                    target.style.display = 'none';
+                                    if (target.parentElement) {
+                                        target.parentElement.innerHTML = PLACEHOLDER_IMAGE_SVG(40);
                                     }
                                 }}
                             />
