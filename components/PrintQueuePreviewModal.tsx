@@ -26,6 +26,7 @@ import {
   Layers,
   List,
   Loader2,
+  Monitor,
   Printer,
   ReceiptText,
   Trash,
@@ -48,7 +49,10 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
 }) => {
     const [queue, setQueue] = useState<PrintQueueItem[]>([]);
     const [labelImages, setLabelImages] = useState<Record<string, string>>({});
-    const [activeTab, setActiveTab] = useState<'preview' | 'edit'>('preview');
+    // En el teléfono la cola sólo se arma y se revisa (la impresión ocurre en la
+    // computadora), así que se entra por la lista editable; la simulación de
+    // hojas A4 sólo describe el PDF, que es una acción de escritorio.
+    const [activeTab, setActiveTab] = useState<'preview' | 'edit'>(isMobile ? 'edit' : 'preview');
     const [isProcessing, setIsProcessing] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [labelSize, setLabelSize] = useState<LabelSizePreset | null>(null);
@@ -442,13 +446,30 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                     </div>
                 </div>
 
-                {/* ── Thermal label size ───────────────────────────── */}
-                <div className="px-4 pt-3 bg-surface border-t border-slate-100 dark:border-slate-800 shrink-0">
-                    <div className="max-w-xs ml-auto flex flex-col gap-3">
-                        <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
-                        <ThermalPrinterSelector />
+                {/* La impresión térmica pasa por QZ Tray, que sólo corre en la
+                    computadora conectada a la impresora -- desde el teléfono
+                    estos controles no tendrían a quién hablarle, así que ahí se
+                    muestra en su lugar dónde termina el trabajo. */}
+                {!isMobile && (
+                    <div className="px-4 pt-3 bg-surface border-t border-slate-100 dark:border-slate-800 shrink-0">
+                        <div className="max-w-xs ml-auto flex flex-col gap-3">
+                            <LabelSizeSelector value={labelSize} onChange={setLabelSize} />
+                            <ThermalPrinterSelector />
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {isMobile && (
+                    <div className="px-4 py-3 bg-surface border-t border-slate-100 dark:border-slate-800 shrink-0">
+                        <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-primary-soft border border-primary/20">
+                            <Monitor size={18} className="text-primary shrink-0 mt-0.5" aria-hidden="true" />
+                            <p className="text-xs font-medium text-fg-muted leading-relaxed">
+                                La cola queda guardada. Para imprimir las etiquetas, abre esta misma
+                                cola en la computadora conectada a la impresora térmica.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Footer / Actions Bar ─────────────────────────── */}
                 <div className="p-4 border-t border-subtle bg-surface flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
@@ -459,49 +480,51 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                         Cerrar
                     </button>
 
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
-                        <button
-                            type="button"
-                            onClick={handleDownload}
-                            disabled={queue.length === 0 || isProcessing}
-                            className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-surface-3 text-fg rounded-2xl font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:pointer-events-none"
-                            title="Descargar archivo PDF"
-                        >
-                            <Download size={18} className="text-primary" aria-hidden="true" />
-                            Descargar PDF ({totalLabels})
-                        </button>
+                    {!isMobile && (
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
+                            <button
+                                type="button"
+                                onClick={handleDownload}
+                                disabled={queue.length === 0 || isProcessing}
+                                className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-surface-3 text-fg rounded-2xl font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                                title="Descargar archivo PDF"
+                            >
+                                <Download size={18} className="text-primary" aria-hidden="true" />
+                                Descargar PDF ({totalLabels})
+                            </button>
 
-                        <button
-                            type="button"
-                            onClick={handlePrintThermal}
-                            disabled={queue.length === 0 || isProcessing || !labelSize}
-                            className="flex-1 sm:flex-none px-7 py-3 bg-success hover:from-success hover:to-success text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-success/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-                            title="Imprimir en la impresora térmica"
-                        >
-                            {isProcessing ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                    <span>Procesando...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <ReceiptText size={18} aria-hidden="true" />
-                                    <span>Imprimir Térmica ({totalLabels})</span>
-                                </>
-                            )}
-                        </button>
+                            <button
+                                type="button"
+                                onClick={handlePrintThermal}
+                                disabled={queue.length === 0 || isProcessing || !labelSize}
+                                className="flex-1 sm:flex-none px-7 py-3 bg-success hover:from-success hover:to-success text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-success/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                                title="Imprimir en la impresora térmica"
+                            >
+                                {isProcessing ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                        <span>Procesando...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <ReceiptText size={18} aria-hidden="true" />
+                                        <span>Imprimir Térmica ({totalLabels})</span>
+                                    </>
+                                )}
+                            </button>
 
-                        <button
-                            type="button"
-                            onClick={handlePrintNow}
-                            disabled={queue.length === 0 || isProcessing}
-                            className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-surface-3 text-fg rounded-2xl font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:pointer-events-none"
-                            title="Abrir cuadro de impresión A4 en vivo"
-                        >
-                            <Printer size={18} className="text-warning" aria-hidden="true" />
-                            A4 ({totalPages} hoja{totalPages !== 1 ? 's' : ''})
-                        </button>
-                    </div>
+                            <button
+                                type="button"
+                                onClick={handlePrintNow}
+                                disabled={queue.length === 0 || isProcessing}
+                                className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-surface-3 text-fg rounded-2xl font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                                title="Abrir cuadro de impresión A4 en vivo"
+                            >
+                                <Printer size={18} className="text-warning" aria-hidden="true" />
+                                A4 ({totalPages} hoja{totalPages !== 1 ? 's' : ''})
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

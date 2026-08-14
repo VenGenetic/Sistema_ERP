@@ -7,7 +7,7 @@ import MobileSearchBar from '../../components/mobile/MobileSearchBar';
 import { CheckCircle2, Eye, History, ImageOff, Info, Layers, ListChecks, Plus, Printer, Receipt, SearchX, Trash2, Zap } from 'lucide-react';
 import {
     getPrintQueue, addToQueue, removeFromQueue, updateQueueItemQty,
-    clearQueue, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF,
+    clearQueue, getQueueTotalLabels,
     PrintQueueItem
 } from '../../utils/mobilePrintQueue';
 import { PrintQueuePreviewModal } from '../../components/PrintQueuePreviewModal';
@@ -28,7 +28,6 @@ const MobileLabels: React.FC = () => {
     const [queueSearchTerm, setQueueSearchTerm] = useState('');
     const [debouncedQueueSearch, setDebouncedQueueSearch] = useState('');
     const [queueQtyMap, setQueueQtyMap] = useState<Record<string, number>>({});
-    const [isGenerating, setIsGenerating] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     const queueDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -180,22 +179,7 @@ const MobileLabels: React.FC = () => {
         if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
     };
 
-    const handleGeneratePDF = async () => {
-        if (queue.length === 0) return;
-        setIsGenerating(true);
-        try {
-            await downloadQueuePDF(queue);
-            setSuccessMessage(`✓ PDF con ${getQueueTotalLabels(queue)} etiquetas descargado`);
-            setTimeout(() => setSuccessMessage(null), 2500);
-        } catch (err: any) {
-            alert('Error al generar PDF: ' + err.message);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
     const totalLabels = getQueueTotalLabels(queue);
-    const totalPages = getQueuePageCount(queue);
 
     return (
         <div className="flex flex-col min-h-full bg-slate-950 pb-56 font-sans">
@@ -713,7 +697,7 @@ const MobileLabels: React.FC = () => {
                                             <Receipt size={18} className="text-amber-400" aria-hidden="true" />
                                             <div>
                                                 <span className="text-xs font-black text-white">{totalLabels} etiqueta{totalLabels !== 1 ? 's' : ''}</span>
-                                                <span className="text-[10px] text-slate-500 ml-1.5">({totalPages} hoja{totalPages !== 1 ? 's' : ''} A4)</span>
+                                                <span className="text-[10px] text-slate-500 ml-1.5">en la cola</span>
                                             </div>
                                         </div>
                                         {/* Clear all */}
@@ -735,14 +719,14 @@ const MobileLabels: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* Generate PDF / Preview button */}
+                                    {/* Revisar la cola antes de imprimirla desde la computadora */}
                                     <button
                                         type="button"
                                         onClick={() => setIsPreviewModalOpen(true)}
                                         className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-400 active:from-amber-600 active:to-amber-500 text-slate-950 rounded-xl font-extrabold text-sm shadow-lg shadow-amber-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                                     >
                                         <Eye size={18} aria-hidden="true" />
-                                        Vista Previa e Imprimir ({totalLabels} etiq.)
+                                        Revisar cola ({totalLabels} etiq.)
                                     </button>
                                 </div>
                             </div>
