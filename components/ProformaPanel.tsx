@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
 import { useProformaStore } from '../store/useProformaStore';
-import { useCartStore } from '../store/cartStore';
+import { convertProformaToPosCart } from '../utils/proformaToCart';
 import { fetchProformaStockInfo, ProformaStockInfo, STOCK_STATUS_LABELS } from '../utils/proformaStock';
 import { ProformaPreviewModal } from './ProformaPreviewModal';
 import {
@@ -54,96 +53,15 @@ export const ProformaPanel: React.FC = () => {
         return () => { cancelled = true; };
     }, [productIdsKey]);
 
-    // Converts the current proforma into a POS sale: resolves a real warehouse
-    // per item (mirrors the products/inventory_levels join POS.tsx already uses),
-    // loads them into the POS cart (a Zustand store, so it survives navigation),
-    // then routes to /pos so the cashier finishes checkout there. No "Venta Libre"
-    // fallback: every item gets a real warehouse_id so its stock is visible and
-    // editable in the POS cart before the sale closes (see the "Editar" stock
-    // button added to each POS cart row). If a product has never been stocked in
-    // any warehouse, we fall back to the user's ProductModal-configured default
-    // warehouse (localStorage 'erp_default_warehouse_id'); if that's not set
-    // either, the item is skipped with a clear alert rather than guessing.
+    // Convierte la proforma en una venta del POS: carga el carrito (un store de
+    // Zustand, así que sobrevive a la navegación) y enruta a /pos para que la
+    // caja cierre ahí. La resolución de bodegas vive en utils/proformaToCart.ts
+    // porque el modo móvil ofrece esta misma acción.
     const handleConvertToSale = async () => {
         if (items.length === 0 || isConverting) return;
         setIsConverting(true);
         try {
-            const productIds = items.map(i => i.productId);
-            const [{ data: products, error: prodError }, { data: warehouses, error: whError }] = await Promise.all([
-                supabase
-                    .from('products')
-                    .select(`
-                        id, sku, name, price, cost_without_vat, vat_percentage, is_discontinued, discontinued_until,
-                        inventory_levels ( current_stock, warehouse_id, warehouses ( name ) )
-                    `)
-                    .in('id', productIds),
-                supabase.from('warehouses').select('id, name').eq('is_active', true),
-            ]);
-
-            if (prodError) throw prodError;
-            if (whError) throw whError;
-
-            const warehouseNameById = new Map<number, string>((warehouses || []).map((w: any) => [w.id, w.name]));
-            const defaultWarehouseIdRaw = localStorage.getItem('erp_default_warehouse_id');
-            const defaultWarehouseId = defaultWarehouseIdRaw ? parseInt(defaultWarehouseIdRaw, 10) : null;
-
-            const unresolved: string[] = [];
-            const lowStock: string[] = [];
-            const { clearCart, addToCart, updateQuantity, updateUnitPrice } = useCartStore.getState();
-            clearCart();
-
-            for (const item of items) {
-                const prod = products?.find((p: any) => p.id === item.productId);
-                if (!prod) {
-                    unresolved.push(item.sku);
-                    continue;
-                }
-
-                const levels: any[] = prod.inventory_levels || [];
-                const chosen = levels.find(l => l.current_stock >= item.quantity) || levels.find(l => l.current_stock > 0) || levels[0];
-
-                let warehouse_id: number;
-                let warehouse_name: string;
-                let current_stock: number;
-
-                if (chosen) {
-                    warehouse_id = chosen.warehouse_id;
-                    warehouse_name = (Array.isArray(chosen.warehouses) ? chosen.warehouses[0]?.name : chosen.warehouses?.name)
-                        || warehouseNameById.get(chosen.warehouse_id)
-                        || 'Bodega';
-                    current_stock = chosen.current_stock;
-                } else if (defaultWarehouseId && warehouseNameById.has(defaultWarehouseId)) {
-                    warehouse_id = defaultWarehouseId;
-                    warehouse_name = warehouseNameById.get(defaultWarehouseId)!;
-                    current_stock = 0;
-                } else {
-                    unresolved.push(item.sku);
-                    continue;
-                }
-
-                if (current_stock < item.quantity) lowStock.push(item.sku);
-
-                addToCart({
-                    product: {
-                        id: prod.id,
-                        sku: prod.sku,
-                        name: prod.name,
-                        price: prod.price,
-                        cost_without_vat: prod.cost_without_vat,
-                        vat_percentage: prod.vat_percentage,
-                        is_discontinued: prod.is_discontinued,
-                        discontinued_until: prod.discontinued_until,
-                    },
-                    warehouse_id,
-                    warehouse_name,
-                    current_stock,
-                });
-
-                const cartNow = useCartStore.getState().cart;
-                const newCartItem = cartNow[cartNow.length - 1];
-                updateQuantity(newCartItem.id, item.quantity);
-                updateUnitPrice(newCartItem.id, item.unitPrice);
-            }
+            const { unresolved, lowStock } = await convertProformaToPosCart(items);
 
             if (unresolved.length > 0) {
                 alert(`Estos productos nunca han sido registrados en ninguna bodega y no se pudieron agregar (configura una bodega por defecto en Editar Producto, o agrégalos manualmente en el POS): ${unresolved.join(', ')}`);

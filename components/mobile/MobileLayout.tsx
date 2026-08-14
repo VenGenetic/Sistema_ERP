@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { setPreferredViewMode } from '../../utils/deviceDetection';
 import { getPrintQueue } from '../../utils/mobilePrintQueue';
-import { House, LayoutGrid, Monitor, Printer, ScanLine, Smartphone } from 'lucide-react';
+import { useProformaStore } from '../../store/useProformaStore';
+import { FileText, House, LayoutGrid, Monitor, Printer, ScanLine, Smartphone } from 'lucide-react';
 
 /** Un solo sitio para el estilo de las pestañas: activo = ámbar y algo más grande. */
 const navItem = (isActive: boolean) =>
@@ -14,6 +15,9 @@ const MobileLayout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [queueCount, setQueueCount] = useState(0);
+    // El store persiste en localStorage, así que el contador sobrevive a
+    // recargas y refleja lo agregado desde el catálogo sin pedir nada a la red.
+    const proformaCount = useProformaStore(s => s.items.length);
 
     const refreshQueueCount = useCallback(async () => {
         const queue = await getPrintQueue();
@@ -49,14 +53,41 @@ const MobileLayout: React.FC = () => {
                     <Smartphone size={18} className="text-amber-400" aria-hidden="true" />
                     <span className="text-xs font-bold tracking-widest uppercase text-slate-300">Modo Móvil</span>
                 </div>
-                <button
-                    onClick={handleSwitchToDesktop}
-                    className="flex items-center gap-1.5 text-xs bg-slate-900 text-slate-300 px-2.5 py-1.5 rounded-full border border-slate-800 active:bg-slate-800 active:text-white active:border-amber-500/40 transition-colors"
-                    title="Ver versión completa de escritorio"
-                >
-                    <Monitor size={14} aria-hidden="true" />
-                    <span>Escritorio</span>
-                </button>
+                <div className="flex items-center gap-2">
+                    {/*
+                        La barra inferior ya está llena con cuatro destinos, así que
+                        la proforma entra por aquí. Se muestra siempre, no sólo con
+                        ítems: el catálogo ofrece «A proforma» en cada repuesto y sin
+                        este acceso no habría dónde ver lo agregado.
+                    */}
+                    <NavLink
+                        to="/mobile/proforma"
+                        aria-label={proformaCount > 0 ? `Proforma, ${proformaCount} ítems` : 'Proforma'}
+                        className={({ isActive }) =>
+                            `relative flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+                                isActive
+                                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                                    : 'bg-slate-900 text-slate-300 border-slate-800 active:bg-slate-800 active:text-white'
+                            }`
+                        }
+                    >
+                        <FileText size={14} aria-hidden="true" />
+                        <span>Proforma</span>
+                        {proformaCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-amber-500 text-slate-950 text-[10px] font-black rounded-full border-2 border-slate-950">
+                                {proformaCount}
+                            </span>
+                        )}
+                    </NavLink>
+                    <button
+                        onClick={handleSwitchToDesktop}
+                        className="flex items-center gap-1.5 text-xs bg-slate-900 text-slate-300 px-2.5 py-1.5 rounded-full border border-slate-800 active:bg-slate-800 active:text-white active:border-amber-500/40 transition-colors"
+                        title="Ver versión completa de escritorio"
+                    >
+                        <Monitor size={14} aria-hidden="true" />
+                        <span>Escritorio</span>
+                    </button>
+                </div>
             </header>
 
             {/* Main Content Area */}

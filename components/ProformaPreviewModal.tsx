@@ -126,8 +126,16 @@ export const ProformaPreviewModal: React.FC<ProformaPreviewModalProps> = ({ isOp
                     que se envía al cliente. El modal que envuelve al documento sí
                     sigue el tema del usuario: sólo la hoja va siempre en claro.
                 */}
-                <div className="p-6 bg-surface-3 flex justify-center">
-                    <div ref={printRef} className="on-paper bg-white" style={{ width: '650px' }}>
+                {/*
+                    overflow-x-auto: el documento mide 650px fijos —no puede
+                    encogerse sin cambiar la imagen que se captura— y eso no entra
+                    en la pantalla de un teléfono, desde donde ahora también se
+                    arma la proforma (pages/mobile/MobileProforma.tsx). Con el
+                    scroll aquí la hoja se recorre de lado en vez de quedar
+                    cortada, y el ancho de captura no se toca.
+                */}
+                <div className="p-3 sm:p-6 bg-surface-3 flex justify-center overflow-x-auto">
+                    <div ref={printRef} className="on-paper bg-white shrink-0" style={{ width: '650px' }}>
                         <div className="border border-subtle rounded-xl overflow-hidden">
                             <div className="h-2 w-full bg-success"></div>
 
