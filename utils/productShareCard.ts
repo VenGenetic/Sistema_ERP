@@ -33,6 +33,16 @@ const CENTER = SIZE / 2;
 const FONT = '"Inter", "Helvetica Neue", Arial, sans-serif';
 
 /**
+ * Precio tal como se le muestra al cliente: redondeado al entero de arriba y
+ * sin centavos (16.15 y 16.99 salen igual, $17).
+ *
+ * Es la misma convención que ya usan ShareDemandModal y la proforma, así que
+ * un repuesto cotizado por WhatsApp y el mismo repuesto en una proforma dan la
+ * misma cifra; mostrar el PVP crudo aquí abriría discusiones por centavos.
+ */
+const customerPriceText = (price?: number | null): string => `$${Math.ceil(Number(price) || 0)}`;
+
+/**
  * Carga la imagen del repuesto para dibujarla en el canvas.
  *
  * crossOrigin='anonymous' es obligatorio: sin él el canvas queda "tainted" y
@@ -272,7 +282,7 @@ const renderCard = async (product: ShareCardProduct): Promise<HTMLCanvasElement>
     // Precio y estado van en la misma fila, centrados como un bloque.
     y += spacingBelowSub + 40;
     ctx.font = `900 68px ${FONT}`;
-    const priceText = `$${Number(product.price || 0).toFixed(2)}`;
+    const priceText = customerPriceText(product.price);
     const priceWidth = ctx.measureText(priceText).width;
     const badgeWidth = badge.text === 'BAJO PEDIDO' ? 240 : 210;
     const badgeHeight = 64;
@@ -344,7 +354,7 @@ export const shareProductCard = async (product: ShareCardProduct): Promise<Share
             await navigator.share({
                 files: [file],
                 title: product.name,
-                text: `${product.name} - $${Number(product.price || 0).toFixed(2)}`,
+                text: `${product.name} - ${customerPriceText(product.price)}`,
             });
             return 'shared';
         } catch (err: any) {
