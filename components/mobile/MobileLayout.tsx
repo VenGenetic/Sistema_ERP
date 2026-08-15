@@ -3,7 +3,8 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { setPreferredViewMode } from '../../utils/deviceDetection';
 import { getPrintQueue } from '../../utils/mobilePrintQueue';
 import { useProformaStore } from '../../store/useProformaStore';
-import { FileText, House, LayoutGrid, Monitor, Printer, ScanLine, Smartphone } from 'lucide-react';
+import { useInstallPrompt } from '../../hooks/useInstallPrompt';
+import { Download, FileText, House, LayoutGrid, Monitor, Printer, ScanLine, Smartphone, X } from 'lucide-react';
 
 /** Un solo sitio para el estilo de las pestañas: activo = ámbar y algo más grande. */
 const navItem = (isActive: boolean) =>
@@ -18,6 +19,33 @@ const MobileLayout: React.FC = () => {
     // El store persiste en localStorage, así que el contador sobrevive a
     // recargas y refleja lo agregado desde el catálogo sin pedir nada a la red.
     const proformaCount = useProformaStore(s => s.items.length);
+
+    const { canInstall, promptInstall } = useInstallPrompt();
+    // El descarte se recuerda entre sesiones: quien ya dijo que no, no debería
+    // volver a ver el aviso cada vez que abre el sistema.
+    const [installDismissed, setInstallDismissed] = useState(() => {
+        try {
+            return localStorage.getItem('install_prompt_dismissed') === 'true';
+        } catch {
+            return false;
+        }
+    });
+
+    const dismissInstall = () => {
+        setInstallDismissed(true);
+        try {
+            localStorage.setItem('install_prompt_dismissed', 'true');
+        } catch {
+            // Modo privado: se oculta igual durante esta sesión.
+        }
+    };
+
+    const handleInstall = async () => {
+        const outcome = await promptInstall();
+        // Rechazar el diálogo del navegador también cuenta como "no me
+        // interesa": insistir en cada visita sería molesto.
+        if (outcome === 'dismissed') dismissInstall();
+    };
 
     const refreshQueueCount = useCallback(async () => {
         const queue = await getPrintQueue();
@@ -89,6 +117,34 @@ const MobileLayout: React.FC = () => {
                     </button>
                 </div>
             </header>
+
+            {/*
+                Invitación a instalar. Sólo aparece cuando Chrome confirma que el
+                sitio es instalable y todavía no lo está; se descarta y no vuelve
+                a molestar. Va aquí y no en la cabecera porque un tercer botón
+                junto a «Proforma» y «Escritorio» no entra en pantallas angostas.
+            */}
+            {canInstall && !installDismissed && (
+                <div className="mx-3 mt-2 flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+                    <Download size={18} className="text-amber-400 shrink-0" aria-hidden="true" />
+                    <p className="flex-1 text-xs font-semibold text-slate-200 leading-snug">
+                        Instala LV Parts en tu teléfono para abrirlo como una app
+                    </p>
+                    <button
+                        onClick={handleInstall}
+                        className="shrink-0 min-h-[36px] px-3 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold active:bg-amber-600"
+                    >
+                        Instalar
+                    </button>
+                    <button
+                        onClick={dismissInstall}
+                        aria-label="No instalar por ahora"
+                        className="shrink-0 p-1.5 text-slate-500 active:text-slate-300"
+                    >
+                        <X size={16} aria-hidden="true" />
+                    </button>
+                </div>
+            )}
 
             {/* Main Content Area */}
             {/* data-mobile-scroll: aquí vive el scroll del modo móvil (no en <body>).

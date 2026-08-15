@@ -1,19 +1,53 @@
 {
-    "name": "DropshipERP Suite",
-    "short_name": "DropshipERP",
+    "id": "/",
+    "name": "LV Parts ERP",
+    "short_name": "LV Parts",
+    "description": "Catálogo, inventario, etiquetas y proformas de LV Parts.",
+    "lang": "es",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "theme_color": "#020617",
+    "background_color": "#020617",
     "icons": [
         {
             "src": "/android-chrome-192x192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "/android-chrome-512x512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
-    "theme_color": "#ffffff",
-    "background_color": "#ffffff",
-    "display": "standalone"
+    "shortcuts": [
+        {
+            "name": "Catálogo",
+            "short_name": "Catálogo",
+            "url": "/#/mobile/catalog",
+            "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Imprimir etiquetas",
+            "short_name": "Etiquetas",
+            "url": "/#/mobile/labels",
+            "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Proforma",
+            "short_name": "Proforma",
+            "url": "/#/mobile/proforma",
+            "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
+        }
+    ]
 }
