@@ -82,7 +82,7 @@ const ProductDemands: React.FC = () => {
     const [viewType, setViewType] = useState<'table' | 'list' | 'kanban' | 'grouped'>('table');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
-    const [stockFilter, setStockFilter] = useState<'all' | 'importer_only' | 'local_only' | 'no_stock' | 'approved_only'>('all');
+    const [stockFilter, setStockFilter] = useState<'all' | 'has_local' | 'importer_only' | 'local_only' | 'no_stock' | 'approved_only'>('all');
     const [flagFilter, setFlagFilter] = useState<string>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
@@ -512,6 +512,12 @@ const ProductDemands: React.FC = () => {
                 const localStock = d.product?.inventory_levels ? d.product.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
                 const hasLocalStock = localStock > 0;
 
+                // `has_local` mira solo la bodega propia: da igual lo que haya
+                // en la importadora. Es lo que hace falta para saber a quien se
+                // le puede entregar YA, sin depender de que llegue un pedido.
+                // `local_only` es mas estrecho: exige ademas que la importadora
+                // no lo tenga, y por eso escondia repuestos que si estan aqui.
+                if (stockFilter === 'has_local' && !hasLocalStock) return false;
                 if (stockFilter === 'importer_only' && (!hasImporterStock || hasLocalStock)) return false;
                 if (stockFilter === 'local_only' && (!hasLocalStock || hasImporterStock)) return false;
                 if (stockFilter === 'no_stock' && (hasImporterStock || hasLocalStock)) return false;
@@ -1254,6 +1260,7 @@ const ProductDemands: React.FC = () => {
                         className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
                     >
                         <option value="all">Stock: Todos</option>
+                        <option value="has_local">Hay en el local (sin importar la importadora)</option>
                         <option value="importer_only">Con stock en la importadora y no en local</option>
                         <option value="local_only">Con stock en local y no importadora</option>
                         <option value="no_stock">Sin stock completamente</option>

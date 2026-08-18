@@ -73,6 +73,11 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                 const localStock = d.product?.inventory_levels ? d.product.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
                 const hasLocalStock = localStock > 0;
 
+                // Mismo criterio que la pagina: `has_local` mira solo la bodega
+                // propia. Sin esta linea, elegir ese filtro en la pantalla y
+                // abrir la exportacion sacaba TODO, porque un filtro que el
+                // modal no reconoce no descarta nada.
+                if (stockFilter === 'has_local' && !hasLocalStock) return false;
                 if (stockFilter === 'importer_only' && (!hasImporterStock || hasLocalStock)) return false;
                 if (stockFilter === 'local_only' && (!hasLocalStock || hasImporterStock)) return false;
                 if (stockFilter === 'no_stock' && (hasImporterStock || hasLocalStock)) return false;
@@ -244,6 +249,7 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                             className="w-full bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
                         >
                             <option value="all">Todos</option>
+                            <option value="has_local">Hay en el local (sin importar la importadora)</option>
                             <option value="importer_only">Con stock en la importadora y no en local</option>
                             <option value="local_only">Con stock en local y no importadora</option>
                             <option value="no_stock">Sin stock completamente</option>
