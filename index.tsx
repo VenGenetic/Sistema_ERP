@@ -37,13 +37,18 @@ root.render(
   Sólo en producción: en desarrollo el service worker se interpondría entre el
   navegador y el servidor de Vite, y los cambios dejarían de verse al recargar.
 
-  Va después de render y colgado de 'load' para no competir por ancho de banda
-  con los archivos que la primera pantalla necesita para dibujarse.
+  Se registra ya, no colgado de 'load'.
+
+  Estaba diferido para no competir por ancho de banda con la primera pantalla,
+  pero el precio era peor: Chrome decide si un sitio es instalable "de verdad"
+  poco después de cargar, y uno de los requisitos es que exista un service
+  worker con manejador de fetch. Si todavía no estaba registrado en ese momento,
+  Chrome no ofrecía instalar la aplicación sino sólo añadir un acceso directo
+  del navegador — un icono que abre una pestaña con barra de direcciones, no una
+  app. El registro pesa unos pocos kilobytes y no bloquea el render.
 */
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.error('No se pudo registrar el service worker:', err);
-    });
+  navigator.serviceWorker.register('/sw.js').catch((err) => {
+    console.error('No se pudo registrar el service worker:', err);
   });
 }

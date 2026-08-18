@@ -24,7 +24,7 @@
  */
 
 // Cambiar este número invalida todo lo guardado por versiones anteriores.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `lvparts-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `lvparts-assets-${CACHE_VERSION}`;
 
@@ -35,6 +35,7 @@ const SHELL_URLS = [
     '/site.webmanifest',
     '/android-chrome-192x192.png',
     '/android-chrome-512x512.png',
+    '/maskable-512x512.png',
 ];
 
 self.addEventListener('install', (event) => {

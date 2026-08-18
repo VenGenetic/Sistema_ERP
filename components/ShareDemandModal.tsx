@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import {
   Copy,
@@ -32,13 +32,48 @@ interface ShareDemandModalProps {
     demand: ProductDemand | null;
 }
 
+/** Lado del ticket que se captura. La imagen que se manda al cliente es cuadrada. */
+const TICKET_SIZE = 500;
+
 export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
     isOpen,
     onClose,
     demand
 }) => {
     const printRef = useRef<HTMLDivElement>(null);
+    const holderRef = useRef<HTMLDivElement>(null);
     const [loading, setLoading] = useState(false);
+
+    /*
+        Cuánto hay que encoger el ticket para que quepa en pantalla.
+
+        El ticket mide 500×500 fijos porque ése es el tamaño de la imagen que se
+        envía al cliente. Pero colgaba suelto de un contenedor flex, y un hijo de
+        flex se encoge: en un teléfono de 360px el ancho bajaba a unos 280
+        mientras el alto seguía clavado en 500. El cuadrado se volvía un
+        rectángulo alto y todo lo de dentro —la foto del repuesto, los textos,
+        los márgenes— salía estirado.
+
+        Ahora se escala de verdad, con `transform`. El elemento que captura
+        html2canvas conserva su caja de 500×500, así que la imagen generada no
+        cambia ni pierde resolución; lo único que se encoge es cómo se ve.
+    */
+    const [scale, setScale] = useState(1);
+
+    useLayoutEffect(() => {
+        if (!isOpen) return;
+        const measure = () => {
+            const width = holderRef.current?.clientWidth ?? TICKET_SIZE;
+            setScale(Math.min(1, width / TICKET_SIZE));
+        };
+        measure();
+        window.addEventListener('resize', measure);
+        window.addEventListener('orientationchange', measure);
+        return () => {
+            window.removeEventListener('resize', measure);
+            window.removeEventListener('orientationchange', measure);
+        };
+    }, [isOpen]);
 
     if (!isOpen || !demand) return null;
 
@@ -94,8 +129,11 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
     const importerStock = demand.product?.importer_stock || 0;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-surface rounded-xl shadow-xl overflow-hidden flex flex-col w-[550px]">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+            {/* `w-full max-w-[550px]`: eran 550px fijos, más ancho que cualquier
+                teléfono, así que el panel se salía de la pantalla y arrastraba
+                consigo el aplastamiento del ticket. */}
+            <div className="bg-surface rounded-t-2xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col w-full max-w-[550px] max-h-[92dvh]">
                 
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">
@@ -117,12 +155,25 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                     usuario tenía el tema oscuro, y la imagen enviada al cliente
                     salía ilegible. Ver la definición en index.html.
                 */}
-                <div className="p-6 bg-surface-3 flex justify-center items-center">
+                <div ref={holderRef} className="p-4 sm:p-6 bg-surface-3 overflow-y-auto">
+                    {/* Hueco ya escalado: si no, el panel seguiría reservando los
+                        500px de alto aunque el ticket se vea más pequeño. */}
+                    <div
+                        className="relative mx-auto"
+                        style={{ width: TICKET_SIZE * scale, height: TICKET_SIZE * scale }}
+                    >
                     {/* Contenedor Cuadrado con Margen */}
                     <div
                         ref={printRef}
-                        className="on-paper bg-white flex items-center justify-center"
-                        style={{ width: '500px', height: '500px', padding: '24px', boxSizing: 'border-box' }}
+                        className="on-paper bg-white flex items-center justify-center absolute top-0 left-0"
+                        style={{
+                            width: `${TICKET_SIZE}px`,
+                            height: `${TICKET_SIZE}px`,
+                            padding: '24px',
+                            boxSizing: 'border-box',
+                            transform: `scale(${scale})`,
+                            transformOrigin: 'top left',
+                        }}
                     >
                         {/* Tarjeta del Ticket interna */}
                         <div className="bg-white rounded-xl shadow-sm border border-subtle flex flex-col overflow-hidden w-full h-full relative">
@@ -231,6 +282,7 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                             
                         </div>
                         </div>
+                    </div>
                     </div>
                 </div>
 
