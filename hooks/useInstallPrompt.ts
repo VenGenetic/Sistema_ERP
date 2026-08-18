@@ -7,48 +7,43 @@
  * la instalación detrás del menú de tres puntos, donde nadie la busca. Guardar
  * ese evento permite ofrecer un botón visible dentro de la propia app.
  *
- * El evento sólo puede usarse una vez, así que después de mostrarlo se descarta
- * y el botón desaparece.
+ * El evento se recoge en utils/installState.ts, ANTES de que React monte: el
+ * escuchador vivía aquí dentro, en un `useEffect`, y en una segunda visita
+ * —service worker ya activo, manifiesto en caché— Chrome puede dispararlo antes
+ * de ese punto. Como no se repite, la app se quedaba sin poder ofrecer la
+ * instalación durante toda la sesión, sin ninguna señal de que algo iba mal.
+ *
+ * Cuando no se puede instalar, `blocker` dice por qué, para que la pantalla lo
+ * explique en vez de callarse.
  */
 import { useCallback, useEffect, useState } from 'react';
-
-interface BeforeInstallPromptEvent extends Event {
-    prompt: () => Promise<void>;
-    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
-
-/** Ya está instalada si se abrió desde el icono en vez de desde el navegador. */
-const isRunningStandalone = (): boolean => {
-    if (typeof window === 'undefined') return false;
-    return (
-        window.matchMedia?.('(display-mode: standalone)').matches ||
-        // iOS no soporta display-mode y marca esto en el navigator.
-        (window.navigator as any).standalone === true
-    );
-};
+import {
+    consumeInstallPrompt,
+    getInstallBlocker,
+    getInstallPrompt,
+    isRunningStandalone,
+    subscribeInstallPrompt,
+    type BeforeInstallPromptEvent,
+    type InstallBlocker,
+} from '../utils/installState';
 
 export const useInstallPrompt = () => {
-    const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+    const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(getInstallPrompt);
     const [installed, setInstalled] = useState(isRunningStandalone);
+    const [blocker, setBlocker] = useState<InstallBlocker>(getInstallBlocker);
 
     useEffect(() => {
-        const handleBeforeInstall = (event: Event) => {
-            // Sin preventDefault Chrome muestra su propia barra, y entonces
-            // habría dos invitaciones a instalar compitiendo en pantalla.
-            event.preventDefault();
-            setPromptEvent(event as BeforeInstallPromptEvent);
-        };
+        const unsubscribe = subscribeInstallPrompt((evt) => {
+            setPromptEvent(evt);
+            if (!evt && isRunningStandalone()) setInstalled(true);
+            setBlocker(getInstallBlocker());
+        });
 
-        const handleInstalled = () => {
-            setPromptEvent(null);
-            setInstalled(true);
-        };
-
-        window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-        window.addEventListener('appinstalled', handleInstalled);
+        const onInstalled = () => setInstalled(true);
+        window.addEventListener('appinstalled', onInstalled);
         return () => {
-            window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-            window.removeEventListener('appinstalled', handleInstalled);
+            unsubscribe();
+            window.removeEventListener('appinstalled', onInstalled);
         };
     }, []);
 
@@ -56,14 +51,15 @@ export const useInstallPrompt = () => {
         if (!promptEvent) return 'unavailable';
         await promptEvent.prompt();
         const { outcome } = await promptEvent.userChoice;
-        // Consumido: el navegador no permite reutilizar el mismo evento.
-        setPromptEvent(null);
+        consumeInstallPrompt();
         return outcome;
     }, [promptEvent]);
 
     return {
         canInstall: !installed && promptEvent !== null,
         installed,
+        /** Por qué no se puede instalar ahora mismo. Null si sí se puede. */
+        blocker: promptEvent ? null : blocker,
         promptInstall,
     };
 };

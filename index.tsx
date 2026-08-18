@@ -1,6 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { captureInstallPrompt } from './utils/installState';
+
+/*
+  Antes de renderizar.
+
+  Chrome dispara `beforeinstallprompt` en cuanto decide que el sitio es
+  instalable, y en una segunda visita —service worker ya activo, manifiesto en
+  caché— eso puede pasar antes de que React monte. El evento no se repite: si
+  nadie estaba escuchando, la app se queda sin poder ofrecer la instalación
+  durante toda la sesión.
+*/
+captureInstallPrompt();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -21,30 +21,40 @@ const MobileLayout: React.FC = () => {
     const proformaCount = useProformaStore(s => s.items.length);
 
     const { canInstall, promptInstall } = useInstallPrompt();
-    // El descarte se recuerda entre sesiones: quien ya dijo que no, no debería
-    // volver a ver el aviso cada vez que abre el sistema.
-    const [installDismissed, setInstallDismissed] = useState(() => {
+
+    /*
+        Descarte del aviso, con fecha de caducidad.
+
+        Se guardaba un `true` sin más: un toque en la X y la invitación a
+        instalar no volvía nunca, en ese teléfono, para siempre. Y `dismissed`
+        también se marcaba al cerrar el diálogo de Chrome, así que abrirlo por
+        curiosidad y cerrarlo bastaba para perder el acceso definitivamente.
+
+        Ahora se pospone un mes, y cerrar el diálogo del navegador no cuenta
+        como un no. Además siempre queda la entrada fija en la pantalla de
+        Inicio, que no depende de esto.
+    */
+    const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
+    const [installSnoozed, setInstallSnoozed] = useState(() => {
         try {
-            return localStorage.getItem('install_prompt_dismissed') === 'true';
+            const until = Number(localStorage.getItem('install_prompt_snoozed_until') || 0);
+            return Date.now() < until;
         } catch {
             return false;
         }
     });
 
-    const dismissInstall = () => {
-        setInstallDismissed(true);
+    const snoozeInstall = () => {
+        setInstallSnoozed(true);
         try {
-            localStorage.setItem('install_prompt_dismissed', 'true');
+            localStorage.setItem('install_prompt_snoozed_until', String(Date.now() + SNOOZE_MS));
         } catch {
             // Modo privado: se oculta igual durante esta sesión.
         }
     };
 
     const handleInstall = async () => {
-        const outcome = await promptInstall();
-        // Rechazar el diálogo del navegador también cuenta como "no me
-        // interesa": insistir en cada visita sería molesto.
-        if (outcome === 'dismissed') dismissInstall();
+        await promptInstall();
     };
 
     const refreshQueueCount = useCallback(async () => {
@@ -151,7 +161,7 @@ const MobileLayout: React.FC = () => {
                 a molestar. Va aquí y no en la cabecera porque un tercer botón
                 junto a «Proforma» y «Escritorio» no entra en pantallas angostas.
             */}
-            {canInstall && !installDismissed && (
+            {canInstall && !installSnoozed && (
                 <div className="mx-3 mt-2 flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
                     <Download size={18} className="text-amber-400 shrink-0" aria-hidden="true" />
                     <p className="flex-1 text-xs font-semibold text-slate-200 leading-snug">
@@ -164,9 +174,9 @@ const MobileLayout: React.FC = () => {
                         Instalar
                     </button>
                     <button
-                        onClick={dismissInstall}
-                        aria-label="No instalar por ahora"
-                        className="shrink-0 p-1.5 text-slate-500 active:text-slate-300"
+                        onClick={snoozeInstall}
+                        aria-label="Ahora no"
+                        className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 active:text-slate-300"
                     >
                         <X size={16} aria-hidden="true" />
                     </button>
