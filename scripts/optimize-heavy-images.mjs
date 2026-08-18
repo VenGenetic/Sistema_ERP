@@ -1,6 +1,11 @@
 /**
  * optimize-heavy-images.mjs
  *
+ * OBSOLETO: lo reemplaza scripts/optimize_product_images.py, que convierte en
+ * local con Pillow (sin pasar por el transformador de Supabase, que se factura
+ * por imagen origen), cubre también la galería y se puede correr las veces que
+ * haga falta. Se conserva sólo como registro de la migración original.
+ *
  * Convierte a WebP las imágenes de producto que quedaron pesadas (los PNG/JPG
  * que se subieron crudos desde la app antes de que existiera la compresión en
  * utils/imageCompression.ts). El 97% del catálogo ya son WebP de ~16 KB; esto
