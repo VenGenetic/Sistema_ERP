@@ -8,7 +8,7 @@ import { Download, FileText, House, LayoutGrid, Monitor, Printer, ScanLine, Smar
 
 /** Un solo sitio para el estilo de las pestañas: activo = ámbar y algo más grande. */
 const navItem = (isActive: boolean) =>
-    `flex flex-col items-center justify-center p-2 min-w-[56px] rounded-2xl transition-all duration-300 ${
+    `flex flex-col items-center justify-center gap-0.5 px-2 min-w-[56px] min-h-[56px] rounded-2xl transition-all duration-300 ${
         isActive ? 'text-amber-400 font-semibold scale-110' : 'text-slate-500 active:text-slate-200'
     }`;
 
@@ -49,14 +49,12 @@ const MobileLayout: React.FC = () => {
 
     const refreshQueueCount = useCallback(async () => {
         const queue = await getPrintQueue();
-        setQueueCount(queue.length);
+        setQueueCount(queue.reduce((total, item) => total + item.quantity, 0));
     }, []);
 
-    useEffect(() => {
-        refreshQueueCount();
-    }, [refreshQueueCount]);
-
-    // Refresh queue badge whenever the route changes (e.g., after adding from catalog)
+    // Se refresca al montar y en cada cambio de ruta (por ejemplo al volver del
+    // catálogo después de encolar). El efecto de montaje aparte sobraba: éste ya
+    // corre en la primera pasada.
     useEffect(() => {
         refreshQueueCount();
     }, [location.pathname, refreshQueueCount]);
@@ -67,6 +65,30 @@ const MobileLayout: React.FC = () => {
         window.addEventListener('print-queue-changed', refreshQueueCount);
         return () => window.removeEventListener('print-queue-changed', refreshQueueCount);
     }, [refreshQueueCount]);
+
+    /*
+        Tema oscuro forzado mientras dure el modo móvil.
+
+        Los modales que esta parte comparte con el escritorio —editar producto,
+        demanda, etiquetas, edición en lote, sourcing, equivalentes...— se pintan
+        con tokens semánticos (`bg-surface`, `text-fg`) que siguen el tema del
+        escritorio. Con el tema claro activo, cada uno se abría en blanco dentro
+        de una interfaz que MASTER.md fija en `slate-950`: exactamente el fallo
+        que MobileSearchBar documenta haber arreglado en su campo y su panel.
+
+        La clase `dark` en <html> es lo único que decide esos tokens (ver
+        utils/theme.ts), así que se pone al entrar y se devuelve al salir. La
+        preferencia guardada del usuario no se toca: al volver al escritorio
+        manda otra vez la suya.
+    */
+    useEffect(() => {
+        const root = document.documentElement;
+        const wasDark = root.classList.contains('dark');
+        root.classList.add('dark');
+        return () => {
+            if (!wasDark) root.classList.remove('dark');
+        };
+    }, []);
 
     const handleSwitchToDesktop = () => {
         setPreferredViewMode('desktop');
@@ -92,7 +114,7 @@ const MobileLayout: React.FC = () => {
                         to="/mobile/proforma"
                         aria-label={proformaCount > 0 ? `Proforma, ${proformaCount} ítems` : 'Proforma'}
                         className={({ isActive }) =>
-                            `relative flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+                            `relative flex items-center gap-1.5 text-xs font-semibold min-h-[44px] px-3.5 rounded-full border transition-colors ${
                                 isActive
                                     ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
                                     : 'bg-slate-900 text-slate-300 border-slate-800 active:bg-slate-800 active:text-white'
@@ -102,18 +124,23 @@ const MobileLayout: React.FC = () => {
                         <FileText size={14} aria-hidden="true" />
                         <span>Proforma</span>
                         {proformaCount > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-amber-500 text-slate-950 text-[10px] font-black rounded-full border-2 border-slate-950">
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full border-2 border-slate-950">
                                 {proformaCount}
                             </span>
                         )}
                     </NavLink>
+                    {/*
+                        «Escritorio» se queda como icono a secas: es una salida de
+                        emergencia que se usa una vez al día, y ocupaba tanto como
+                        la proforma, que es donde se trabaja. El sitio que libera
+                        se lo lleva la pastilla de la proforma.
+                    */}
                     <button
                         onClick={handleSwitchToDesktop}
-                        className="flex items-center gap-1.5 text-xs bg-slate-900 text-slate-300 px-2.5 py-1.5 rounded-full border border-slate-800 active:bg-slate-800 active:text-white active:border-amber-500/40 transition-colors"
-                        title="Ver versión completa de escritorio"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-slate-900 text-slate-400 rounded-full border border-slate-800 active:bg-slate-800 active:text-white active:border-amber-500/40 transition-colors"
+                        aria-label="Ver versión completa de escritorio"
                     >
-                        <Monitor size={14} aria-hidden="true" />
-                        <span>Escritorio</span>
+                        <Monitor size={16} aria-hidden="true" />
                     </button>
                 </div>
             </header>
@@ -183,7 +210,7 @@ const MobileLayout: React.FC = () => {
                                             className={`mb-0.5 transition-all duration-300 ${isActive ? 'drop-shadow-md' : ''}`}
                                             aria-hidden="true"
                                         />
-                                        <span className="text-[9px] uppercase tracking-wider font-medium">Inicio</span>
+                                        <span className="text-xs uppercase tracking-wide font-medium leading-none">Inicio</span>
                                     </>
                                 )}
                             </NavLink>
@@ -198,7 +225,7 @@ const MobileLayout: React.FC = () => {
                                             className={`mb-0.5 transition-all duration-300 ${isActive ? 'drop-shadow-md' : ''}`}
                                             aria-hidden="true"
                                         />
-                                        <span className="text-[9px] uppercase tracking-wider font-medium">Catálogo</span>
+                                        <span className="text-xs uppercase tracking-wide font-medium leading-none">Catálogo</span>
                                     </>
                                 )}
                             </NavLink>
@@ -217,7 +244,7 @@ const MobileLayout: React.FC = () => {
                             >
                                 <Printer size={26} strokeWidth={2.25} aria-hidden="true" />
                                 {queueCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-slate-950 text-amber-300 text-[10px] font-black rounded-full border-2 border-amber-300 shadow-md">
+                                    <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-slate-950 text-amber-300 text-xs font-black rounded-full border-2 border-amber-300 shadow-md">
                                         {queueCount}
                                     </span>
                                 )}
@@ -233,7 +260,7 @@ const MobileLayout: React.FC = () => {
                                             className={`mb-0.5 transition-all duration-300 ${isActive ? 'drop-shadow-md' : ''}`}
                                             aria-hidden="true"
                                         />
-                                        <span className="text-[9px] uppercase tracking-wider font-medium">Inventario</span>
+                                        <span className="text-xs uppercase tracking-wide font-medium leading-none">Inventario</span>
                                     </>
                                 )}
                             </NavLink>

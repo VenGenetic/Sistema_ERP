@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, LayoutGrid, Lightbulb, Monitor, Printer, ScanLine } from 'lucide-react';
+import { ArrowRight, FileText, LayoutGrid, Lightbulb, Printer, ScanLine } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { getPrintQueue, getQueueTotalLabels } from '../../utils/mobilePrintQueue';
+import { getPrintHistory } from '../../utils/mobilePrintHistory';
+import { useProformaStore } from '../../store/useProformaStore';
 
 /**
  * Nombre para saludar. El apodo manda sobre el nombre completo, y del nombre
@@ -21,24 +24,67 @@ const MobileDashboard: React.FC = () => {
     const navigate = useNavigate();
     const name = useGreetingName();
 
+    /*
+        La pantalla de inicio no decía nada: tres botones de navegación y un
+        consejo fijo. Lo que importa al abrir la app es qué quedó a medias, y
+        esos datos ya están en memoria —la cola en su caché de módulo, la
+        proforma en su store— así que enseñarlos no cuesta ni una petición.
+    */
+    const proformaCount = useProformaStore(s => s.items.length);
+    const [queueLabels, setQueueLabels] = useState(0);
+    const [lastPrinted, setLastPrinted] = useState<string | null>(null);
+
+    const refreshCounters = useCallback(async () => {
+        setQueueLabels(getQueueTotalLabels(await getPrintQueue()));
+        setLastPrinted(getPrintHistory()[0]?.sku ?? null);
+    }, []);
+
+    useEffect(() => { refreshCounters(); }, [refreshCounters]);
+
+    useEffect(() => {
+        window.addEventListener('print-queue-changed', refreshCounters);
+        return () => window.removeEventListener('print-queue-changed', refreshCounters);
+    }, [refreshCounters]);
+
     return (
-        <div className="p-6 h-full flex flex-col pt-12 animate-fade-in">
+        <div className="p-6 pt-12 pb-mobile-page min-h-full flex flex-col animate-fade-in">
             {/* Header */}
             <div className="mb-8">
-                <div className="flex justify-between items-center mb-2">
-                    <h1 className="text-3xl font-black text-white tracking-tight">
-                        {name ? `Hola, ${name}` : 'Hola'}
-                    </h1>
-                    <button
-                        onClick={() => navigate('/')}
-                        className="p-2 rounded-full bg-slate-900 border border-slate-800 shadow-sm text-slate-500 active:text-amber-400 active:bg-slate-800 transition-colors"
-                        title="Volver al escritorio"
-                        aria-label="Volver al escritorio"
-                    >
-                        <Monitor size={20} aria-hidden="true" />
-                    </button>
-                </div>
-                <p className="text-slate-400">Bienvenido a la versión móvil</p>
+                {/* «Escritorio» vivía aquí y también en la cabecera del layout,
+                    que está en todas las pantallas. Se queda solo allí. */}
+                <h1 className="text-3xl font-black text-white tracking-tight mb-2">
+                    {name ? `Hola, ${name}` : 'Hola'}
+                </h1>
+                <p className="text-slate-400 text-sm">
+                    {queueLabels > 0 || proformaCount > 0
+                        ? 'Tienes trabajo a medias'
+                        : 'Todo al día. Escanea para empezar.'}
+                </p>
+
+                {(queueLabels > 0 || proformaCount > 0) && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                        {queueLabels > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => navigate('/mobile/labels')}
+                                className="min-h-[44px] px-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-bold flex items-center gap-2 active:bg-amber-500/20"
+                            >
+                                <Printer size={16} aria-hidden="true" />
+                                {queueLabels} etiqueta{queueLabels !== 1 ? 's' : ''} en cola
+                            </button>
+                        )}
+                        {proformaCount > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => navigate('/mobile/proforma')}
+                                className="min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 text-sm font-bold flex items-center gap-2 active:bg-slate-800"
+                            >
+                                <FileText size={16} aria-hidden="true" />
+                                {proformaCount} ítem{proformaCount !== 1 ? 's' : ''} en proforma
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Quick Actions */}
@@ -76,7 +122,9 @@ const MobileDashboard: React.FC = () => {
                 </div>
                 <div className="flex-1 text-left">
                     <span className="font-black text-lg block">Imprimir Etiquetas</span>
-                    <span className="text-slate-950/70 text-sm font-semibold">Buscar → Imprimir → Siguiente</span>
+                    <span className="text-slate-950/70 text-sm font-semibold">
+                        {lastPrinted ? `Último: ${lastPrinted}` : 'Buscar → Imprimir → Siguiente'}
+                    </span>
                 </div>
                 <ArrowRight size={26} className="text-slate-950/50" aria-hidden="true" />
             </button>
@@ -93,16 +141,6 @@ const MobileDashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
-
-            <style>{`
-                @keyframes fade-in {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-in {
-                    animation: fade-in 0.4s ease-out forwards;
-                }
-            `}</style>
         </div>
     );
 };

@@ -90,9 +90,14 @@ export const QuickTagAssignModal: React.FC<QuickTagAssignModalProps> = ({ isOpen
 
     if (!isOpen) return null;
 
+    /*
+        Anclado abajo en el teléfono (MASTER.md: las ventanas entran por
+        abajo, al alcance del pulgar) y centrado a partir de `sm`, que es
+        el escritorio. La versión grande no cambia.
+    */
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-surface rounded-xl shadow-lg w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4">
+            <div className="bg-surface rounded-t-2xl sm:rounded-xl shadow-lg w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-4 border-b border-subtle flex justify-between items-center">
                     <div>
                         <h3 className="font-bold text-fg flex items-center gap-2">

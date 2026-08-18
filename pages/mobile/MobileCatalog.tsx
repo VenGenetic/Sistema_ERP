@@ -17,7 +17,7 @@ import { SourcingQuickEditModal } from '../../components/SourcingQuickEditModal'
 import { BulkEditModal } from '../../components/BulkEditModal';
 import { InventoryGroupSelectModal } from '../../components/InventoryGroupSelectModal';
 
-import { addToPrintHistory } from '../../utils/mobileLabelPrinter';
+import { addToPrintHistory } from '../../utils/mobilePrintHistory';
 import { addToQueue } from '../../utils/mobilePrintQueue';
 import { shareProductCard } from '../../utils/productShareCard';
 import { compressImageForUpload } from '../../utils/imageCompression';
@@ -37,6 +37,7 @@ import {
     FileText,
     Hourglass,
     Image as ImageIcon,
+    Info,
     ImageDown,
     ImageOff,
     Link as LinkIcon,
@@ -151,26 +152,44 @@ const money = (v: number | null | undefined) =>
 /**
  * Congela el scroll del modo móvil mientras haya hojas abiertas.
  *
- * El scroll no vive en <body> sino en el <main> del layout, así que el truco
- * habitual (`document.body.style.overflow`) no hacía nada: la lista de repuestos
- * seguía corriendo bajo el dedo con la hoja encima. Se cuenta cuántas hojas hay
- * abiertas para no descongelar de más al cerrar una sobre otra.
+ * El scroll no vive en <body> sino en contenedores marcados con
+ * `data-mobile-scroll`: el <main> del layout y —en esta pantalla— la propia
+ * lista de repuestos, que tiene su scroll interno. Por eso se congelan TODOS
+ * los que haya: bloquear solo el <main> no servía de nada aquí, porque el
+ * catálogo mide `h-full` y el que se desplaza bajo el dedo es el de dentro.
+ *
+ * Se cuenta cuántas hojas hay abiertas para no descongelar de más al cerrar una
+ * sobre otra, y el valor original se guarda UNA sola vez, al echar el primer
+ * cerrojo. Guardarlo por hoja dejaba el scroll muerto para siempre: la segunda
+ * hoja copiaba el `hidden` que había puesto la primera y lo "restauraba" al
+ * cerrarse.
  */
 let openSheetCount = 0;
+let lockedScrollers: { el: HTMLElement; previousOverflow: string }[] = [];
 
 const useMobileScrollLock = (active: boolean) => {
     useEffect(() => {
         if (!active) return;
 
-        const scroller = document.querySelector<HTMLElement>('[data-mobile-scroll]');
-        const previousOverflow = scroller?.style.overflow ?? '';
-
+        if (openSheetCount === 0) {
+            lockedScrollers = Array.from(
+                document.querySelectorAll<HTMLElement>('[data-mobile-scroll]')
+            ).map(el => {
+                const previousOverflow = el.style.overflow;
+                el.style.overflow = 'hidden';
+                return { el, previousOverflow };
+            });
+        }
         openSheetCount += 1;
-        if (scroller) scroller.style.overflow = 'hidden';
 
         return () => {
             openSheetCount -= 1;
-            if (openSheetCount === 0 && scroller) scroller.style.overflow = previousOverflow;
+            if (openSheetCount === 0) {
+                lockedScrollers.forEach(({ el, previousOverflow }) => {
+                    el.style.overflow = previousOverflow;
+                });
+                lockedScrollers = [];
+            }
         };
     }, [active]);
 };
@@ -301,6 +320,12 @@ interface CardProps {
     onQuickPrint: (e: React.MouseEvent) => void;
     onQueue: () => void;
     /**
+     * Cajón abierto ahora mismo en toda la lista. Cada tarjeta guardaba el suyo,
+     * así que recorriendo el catálogo se quedaban varios abiertos a la vez.
+     */
+    openDrawerId: number | null;
+    onDrawerChange: (id: number | null) => void;
+    /**
      * Constructor de acciones, no el array ya construido.
      *
      * Si el padre pasara el array, su identidad cambiaría en cada render y
@@ -310,12 +335,32 @@ interface CardProps {
     buildActions: (prod: any) => CardActionDef[];
 }
 
+/**
+ * Diálogo de la pantalla: confirmar, pedir un dato o avisar.
+ *
+ * Sustituye a `window.confirm`, `window.prompt` y `alert`, que aquí eran diez.
+ * Los nativos salen centrados, con el estilo del sistema operativo —claro,
+ * dentro de una interfaz que el spec fija en `slate-950`— y dejan sus botones
+ * en mitad de la pantalla, fuera del arco del pulgar. Etiquetas ya los había
+ * eliminado por lo mismo; aquí faltaba.
+ */
+type DialogRequest = {
+    title: string;
+    body?: string;
+    /** Si está, el diálogo pide un texto y lo pasa a `onConfirm`. */
+    prompt?: { label: string; initial: string; placeholder?: string };
+    confirmLabel?: string;
+    tone?: 'default' | 'danger';
+    /** Sin esto el diálogo es un aviso: un solo botón para cerrarlo. */
+    onConfirm?: (value: string) => void;
+};
+
 /** Umbral y ancho del cajón que se descubre al deslizar la tarjeta. */
 const SWIPE_MAX = 152;
 const SWIPE_SNAP = 60;
 
 const ProductCard: React.FC<CardProps> = React.memo(({
-    prod, isSelected, isExpanded, copiedSku, equivalents,
+    prod, isSelected, isExpanded, copiedSku, equivalents, openDrawerId, onDrawerChange,
     onToggleExpand, onToggleSelect, onOpenLightbox, onCopySku, onQuickPrint, onQueue, buildActions,
 }) => {
     const actions = useMemo(() => buildActions(prod), [buildActions, prod]);
@@ -334,8 +379,13 @@ const ProductCard: React.FC<CardProps> = React.memo(({
         recorrer la lista con el pulgar, que es el fallo típico de este patrón.
     */
     const [dragX, setDragX] = useState(0);
-    const [open, setOpen] = useState(false);
+    const open = openDrawerId === prod.id;
     const touch = useRef<{ x: number; y: number; locked: boolean | null }>({ x: 0, y: 0, locked: null });
+
+    // Si otra tarjeta abre su cajón, ésta vuelve a su sitio sola.
+    useEffect(() => {
+        if (!open) setDragX(0);
+    }, [open]);
 
     const onTouchStart = (e: React.TouchEvent) => {
         touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, locked: null };
@@ -358,12 +408,12 @@ const ProductCard: React.FC<CardProps> = React.memo(({
     const onTouchEnd = () => {
         if (!touch.current.locked) return;
         const shouldOpen = dragX < -SWIPE_SNAP;
-        setOpen(shouldOpen);
+        onDrawerChange(shouldOpen ? prod.id : null);
         setDragX(shouldOpen ? -SWIPE_MAX : 0);
         touch.current.locked = null;
     };
 
-    const closeDrawer = () => { setOpen(false); setDragX(0); };
+    const closeDrawer = () => { onDrawerChange(null); setDragX(0); };
 
     return (
         <div className="relative rounded-2xl overflow-hidden">
@@ -431,7 +481,7 @@ const ProductCard: React.FC<CardProps> = React.memo(({
                             <ImageOff size={22} className="text-slate-600" aria-hidden="true" />
                         )}
                         {globalStock <= 0 && importer <= 0 && (
-                            <span className="absolute inset-x-0 bottom-0 bg-rose-600 text-white text-[10px] uppercase font-bold tracking-wide text-center py-0.5">
+                            <span className="absolute inset-x-0 bottom-0 bg-rose-600 text-white text-xs uppercase font-bold tracking-wide text-center py-0.5">
                                 Agotado
                             </span>
                         )}
@@ -525,7 +575,7 @@ const ProductCard: React.FC<CardProps> = React.memo(({
                             <button
                                 type="button"
                                 onClick={onCopySku}
-                                className="ml-auto min-h-[36px] px-3 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1.5 active:bg-slate-700"
+                                className="ml-auto min-h-[44px] px-3 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1.5 active:bg-slate-700"
                             >
                                 {copiedSku === prod.sku ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                                 {copiedSku === prod.sku ? 'Copiado' : 'Copiar SKU'}
@@ -597,6 +647,8 @@ const ProductCard: React.FC<CardProps> = React.memo(({
     prev.isExpanded === next.isExpanded &&
     prev.equivalents === next.equivalents &&
     prev.buildActions === next.buildActions &&
+    (prev.openDrawerId === next.openDrawerId ||
+        (prev.openDrawerId !== prev.prod.id && next.openDrawerId !== next.prod.id)) &&
     (prev.copiedSku === next.copiedSku ||
         (prev.copiedSku !== prev.prod.sku && next.copiedSku !== next.prod.sku))
 );
@@ -647,6 +699,8 @@ const MobileCatalog: React.FC = () => {
     const [headerCompact, setHeaderCompact] = useState(false);
 
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [openDrawerId, setOpenDrawerId] = useState<number | null>(null);
+    const [dialog, setDialog] = useState<DialogRequest | null>(null);
 
     // Modales
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -675,10 +729,19 @@ const MobileCatalog: React.FC = () => {
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    /*
+        Un solo temporizador para el aviso. Con uno por llamada, dos acciones
+        seguidas (encolar y compartir, por ejemplo) hacían que el primer
+        temporizador borrara el segundo mensaje a mitad de camino; y el último
+        quedaba corriendo tras salir de la pantalla.
+    */
+    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const notify = useCallback((msg: string) => {
+        if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast(msg);
-        setTimeout(() => setToast(null), 2400);
+        toastTimer.current = setTimeout(() => setToast(null), 2400);
     }, []);
+    useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
     const buzz = (ms = 40) => { if (navigator.vibrate) navigator.vibrate(ms); };
 
@@ -714,8 +777,17 @@ const MobileCatalog: React.FC = () => {
             });
         }
 
-        if (f.discontinuedStatus === 'descontinuados') list = list.filter(p => p.is_discontinued === true);
-        else if (f.discontinuedStatus === 'activos') list = list.filter(p => !p.is_discontinued);
+        /*
+            Mismo criterio que la insignia «Desc.» de la tarjeta.
+
+            El filtro miraba `is_discontinued` a secas mientras la tarjeta usa
+            `isProductDiscontinued`, que además comprueba si la fecha de
+            `discontinued_until` ya pasó. Un repuesto descontinuado sólo hasta
+            una fecha vencida se veía SIN insignia (correcto, ya volvió) pero
+            «Solo activos» lo escondía y «Descontinuados» lo mostraba.
+        */
+        if (f.discontinuedStatus === 'descontinuados') list = list.filter(p => isProductDiscontinued(p));
+        else if (f.discontinuedStatus === 'activos') list = list.filter(p => !isProductDiscontinued(p));
 
         // El orden por relevancia del buscador manda: reordenar por nombre
         // destruiría el ranking del motor de búsqueda.
@@ -758,6 +830,10 @@ const MobileCatalog: React.FC = () => {
         }, { rootMargin: '400px' });
         if (node) observer.current.observe(node);
     }, [catalogLoading, hasMore]);
+
+    // El observador se reemplaza en cada cambio de la lista, pero el último se
+    // quedaba observando un nodo ya desmontado al salir del catálogo.
+    useEffect(() => () => observer.current?.disconnect(), []);
 
     /* ── Scroll: cabecera compacta + volver arriba ── */
     const handleScroll = useCallback(() => {
@@ -805,13 +881,42 @@ const MobileCatalog: React.FC = () => {
         await refreshCatalog();
     };
 
-    const handleCopySku = (sku: string, e: React.MouseEvent) => {
+    /*
+        `navigator.clipboard` sólo existe en contextos seguros: por HTTPS o en
+        localhost. Al abrir el sistema desde el teléfono por la IP de la red
+        local (http://192.168.x.x) la API no está, y `navigator.clipboard.write…`
+        reventaba con TypeError antes siquiera de devolver la promesa — sin
+        `catch`, además. Se cae al método viejo de `execCommand` para que el
+        botón siga sirviendo, y si tampoco hay, se avisa en vez de no hacer nada.
+    */
+    const handleCopySku = async (sku: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(sku).then(() => {
+        const markCopied = () => {
             buzz(50);
             setCopiedSku(sku);
             setTimeout(() => setCopiedSku(prev => (prev === sku ? null : prev)), 2000);
-        });
+        };
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(sku);
+                markCopied();
+                return;
+            }
+            const helper = document.createElement('textarea');
+            helper.value = sku;
+            helper.setAttribute('readonly', '');
+            helper.style.position = 'fixed';
+            helper.style.opacity = '0';
+            document.body.appendChild(helper);
+            helper.select();
+            const ok = document.execCommand('copy');
+            document.body.removeChild(helper);
+            if (ok) markCopied();
+            else notify(`No se pudo copiar. El código es ${sku}`);
+        } catch {
+            notify(`No se pudo copiar. El código es ${sku}`);
+        }
     };
 
     /**
@@ -843,46 +948,97 @@ const MobileCatalog: React.FC = () => {
         setLightbox({ isOpen: true, media, initialIndex: 0, product: prod });
     };
 
-    const handleDeleteProduct = async (product: any) => {
-        const globalStock = product.inventory_levels?.reduce((acc: number, l: any) => acc + (l.current_stock || 0), 0) || 0;
-        if (globalStock > 0) {
-            alert(`No se puede eliminar "${product.name}" porque tiene stock (${globalStock} unidades). Vacía el inventario primero.`);
-            return;
-        }
-        if (!window.confirm(`¿Eliminar permanentemente "${product.sku}"? Esta acción no se puede deshacer.`)) return;
-
+    const deleteProductConfirmed = async (product: any) => {
         try {
             const { data, error } = await supabase.from('products').delete().eq('id', product.id).select();
             if (error) {
                 if (error.code === '23503') {
-                    if (window.confirm('Tiene historial. ¿Ocultarlo definitivamente?')) {
-                        await supabase.from('products').update({ is_active: false }).eq('id', product.id);
-                        notify('Repuesto ocultado');
-                    }
-                } else throw error;
-            } else if (!data || data.length === 0) {
-                throw new Error('Sin permisos para eliminar.');
-            } else {
-                notify('Repuesto eliminado');
+                    setDialog({
+                        title: 'Tiene historial de movimientos',
+                        body: `${product.sku} aparece en ventas o ajustes anteriores, así que no se puede borrar sin romperlos. Se puede ocultar: deja de aparecer en el catálogo y su historial queda intacto.`,
+                        confirmLabel: 'Ocultar repuesto',
+                        onConfirm: async () => {
+                            const { error: hideErr } = await supabase.from('products').update({ is_active: false }).eq('id', product.id);
+                            if (hideErr) {
+                                setDialog({ title: 'No se pudo ocultar', body: hideErr.message });
+                                return;
+                            }
+                            notify('Repuesto ocultado');
+                            refreshInPlace();
+                        },
+                    });
+                    return;
+                }
+                throw error;
             }
+            if (!data || data.length === 0) throw new Error('Tu usuario no tiene permiso para eliminar repuestos.');
+            notify('Repuesto eliminado');
             refreshInPlace();
         } catch (error: any) {
-            alert('Error: ' + error.message);
+            setDialog({ title: 'No se pudo eliminar', body: error.message });
         }
     };
 
-    const handleDuplicateProduct = async (prod: any) => {
-        const newSku = window.prompt(`Nuevo SKU para la copia de "${prod.sku}":`, `${prod.sku}-COPIA`);
-        if (!newSku || !newSku.trim()) return;
+    const handleDeleteProduct = (product: any) => {
+        const globalStock = product.inventory_levels?.reduce((acc: number, l: any) => acc + (l.current_stock || 0), 0) || 0;
+        if (globalStock > 0) {
+            setDialog({
+                title: 'Tiene stock en el almacén',
+                body: `${product.sku} todavía tiene ${globalStock} unidad${globalStock !== 1 ? 'es' : ''}. Vacía su inventario antes de eliminarlo.`,
+            });
+            return;
+        }
+        setDialog({
+            title: `¿Eliminar ${product.sku}?`,
+            body: 'Se borra de forma permanente y no se puede deshacer.',
+            confirmLabel: 'Eliminar',
+            tone: 'danger',
+            onConfirm: () => deleteProductConfirmed(product),
+        });
+    };
+
+    /**
+     * Duplicar.
+     *
+     * La fila que trae la lista sólo tiene las columnas que pinta la tarjeta
+     * (ver MOBILE_PRODUCT_SELECT), así que copiarla dejaba fuera la marca, el
+     * stock mínimo, el margen y las banderas de importadora: la copia nacía con
+     * los valores por defecto de la base y en silencio. Se pide la fila completa
+     * antes de insertar, igual que hace handleEditProduct.
+     */
+    const duplicateProductConfirmed = async (prod: any, newSku: string) => {
+        const sku = newSku.trim();
+        if (!sku) {
+            setDialog({ title: 'Hace falta un código', body: 'La copia necesita un SKU distinto del original.' });
+            return;
+        }
         try {
-            const { id, created_at, brands, inventory_levels, product_tags, profiles, ...rest } = prod;
-            const { error } = await supabase.from('products').insert([{ ...rest, sku: newSku.trim(), is_active: true }]);
-            if (error) throw error;
-            notify(`Creado ${newSku.trim()}`);
+            const { data: full, error: fetchErr } = await supabase
+                .from('products').select('*').eq('id', prod.id).single();
+            if (fetchErr || !full) throw fetchErr || new Error('No se pudo leer el repuesto original.');
+
+            const { id, created_at, updated_at, ...rest } = full as any;
+            const { error } = await supabase.from('products').insert([{ ...rest, sku, is_active: true }]);
+            if (error) {
+                throw new Error(error.code === '23505'
+                    ? `Ya existe un repuesto con el código ${sku}.`
+                    : error.message);
+            }
+            notify(`Creado ${sku}`);
             refreshInPlace();
         } catch (error: any) {
-            alert('No se pudo duplicar: ' + error.message);
+            setDialog({ title: 'No se pudo duplicar', body: error.message });
         }
+    };
+
+    const handleDuplicateProduct = (prod: any) => {
+        setDialog({
+            title: `Duplicar ${prod.sku}`,
+            body: 'Se copia todo el repuesto —precios, marca, stock mínimo— con un código nuevo.',
+            prompt: { label: 'Código de la copia', initial: `${prod.sku}-COPIA`, placeholder: 'SKU nuevo' },
+            confirmLabel: 'Crear copia',
+            onConfirm: (value) => duplicateProductConfirmed(prod, value),
+        });
     };
 
     /*
@@ -913,23 +1069,40 @@ const MobileCatalog: React.FC = () => {
         });
     };
 
-    const handleQuickPrint = (prod: any, e: React.MouseEvent) => {
+    /*
+        `addToQueue` escribe en Supabase, así que hay que esperarla antes de
+        cantar victoria. Sin el `await`, el aviso «agregado a la cola» salía
+        siempre —incluso sin red— y el usuario se iba convencido de que la
+        etiqueta estaba encolada.
+    */
+    const handleQuickPrint = async (prod: any, e: React.MouseEvent) => {
         e.stopPropagation();
         buzz(50);
-        addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
-        addToPrintHistory({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
-        notify(`${prod.sku} agregado a la cola de impresión`);
+        const entry = { id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url };
+        try {
+            await addToQueue(entry, 1);
+            addToPrintHistory(entry, 1);
+            notify(`${prod.sku} agregado a la cola de impresión`);
+        } catch (err: any) {
+            notify(`No se pudo encolar ${prod.sku}: ${err?.message || 'error de conexión'}`);
+        }
     };
 
-    const handleAddToQueueConfirm = () => {
+    const handleAddToQueueConfirm = async () => {
         if (!queueSheetProduct) return;
-        addToQueue(
-            { id: queueSheetProduct.id, sku: queueSheetProduct.sku, name: queueSheetProduct.name, image_url: queueSheetProduct.image_url },
-            queueSheetQty
-        );
-        buzz(50);
-        notify(`${queueSheetQty} etiqueta(s) de ${queueSheetProduct.sku} en la cola`);
+        const prod = queueSheetProduct;
+        const qty = queueSheetQty;
         setQueueSheetProduct(null);
+        buzz(50);
+        try {
+            await addToQueue(
+                { id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url },
+                qty
+            );
+            notify(`${qty} etiqueta(s) de ${prod.sku} en la cola`);
+        } catch (err: any) {
+            notify(`No se pudo encolar ${prod.sku}: ${err?.message || 'error de conexión'}`);
+        }
     };
 
     const handleShareCard = async (prod: any) => {
@@ -988,7 +1161,7 @@ const MobileCatalog: React.FC = () => {
             notify(`Foto actualizada en ${prod.sku}`);
             await refreshInPlace();
         } catch (err: any) {
-            alert('No se pudo subir la foto: ' + err.message);
+            setDialog({ title: 'No se pudo subir la foto', body: err.message });
         } finally {
             setUploadingPhoto(false);
             cameraProductRef.current = null;
@@ -1001,12 +1174,32 @@ const MobileCatalog: React.FC = () => {
         [allProducts, selectedIds]
     );
 
+    /*
+        En serie a propósito: `addToQueue` lee y reescribe la misma caché de la
+        cola para fusionar cantidades, así que lanzarlas en paralelo haría que
+        varias partieran del mismo estado y se pisaran entre sí.
+
+        Un fallo a mitad ya no se traga: se cuenta y se dice. Antes, si la
+        tercera de veinte reventaba, la excepción escapaba del manejador, la
+        selección se quedaba puesta y no aparecía ningún aviso.
+    */
     const handleBulkQueue = async () => {
+        const failed: string[] = [];
         for (const prod of selectedProducts) {
-            await addToQueue({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
-            addToPrintHistory({ id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url }, 1);
+            const entry = { id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url };
+            try {
+                await addToQueue(entry, 1);
+                addToPrintHistory(entry, 1);
+            } catch {
+                failed.push(prod.sku);
+            }
         }
-        notify(`${selectedProducts.length} repuestos en la cola`);
+        const ok = selectedProducts.length - failed.length;
+        notify(
+            failed.length === 0
+                ? `${ok} repuestos en la cola`
+                : `${ok} en la cola · ${failed.length} fallaron (${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '…' : ''})`
+        );
         setSelectedIds(new Set());
         setIsBulkSheetOpen(false);
     };
@@ -1020,25 +1213,39 @@ const MobileCatalog: React.FC = () => {
         setIsBulkSheetOpen(false);
     };
 
-    const handleBulkDelete = async () => {
-        const blocked = selectedProducts.filter(p =>
-            (p.inventory_levels?.reduce((a: number, l: any) => a + (l.current_stock || 0), 0) || 0) > 0
-        );
-        if (blocked.length > 0) {
-            alert(`${blocked.length} repuesto(s) tienen stock y no se pueden eliminar. Vacía su inventario primero.`);
-            return;
-        }
-        if (!window.confirm(`¿Eliminar permanentemente ${selectedProducts.length} repuesto(s)? No se puede deshacer.`)) return;
+    const bulkDeleteConfirmed = async (victims: any[]) => {
         try {
-            const { error } = await supabase.from('products').delete().in('id', selectedProducts.map(p => p.id));
+            const { error } = await supabase.from('products').delete().in('id', victims.map(p => p.id));
             if (error) throw error;
-            notify(`${selectedProducts.length} repuestos eliminados`);
+            notify(`${victims.length} repuestos eliminados`);
             setSelectedIds(new Set());
             setIsBulkSheetOpen(false);
             refreshInPlace();
         } catch (error: any) {
-            alert('Error: ' + error.message);
+            setDialog({ title: 'No se pudieron eliminar', body: error.message });
         }
+    };
+
+    const handleBulkDelete = () => {
+        const blocked = selectedProducts.filter(p =>
+            (p.inventory_levels?.reduce((a: number, l: any) => a + (l.current_stock || 0), 0) || 0) > 0
+        );
+        if (blocked.length > 0) {
+            setDialog({
+                title: `${blocked.length} tienen stock`,
+                body: `No se pueden eliminar mientras quede inventario: ${blocked.slice(0, 5).map(p => p.sku).join(', ')}${blocked.length > 5 ? '…' : ''}.`,
+            });
+            return;
+        }
+        const victims = selectedProducts;
+        setIsBulkSheetOpen(false);
+        setDialog({
+            title: `¿Eliminar ${victims.length} repuestos?`,
+            body: 'Se borran de forma permanente y no se puede deshacer.',
+            confirmLabel: `Eliminar ${victims.length}`,
+            tone: 'danger',
+            onConfirm: () => bulkDeleteConfirmed(victims),
+        });
     };
 
     const activeFilterCount = Object.values(filters).filter(Boolean).length;
@@ -1098,21 +1305,6 @@ const MobileCatalog: React.FC = () => {
 
     return (
         <div className="flex flex-col h-full bg-slate-950 font-sans overflow-hidden">
-            <style>{`
-                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes slide-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes slide-down { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
-                .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
-                .animate-slide-up { animation: slide-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-                .animate-slide-down { animation: slide-down 0.25s ease-out forwards; }
-                /* Exigido por la checklist de MASTER.md: quien active "reducir
-                   movimiento" en su teléfono no debe ver ninguna animación. */
-                @media (prefers-reduced-motion: reduce) {
-                    .animate-fade-in, .animate-slide-up, .animate-slide-down { animation: none !important; }
-                    * { transition-duration: 0.01ms !important; }
-                }
-            `}</style>
-
             {/* Entrada oculta para la cámara */}
             <input
                 ref={cameraInputRef}
@@ -1125,8 +1317,8 @@ const MobileCatalog: React.FC = () => {
 
             {/* ── TOAST ── */}
             {toast && (
-                <div role="status" style={{ bottom: 'calc(168px + env(safe-area-inset-bottom))' }} className="fixed left-4 right-4 z-[70] bg-slate-100 text-slate-900 py-3 px-4 rounded-xl shadow-2xl flex items-center gap-2 font-semibold text-sm animate-slide-up">
-                    <Check size={18} className="text-emerald-600 shrink-0" aria-hidden="true" />
+                <div role="status" className="fixed bottom-above-bar left-4 right-4 z-[70] bg-slate-900 border border-slate-700 text-slate-100 py-3 px-4 rounded-xl shadow-2xl flex items-center gap-2 font-semibold text-sm animate-slide-up">
+                    <Check size={18} className="text-emerald-400 shrink-0" aria-hidden="true" />
                     <span className="leading-snug">{toast}</span>
                 </div>
             )}
@@ -1189,11 +1381,12 @@ const MobileCatalog: React.FC = () => {
             {/* ── LISTA ── */}
             <div
                 ref={scrollRef}
+                data-mobile-scroll
                 onScroll={handleScroll}
                 onTouchStart={onPullStart}
                 onTouchMove={onPullMove}
                 onTouchEnd={onPullEnd}
-                className="flex-1 overflow-y-auto overscroll-contain px-4 pb-44"
+                className="flex-1 overflow-y-auto overscroll-contain px-4 pb-mobile-page-bar"
             >
                 {/* Tirar para actualizar */}
                 <div
@@ -1228,6 +1421,8 @@ const MobileCatalog: React.FC = () => {
                                 onCopySku={(e) => handleCopySku(prod.sku, e)}
                                 onQuickPrint={(e) => handleQuickPrint(prod, e)}
                                 onQueue={() => { setQueueSheetProduct(prod); setQueueSheetQty(1); }}
+                                openDrawerId={openDrawerId}
+                                onDrawerChange={setOpenDrawerId}
                                 buildActions={buildActions}
                             />
                         </div>
@@ -1278,8 +1473,7 @@ const MobileCatalog: React.FC = () => {
             {showScrollTop && selectedIds.size === 0 && (
                 <button
                     onClick={scrollToTop}
-                    style={{ bottom: 'calc(216px + env(safe-area-inset-bottom))' }}
-                    className="fixed right-4 z-30 w-11 h-11 rounded-full bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-200 shadow-lg flex items-center justify-center active:bg-slate-700 animate-fade-in"
+                    className="fixed bottom-above-bar-2 right-4 z-30 w-11 h-11 rounded-full bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-200 shadow-lg flex items-center justify-center active:bg-slate-700 animate-fade-in"
                     aria-label="Volver arriba"
                 >
                     <ArrowUp size={20} aria-hidden="true" />
@@ -1291,14 +1485,10 @@ const MobileCatalog: React.FC = () => {
                 Estaban arriba del todo: en un teléfono de 6.5" hay que recolocar la
                 mano cada vez, que es justo lo que hace incómodo el uso prolongado. */}
             {selectedIds.size === 0 ? (
-                /*
-                    108px: la barra de navegación mide ~91px y su botón central de
-                    impresión sobresale por encima (`-top-5`), llegando a unos 100px.
-                    A menos altura, la barra de herramientas quedaría partida por ese
-                    botón justo en el centro. Se le suma la zona de gestos del sistema,
-                    que empuja la barra de navegación hacia arriba.
-                */
-                <div style={{ bottom: 'calc(108px + env(safe-area-inset-bottom))' }} className="fixed inset-x-0 z-30 px-4">
+                /* `bottom-above-nav` deja la barra justo encima del botón central
+                   de impresión, que sobresale de la barra de navegación. La medida
+                   vive en index.html porque las cuatro pantallas la necesitan. */
+                <div className="fixed bottom-above-nav inset-x-0 z-30 px-4">
                     <div className="max-w-md mx-auto flex gap-2">
                         <button
                             onClick={() => setIsFiltersOpen(true)}
@@ -1330,7 +1520,7 @@ const MobileCatalog: React.FC = () => {
                 </div>
             ) : (
                 /* ── BARRA DE SELECCIÓN ── */
-                <div style={{ bottom: 'calc(108px + env(safe-area-inset-bottom))' }} className="fixed inset-x-0 z-30 px-4 animate-slide-up">
+                <div className="fixed bottom-above-nav inset-x-0 z-30 px-4 animate-slide-up">
                     <div className="max-w-md mx-auto flex items-center gap-2 bg-amber-500 rounded-xl p-2 shadow-2xl">
                         <span className="pl-2 font-bold text-sm text-slate-950 tabular-nums shrink-0">
                             {selectedIds.size} sel.
@@ -1498,6 +1688,73 @@ const MobileCatalog: React.FC = () => {
                             Agregar {queueSheetQty} a la cola
                         </button>
                     </>
+                )}
+            </Sheet>
+
+            {/* ── HOJA: CONFIRMAR / PEDIR / AVISAR ── */}
+            <Sheet
+                open={!!dialog}
+                onClose={() => setDialog(null)}
+                title={dialog?.title || ''}
+                icon={dialog?.tone === 'danger' ? TriangleAlert : Info}
+            >
+                {dialog && (
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            const value = dialog.prompt
+                                ? new FormData(e.currentTarget).get('valor')?.toString() ?? ''
+                                : '';
+                            const run = dialog.onConfirm;
+                            setDialog(null);
+                            run?.(value);
+                        }}
+                        className="flex flex-col gap-4"
+                    >
+                        {dialog.body && (
+                            <p className="text-sm text-slate-300 leading-relaxed">{dialog.body}</p>
+                        )}
+
+                        {dialog.prompt && (
+                            <label className="flex flex-col gap-1.5">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                                    {dialog.prompt.label}
+                                </span>
+                                <input
+                                    name="valor"
+                                    type="text"
+                                    autoFocus
+                                    defaultValue={dialog.prompt.initial}
+                                    placeholder={dialog.prompt.placeholder}
+                                    autoComplete="off"
+                                    autoCapitalize="characters"
+                                    className="min-h-[52px] px-4 bg-slate-800 border border-slate-700 rounded-xl text-white text-base font-mono focus:border-amber-500 outline-none"
+                                />
+                            </label>
+                        )}
+
+                        <div className="flex gap-2">
+                            {dialog.onConfirm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setDialog(null)}
+                                    className="flex-1 min-h-[52px] rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold active:bg-slate-700"
+                                >
+                                    Cancelar
+                                </button>
+                            )}
+                            <button
+                                type="submit"
+                                className={`flex-[2] min-h-[52px] rounded-xl font-bold flex items-center justify-center gap-2 ${
+                                    dialog.tone === 'danger'
+                                        ? 'bg-rose-500 text-white active:bg-rose-600'
+                                        : 'bg-amber-500 text-slate-950 active:bg-amber-600'
+                                }`}
+                            >
+                                {dialog.confirmLabel || 'Entendido'}
+                            </button>
+                        </div>
+                    </form>
                 )}
             </Sheet>
 

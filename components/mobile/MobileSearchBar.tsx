@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ChevronRight, History, Mic, MicOff, ScanLine, Search, TrendingUp, X } from 'lucide-react';
+import { ChevronRight, Clock, History, Mic, MicOff, ScanLine, Search, TrendingUp, X } from 'lucide-react';
 import { getSuggestions } from '../../utils/mobileSearchEngine';
+import { getSearchHistory, rememberSearch } from '../../utils/mobileSearchHistory';
 
 declare global {
     interface Window {
@@ -38,10 +39,39 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
     const dropdownRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Sync local value when parent changes searchTerm (e.g. clear)
+    // `setSearchTerm` suele llegar como flecha en línea, así que su identidad
+    // cambia en cada render del padre. Leerlo por ref permite montar el
+    // micrófono una sola vez (ver el efecto de abajo) sin quedarse con una
+    // versión caducada del callback.
+    const setSearchTermRef = useRef(setSearchTerm);
+    setSearchTermRef.current = setSearchTerm;
+
+    /*
+        Último valor que este componente le mandó al padre.
+
+        El campo se sincronizaba con `searchTerm` en cada cambio, y `searchTerm`
+        llega con 250 ms de retardo: si una pulsación caía justo después de que
+        disparara el temporizador, el efecto devolvía al campo el valor anterior
+        y borraba lo último tecleado. Con un lector de código —que teclea a
+        ráfagas— era fácil dar con esa ventana y perder un carácter del código.
+
+        Guardando lo que hemos emitido, el campo sólo se resincroniza cuando el
+        cambio viene de fuera (limpiar desde la pantalla, restaurar un término),
+        que es para lo único que hacía falta.
+    */
+    const emittedRef = useRef(searchTerm);
+
     useEffect(() => {
+        if (searchTerm === emittedRef.current) return;
+        emittedRef.current = searchTerm;
         setLocalValue(searchTerm);
     }, [searchTerm]);
+
+    const commit = useCallback((val: string) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        emittedRef.current = val;
+        setSearchTerm(val);
+    }, [setSearchTerm]);
 
     // Debounced search: update parent after 250ms of no typing
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,9 +80,27 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
-            setSearchTerm(val); // trigger expensive search after pause
+            commit(val); // trigger expensive search after pause
         }, 250);
-    }, [setSearchTerm]);
+    }, [commit]);
+
+    /*
+        El lector físico cierra el código con Enter, y no había nada escuchando:
+        aunque el código llegara entero había que esperar igual los 250 ms del
+        retardo. Enter confirma en el acto, guarda el término y cierra el teclado.
+    */
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const val = localValue.trim();
+        commit(val);
+        if (val.length >= 2) {
+            rememberSearch(val);
+            setHistory(getSearchHistory());
+        }
+        setIsFocused(false);
+        inputRef.current?.blur();
+    };
 
     // Cleanup debounce timer on unmount
     useEffect(() => {
@@ -67,67 +115,108 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
         return getSuggestions(products, searchTerm, 6);
     }, [products, searchTerm]);
 
-    const busquedasPopulares = ['Freno', 'Pastillas', 'Batería', 'Cadena', 'Arrastre', 'Llanta', 'Faro', 'Aceite', 'Bujía'];
+    /*
+        Lo que de verdad busca quien tiene el teléfono en la mano, no una lista
+        escrita a mano. Si todavía no hay historial se cae a unos términos
+        habituales del taller, que al menos dan algo que tocar el primer día.
+    */
+    const [history, setHistory] = useState<string[]>(getSearchHistory);
+    const busquedasHabituales = ['Freno', 'Pastillas', 'Batería', 'Cadena', 'Arrastre', 'Llanta', 'Faro', 'Aceite', 'Bujía'];
+    const atajos = history.length > 0 ? history : busquedasHabituales;
+    const mostrandoHistorial = history.length > 0;
 
+    /*
+        El micrófono se monta UNA vez y se apaga al desmontar.
+
+        Antes el efecto dependía de `setSearchTerm`: como el padre lo pasa en
+        línea, se creaba un `SpeechRecognition` nuevo en cada render y el
+        anterior quedaba suelto. Y sin limpieza, salir de la pantalla mientras
+        escuchaba dejaba el micrófono encendido y el indicador del sistema
+        puesto hasta recargar la app.
+    */
     useEffect(() => {
         if (typeof window === 'undefined') return;
         try {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                recognitionRef.current = new SpeechRecognition();
-                recognitionRef.current.continuous = false;
-                recognitionRef.current.interimResults = false;
-                recognitionRef.current.lang = 'es-ES';
-                recognitionRef.current.onresult = (event: any) => {
-                    const transcript = event.results[0]?.[0]?.transcript;
-                    if (transcript) {
-                        const cleaned = transcript.trim().replace(/\.$/, '');
-                        setLocalValue(cleaned);
-                        setSearchTerm(cleaned);
-                    }
-                    setIsListening(false);
-                };
-                recognitionRef.current.onend = () => setIsListening(false);
-                recognitionRef.current.onerror = () => setIsListening(false);
-            }
+            if (!SpeechRecognition) return;
+
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            // Español de Ecuador: reconoce mejor los nombres de repuesto dictados aquí.
+            recognition.lang = 'es-EC';
+            recognition.onresult = (event: any) => {
+                const transcript = event.results[0]?.[0]?.transcript;
+                if (transcript) {
+                    const cleaned = transcript.trim().replace(/\.$/, '');
+                    setLocalValue(cleaned);
+                    setSearchTermRef.current(cleaned);
+                    if (cleaned.length >= 2) rememberSearch(cleaned);
+                }
+            };
+            // El estado lo mandan los eventos del propio reconocedor, no la
+            // suposición del que pulsa: si el navegador niega el permiso o lo
+            // corta por silencio, el botón dejaba de parpadear solo por
+            // `onend`, pero podía haber quedado en rojo tras un `start()` que
+            // nunca llegó a arrancar.
+            recognition.onstart = () => setIsListening(true);
+            recognition.onend = () => setIsListening(false);
+            recognition.onerror = () => setIsListening(false);
+
+            recognitionRef.current = recognition;
+
+            return () => {
+                recognition.onresult = null;
+                recognition.onstart = null;
+                recognition.onend = null;
+                recognition.onerror = null;
+                try { recognition.abort(); } catch { /* nunca llegó a arrancar */ }
+                recognitionRef.current = null;
+            };
         } catch (error) {
             console.error('Error inicializando micrófono:', error);
         }
-    }, [setSearchTerm]);
+    }, []);
 
     const handleVoiceSearch = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!recognitionRef.current) {
-            alert('Tu navegador no soporta búsqueda por voz.');
-            return;
+        const recognition = recognitionRef.current;
+        if (!recognition) return;
+
+        // `start()` lanza InvalidStateError si ya estaba escuchando, y ese caso
+        // se da de verdad: `onend` puede llegar tarde y dejar `isListening`
+        // desfasado respecto al reconocedor.
+        try {
+            if (isListening) recognition.stop();
+            else recognition.start();
+        } catch (error) {
+            console.warn('No se pudo alternar el micrófono:', error);
+            setIsListening(false);
         }
-        if (isListening) {
-            recognitionRef.current.stop();
-        } else {
-            recognitionRef.current.start();
-        }
-        setIsListening(!isListening);
         inputRef.current?.focus();
     };
 
     const handleSuggestionClick = (sugerencia: string) => {
         const cleaned = sugerencia.replace(/"/g, '');
         setLocalValue(cleaned);
-        setSearchTerm(cleaned);
+        commit(cleaned);
+        if (cleaned.length >= 2) {
+            rememberSearch(cleaned);
+            setHistory(getSearchHistory());
+        }
         setIsFocused(false);
         inputRef.current?.blur();
     };
 
     const handleClearClick = () => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
         setLocalValue('');
-        setSearchTerm('');
+        commit('');
         if (onClear) onClear();
         inputRef.current?.focus();
     };
 
-    const showSuggestions = isFocused && (sugerencias.length > 0 || (!localValue && busquedasPopulares.length > 0));
+    const showSuggestions = isFocused && (sugerencias.length > 0 || (!localValue && atajos.length > 0));
 
     // Cerrar sugerencias al tocar afuera
     useEffect(() => {
@@ -178,11 +267,14 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                 */}
                 <input
                     ref={inputRef}
-                    type="text"
+                    type="search"
+                    inputMode="search"
+                    enterKeyHint="search"
                     placeholder={placeholder}
-                    className="w-full px-3 py-3.5 bg-transparent text-white text-base placeholder:text-slate-500 outline-none border-none focus:ring-0 rounded-2xl font-medium"
+                    className="w-full px-3 py-3.5 bg-transparent text-white text-base placeholder:text-slate-500 outline-none border-none focus:ring-0 rounded-2xl font-medium [&::-webkit-search-cancel-button]:hidden"
                     value={localValue}
                     onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
                     onFocus={() => setIsFocused(true)}
                     autoFocus={autoFocus}
                     autoComplete="off"
@@ -196,28 +288,30 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                         <button
                             type="button"
                             onClick={handleClearClick}
-                            className="p-2 text-slate-400 active:text-white rounded-full active:bg-slate-700 transition-colors flex items-center justify-center active:scale-90"
-                            title="Limpiar"
+                            className="min-w-[44px] min-h-[44px] text-slate-400 active:text-white rounded-full active:bg-slate-700 transition-colors flex items-center justify-center active:scale-90"
                             aria-label="Limpiar búsqueda"
                         >
                             <X size={19} aria-hidden="true" />
                         </button>
                     )}
 
-                    {/* Divisor vertical */}
-                    <div className="h-6 w-px bg-slate-700 mx-0.5"></div>
+                    {/* Divisor vertical: solo tiene sentido si hay algo a cada
+                        lado. Se pintaba siempre, así que en un campo vacío o sin
+                        soporte de voz quedaba una rayita suelta contra el borde. */}
+                    {localValue && hasSpeechSupport && (
+                        <div className="h-6 w-px bg-slate-700 mx-0.5" aria-hidden="true"></div>
+                    )}
 
                     {/* Botón de Voz */}
                     {hasSpeechSupport && (
                         <button
                             type="button"
                             onClick={handleVoiceSearch}
-                            className={`p-2 rounded-xl transition-all flex items-center justify-center active:scale-90 ${
+                            className={`min-w-[44px] min-h-[44px] rounded-xl transition-all flex items-center justify-center active:scale-90 ${
                                 isListening
                                     ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 animate-pulse'
                                     : 'text-slate-400 active:text-amber-400 active:bg-slate-700'
                             }`}
-                            title="Buscar por voz"
                             aria-label={isListening ? 'Detener búsqueda por voz' : 'Buscar por voz'}
                             aria-pressed={isListening}
                         >
@@ -237,22 +331,24 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
                     fichas `bg-slate-800`). Con el tema claro el panel salía blanco
                     y las coincidencias resultaban ilegibles encima.
                 */
-                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-slide-down origin-top max-h-[65dvh] overflow-y-auto">
+                <div className="absolute top-[calc(100%+8px)] left-0 right-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 animate-slide-down origin-top max-h-[65dvh] overflow-y-auto overscroll-contain">
                     
                     {/* Si NO hay búsqueda: Mostrar Populares / Más Buscado */}
                     {!localValue ? (
                         <div className="p-4">
                             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                                <TrendingUp size={15} aria-hidden="true" />
-                                Búsqueda Rápida / Populares
+                                {mostrandoHistorial
+                                    ? <Clock size={15} aria-hidden="true" />
+                                    : <TrendingUp size={15} aria-hidden="true" />}
+                                {mostrandoHistorial ? 'Tus últimas búsquedas' : 'Búsquedas habituales'}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {busquedasPopulares.map((term) => (
+                                {atajos.map((term) => (
                                     <button
                                         key={term}
                                         type="button"
                                         onClick={() => handleSuggestionClick(term)}
-                                        className="px-3.5 py-2 bg-slate-800 active:bg-amber-500 active:text-slate-950 text-slate-200 text-sm font-semibold rounded-xl transition-all active:scale-95 border border-slate-700 shadow-xs"
+                                        className="min-h-[44px] px-3.5 bg-slate-800 active:bg-amber-500 active:text-slate-950 text-slate-200 text-sm font-semibold rounded-xl transition-all active:scale-95 border border-slate-700 shadow-xs"
                                     >
                                         {term}
                                     </button>

@@ -23,6 +23,7 @@ import {
     Pencil,
     ShoppingCart,
     Trash2,
+    TriangleAlert,
 } from 'lucide-react';
 
 const STOCK_BADGE: Record<string, string> = {
@@ -30,6 +31,10 @@ const STOCK_BADGE: Record<string, string> = {
     backorder: 'bg-amber-900/30 text-amber-400',
     out_of_stock: 'bg-rose-900/30 text-rose-400',
 };
+
+/** Un estado que no esté en la tabla dejaba la insignia sin color de fondo ni
+ *  de texto: se veía el hueco pero no el dato. */
+const stockBadgeClass = (status: string) => STOCK_BADGE[status] || 'bg-slate-800 text-slate-300';
 
 const MobileProforma: React.FC = () => {
     const navigate = useNavigate();
@@ -52,6 +57,17 @@ const MobileProforma: React.FC = () => {
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isConverting, setIsConverting] = useState(false);
 
+    /*
+        Avisos de la conversión a venta.
+
+        Eran tres `alert()` nativos, dos de ellos seguidos: en el teléfono tapan
+        la pantalla, salen con el estilo del sistema y hay que descartarlos uno a
+        uno antes de poder mirar la proforma que describen. Etiquetas ya los
+        había eliminado por lo mismo. Aquí el aviso se queda en pantalla, cita
+        los SKU y se cierra cuando se ha leído.
+    */
+    const [conversionNotice, setConversionNotice] = useState<string[] | null>(null);
+
     // Se depende de la lista de ids serializada, no del array: `items` cambia de
     // identidad con cada edición de cantidad o precio, y eso volvería a pedir el
     // stock en cada toque del contador.
@@ -62,9 +78,14 @@ const MobileProforma: React.FC = () => {
             return;
         }
         let cancelled = false;
-        fetchProformaStockInfo(productIdsKey.split(',').map(Number)).then(info => {
-            if (!cancelled) setStockInfo(info);
-        });
+        fetchProformaStockInfo(productIdsKey.split(',').map(Number))
+            .then(info => { if (!cancelled) setStockInfo(info); })
+            .catch(err => {
+                // Sin insignias de stock la proforma se sigue pudiendo armar y
+                // enviar; lo que no puede es reventar por ello en silencio.
+                console.error('No se pudo consultar el stock de la proforma:', err);
+                if (!cancelled) setStockInfo({});
+            });
         return () => { cancelled = true; };
     }, [productIdsKey]);
 
@@ -81,18 +102,30 @@ const MobileProforma: React.FC = () => {
         try {
             const { unresolved, lowStock } = await convertProformaToPosCart(items);
 
+            const avisos: string[] = [];
             if (unresolved.length > 0) {
-                alert(`Estos productos nunca han sido registrados en ninguna bodega y no se pudieron agregar (configura una bodega por defecto en Editar Producto, o agrégalos manualmente en el POS): ${unresolved.join(', ')}`);
+                avisos.push(`Sin bodega asignada, no se agregaron: ${unresolved.join(', ')}. Configura una bodega por defecto en Editar Producto, o agrégalos a mano en el POS.`);
             }
             if (lowStock.length > 0) {
-                alert(`Estos productos no tienen stock suficiente en la bodega asignada — corrige el stock desde el carrito del POS antes de cerrar la venta: ${lowStock.join(', ')}`);
+                avisos.push(`Sin stock suficiente en su bodega: ${lowStock.join(', ')}. Corrígelo desde el carrito del POS antes de cerrar la venta.`);
             }
 
+            /*
+                Con avisos no se navega todavía: en el escritorio el mensaje ya
+                no estaría, y el usuario llegaría al POS sin saber que faltan
+                líneas. Se enseña aquí y se vuelve a pulsar para continuar.
+            */
+            if (avisos.length > 0 && !conversionNotice) {
+                setConversionNotice(avisos);
+                return;
+            }
+
+            setConversionNotice(null);
             setPreferredViewMode('desktop');
             navigate('/pos');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error convirtiendo proforma a venta:', err);
-            alert('Error al convertir la proforma a venta POS. Intenta nuevamente.');
+            setConversionNotice([`No se pudo convertir la proforma a venta: ${err?.message || 'error de conexión'}`]);
         } finally {
             setIsConverting(false);
         }
@@ -102,7 +135,7 @@ const MobileProforma: React.FC = () => {
     const total = getTotal();
 
     return (
-        <div className="flex flex-col min-h-full bg-slate-950 pb-56 font-sans">
+        <div className="flex flex-col min-h-full bg-slate-950 pb-mobile-page-bar font-sans">
             {/* Cabecera */}
             <div className="bg-gradient-to-r from-amber-500 to-amber-400 p-4 pt-6 shadow-lg text-slate-950 rounded-b-3xl mb-1 z-20">
                 <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight">
@@ -147,11 +180,11 @@ const MobileProforma: React.FC = () => {
                                         <div className="flex items-start gap-3">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                                    <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[11px] font-mono font-extrabold rounded-lg border border-amber-500/20">
+                                                    <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-xs font-mono font-extrabold rounded-lg border border-amber-500/20">
                                                         {item.sku}
                                                     </span>
                                                     {info && (
-                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${STOCK_BADGE[info.status]}`}>
+                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-lg ${stockBadgeClass(info.status)}`}>
                                                             {info.status === 'in_stock'
                                                                 ? `Stock: ${info.totalStock}`
                                                                 : STOCK_STATUS_LABELS[info.status]}
@@ -163,7 +196,7 @@ const MobileProforma: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => removeItem(item.id)}
-                                                className="active:scale-90 p-2.5 bg-rose-900/20 active:bg-rose-900/40 text-rose-400 rounded-xl transition-all shrink-0 border border-rose-800/50"
+                                                className="active:scale-90 min-w-[44px] min-h-[44px] flex items-center justify-center bg-rose-900/20 active:bg-rose-900/40 text-rose-400 rounded-xl transition-all shrink-0 border border-rose-800/50"
                                                 aria-label={`Quitar ${item.sku} de la proforma`}
                                             >
                                                 <Trash2 size={18} aria-hidden="true" />
@@ -192,13 +225,13 @@ const MobileProforma: React.FC = () => {
                                                         }
                                                         if (e.key === 'Escape') setEditingPriceId(null);
                                                     }}
-                                                    className="w-28 h-11 px-3 text-right bg-slate-800 border-2 border-amber-500 rounded-xl text-white font-bold text-sm"
+                                                    className="w-28 h-12 px-3 text-right bg-slate-800 border-2 border-amber-500 rounded-xl text-white font-bold text-base"
                                                 />
                                             ) : (
                                                 <button
                                                     type="button"
                                                     onClick={() => setEditingPriceId(item.id)}
-                                                    className="inline-flex items-center gap-1.5 h-11 px-3 rounded-xl bg-slate-800 border border-slate-700 text-white font-bold text-sm active:bg-slate-700"
+                                                    className="inline-flex items-center gap-1.5 h-12 px-3 rounded-xl bg-slate-800 border border-slate-700 text-white font-bold text-base active:bg-slate-700"
                                                 >
                                                     ${item.unitPrice.toFixed(2)}
                                                     <Pencil size={13} className="opacity-60" aria-hidden="true" />
@@ -212,7 +245,8 @@ const MobileProforma: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                    className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xl font-bold active:bg-slate-700"
+                                                    disabled={item.quantity <= 1}
+                                                    className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xl font-bold active:bg-slate-700 disabled:opacity-40"
                                                     aria-label="Quitar una unidad"
                                                 >
                                                     −
@@ -223,7 +257,7 @@ const MobileProforma: React.FC = () => {
                                                     min="1"
                                                     value={item.quantity}
                                                     onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
-                                                    className="w-14 h-11 text-center bg-slate-900 border border-amber-700/60 rounded-xl text-amber-300 font-black text-sm"
+                                                    className="w-16 h-11 text-center bg-slate-900 border border-amber-700/60 rounded-xl text-amber-300 font-black text-base"
                                                     aria-label="Cantidad"
                                                 />
                                                 <button
@@ -257,7 +291,7 @@ const MobileProforma: React.FC = () => {
                             </label>
                             {shippingEnabled && (
                                 <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-base">$</span>
                                     <input
                                         type="number"
                                         inputMode="decimal"
@@ -266,7 +300,7 @@ const MobileProforma: React.FC = () => {
                                         value={shippingCost}
                                         onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
                                         placeholder="0.00"
-                                        className="w-full h-12 pl-7 pr-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-sm"
+                                        className="w-full h-12 pl-7 pr-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-base"
                                         aria-label="Costo de envío"
                                     />
                                 </div>
@@ -326,12 +360,32 @@ const MobileProforma: React.FC = () => {
                 )}
             </div>
 
+            {conversionNotice && (
+                <div
+                    role="alert"
+                    className="fixed bottom-above-bar-2 left-2 right-2 z-40 animate-slide-up"
+                >
+                    <div className="max-w-md mx-auto bg-slate-900 border border-amber-500/40 rounded-2xl shadow-2xl p-3 px-4 flex gap-3">
+                        <TriangleAlert size={20} className="text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="flex-1 min-w-0 flex flex-col gap-2">
+                            {conversionNotice.map((aviso, i) => (
+                                <p key={i} className="text-xs font-semibold text-slate-200 leading-snug">{aviso}</p>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => setConversionNotice(null)}
+                                className="self-start min-h-[44px] px-3 -my-1 rounded-xl text-xs font-bold text-slate-400 active:text-white"
+                            >
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Barra flotante de acciones */}
             {items.length > 0 && (
-                <div
-                    style={{ bottom: 'calc(88px + env(safe-area-inset-bottom))' }}
-                    className="fixed left-2 right-2 z-40"
-                >
+                <div className="fixed bottom-above-nav left-2 right-2 z-40">
                     <div className="max-w-md mx-auto bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 p-3 px-4 flex flex-col gap-2">
                         <button
                             type="button"
@@ -350,7 +404,11 @@ const MobileProforma: React.FC = () => {
                             {isConverting
                                 ? <Loader2 size={16} className="animate-spin" aria-hidden="true" />
                                 : <ShoppingCart size={16} aria-hidden="true" />}
-                            {isConverting ? 'Convirtiendo...' : 'Convertir a venta (abre escritorio)'}
+                            {isConverting
+                                ? 'Convirtiendo...'
+                                : conversionNotice
+                                    ? 'Continuar de todos modos'
+                                    : 'Convertir a venta (abre escritorio)'}
                         </button>
                     </div>
                 </div>

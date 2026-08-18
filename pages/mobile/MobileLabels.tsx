@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
-import { addToPrintHistory, getPrintHistory, PrintHistoryItem } from '../../utils/mobileLabelPrinter';
+import { addToPrintHistory, getPrintHistory, PrintHistoryItem } from '../../utils/mobilePrintHistory';
 import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngine';
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
-import { CheckCircle2, Eye, History, ImageOff, Info, Layers, ListChecks, Plus, Printer, Receipt, SearchX, Trash2, Zap } from 'lucide-react';
+import { CheckCircle2, Eye, History, ImageOff, Info, Layers, ListChecks, Minus, Plus, Printer, Receipt, SearchX, SlidersHorizontal, Trash2, TriangleAlert, Zap } from 'lucide-react';
 import {
     getPrintQueue, addToQueue, removeFromQueue, updateQueueItemQty,
     clearQueue, getQueueTotalLabels,
@@ -12,16 +12,50 @@ import {
 } from '../../utils/mobilePrintQueue';
 import { PrintQueuePreviewModal } from '../../components/PrintQueuePreviewModal';
 
+/**
+ * Cantidades de un toque.
+ *
+ * 21 no es una preferencia: son las etiquetas que entran en una hoja A4
+ * (3 columnas × 7 filas), así que imprimir 21 no desperdicia papel. Las otras
+ * dos sí son costumbre y cambian según el trabajo del día, por eso se guardan.
+ */
+const QUICK_QTY_KEY = 'mobile:labelQuickQty';
+const DEFAULT_QUICK_QTY = [3, 6, 21];
+
+const readQuickQty = (): number[] => {
+    try {
+        const saved = JSON.parse(localStorage.getItem(QUICK_QTY_KEY) || 'null');
+        if (Array.isArray(saved) && saved.length === 3 && saved.every(n => Number.isInteger(n) && n > 0)) {
+            return saved;
+        }
+    } catch { /* valor corrupto: se usa el de siempre */ }
+    return DEFAULT_QUICK_QTY;
+};
+
 const MobileLabels: React.FC = () => {
     const { products: allProducts, loading: catalogLoading } = useMobileProducts();
     const [searchTerm, setSearchTerm] = useState('');
     const [printHistory, setPrintHistory] = useState<PrintHistoryItem[]>([]);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    // Los fallos de la cola se decían con `alert()`, que en el teléfono tapa la
+    // pantalla y hay que descartar a mano; ahora comparten sitio con el aviso
+    // de éxito y se retiran solos.
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [customQtyMap, setCustomQtyMap] = useState<Record<string, number>>({});
     const [reprintLoading, setReprintLoading] = useState(false);
 
     // ── Tab State ──────────────────────────────────────
     const [activeTab, setActiveTab] = useState<'quick' | 'queue'>('quick');
+    const [quickQty, setQuickQty] = useState<number[]>(readQuickQty);
+    const [isEditingQuickQty, setIsEditingQuickQty] = useState(false);
+
+    const saveQuickQty = (index: number, value: number) => {
+        setQuickQty(prev => {
+            const next = prev.map((v, i) => (i === index ? Math.max(1, value) : v));
+            try { localStorage.setItem(QUICK_QTY_KEY, JSON.stringify(next)); } catch { /* modo privado */ }
+            return next;
+        });
+    };
 
     // ── Queue State ────────────────────────────────────
     const [queue, setQueue] = useState<PrintQueueItem[]>([]);
@@ -31,6 +65,25 @@ const MobileLabels: React.FC = () => {
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     const queueDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Un solo temporizador para los avisos: encadenar dos acciones hacía que el
+    // primero borrara el mensaje del segundo, y el último seguía vivo tras salir.
+    const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const clearSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const flash = useCallback((text: string, kind: 'ok' | 'error' = 'ok') => {
+        if (messageTimer.current) clearTimeout(messageTimer.current);
+        setSuccessMessage(kind === 'ok' ? text : null);
+        setErrorMessage(kind === 'error' ? text : null);
+        messageTimer.current = setTimeout(() => {
+            setSuccessMessage(null);
+            setErrorMessage(null);
+        }, kind === 'ok' ? 1800 : 4000);
+    }, []);
+
+    useEffect(() => () => {
+        if (messageTimer.current) clearTimeout(messageTimer.current);
+        if (clearSearchTimer.current) clearTimeout(clearSearchTimer.current);
+    }, []);
 
     // Debounce queue search
     useEffect(() => {
@@ -86,15 +139,16 @@ const MobileLabels: React.FC = () => {
                 navigator.vibrate(50);
             }
 
-            setSuccessMessage(`✓ ${qty} etiqueta${qty !== 1 ? 's' : ''} de ${prod.sku} agregada${qty !== 1 ? 's' : ''} a la cola`);
-
-            setTimeout(() => {
-                setSuccessMessage(null);
-                handleClear();
-            }, 1500);
-        } catch (err) {
+            flash(`${qty} etiqueta${qty !== 1 ? 's' : ''} de ${prod.sku} en la cola`);
+            // Pausa antes de vaciar la búsqueda: da tiempo a leer la
+            // confirmación con el repuesto todavía en pantalla, y luego deja el
+            // campo listo para el siguiente escaneo. El temporizador se guarda
+            // para poder cancelarlo al desmontar.
+            if (clearSearchTimer.current) clearTimeout(clearSearchTimer.current);
+            clearSearchTimer.current = setTimeout(handleClear, 1500);
+        } catch (err: any) {
             console.error('Error al agregar a la cola:', err);
-            alert('Error al agregar a la cola');
+            flash(`No se pudo agregar ${prod.sku} a la cola: ${err?.message || 'error de conexión'}`, 'error');
         }
     };
 
@@ -105,20 +159,23 @@ const MobileLabels: React.FC = () => {
             if (!prod) {
                 const { data } = await supabase
                     .from('products')
-                    .select('*, inventory_levels(*)')
+                    .select('id, sku, name, image_url, inventory_levels(current_stock)')
                     .eq('id', historyItem.id)
                     .eq('is_active', true)
                     .limit(1);
                 if (data && data.length > 0) prod = data[0];
             }
-                
+
             if (prod) {
-                handlePrint(prod, historyItem.quantity || 3);
+                // Con `await`: sin él, el `finally` apagaba el indicador de
+                // carga antes de que la cola llegara siquiera a escribirse.
+                await handlePrint(prod, historyItem.quantity || 3);
             } else {
-                alert('Producto no encontrado');
+                flash(`${historyItem.sku} ya no está en el catálogo`, 'error');
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            flash(err?.message || 'No se pudo repetir el agregado', 'error');
         } finally {
             setReprintLoading(false);
         }
@@ -155,53 +212,63 @@ const MobileLabels: React.FC = () => {
         setQueueQtyMap(prev => ({ ...prev, [id]: Math.max(1, val) }));
     };
 
+    /*
+        Los cuatro manejadores de abajo llamaban a la cola sin `try`. Cualquier
+        fallo (sin red, sesión caducada) escapaba como promesa rechazada sin
+        capturar: nada en pantalla, y la lista se quedaba mostrando el estado
+        anterior como si la operación hubiera salido bien.
+    */
     const handleAddToQueue = async (prod: any) => {
         const qty = getQueueQty(String(prod.id));
-        const updated = await addToQueue(
-            { id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url },
-            qty
-        );
-        setQueue(updated);
-        if (navigator.vibrate) navigator.vibrate(50);
-        setSuccessMessage(`✓ ${qty} etiqueta(s) de ${prod.sku} agregadas a la cola`);
-        setTimeout(() => setSuccessMessage(null), 1800);
-        setQueueSearchTerm('');
-        setQueueQtyMap(prev => { const n = { ...prev }; delete n[String(prod.id)]; return n; });
+        try {
+            const updated = await addToQueue(
+                { id: prod.id, sku: prod.sku, name: prod.name, image_url: prod.image_url },
+                qty
+            );
+            setQueue(updated);
+            if (navigator.vibrate) navigator.vibrate(50);
+            flash(`${qty} etiqueta${qty !== 1 ? 's' : ''} de ${prod.sku} en la cola`);
+            setQueueSearchTerm('');
+            setQueueQtyMap(prev => { const n = { ...prev }; delete n[String(prod.id)]; return n; });
+        } catch (err: any) {
+            flash(`No se pudo agregar ${prod.sku}: ${err?.message || 'error de conexión'}`, 'error');
+        }
     };
 
     const handleRemoveFromQueue = async (id: number) => {
-        const updated = await removeFromQueue(id);
-        setQueue(updated);
-        if (navigator.vibrate) navigator.vibrate(30);
+        try {
+            const updated = await removeFromQueue(id);
+            setQueue(updated);
+            if (navigator.vibrate) navigator.vibrate(30);
+        } catch (err: any) {
+            flash(err?.message || 'No se pudo quitar de la cola', 'error');
+        }
     };
 
     const handleUpdateQueueQty = async (id: number, newQty: number) => {
-        const updated = await updateQueueItemQty(id, newQty);
-        setQueue(updated);
+        try {
+            const updated = await updateQueueItemQty(id, newQty);
+            setQueue(updated);
+        } catch (err: any) {
+            flash(err?.message || 'No se pudo cambiar la cantidad', 'error');
+        }
     };
 
     const handleClearQueue = async () => {
-        await clearQueue();
-        setQueue([]);
         setShowClearConfirm(false);
-        if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+        try {
+            await clearQueue();
+            setQueue(await getPrintQueue());
+            if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+        } catch (err: any) {
+            flash(err?.message || 'No se pudo vaciar la cola', 'error');
+        }
     };
 
     const totalLabels = getQueueTotalLabels(queue);
 
     return (
-        <div className="flex flex-col min-h-full bg-slate-950 pb-56 font-sans">
-            <style>{`
-                @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes slide-down { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); } }
-                .animate-fade-in { animation: fade-in 0.25s ease-out forwards; }
-                .animate-slide-down { animation: slide-down 0.25s ease-out forwards; }
-                .animate-slide-up { animation: slide-up 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards; }
-                .animate-pulse-glow { animation: pulse-glow 2s infinite; }
-            `}</style>
-            
+        <div className="flex flex-col min-h-full bg-slate-950 pb-mobile-page-bar font-sans">
             {/* Header */}
             <div className="bg-gradient-to-r from-amber-500 to-amber-400 p-4 pt-6 shadow-lg text-slate-950 rounded-b-3xl mb-1 z-20">
                 <h1 className="text-2xl font-black flex items-center gap-2 tracking-tight">
@@ -238,7 +305,7 @@ const MobileLabels: React.FC = () => {
                         <Layers size={16} aria-hidden="true" />
                         Cola
                         {queue.length > 0 && activeTab !== 'queue' && (
-                            <span className="absolute -top-1.5 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-amber-500 text-slate-950 text-[10px] font-black rounded-full border-2 border-slate-900 animate-pulse-glow">
+                            <span className="absolute -top-1.5 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full border-2 border-slate-900 animate-pulse-glow">
                                 {queue.length}
                             </span>
                         )}
@@ -246,11 +313,22 @@ const MobileLabels: React.FC = () => {
                 </div>
             </div>
 
-            {/* Toast de Éxito (shared) */}
-            {successMessage && (
-                <div className="mx-4 mt-2 animate-slide-down bg-emerald-500 text-white px-4 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 z-40 border border-emerald-400">
-                    <CheckCircle2 size={24} aria-hidden="true" />
-                    <span className="font-bold text-sm">{successMessage}</span>
+            {/* Aviso compartido: éxito o error. `role="status"` para que el
+                lector de pantalla lo anuncie sin robar el foco. */}
+            {(successMessage || errorMessage) && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className={`mx-4 mt-2 animate-slide-down px-4 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 z-40 border text-white ${
+                        errorMessage
+                            ? 'bg-rose-600 border-rose-400'
+                            : 'bg-emerald-500 border-emerald-400'
+                    }`}
+                >
+                    {errorMessage
+                        ? <TriangleAlert size={24} aria-hidden="true" />
+                        : <CheckCircle2 size={24} aria-hidden="true" />}
+                    <span className="font-bold text-sm">{errorMessage || successMessage}</span>
                 </div>
             )}
 
@@ -325,7 +403,7 @@ const MobileLabels: React.FC = () => {
                                                         <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-xs font-mono font-extrabold rounded-lg border border-amber-500/20">
                                                             {prod.sku}
                                                         </span>
-                                                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${
                                                             stock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-rose-900/30 text-rose-400'
                                                         }`}>
                                                             Stock: {stock}
@@ -335,76 +413,97 @@ const MobileLabels: React.FC = () => {
                                                         {prod.name}
                                                     </h3>
                                                     {prod.brands?.name && (
-                                                        <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
+                                                        <p className="text-xs text-slate-400 font-semibold mt-0.5">
                                                             {prod.brands.name}
                                                         </p>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            {/* Botones Rápidos 3, 6, 21 */}
+                                            {/*
+                                                Botones rápidos.
+
+                                                El color ya no distingue cantidades: verde y cian
+                                                significan "hay stock" y "equivalentes" en el resto
+                                                del modo móvil, y aquí competían con el badge de
+                                                stock que está tres líneas más arriba. Los tres son
+                                                ámbar, que es el color de la impresión.
+                                            */}
                                             <div className="grid grid-cols-3 gap-2.5 pt-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePrint(prod, 3)}
-                                                    className="active:scale-95 transition-all bg-amber-500/10 active:bg-amber-500/20 text-amber-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-amber-500/25 shadow-xs"
-                                                >
-                                                    <Printer size={20} aria-hidden="true" />
-                                                    <span className="font-black text-base">3</span>
-                                                    <span className="text-[9px] uppercase tracking-tighter opacity-75">etiquetas</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePrint(prod, 6)}
-                                                    className="active:scale-95 transition-all bg-cyan-500/10 active:bg-cyan-500/20 text-cyan-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-cyan-500/25 shadow-xs"
-                                                >
-                                                    <Printer size={20} aria-hidden="true" />
-                                                    <span className="font-black text-base">6</span>
-                                                    <span className="text-[9px] uppercase tracking-tighter opacity-75">etiquetas</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePrint(prod, 21)}
-                                                    className="active:scale-95 transition-all bg-emerald-500/10 active:bg-emerald-500/20 text-emerald-300 rounded-2xl flex flex-col items-center justify-center py-3 gap-0.5 border border-emerald-500/25 shadow-xs"
-                                                >
-                                                    <Printer size={20} aria-hidden="true" />
-                                                    <span className="font-black text-base">21</span>
-                                                    <span className="text-[9px] uppercase tracking-tighter opacity-75">etiquetas</span>
-                                                </button>
+                                                {quickQty.map((qty, i) => (
+                                                    isEditingQuickQty ? (
+                                                        <label key={i} className="bg-slate-800 rounded-2xl flex flex-col items-center justify-center py-2 gap-1 border border-slate-700">
+                                                            <span className="text-xs uppercase tracking-tight text-slate-400">Botón {i + 1}</span>
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                inputMode="numeric"
+                                                                value={qty}
+                                                                onChange={(e) => saveQuickQty(i, parseInt(e.target.value) || 1)}
+                                                                aria-label={`Cantidad del botón ${i + 1}`}
+                                                                className="w-16 min-h-[44px] text-center bg-slate-900 border border-slate-700 rounded-xl text-white font-black text-base"
+                                                            />
+                                                        </label>
+                                                    ) : (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onClick={() => handlePrint(prod, qty)}
+                                                            className="active:scale-95 transition-all bg-amber-500/10 active:bg-amber-500/20 text-amber-300 rounded-2xl flex flex-col items-center justify-center min-h-[76px] py-3 gap-0.5 border border-amber-500/25 shadow-xs"
+                                                        >
+                                                            <Printer size={20} aria-hidden="true" />
+                                                            <span className="font-black text-base">{qty}</span>
+                                                            <span className="text-xs uppercase tracking-tight opacity-75">etiquetas</span>
+                                                        </button>
+                                                    )
+                                                ))}
                                             </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsEditingQuickQty(v => !v)}
+                                                className="self-start min-h-[44px] px-3 -my-1 rounded-xl text-xs font-semibold text-slate-400 active:text-amber-300 flex items-center gap-1.5"
+                                            >
+                                                <SlidersHorizontal size={13} aria-hidden="true" />
+                                                {isEditingQuickQty ? 'Listo' : 'Cambiar cantidades'}
+                                            </button>
 
                                             {/* Fila Cantidad Personalizada */}
                                             <div className="bg-slate-900/80 p-2 px-3 rounded-2xl border border-slate-800 flex items-center justify-between gap-3 mt-0.5">
                                                 <span className="text-xs font-bold text-slate-400">Otro número:</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center border border-slate-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
+                                                    <div className="flex items-center border border-slate-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-12">
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
+                                                            className="w-11 h-full flex items-center justify-center text-slate-300 active:bg-slate-700"
                                                             onClick={() => setProductCustomQty(String(prod.id), currentQty - 1)}
+                                                            aria-label="Una etiqueta menos"
                                                         >
-                                                            -
+                                                            <Minus size={16} aria-hidden="true" />
                                                         </button>
                                                         <input
                                                             type="number"
                                                             min="1"
                                                             step="1"
+                                                            inputMode="numeric"
                                                             value={currentQty}
                                                             onChange={(e) => setProductCustomQty(String(prod.id), parseInt(e.target.value) || 1)}
-                                                            className="w-12 text-center bg-transparent border-none focus:ring-0 text-white font-bold text-sm p-0"
+                                                            aria-label={`Cantidad de etiquetas de ${prod.sku}`}
+                                                            className="w-12 h-full text-center bg-transparent border-none focus:ring-0 text-white font-bold text-base p-0"
                                                         />
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
+                                                            className="w-11 h-full flex items-center justify-center text-slate-300 active:bg-slate-700"
                                                             onClick={() => setProductCustomQty(String(prod.id), currentQty + 1)}
+                                                            aria-label="Una etiqueta más"
                                                         >
-                                                            +
+                                                            <Plus size={16} aria-hidden="true" />
                                                         </button>
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => handlePrint(prod, currentQty)}
-                                                        className="active:scale-95 transition-transform bg-slate-200 active:bg-white text-slate-900 px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                                                        className="active:scale-95 transition-transform bg-slate-200 active:bg-white text-slate-900 px-4 h-12 rounded-xl font-bold text-sm flex items-center gap-1.5 shadow-sm"
                                                     >
                                                         <span>Agregar</span>
                                                     </button>
@@ -425,7 +524,11 @@ const MobileLabels: React.FC = () => {
                                         Agregados Recientemente
                                     </h2>
                                     {printHistory.length > 0 && (
-                                        <span className="text-[11px] font-semibold text-slate-400">Toca 🖨️ para agregar de nuevo</span>
+                                        <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                                            Toca
+                                            <Printer size={13} className="text-emerald-400" aria-hidden="true" />
+                                            para repetir
+                                        </span>
                                     )}
                                 </div>
 
@@ -456,22 +559,22 @@ const MobileLabels: React.FC = () => {
                                                         <span className="text-xs font-mono font-extrabold text-slate-300 truncate">
                                                             {item.sku}
                                                         </span>
-                                                        <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap ml-auto">
+                                                        <span className="text-xs font-medium text-slate-400 whitespace-nowrap ml-auto">
                                                             {timeAgo(item.printedAt)}
                                                         </span>
                                                     </div>
                                                     <p className="font-bold text-xs text-slate-100 truncate mt-0.5">
                                                         {item.name}
                                                     </p>
-                                                    <span className="inline-block text-[10px] font-extrabold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-md mt-1">
+                                                    <span className="inline-block text-xs font-extrabold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-md mt-1">
                                                         {item.quantity} etiquetas
                                                     </span>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleReprint(item)}
-                                                    className="active:scale-90 p-3 bg-emerald-900/30 active:bg-emerald-900/50 text-emerald-300 rounded-2xl transition-all shrink-0 border border-emerald-800"
-                                                    title={`Agregar ${item.quantity} etiquetas de nuevo a la cola`}
+                                                    className="active:scale-90 min-w-[44px] min-h-[44px] flex items-center justify-center bg-emerald-900/30 active:bg-emerald-900/50 text-emerald-300 rounded-2xl transition-all shrink-0 border border-emerald-800"
+                                                    aria-label={`Agregar otras ${item.quantity} etiquetas de ${item.sku} a la cola`}
                                                 >
                                                     <Printer size={20} aria-hidden="true" />
                                                 </button>
@@ -534,14 +637,14 @@ const MobileLabels: React.FC = () => {
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-[11px] font-mono font-extrabold rounded-lg border border-amber-500/20">
+                                                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 text-xs font-mono font-extrabold rounded-lg border border-amber-500/20">
                                                             {prod.sku}
                                                         </span>
-                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${stock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-rose-900/30 text-rose-400'}`}>
+                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-lg ${stock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-rose-900/30 text-rose-400'}`}>
                                                             Stock: {stock}
                                                         </span>
                                                         {alreadyInQueue && (
-                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-amber-900/30 text-amber-400">
+                                                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-lg bg-amber-900/30 text-amber-400">
                                                                 Ya en cola: {alreadyInQueue.quantity}
                                                             </span>
                                                         )}
@@ -554,34 +657,38 @@ const MobileLabels: React.FC = () => {
                                             <div className="flex items-center justify-between gap-2 bg-amber-900/10 p-2 px-3 rounded-xl border border-amber-800/40">
                                                 <span className="text-xs font-bold text-amber-400">Cantidad:</span>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center border border-amber-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-11">
+                                                    <div className="flex items-center border border-amber-700 rounded-xl overflow-hidden bg-slate-900 shadow-inner h-12">
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
+                                                            className="w-11 h-full flex items-center justify-center text-slate-300 active:bg-slate-700"
                                                             onClick={() => setQueueProductQty(String(prod.id), currentQty - 1)}
+                                                            aria-label="Una etiqueta menos"
                                                         >
-                                                            −
+                                                            <Minus size={16} aria-hidden="true" />
                                                         </button>
                                                         <input
                                                             type="number"
                                                             min="1"
                                                             step="1"
+                                                            inputMode="numeric"
                                                             value={currentQty}
                                                             onChange={(e) => setQueueProductQty(String(prod.id), parseInt(e.target.value) || 1)}
-                                                            className="w-12 text-center bg-transparent border-none focus:ring-0 text-white font-bold text-sm p-0"
+                                                            aria-label={`Cantidad de etiquetas de ${prod.sku}`}
+                                                            className="w-12 h-full text-center bg-transparent border-none focus:ring-0 text-white font-bold text-base p-0"
                                                         />
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 h-full text-slate-500 active:bg-slate-600 font-bold"
+                                                            className="w-11 h-full flex items-center justify-center text-slate-300 active:bg-slate-700"
                                                             onClick={() => setQueueProductQty(String(prod.id), currentQty + 1)}
+                                                            aria-label="Una etiqueta más"
                                                         >
-                                                            +
+                                                            <Plus size={16} aria-hidden="true" />
                                                         </button>
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleAddToQueue(prod)}
-                                                        className="active:scale-95 transition-all bg-amber-500 active:bg-amber-600 text-white px-4 h-11 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                                                        className="active:scale-95 transition-all bg-amber-500 active:bg-amber-600 text-slate-950 px-4 h-12 rounded-xl font-bold text-sm flex items-center gap-1.5 shadow-md shadow-amber-500/20"
                                                     >
                                                         <Plus size={16} aria-hidden="true" />
                                                         Agregar
@@ -610,7 +717,7 @@ const MobileLabels: React.FC = () => {
                                         <ListChecks size={20} className="text-amber-500" aria-hidden="true" />
                                         Cola de Impresión
                                         {queue.length > 0 && (
-                                            <span className="text-[11px] font-extrabold bg-amber-900/30 text-amber-400 px-2 py-0.5 rounded-lg">
+                                            <span className="text-xs font-extrabold bg-amber-900/30 text-amber-400 px-2 py-0.5 rounded-lg">
                                                 {queue.length} item{queue.length !== 1 ? 's' : ''}
                                             </span>
                                         )}
@@ -626,7 +733,7 @@ const MobileLabels: React.FC = () => {
                                         </p>
                                         <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
                                             <Info size={14} aria-hidden="true" />
-                                            <span className="text-[11px] font-semibold">La cola se guarda automáticamente</span>
+                                            <span className="text-xs font-semibold">La cola se guarda automáticamente</span>
                                         </div>
                                     </div>
                                 ) : (
@@ -646,7 +753,7 @@ const MobileLabels: React.FC = () => {
                                                 )}
 
                                                 <div className="flex-1 min-w-0">
-                                                    <span className="text-[11px] font-mono font-extrabold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
+                                                    <span className="text-xs font-mono font-extrabold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20">
                                                         {item.sku}
                                                     </span>
                                                     <p className="font-bold text-xs text-slate-100 truncate mt-0.5" title={item.name}>{item.name}</p>
@@ -656,26 +763,30 @@ const MobileLabels: React.FC = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleUpdateQueueQty(item.id, item.quantity - 1)}
-                                                            className="w-10 h-10 rounded-lg bg-slate-700 text-slate-300 flex items-center justify-center active:bg-slate-600 active:scale-95 transition-all font-bold text-sm"
+                                                            className="w-11 h-11 rounded-lg bg-slate-700 text-slate-200 flex items-center justify-center active:bg-slate-600 active:scale-95 transition-all"
+                                                            aria-label={`Una etiqueta menos de ${item.sku}`}
                                                         >
-                                                            −
+                                                            <Minus size={16} aria-hidden="true" />
                                                         </button>
                                                         <input
                                                             type="number"
                                                             min="1"
                                                             step="1"
+                                                            inputMode="numeric"
                                                             value={item.quantity}
                                                             onChange={(e) => handleUpdateQueueQty(item.id, parseInt(e.target.value) || 1)}
-                                                            className="w-10 h-10 text-center bg-amber-900/20 border border-amber-700/60 rounded-lg text-amber-300 font-black text-xs focus:ring-0 p-0"
+                                                            aria-label={`Etiquetas de ${item.sku}`}
+                                                            className="w-14 h-11 text-center bg-amber-900/20 border border-amber-700/60 rounded-lg text-amber-300 font-black text-base focus:ring-0 p-0"
                                                         />
                                                         <button
                                                             type="button"
                                                             onClick={() => handleUpdateQueueQty(item.id, item.quantity + 1)}
-                                                            className="w-10 h-10 rounded-lg bg-slate-700 text-slate-300 flex items-center justify-center active:bg-slate-600 active:scale-95 transition-all font-bold text-sm"
+                                                            className="w-11 h-11 rounded-lg bg-slate-700 text-slate-200 flex items-center justify-center active:bg-slate-600 active:scale-95 transition-all"
+                                                            aria-label={`Una etiqueta más de ${item.sku}`}
                                                         >
-                                                            +
+                                                            <Plus size={16} aria-hidden="true" />
                                                         </button>
-                                                        <span className="text-[10px] text-slate-400 font-semibold ml-0.5">etiq.</span>
+                                                        <span className="text-xs text-slate-400 font-semibold ml-0.5">etiq.</span>
                                                     </div>
                                                 </div>
 
@@ -683,8 +794,8 @@ const MobileLabels: React.FC = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveFromQueue(item.id)}
-                                                    className="active:scale-90 p-2.5 bg-rose-900/20 active:bg-rose-900/40 text-rose-400 rounded-xl transition-all shrink-0 border border-rose-800/50"
-                                                    title="Eliminar de la cola"
+                                                    className="active:scale-90 min-w-[44px] min-h-[44px] flex items-center justify-center bg-rose-900/20 active:bg-rose-900/40 text-rose-400 rounded-xl transition-all shrink-0 border border-rose-800/50"
+                                                    aria-label={`Quitar ${item.sku} de la cola`}
                                                 >
                                                     <Trash2 size={18} aria-hidden="true" />
                                                 </button>
@@ -697,7 +808,7 @@ const MobileLabels: React.FC = () => {
 
                         {/* ── Floating Bottom Bar (when queue has items) ── */}
                         {queue.length > 0 && (
-                            <div style={{ bottom: 'calc(88px + env(safe-area-inset-bottom))' }} className="fixed left-2 right-2 z-40 animate-slide-up">
+                            <div className="fixed bottom-above-nav left-2 right-2 z-40 animate-slide-up">
                                 <div className="max-w-md mx-auto bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 p-3 px-4">
                                     {/* Summary row */}
                                     <div className="flex items-center justify-between mb-2.5">
@@ -705,7 +816,7 @@ const MobileLabels: React.FC = () => {
                                             <Receipt size={18} className="text-amber-400" aria-hidden="true" />
                                             <div>
                                                 <span className="text-xs font-black text-white">{totalLabels} etiqueta{totalLabels !== 1 ? 's' : ''}</span>
-                                                <span className="text-[10px] text-slate-500 ml-1.5">en la cola</span>
+                                                <span className="text-xs text-slate-500 ml-1.5">en la cola</span>
                                             </div>
                                         </div>
                                         {/* Clear all */}
@@ -713,16 +824,16 @@ const MobileLabels: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowClearConfirm(true)}
-                                                className="text-[11px] font-bold text-rose-400 active:text-rose-300 active:opacity-70 flex items-center gap-0.5"
+                                                className="min-h-[44px] px-3 -my-2 rounded-lg text-xs font-bold text-rose-400 active:text-rose-300 active:bg-rose-500/10 flex items-center gap-1.5"
                                             >
                                                 <Trash2 size={14} aria-hidden="true" />
                                                 Vaciar
                                             </button>
                                         ) : (
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-[10px] text-rose-400 font-bold">¿Seguro?</span>
-                                                <button onClick={handleClearQueue} className="text-[11px] font-extrabold text-white bg-rose-500 px-2.5 py-1 rounded-lg active:scale-95">Sí</button>
-                                                <button onClick={() => setShowClearConfirm(false)} className="text-[11px] font-extrabold text-slate-300 bg-slate-700 px-2.5 py-1 rounded-lg active:scale-95">No</button>
+                                                <span className="text-xs text-rose-400 font-bold">¿Seguro?</span>
+                                                <button onClick={handleClearQueue} className="min-h-[44px] px-3 text-xs font-extrabold text-white bg-rose-500 rounded-lg active:scale-95">Sí</button>
+                                                <button onClick={() => setShowClearConfirm(false)} className="min-h-[44px] px-3 text-xs font-extrabold text-slate-300 bg-slate-700 rounded-lg active:scale-95">No</button>
                                             </div>
                                         )}
                                     </div>

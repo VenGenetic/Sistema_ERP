@@ -287,9 +287,14 @@ export const ProductDemandModal: React.FC<ProductDemandModalProps> = ({
         }
     };
 
+    /*
+        Anclado abajo en el teléfono (MASTER.md: las ventanas entran por
+        abajo, al alcance del pulgar) y centrado a partir de `sm`, que es
+        el escritorio. La versión grande no cambia.
+    */
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-surface rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh]">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm">
+            <div className="bg-surface rounded-t-2xl sm:rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh]">
                 
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-subtle flex justify-between items-center bg-surface-2">

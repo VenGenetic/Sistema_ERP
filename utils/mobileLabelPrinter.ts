@@ -161,45 +161,6 @@ export const renderLabelToCanvas = async (
 };
 
 
-// --- Print history management (localStorage) ---
-const HISTORY_KEY = 'mobile_print_history';
-const MAX_HISTORY = 15;
-
-export interface PrintHistoryItem {
-    id: number;
-    sku: string;
-    name: string;
-    image_url?: string;
-    printedAt: number; // timestamp
-    quantity: number;
-}
-
-export const addToPrintHistory = (product: { id: number; sku: string; name: string; image_url?: string }, quantity: number): void => {
-    try {
-        const history = getPrintHistory();
-        // Remove existing entry for same product if any
-        const filtered = history.filter(h => h.id !== product.id);
-        filtered.unshift({
-            id: product.id,
-            sku: product.sku,
-            name: product.name,
-            image_url: product.image_url,
-            printedAt: Date.now(),
-            quantity,
-        });
-        // Keep only latest N
-        const trimmed = filtered.slice(0, MAX_HISTORY);
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
-    } catch (e) {
-        console.error('Error saving print history:', e);
-    }
-};
-
-export const getPrintHistory = (): PrintHistoryItem[] => {
-    try {
-        const raw = localStorage.getItem(HISTORY_KEY);
-        return raw ? JSON.parse(raw) : [];
-    } catch {
-        return [];
-    }
-};
+// El historial de impresión se mudó a `./mobilePrintHistory`: no necesitaba
+// nada de este módulo, y tenerlo aquí obligaba a quien solo quería anotar una
+// entrada a cargarse jsbarcode entero.

@@ -828,9 +828,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const inputClass = "w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none text-sm";
     const labelClass = "block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1";
 
+    /*
+        Anclado abajo en el teléfono (MASTER.md: las ventanas entran por
+        abajo, al alcance del pulgar) y centrado a partir de `sm`, que es
+        el escritorio. La versión grande no cambia.
+    */
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="bg-surface rounded-xl shadow-lg w-full max-w-2xl overflow-hidden border border-subtle my-8">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-start justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
+            <div className="bg-surface rounded-t-2xl sm:rounded-xl shadow-lg w-full max-w-2xl overflow-hidden border border-subtle mt-auto sm:my-8 max-h-[92dvh] sm:max-h-none overflow-y-auto">
                 {/* Header */}
                 <div className="p-5 border-b border-subtle flex justify-between items-center">
                     <div className="flex items-center gap-3">

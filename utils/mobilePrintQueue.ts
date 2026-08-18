@@ -4,8 +4,13 @@
  * Users can accumulate multiple products with custom quantities,
  * then generate a single consolidated PDF with all labels.
  */
-import { renderLabelToCanvas } from './mobileLabelPrinter';
-import { jsPDF } from 'jspdf';
+// jsPDF (y jsbarcode, que entra por mobileLabelPrinter) solo hacen falta al
+// generar el PDF de la cola. Importados arriba del todo se llevaban por delante
+// 145 kB comprimidos en CADA carga del modo móvil: MobileLayout importa de aquí
+// `getPrintQueue` únicamente para pintar el número del badge, y eso bastaba para
+// arrastrar el chunk entero. Se cargan bajo demanda, igual que `xlsx`/`jszip` en
+// el resto del proyecto (ver vite.config.ts).
+import type { jsPDF } from 'jspdf';
 import { supabase } from '../supabaseClient';
 
 // ── Types ──────────────────────────────────────────────
@@ -38,6 +43,37 @@ const notifyQueueChanged = () => {
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('print-queue-changed'));
     }
+};
+
+/**
+ * Error de escritura en la cola.
+ *
+ * supabase-js NO lanza cuando el servidor rechaza la operación (RLS, columna
+ * inexistente, fila ajena...): devuelve `{ error }` y sigue. Las mutaciones de
+ * abajo avisaban del fallo por un evento de ventana y luego **retornaban
+ * normalmente**, así que el `try/catch` de quien las llamaba nunca se enteraba:
+ * ejecutaba su mensaje de éxito y pisaba el aviso de error. El teléfono decía
+ * "agregado a la cola" y la computadora no veía ninguna etiqueta.
+ *
+ * Ahora se lanza. El fallo tira la caché para que la próxima lectura traiga la
+ * verdad del servidor, y la pantalla se entera por donde ya lo esperaba.
+ */
+export class PrintQueueError extends Error {
+    readonly action: string;
+
+    constructor(action: string, detail: unknown) {
+        super((detail as any)?.message || 'No se pudo guardar el cambio en la cola de impresión.');
+        this.name = 'PrintQueueError';
+        this.action = action;
+    }
+}
+
+/** Tira la caché y devuelve el error a lanzar. */
+const queueFailure = (action: string, detail: unknown): PrintQueueError => {
+    console.error(`Error de la cola de impresión (${action}):`, detail);
+    cachedQueue = null;
+    notifyQueueChanged();
+    return new PrintQueueError(action, detail);
 };
 
 // ── Sincronización en vivo entre dispositivos ──────────
@@ -183,14 +219,21 @@ export const getPrintQueue = async (force = false): Promise<PrintQueueItem[]> =>
             return cachedQueue ?? [];
         }
 
-        cachedQueue = data.map((item: any) => ({
-            id: item.product_id,
-            sku: item.products.sku,
-            name: item.products.name,
-            image_url: item.products.image_url,
-            quantity: item.quantity,
-            addedAt: new Date(item.created_at).getTime()
-        }));
+        // `products` llega en null cuando el repuesto se eliminó (o quedó fuera
+        // de lo que deja ver RLS) después de encolarlo. Antes se leía
+        // `item.products.sku` a pelo: el TypeError subía hasta el catch de abajo
+        // y la cola ENTERA se devolvía vacía, como si el usuario la hubiera
+        // borrado. Se descarta solo la fila huérfana.
+        cachedQueue = (data as any[])
+            .filter(item => item.products)
+            .map((item: any) => ({
+                id: item.product_id,
+                sku: item.products.sku,
+                name: item.products.name,
+                image_url: item.products.image_url,
+                quantity: item.quantity,
+                addedAt: new Date(item.created_at).getTime()
+            }));
         return cachedQueue;
     } catch (err) {
         console.error('getPrintQueue Error:', err);
@@ -215,21 +258,23 @@ export const addToQueue = async (
         const existingLocal = cachedQueue?.find(item => item.id === product.id);
         const newQty = (existingLocal?.quantity || 0) + q;
 
-        if (existingLocal) {
-            await supabase
+        const { error } = existingLocal
+            ? await supabase
                 .from('print_queue_items')
                 .update({ quantity: newQty })
                 .eq('user_id', userData.user.id)
-                .eq('product_id', product.id);
-        } else {
-            await supabase
+                .eq('product_id', product.id)
+            : await supabase
                 .from('print_queue_items')
                 .insert({
                     user_id: userData.user.id,
                     product_id: product.id,
                     quantity: newQty
                 });
-        }
+
+        // Si el servidor lo rechazó, no se toca la caché: mostrar la etiqueta
+        // "ya encolada" cuando no llegó a guardarse es peor que no mostrarla.
+        if (error) throw queueFailure('agregar', error);
 
         if (cachedQueue) {
             if (existingLocal) {
@@ -250,8 +295,8 @@ export const addToQueue = async (
         notifyQueueChanged();
         return cachedQueue ?? await getPrintQueue();
     } catch (e) {
-        console.error('Error in addToQueue:', e);
-        return await getPrintQueue(true);
+        if (e instanceof PrintQueueError) throw e;
+        throw queueFailure('agregar', e);
     }
 };
 
@@ -260,11 +305,12 @@ export const removeFromQueue = async (product_id: number): Promise<PrintQueueIte
     try {
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
-            await supabase
+            const { error } = await supabase
                 .from('print_queue_items')
                 .delete()
                 .eq('user_id', userData.user.id)
                 .eq('product_id', product_id);
+            if (error) throw queueFailure('quitar', error);
         }
         if (cachedQueue) {
             cachedQueue = cachedQueue.filter(item => item.id !== product_id);
@@ -272,8 +318,8 @@ export const removeFromQueue = async (product_id: number): Promise<PrintQueueIte
         notifyQueueChanged();
         return cachedQueue ?? await getPrintQueue();
     } catch (e) {
-        console.error('Error in removeFromQueue:', e);
-        return await getPrintQueue(true);
+        if (e instanceof PrintQueueError) throw e;
+        throw queueFailure('quitar', e);
     }
 };
 
@@ -283,11 +329,12 @@ export const updateQueueItemQty = async (product_id: number, newQty: number): Pr
     try {
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
-            await supabase
+            const { error } = await supabase
                 .from('print_queue_items')
                 .update({ quantity: q })
                 .eq('user_id', userData.user.id)
                 .eq('product_id', product_id);
+            if (error) throw queueFailure('cambiar la cantidad', error);
         }
         if (cachedQueue) {
             cachedQueue = cachedQueue.map(item =>
@@ -297,8 +344,8 @@ export const updateQueueItemQty = async (product_id: number, newQty: number): Pr
         notifyQueueChanged();
         return cachedQueue ?? await getPrintQueue();
     } catch (e) {
-        console.error('Error in updateQueueItemQty:', e);
-        return await getPrintQueue(true);
+        if (e instanceof PrintQueueError) throw e;
+        throw queueFailure('cambiar la cantidad', e);
     }
 };
 
@@ -307,15 +354,17 @@ export const clearQueue = async (): Promise<void> => {
     try {
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user) {
-            await supabase
+            const { error } = await supabase
                 .from('print_queue_items')
                 .delete()
                 .eq('user_id', userData.user.id);
+            if (error) throw queueFailure('vaciar', error);
         }
         cachedQueue = [];
         notifyQueueChanged();
     } catch (e) {
-        console.error('Error in clearQueue:', e);
+        if (e instanceof PrintQueueError) throw e;
+        throw queueFailure('vaciar', e);
     }
 };
 
@@ -333,7 +382,12 @@ export const getQueuePageCount = (queue: PrintQueueItem[]): number => {
 export const generateQueuePDF = async (queue: PrintQueueItem[]): Promise<jsPDF> => {
     if (!queue || queue.length === 0) throw new Error('La cola está vacía');
 
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const [{ jsPDF: JsPDF }, { renderLabelToCanvas }] = await Promise.all([
+        import('jspdf'),
+        import('./mobileLabelPrinter'),
+    ]);
+
+    const pdf = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const cols = 3;
     const rows = 7;
     const LABEL_W = 210 / cols;

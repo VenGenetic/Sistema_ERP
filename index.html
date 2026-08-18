@@ -465,9 +465,34 @@
       }
 
       /* Hueco para que el contenido no quede debajo de la barra de navegación
-         móvil (72px) ni de la zona de gestos del sistema. */
+         móvil ni de la zona de gestos del sistema. */
       .pb-nav-safe {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom));
+        padding-bottom: var(--mobile-nav-h);
+      }
+
+      /* Fondo de scroll de una pantalla móvil con barra flotante propia: deja
+         sitio para la barra de navegación, para su botón central y para la
+         barra flotante que se apoya encima. */
+      .pb-mobile-page {
+        padding-bottom: calc(var(--mobile-nav-peak) + 1rem);
+      }
+
+      .pb-mobile-page-bar {
+        padding-bottom: calc(var(--mobile-nav-peak) + 7rem);
+      }
+
+      /* Barra flotante de acciones: se apoya justo encima del botón central. */
+      .bottom-above-nav {
+        bottom: calc(var(--mobile-nav-peak) + 4px);
+      }
+
+      /* Elementos que se apilan sobre esa barra flotante. */
+      .bottom-above-bar {
+        bottom: calc(var(--mobile-nav-peak) + 64px);
+      }
+
+      .bottom-above-bar-2 {
+        bottom: calc(var(--mobile-nav-peak) + 112px);
       }
 
       /* Numeric columns: fixed-width digits so decimals line up down the column. */
@@ -528,6 +553,58 @@
     .filled-icon {
       font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     }
+
+    /*
+       Medidas de la barra de navegación móvil, en un solo sitio.
+
+       Cada pantalla las tenía a ojo (72px, 88px, 108px, 168px, 216px,
+       pb-28/44/56) y ya habían divergido: Etiquetas y Proforma anclaban su
+       barra flotante a 88px, por debajo del botón central de impresión, que se
+       les venía encima.
+
+       --mobile-nav-h: alto real de la barra = pt-2 (8) + ul py-2 (16) + botón
+         central de 60px = 84px, más la zona segura del sistema.
+       --mobile-nav-peak: hasta dónde llega ese botón central, que sobresale
+         20px por encima (`-top-5`). Nada flotante puede bajar de aquí.
+    */
+    :root {
+      --mobile-nav-h: calc(84px + env(safe-area-inset-bottom));
+      --mobile-nav-peak: calc(104px + env(safe-area-inset-bottom));
+    }
+
+    /*
+       Animaciones del modo móvil.
+
+       Estaban repetidas en cuatro bloques <style> dentro de los componentes,
+       con duraciones distintas para el mismo nombre (0.4s en Inicio, 0.25s en
+       Inventario, 0.2s en Catálogo), y `animate-slide-down` faltaba justo en
+       la pantalla de Inventario: allí el panel de sugerencias aparecía de
+       golpe. Viven aquí una sola vez.
+    */
+    @keyframes mobile-fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes mobile-slide-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes mobile-slide-down {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes mobile-pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+      50%      { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    }
+
+    .animate-fade-in   { animation: mobile-fade-in 0.25s ease-out forwards; }
+    .animate-slide-up  { animation: mobile-slide-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-slide-down{ animation: mobile-slide-down 0.25s ease-out forwards; }
+    .animate-pulse-glow{ animation: mobile-pulse-glow 2s infinite; }
 
     /* Respect the OS "reduce motion" setting — required for accessibility. */
     @media (prefers-reduced-motion: reduce) {
