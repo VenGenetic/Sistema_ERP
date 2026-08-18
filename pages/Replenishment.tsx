@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { WarehouseSelect } from '../components/WarehouseSelect';
 import { MediaLightbox } from '../components/MediaLightbox';
+import { GeneratePurchaseOrderModal } from '../components/GeneratePurchaseOrderModal';
 import {
   Check,
   ChevronLeft,
@@ -15,6 +16,7 @@ import {
   Plus,
   Search,
   SearchX,
+  FileSpreadsheet,
   ShoppingBag,
   ShoppingBasket,
   ShoppingCart,
@@ -79,6 +81,9 @@ const Replenishment: React.FC = () => {
         initialIndex: 0
     });
     
+    // Pedido automatico a partir de las solicitudes de clientes
+    const [isAutoOrderOpen, setIsAutoOrderOpen] = useState(false);
+
     // Pagination for the virtualized/paged display (9k items is too much to render at once in DOM)
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 20;
@@ -529,6 +534,10 @@ const Replenishment: React.FC = () => {
 
     return (
         <div className="p-4 md:p-6 w-full max-w-full flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-64px)]">
+            <GeneratePurchaseOrderModal
+                isOpen={isAutoOrderOpen}
+                onClose={() => setIsAutoOrderOpen(false)}
+            />
             
             {/* ═══════ LEFT PANEL: CATALOG & CONTROLS ═══════ */}
             <div className="flex-1 flex flex-col gap-6">
@@ -542,6 +551,23 @@ const Replenishment: React.FC = () => {
                     <p className="text-fg-muted mt-1">
                         Compara tu stock local con las existencias y fotos de la importadora, y genera pedidos rápidos descargables en Excel.
                     </p>
+
+                    {/*
+                        Pedido de un clic.
+
+                        El carrito de abajo sirve para armar un pedido a mano,
+                        repuesto por repuesto. Este botón hace el que casi siempre
+                        se quiere: cruzar lo que los clientes están esperando con
+                        lo que la importadora tiene, y de paso listar lo que no
+                        tiene para buscarlo con otro proveedor.
+                    */}
+                    <button
+                        onClick={() => setIsAutoOrderOpen(true)}
+                        className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-primary hover:opacity-90 text-white rounded-lg text-sm font-bold transition-opacity shadow-sm"
+                    >
+                        <FileSpreadsheet size={18} aria-hidden="true" />
+                        Generar Pedido de Clientes
+                    </button>
                 </div>
 
                 {/* Filters & Selector */}
