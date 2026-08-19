@@ -12,7 +12,7 @@
  * encima sumaba latencia: la primera petición de cada variante la genera el
  * servidor al vuelo. Las pocas imágenes pesadas que quedaban (PNG de ~800 KB
  * subidos crudos desde la app) se convirtieron a WebP una sola vez con
- * scripts/optimize-heavy-images.mjs, y las nuevas se comprimen antes de subirse
+ * scripts/optimize_product_images.py, y las nuevas se comprimen antes de subirse
  * (utils/imageCompression.ts), de modo que ya no hay nada que transformar.
  *
  * Se conservan los parámetros de tamaño aunque no se usen: documentan a qué
