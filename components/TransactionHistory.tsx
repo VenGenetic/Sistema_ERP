@@ -135,7 +135,7 @@ const TransactionHistory: React.FC = () => {
                                     <React.Fragment key={t.id}>
                                         <tr className="group hover:bg-surface-hover transition-colors cursor-pointer" onClick={() => toggleRow(t.id)}>
                                             <td className="p-4 text-center">
-                                                <ChevronRight size={18} className="text-fg-subtle transition-transform ${expandedRows.has(t.id) ? 'rotate-90' : ''}" aria-hidden="true" />
+                                                <ChevronRight size={18} className={`text-fg-subtle transition-transform ${expandedRows.has(t.id) ? 'rotate-90' : ''}`} aria-hidden="true" />
                                             </td>
                                             <td className="py-4 px-4 text-sm text-fg-muted whitespace-nowrap">
                                                 {new Date(t.created_at).toLocaleDateString()}

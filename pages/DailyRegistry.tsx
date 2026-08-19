@@ -630,7 +630,7 @@ const DailyRegistry: React.FC = () => {
                         title="Actualizar"
                         className="p-2 rounded-lg bg-surface border border-subtle shadow-sm hover:bg-surface-hover transition-colors disabled:opacity-50"
                     >
-                        <RefreshCw size={20} className="text-fg-muted ${loading ? 'animate-spin' : ''}" aria-hidden="true" />
+                        <RefreshCw size={20} className={`text-fg-muted ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
                     </button>
                 </div>
             </div>
@@ -806,7 +806,7 @@ const DailyRegistry: React.FC = () => {
                                             onClick={() => setExpandedDate(isExpanded ? null : day.date)}
                                         >
                                             <td className="px-4 py-3 text-center">
-                                                <ChevronRight size={18} className="text-fg-subtle transition-transform duration-200 ${isExpanded ? 'rotate-90 text-primary' : ''}" aria-hidden="true" />
+                                                <ChevronRight size={18} className={`text-fg-subtle transition-transform duration-200 ${isExpanded ? 'rotate-90 text-primary' : ''}`} aria-hidden="true" />
                                             </td>
                                             <td className="px-4 py-3 text-sm font-bold text-fg">
                                                 {new Date(day.date + 'T12:00:00').toLocaleDateString('es-EC', {
@@ -857,7 +857,7 @@ const DailyRegistry: React.FC = () => {
                                                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between">
                                                                             <div className="flex items-center gap-4">
                                                                                 <div className="flex items-center gap-2">
-                                                                                    <ChevronDown size={14} className="text-fg-subtle transition-transform duration-200 ${isOrderExpanded ? 'rotate-180' : ''}" aria-hidden="true" />
+                                                                                    <ChevronDown size={14} className={`text-fg-subtle transition-transform duration-200 ${isOrderExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
                                                                                     <div className="bg-primary-soft text-primary-soft-fg font-bold font-mono text-xs px-2 py-1 rounded">
                                                                                         #{order.id}
                                                                                     </div>

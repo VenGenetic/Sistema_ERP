@@ -62,7 +62,10 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
             if (statusFilter === 'active') {
                 if (d.status !== 'pending_stock' && d.status !== 'stock_available') return false;
             } else if (statusFilter === 'inactive') {
-                if (d.status !== 'notified' && d.status !== 'cancelled') return false;
+                // La pantalla cuenta como inactivas notificado, cancelado,
+                // vencido y descontinuado. Aquí faltaban las dos últimas, así
+                // que exportar "Inactivas" daba menos filas de las que se veían.
+                if (!['notified', 'cancelled', 'expired', 'discontinued'].includes(d.status)) return false;
             } else if (statusFilter !== 'all') {
                 if (d.status !== statusFilter) return false;
             }

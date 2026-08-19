@@ -160,7 +160,7 @@ const SourcingPipeline: React.FC = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-surface border border-subtle rounded-lg hover:bg-surface-hover transition-colors shadow-sm dark:text-white"
                         title="Actualizar"
                     >
-                        <RefreshCw size={18} className="${loading ? 'animate-spin' : ''}" aria-hidden="true" />
+                        <RefreshCw size={18} className={`${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
                     </button>
                 </div>
             </div>

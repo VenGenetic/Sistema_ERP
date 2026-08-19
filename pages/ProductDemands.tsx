@@ -39,6 +39,38 @@ import {
   X,
 } from 'lucide-react';
 
+/**
+ * Estados de una solicitud, en un solo sitio.
+ *
+ * Estaban escritos a mano en cada `filter`, y por eso `discontinued` se quedó
+ * fuera de "Inactivas" y de los contadores: las 4 solicitudes de repuestos
+ * descontinuados no aparecían en ninguna vista salvo "Todos los estados".
+ */
+const ACTIVE_STATUSES = ['pending_stock', 'stock_available'];
+const INACTIVE_STATUSES = ['notified', 'cancelled', 'expired', 'discontinued'];
+
+/** Días que una solicitud espera antes de darse por vencida. */
+const DEMAND_EXPIRY_DAYS = 60;
+
+/** Anillo de foco del sistema de diseño (components/ui/styles.ts). */
+const focusRing =
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
+
+/**
+ * Aviso o confirmación de la pantalla.
+ *
+ * Sustituye a los `alert()` y `window.confirm()` del sistema, que se pintan con
+ * el estilo del navegador, salen centrados y en el teléfono tapan todo. Sin
+ * `onConfirm` es un aviso de un solo botón.
+ */
+type DialogRequest = {
+    title: string;
+    body?: string;
+    confirmLabel?: string;
+    tone?: 'default' | 'danger';
+    onConfirm?: () => void;
+};
+
 interface ProductDemand {
     id: number;
     product_id: number;
@@ -77,6 +109,7 @@ const ProductDemands: React.FC = () => {
     const user = session?.user;
     const [demands, setDemands] = useState<ProductDemand[]>([]);
     const [loading, setLoading] = useState(true);
+    const [dialog, setDialog] = useState<DialogRequest | null>(null);
     
     // View and Filters State
     const [viewType, setViewType] = useState<'table' | 'list' | 'kanban' | 'grouped'>('table');
@@ -86,6 +119,17 @@ const ProductDemands: React.FC = () => {
     const [flagFilter, setFlagFilter] = useState<string>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
     const [searchTerm, setSearchTerm] = useState('');
+    /*
+        Paginación de las vistas Tabla y Lista.
+
+        Se pintaban todas las solicitudes a la vez —535 activas hoy, cada una
+        con su bloque de stock, su bloque de precios y seis botones—, que son
+        decenas de miles de nodos. Kanban y Agrupado no paginan a propósito:
+        el Kanban necesita ver las columnas enteras para arrastrar, y Agrupado
+        ya condensa por repuesto.
+    */
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 50;
     const [ticketSearchTerm, setTicketSearchTerm] = useState('');
     const [expandedProducts, setExpandedProducts] = useState<Record<number, boolean>>({});
     const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
@@ -158,11 +202,49 @@ const ProductDemands: React.FC = () => {
             setAvailableOrderFlags(uniqueFlags.sort());
 
             setDemands(mappedData);
+            expireOverdueDemands(mappedData);
         } catch (error: any) {
             console.error('Error fetching demands:', error);
+            setDialog({
+                title: 'No se pudieron cargar las solicitudes',
+                body: error?.message || 'Error de conexión con Supabase.',
+            });
         } finally {
             setLoading(false);
         }
+    };
+
+    /*
+        Vencimiento real, no decorativo.
+
+        La ficha ya pintaba "(Vencido)" pasados 60 días, pero nada ponía nunca
+        `status = 'expired'`: la solicitud seguía contando como activa, seguía
+        en la cola y entraba en el generador de pedidos. El estado existe, tiene
+        insignia y columna en el Kanban; sólo faltaba quien lo escribiera.
+
+        Se hace al cargar y sólo sobre `pending_stock`: una solicitud en
+        `stock_available` tiene el repuesto esperando y merece que alguien avise
+        al cliente, no que se archive sola.
+    */
+    const expireOverdueDemands = async (rows: ProductDemand[]) => {
+        const cutoff = Date.now() - DEMAND_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+        const overdue = rows.filter(
+            d => d.status === 'pending_stock' && new Date(d.created_at).getTime() < cutoff
+        );
+        if (overdue.length === 0) return;
+
+        const { error } = await supabase
+            .from('product_demands')
+            .update({ status: 'expired' })
+            .in('id', overdue.map(d => d.id));
+
+        if (error) {
+            console.error('No se pudieron vencer las solicitudes caducadas:', error);
+            return;
+        }
+        setDemands(prev => prev.map(d =>
+            overdue.some(o => o.id === d.id) ? { ...d, status: 'expired' as const } : d
+        ));
     };
 
     useEffect(() => {
@@ -179,10 +261,43 @@ const ProductDemands: React.FC = () => {
         return local + importer;
     };
 
-    const handleCopyPhone = (phone: string, e: React.MouseEvent) => {
+    /*
+        Copiar el teléfono.
+
+        `navigator.clipboard` sólo existe en contextos seguros: HTTPS o
+        localhost. Abriendo el sistema desde la red local por IP
+        (http://192.168.x.x) no está, y la llamada reventaba con un TypeError
+        sin capturar: el botón no hacía nada y no se avisaba de por qué. Se cae
+        al método viejo, igual que ya hace el catálogo móvil.
+    */
+    const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+
+    const handleCopyPhone = async (phone: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(phone);
-        // Optional: you could add a local state for a tiny copied tooltip, but for simplicity we just copy.
+        const done = () => {
+            setCopiedPhone(phone);
+            setTimeout(() => setCopiedPhone(prev => (prev === phone ? null : prev)), 2000);
+        };
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(phone);
+                done();
+                return;
+            }
+            const helper = document.createElement('textarea');
+            helper.value = phone;
+            helper.setAttribute('readonly', '');
+            helper.style.position = 'fixed';
+            helper.style.opacity = '0';
+            document.body.appendChild(helper);
+            helper.select();
+            const ok = document.execCommand('copy');
+            document.body.removeChild(helper);
+            if (ok) done();
+            else setDialog({ title: 'No se pudo copiar', body: `El número es ${phone}` });
+        } catch {
+            setDialog({ title: 'No se pudo copiar', body: `El número es ${phone}` });
+        }
     };
 
     const toggleProductExpand = (productId: number) => {
@@ -200,6 +315,25 @@ const ProductDemands: React.FC = () => {
     };
 
     // Actions
+
+    /** Marca notificado. Era el mismo cuerpo repetido en tres manejadores. */
+    const markNotified = async (demandId: number) => {
+        try {
+            const { error } = await supabase
+                .from('product_demands')
+                .update({
+                    status: 'notified',
+                    notified_at: new Date().toISOString(),
+                    notified_by: user?.id
+                })
+                .eq('id', demandId);
+            if (error) throw error;
+            fetchDemands();
+        } catch (error: any) {
+            setDialog({ title: 'No se pudo marcar como notificado', body: error.message });
+        }
+    };
+
     const handleNotify = async (demand: ProductDemand, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
         if (!demand.product) return;
@@ -213,23 +347,12 @@ const ProductDemands: React.FC = () => {
 
         openWhatsApp(url);
 
-        if (window.confirm(`¿Se envió el mensaje a ${demand.customer_name || demand.phone_number} correctamente?`)) {
-            try {
-                const { error } = await supabase
-                    .from('product_demands')
-                    .update({
-                        status: 'notified',
-                        notified_at: new Date().toISOString(),
-                        notified_by: user?.id
-                    })
-                    .eq('id', demand.id);
-
-                if (error) throw error;
-                fetchDemands();
-            } catch (error: any) {
-                alert(`Error al marcar como notificado: ${error.message}`);
-            }
-        }
+        setDialog({
+            title: '¿Se envió el mensaje?',
+            body: `Confirma que ${demand.customer_name || demand.phone_number} recibió el aviso para archivar la solicitud.`,
+            confirmLabel: 'Sí, se envió',
+            onConfirm: () => markNotified(demand.id),
+        });
     };
 
     const handleNotifyDiscontinued = async (demand: ProductDemand, e?: React.MouseEvent) => {
@@ -245,98 +368,90 @@ const ProductDemands: React.FC = () => {
 
         openWhatsApp(url);
 
-        if (window.confirm(`¿Se envió el mensaje notificando la descontinuación a ${demand.customer_name || demand.phone_number} correctamente? Esto archivará la solicitud.`)) {
-            try {
-                const { error } = await supabase
-                    .from('product_demands')
-                    .update({
-                        status: 'notified',
-                        notified_at: new Date().toISOString(),
-                        notified_by: user?.id
-                    })
-                    .eq('id', demand.id);
-
-                if (error) throw error;
-                fetchDemands();
-            } catch (error: any) {
-                alert(`Error al marcar como notificado: ${error.message}`);
-            }
-        }
+        setDialog({
+            title: '¿Se avisó de la descontinuación?',
+            body: `Confirma que ${demand.customer_name || demand.phone_number} recibió el aviso. La solicitud quedará archivada.`,
+            confirmLabel: 'Sí, se envió',
+            onConfirm: () => markNotified(demand.id),
+        });
     };
 
-    const handleMarkAvailable = async (demand: ProductDemand, e?: React.MouseEvent) => {
+    const handleMarkAvailable = (demand: ProductDemand, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (window.confirm(`¿Marcar como disponible manualmente? (Útil cuando llega un producto equivalente)`)) {
-            try {
-                const { error } = await supabase
-                    .from('product_demands')
-                    .update({
-                        status: 'stock_available',
-                        stock_detected_at: new Date().toISOString()
-                    })
-                    .eq('id', demand.id);
-
-                if (error) throw error;
-                fetchDemands();
-            } catch (error: any) {
-                alert(`Error: ${error.message}`);
-            }
-        }
+        setDialog({
+            title: '¿Marcar como disponible?',
+            body: 'Útil cuando llega un repuesto equivalente que sirve para este cliente.',
+            confirmLabel: 'Marcar disponible',
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('product_demands')
+                        .update({
+                            status: 'stock_available',
+                            stock_detected_at: new Date().toISOString()
+                        })
+                        .eq('id', demand.id);
+                    if (error) throw error;
+                    fetchDemands();
+                } catch (error: any) {
+                    setDialog({ title: 'No se pudo marcar como disponible', body: error.message });
+                }
+            },
+        });
     };
 
-    const handleCancel = async (demand: ProductDemand, e?: React.MouseEvent) => {
+    const handleCancel = (demand: ProductDemand, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (window.confirm('¿Estás seguro de cancelar esta solicitud?')) {
-            try {
-                const { error } = await supabase
-                    .from('product_demands')
-                    .update({ status: 'cancelled' })
-                    .eq('id', demand.id);
-
-                if (error) throw error;
-                fetchDemands();
-            } catch (error: any) {
-                alert(`Error: ${error.message}`);
-            }
-        }
+        setDialog({
+            title: '¿Cancelar esta solicitud?',
+            body: `${demand.customer_name || demand.phone_number} dejará de estar en la lista de espera.`,
+            confirmLabel: 'Cancelar solicitud',
+            tone: 'danger',
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('product_demands')
+                        .update({ status: 'cancelled' })
+                        .eq('id', demand.id);
+                    if (error) throw error;
+                    fetchDemands();
+                } catch (error: any) {
+                    setDialog({ title: 'No se pudo cancelar', body: error.message });
+                }
+            },
+        });
     };
 
-    const handleDelete = async (demand: ProductDemand, e?: React.MouseEvent) => {
+    const handleDelete = (demand: ProductDemand, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (window.confirm('¿Eliminar permanentemente del historial?')) {
-            try {
-                const { error } = await supabase
-                    .from('product_demands')
-                    .delete()
-                    .eq('id', demand.id);
-
-                if (error) throw error;
-                fetchDemands();
-            } catch (error: any) {
-                alert(`Error: ${error.message}`);
-            }
-        }
+        setDialog({
+            title: '¿Eliminar del historial?',
+            body: 'Se borra de forma permanente y no se puede deshacer.',
+            confirmLabel: 'Eliminar',
+            tone: 'danger',
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('product_demands')
+                        .delete()
+                        .eq('id', demand.id);
+                    if (error) throw error;
+                    fetchDemands();
+                } catch (error: any) {
+                    setDialog({ title: 'No se pudo eliminar', body: error.message });
+                }
+            },
+        });
     };
 
-    const handleMarkNotifiedDirectly = async (demand: ProductDemand, e?: React.MouseEvent) => {
+    const handleMarkNotifiedDirectly = (demand: ProductDemand, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (window.confirm(`¿Marcar como notificado a ${demand.customer_name || demand.phone_number} sin enviar WhatsApp?`)) {
-            try {
-                const { error } = await supabase
-                    .from('product_demands')
-                    .update({
-                        status: 'notified',
-                        notified_at: new Date().toISOString(),
-                        notified_by: user?.id
-                    })
-                    .eq('id', demand.id);
-
-                if (error) throw error;
-                fetchDemands();
-            } catch (error: any) {
-                alert(`Error al marcar como notificado: ${error.message}`);
-            }
-        }
+        setDialog({
+            title: '¿Marcar como notificado?',
+            body: `Se archivará la solicitud de ${demand.customer_name || demand.phone_number} sin enviar ningún WhatsApp.`,
+            confirmLabel: 'Marcar notificado',
+            onConfirm: () => markNotified(demand.id),
+        });
     };
 
     const handleOpenFlagPopover = (demand: ProductDemand, e: React.MouseEvent) => {
@@ -356,7 +471,7 @@ const ProductDemands: React.FC = () => {
             if (error) throw error;
             fetchDemands();
         } catch (error: any) {
-            alert(`Error al guardar la bandera: ${error.message}`);
+            setDialog({ title: 'No se pudo guardar la bandera', body: error.message });
         } finally {
             setFlagActionDemand(null);
             setFlagInputValue('');
@@ -373,7 +488,7 @@ const ProductDemands: React.FC = () => {
             if (error) throw error;
             fetchDemands();
         } catch (error: any) {
-            alert(`Error al eliminar la bandera: ${error.message}`);
+            setDialog({ title: 'No se pudo eliminar la bandera', body: error.message });
         } finally {
             setFlagActionDemand(null);
             setFlagInputValue('');
@@ -412,18 +527,30 @@ const ProductDemands: React.FC = () => {
 
             if (demandError) throw demandError;
 
-            // Also update customer_requests (POS waitlist)
-            await supabase
+            // Also update customer_requests (POS waitlist).
+            // El error se ignoraba y aun así se anunciaba éxito: si esta parte
+            // fallaba, la lista de espera del POS quedaba desincronizada y
+            // nadie se enteraba.
+            const { error: posError } = await supabase
                 .from('customer_requests')
-                .update({ status: 'cancelled' }) // or you could map to cancelled
+                .update({ status: 'cancelled' })
                 .eq('product_id', discontinueProductId)
                 .eq('status', 'pending');
 
-            alert('Producto marcado como descontinuado exitosamente. Las solicitudes han sido actualizadas.');
             setDiscontinueProductId(null);
             fetchDemands();
+
+            setDialog(posError
+                ? {
+                    title: 'Descontinuado, pero el POS quedó pendiente',
+                    body: `El repuesto y sus solicitudes se actualizaron, pero la lista de espera del POS no: ${posError.message}. Revísala a mano.`,
+                }
+                : {
+                    title: 'Repuesto descontinuado',
+                    body: 'Sus solicitudes pasaron a "Descontinuado" y la lista de espera del POS quedó al día.',
+                });
         } catch (error: any) {
-            alert(`Error al descontinuar producto: ${error.message}`);
+            setDialog({ title: 'No se pudo descontinuar', body: error.message });
         } finally {
             setIsDiscontinuing(false);
         }
@@ -454,7 +581,7 @@ const ProductDemands: React.FC = () => {
             if (error) throw error;
             fetchDemands();
         } catch (error: any) {
-            alert(`Error al cambiar el estado: ${error.message}`);
+            setDialog({ title: 'No se pudo cambiar el estado', body: error.message });
         }
     };
 
@@ -463,7 +590,10 @@ const ProductDemands: React.FC = () => {
         const importerStock = getStockValue(demand.product, 'importer');
         
         if (importerStock <= 0 && !demand.is_approved) {
-            alert("No se puede aprobar: No hay stock en la importadora.\n\nDisclaimer: Si ya hay stock porque han revisado aparte, se debe solicitar a la administración la actualización del sistema con el stock visible en la importadora para poder aprobar este pedido.");
+            setDialog({
+                title: 'No se puede aprobar sin stock en la importadora',
+                body: 'Si sabes que sí hay porque lo revisaron aparte, pide a administración que actualice el stock de la importadora en el sistema y vuelve a intentarlo.',
+            });
             return;
         }
 
@@ -480,16 +610,23 @@ const ProductDemands: React.FC = () => {
             if (error) throw error;
             fetchDemands();
         } catch (error: any) {
-            alert(`Error al cambiar estado de aprobación: ${error.message}`);
+            setDialog({ title: 'No se pudo cambiar la aprobación', body: error.message });
         }
     };
 
-    // Derived Data
+    /*
+        Derived Data.
+
+        `inactive` contaba notificados, cancelados y vencidos pero se dejaba
+        fuera los descontinuados, así que las tarjetas no sumaban el total: con
+        4 descontinuados, Activas + Historial daban 670 de 674 y esos 4 no
+        aparecían en ninguna parte.
+    */
     const stats = useMemo(() => {
         const total = demands.length;
-        const active = demands.filter(d => d.status === 'pending_stock' || d.status === 'stock_available').length;
-        const inactive = demands.filter(d => d.status === 'notified' || d.status === 'cancelled' || d.status === 'expired').length;
-        const readyToNotify = demands.filter(d => (d.status === 'pending_stock' || d.status === 'stock_available') && getStockValue(d.product) > 0).length;
+        const active = demands.filter(d => ACTIVE_STATUSES.includes(d.status)).length;
+        const inactive = demands.filter(d => INACTIVE_STATUSES.includes(d.status)).length;
+        const readyToNotify = demands.filter(d => ACTIVE_STATUSES.includes(d.status) && getStockValue(d.product) > 0).length;
         return { total, active, inactive, readyToNotify };
     }, [demands]);
 
@@ -500,7 +637,10 @@ const ProductDemands: React.FC = () => {
                 if (statusFilter === 'active') {
                     if (d.status !== 'pending_stock' && d.status !== 'stock_available') return false;
                 } else if (statusFilter === 'inactive') {
-                    if (d.status !== 'notified' && d.status !== 'cancelled' && d.status !== 'expired') return false;
+                    // `discontinued` faltaba aquí, y tampoco estaba en el
+                    // desplegable: las solicitudes de repuestos descontinuados
+                    // quedaban invisibles salvo eligiendo "Todos los estados".
+                    if (!INACTIVE_STATUSES.includes(d.status)) return false;
                 } else if (statusFilter !== 'all') {
                     if (d.status !== statusFilter) return false;
                 }
@@ -538,11 +678,13 @@ const ProductDemands: React.FC = () => {
         });
 
         // Ticket Search Term
-        if (ticketSearchTerm) {
-            const ticketId = parseInt(ticketSearchTerm.trim(), 10);
-            if (!isNaN(ticketId)) {
-                filtered = filtered.filter(d => d.id === ticketId);
-            }
+        if (ticketSearchTerm.trim()) {
+            const raw = ticketSearchTerm.trim();
+            const ticketId = parseInt(raw, 10);
+            // Un ticket es un número. Si lo escrito no lo es, no hay nada que
+            // pueda coincidir: antes se ignoraba el filtro y la lista salía
+            // entera, dando a entender que ese ticket sí existía.
+            filtered = Number.isNaN(ticketId) ? [] : filtered.filter(d => d.id === ticketId);
         }
 
         // Search Term
@@ -585,6 +727,17 @@ const ProductDemands: React.FC = () => {
         return filtered;
     }, [demands, statusFilter, stockFilter, flagFilter, searchTerm, ticketSearchTerm, sortBy, viewType]);
 
+    const paginated = useMemo(() => {
+        if (viewType !== 'table' && viewType !== 'list') return filteredAndSortedDemands;
+        return filteredAndSortedDemands.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    }, [filteredAndSortedDemands, currentPage, viewType]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredAndSortedDemands.length / PAGE_SIZE));
+
+    // Al cambiar filtros la página actual puede quedar fuera de rango y la
+    // lista saldría vacía sin explicación.
+    useEffect(() => { setCurrentPage(1); }, [statusFilter, stockFilter, flagFilter, searchTerm, ticketSearchTerm, sortBy, viewType]);
+
     const grouped = useMemo(() => {
         const map = new Map<number, { productId: number; product: any; demands: ProductDemand[] }>();
         filteredAndSortedDemands.forEach(d => {
@@ -600,11 +753,11 @@ const ProductDemands: React.FC = () => {
     const OrderFlag = ({ demand }: { demand: ProductDemand }) => (
         <button
             onClick={(e) => handleOpenFlagPopover(demand, e)}
-            className={`flex items-center justify-center px-1.5 py-0.5 rounded-lg transition-colors border ${ demand.order_flag ? 'border-primary/20 text-primary-soft-fg bg-primary-soft hover:bg-primary-soft dark:hover:bg-primary/50' : 'border-transparent text-fg-subtle hover:text-slate-600 hover:bg-surface-hover dark:hover:text-slate-300 dark:hover:bg-slate-800' }`}
-            title={demand.order_flag ? `Orden: ${demand.order_flag}` : 'Agregar Bandera/Orden'}
+            className={`flex items-center justify-center px-1.5 py-0.5 rounded-lg transition-colors border ${ demand.order_flag ? 'border-primary/20 text-primary-soft-fg bg-primary-soft hover:brightness-95' : 'border-transparent text-fg-subtle hover:text-slate-600 hover:bg-surface-hover dark:hover:text-slate-300 dark:hover:bg-slate-800' }`}
+            aria-label={demand.order_flag ? `Orden ${demand.order_flag}. Cambiar la bandera` : 'Agregar una bandera de orden'}
         >
             <Flag size={14} aria-hidden="true" />
-            {demand.order_flag && <span className="text-2xs font-bold ml-1">{demand.order_flag}</span>}
+            {demand.order_flag && <span className="text-xs font-bold ml-1">{demand.order_flag}</span>}
         </button>
     );
 
@@ -631,7 +784,7 @@ const ProductDemands: React.FC = () => {
                         className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${ demand.is_approved ? 'translate-x-4' : 'translate-x-0' }`}
                     />
                 </button>
-                <span className={`text-xs font-medium ${demand.is_approved ? 'text-primary dark:text-primary' : 'text-slate-500'}`}>
+                <span className={`text-xs font-medium ${demand.is_approved ? 'text-primary' : 'text-fg-muted'}`}>
                     {demand.is_approved ? 'Aprobado en espera' : 'No aprobado'}
                 </span>
             </div>
@@ -641,26 +794,34 @@ const ProductDemands: React.FC = () => {
     const PhoneDisplay = ({ phone }: { phone: string }) => (
         <div className="flex items-center gap-2 mt-1">
             <span className="text-sm font-mono font-bold text-fg">{phone}</span>
-            <button onClick={(e) => handleCopyPhone(phone, e)} className="p-1 text-fg-subtle hover:text-primary hover:bg-primary-soft rounded transition-colors" title="Copiar Teléfono">
-                <Copy size={14} aria-hidden="true" />
+            <button
+                onClick={(e) => handleCopyPhone(phone, e)}
+                className={`p-1 rounded transition-colors ${focusRing} ${copiedPhone === phone ? 'text-success' : 'text-fg-subtle hover:text-primary hover:bg-primary-soft'}`}
+                aria-label={`Copiar el teléfono ${phone}`}
+            >
+                {copiedPhone === phone
+                    ? <CircleCheck size={14} aria-hidden="true" />
+                    : <Copy size={14} aria-hidden="true" />}
             </button>
         </div>
     );
 
     const StockDisplay = ({ prod }: { prod: any }) => {
-        if (!prod) return <span className="text-xs text-fg-subtle italic">Sin Stock</span>;
+        // `prod` nulo no significa "sin stock": significa que el repuesto ya no
+        // está en el catálogo (eliminado, o escondido por RLS).
+        if (!prod) return <span className="text-xs text-fg-subtle italic">Repuesto no disponible</span>;
         
         const localStock = prod.inventory_levels ? prod.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0) : 0;
         const importerStock = prod.importer_stock || 0;
         
         return (
-            <div className="flex flex-col gap-0.5 text-[11px] mt-1 bg-surface-2 p-2 rounded-lg border border-slate-100 dark:border-slate-800 text-left min-w-[120px]">
+            <div className="flex flex-col gap-0.5 text-xs mt-1 bg-surface-2 p-2 rounded-lg border border-slate-100 dark:border-slate-800 text-left min-w-[120px]">
                 <span className="flex items-center gap-1.5 justify-between">
                     <span className="flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
                         <span className="text-fg-muted">Local:</span>
                     </span>
-                    <span className={`font-bold ${localStock > 0 ? 'text-primary dark:text-primary' : 'text-slate-400'}`}>
+                    <span className={`font-bold ${localStock > 0 ? 'text-primary' : 'text-slate-400'}`}>
                         {localStock}
                     </span>
                 </span>
@@ -669,7 +830,7 @@ const ProductDemands: React.FC = () => {
                         <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
                         <span className="text-fg-muted">Impo:</span>
                     </span>
-                    <span className={`font-bold ${importerStock > 0 ? 'text-success dark:text-success' : 'text-slate-400'}`}>
+                    <span className={`font-bold ${importerStock > 0 ? 'text-success' : 'text-slate-400'}`}>
                         {importerStock}
                     </span>
                 </span>
@@ -686,7 +847,7 @@ const ProductDemands: React.FC = () => {
                 : null;
         if (pvp == null && costWithVat == null) return null;
         return (
-            <div className="flex flex-col gap-0.5 text-[11px] mt-1 bg-primary-soft p-2 rounded-lg border border-primary/20 text-left min-w-[120px]">
+            <div className="flex flex-col gap-0.5 text-xs mt-1 bg-primary-soft p-2 rounded-lg border border-primary/20 text-left min-w-[120px]">
                 {costWithVat != null && (
                     <span className="flex items-center gap-1.5 justify-between">
                         <span className="flex items-center gap-1">
@@ -723,14 +884,14 @@ const ProductDemands: React.FC = () => {
             <div className="flex flex-col gap-2">
                 {isActive ? (
                     <>
-                        <button onClick={(e) => handleNotify(demand, e)} className={`flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold text-white transition-colors shadow-sm ${isReady ? 'bg-success hover:bg-success' : 'bg-primary hover:bg-primary'}`}>
+                        <button onClick={(e) => handleNotify(demand, e)} className={`flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold transition-colors shadow-sm ${isReady ? 'bg-success text-success-fg hover:brightness-110' : 'bg-primary text-primary-fg hover:bg-primary-hover'}`}>
                             <MessageSquare size={16} aria-hidden="true" /> Notificar
                         </button>
                         <div className="flex items-center justify-center gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); setEditingDemand(demand); }} className="text-xs text-fg-muted hover:text-primary transition-colors flex items-center gap-1" title="Editar">
+                            <button onClick={(e) => { e.stopPropagation(); setEditingDemand(demand); }} className={`text-xs text-fg-muted hover:text-primary transition-colors flex items-center gap-1 ${focusRing}`} aria-label={`Editar la solicitud de ${demand.customer_name || demand.phone_number}`}>
                                 <Pencil size={14} aria-hidden="true" /> Editar
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); setSharingDemand(demand); }} className="text-xs text-fg-muted hover:text-primary transition-colors flex items-center gap-1" title="Compartir">
+                            <button onClick={(e) => { e.stopPropagation(); setSharingDemand(demand); }} className={`text-xs text-fg-muted hover:text-primary transition-colors flex items-center gap-1 ${focusRing}`} aria-label={`Compartir el ticket de ${demand.customer_name || demand.phone_number}`}>
                                 <Share2 size={14} aria-hidden="true" /> Compartir
                             </button>
                             {!isReady && (
@@ -738,24 +899,24 @@ const ProductDemands: React.FC = () => {
                             )}
                         </div>
                         <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-fg-muted hover:text-primary transition-colors">Marcar Notificado</button>
-                        <button onClick={(e) => handleStatusChange(demand.id, 'expired')} className="text-xs text-danger hover:text-danger transition-colors">Marcar Vencido</button>
-                        <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-danger hover:text-danger transition-colors">Cancelar</button>
+                        <button onClick={(e) => handleStatusChange(demand.id, 'expired')} className="text-xs text-danger hover:text-danger-hover transition-colors">Marcar Vencido</button>
+                        <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-danger hover:text-danger-hover transition-colors">Cancelar</button>
                     </>
                 ) : isDiscontinued ? (
                     <>
-                        <button onClick={(e) => handleNotifyDiscontinued(demand, e)} className="flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold text-white transition-colors shadow-sm bg-danger hover:bg-danger">
+                        <button onClick={(e) => handleNotifyDiscontinued(demand, e)} className="flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold transition-colors shadow-sm bg-danger text-danger-fg hover:bg-danger-hover">
                             <MessageSquare size={16} aria-hidden="true" /> Notificar Descontinuado
                         </button>
                         <div className="flex items-center justify-center gap-2">
                             <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-fg-muted hover:text-primary transition-colors">Archivar/Notificado</button>
-                            <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-danger hover:text-danger transition-colors">Cancelar</button>
+                            <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-danger hover:text-danger-hover transition-colors">Cancelar</button>
                         </div>
                     </>
                 ) : isExpired ? (
                     <>
                         <div className="flex flex-col gap-2 justify-center items-center">
                             <span className="text-xs text-fg-subtle">Expiró sin stock</span>
-                            <button onClick={(e) => handleDelete(demand, e)} className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors mx-auto" title="Eliminar registro">
+                            <button onClick={(e) => handleDelete(demand, e)} className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors mx-auto" aria-label="Eliminar este registro del historial">
                                 <Trash2 size={18} aria-hidden="true" />
                             </button>
                         </div>
@@ -772,9 +933,9 @@ const ProductDemands: React.FC = () => {
     // Render Views
     const renderTableView = () => (
         <div className="bg-surface border border-subtle rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
                 <table className="w-full text-left border-collapse">
-                    <thead>
+                    <thead className="bg-surface-2 sticky top-0 z-10">
                         <tr className="bg-surface-2 border-b border-subtle">
                             <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider">Cliente / Teléfono</th>
                             <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider">Producto (SKU)</th>
@@ -784,7 +945,7 @@ const ProductDemands: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-subtle">
-                        {filteredAndSortedDemands.map(demand => {
+                        {paginated.map(demand => {
                             const totalStock = getStockValue(demand.product);
                             const isReady = demand.status === 'stock_available';
                             return (
@@ -793,7 +954,7 @@ const ProductDemands: React.FC = () => {
                                         <div className="flex flex-col">
                                             <span className="font-semibold text-fg">{demand.customer_name || 'Sin Nombre'}</span>
                                             <div className="flex items-center gap-2 mt-1 mb-1">
-                                                <span className="text-2xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit">Ticket #{demand.id}</span>
+                                                <span className="text-xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit">Ticket #{demand.id}</span>
                                                 <OrderFlag demand={demand} />
                                             </div>
                                             <PhoneDisplay phone={demand.phone_number} />
@@ -866,7 +1027,7 @@ const ProductDemands: React.FC = () => {
 
     const renderListView = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAndSortedDemands.map(demand => {
+            {paginated.map(demand => {
                 const totalStock = getStockValue(demand.product);
                 const isReady = demand.status === 'stock_available';
                 return (
@@ -875,7 +1036,7 @@ const ProductDemands: React.FC = () => {
                             <div>
                                 <h3 className="font-bold text-fg">{demand.customer_name || 'Cliente Sin Nombre'}</h3>
                                 <div className="flex items-center gap-2 mt-1 mb-1">
-                                    <span className="text-2xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
+                                    <span className="text-xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
                                     <OrderFlag demand={demand} />
                                 </div>
                                 <PhoneDisplay phone={demand.phone_number} />
@@ -937,11 +1098,11 @@ const ProductDemands: React.FC = () => {
 
     const renderKanbanView = () => {
         const columns = [
-            { id: 'pending_stock', title: 'Esperando Stock', color: 'bg-warning-soft dark:bg-warning/10', hoverColor: 'bg-warning-soft/80 dark:bg-warning/20', header: 'border-warning/20 dark:border-warning', text: 'text-warning dark:text-warning' },
-            { id: 'stock_available', title: 'Stock Disponible', color: 'bg-success-soft dark:bg-success/10', hoverColor: 'bg-success-soft/80 dark:bg-success/20', header: 'border-success/20 dark:border-success', text: 'text-success dark:text-success' },
-            { id: 'discontinued', title: 'Descontinuados por Notificar', color: 'bg-danger-soft dark:bg-danger/10', hoverColor: 'bg-danger-soft/80 dark:bg-danger/20', header: 'border-danger/20 dark:border-danger', text: 'text-danger dark:text-danger' },
-            { id: 'expired', title: 'Vencidos', color: 'bg-danger-soft dark:bg-danger/10', hoverColor: 'bg-danger-soft/80 dark:bg-danger/20', header: 'border-danger/20 dark:border-danger', text: 'text-danger dark:text-danger' },
-            { id: 'notified', title: 'Notificados', color: 'bg-primary-soft dark:bg-primary/10', hoverColor: 'bg-primary-soft/80 dark:bg-primary/20', header: 'border-primary/20 dark:border-primary', text: 'text-primary dark:text-primary' },
+            { id: 'pending_stock', title: 'Esperando Stock', color: 'bg-warning-soft dark:bg-warning/10', hoverColor: 'bg-warning-soft/80 dark:bg-warning/20', header: 'border-warning/20 dark:border-warning', text: 'text-warning' },
+            { id: 'stock_available', title: 'Stock Disponible', color: 'bg-success-soft dark:bg-success/10', hoverColor: 'bg-success-soft/80 dark:bg-success/20', header: 'border-success/20 dark:border-success', text: 'text-success' },
+            { id: 'discontinued', title: 'Descontinuados por Notificar', color: 'bg-danger-soft dark:bg-danger/10', hoverColor: 'bg-danger-soft/80 dark:bg-danger/20', header: 'border-danger/20 dark:border-danger', text: 'text-danger' },
+            { id: 'expired', title: 'Vencidos', color: 'bg-danger-soft dark:bg-danger/10', hoverColor: 'bg-danger-soft/80 dark:bg-danger/20', header: 'border-danger/20 dark:border-danger', text: 'text-danger' },
+            { id: 'notified', title: 'Notificados', color: 'bg-primary-soft dark:bg-primary/10', hoverColor: 'bg-primary-soft/80 dark:bg-primary/20', header: 'border-primary/20 dark:border-primary', text: 'text-primary' },
             { id: 'cancelled', title: 'Cancelados', color: 'bg-slate-50 dark:bg-slate-900/10', hoverColor: 'bg-slate-100/80 dark:bg-slate-900/20', header: 'border-slate-300 dark:border-slate-600', text: 'text-slate-700 dark:text-slate-300' }
         ];
 
@@ -988,7 +1149,7 @@ const ProductDemands: React.FC = () => {
                                             <div>
                                                 <span className="font-semibold text-fg block">{demand.customer_name || 'Sin Nombre'}</span>
                                                 <div className="flex items-center gap-2 mt-1 mb-1">
-                                                    <span className="text-2xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
+                                                    <span className="text-xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
                                                     <OrderFlag demand={demand} />
                                                 </div>
                                                 <PhoneDisplay phone={demand.phone_number} />
@@ -1013,7 +1174,7 @@ const ProductDemands: React.FC = () => {
                                                 <PriceDisplay prod={demand.product} />
                                             </div>
                                         </div>
-                                        <div className="text-2xs text-fg-subtle flex flex-col gap-0.5 mt-1 border-t border-slate-100 dark:border-slate-800 pt-1">
+                                        <div className="text-xs text-fg-subtle flex flex-col gap-0.5 mt-1 border-t border-slate-100 dark:border-slate-800 pt-1">
                                             <span className="flex items-center gap-1">
                                                 <Calendar size={11} aria-hidden="true" />
                                                 {new Date(demand.created_at).toLocaleDateString()} {new Date(demand.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
@@ -1062,7 +1223,7 @@ const ProductDemands: React.FC = () => {
                         <div key={group.productId} className="bg-surface rounded-xl border border-subtle overflow-hidden shadow-sm">
                             <div onClick={() => toggleProductExpand(group.productId)} className="p-4 flex items-center justify-between cursor-pointer hover:bg-surface-hover transition-colors">
                                 <div className="flex items-center gap-4">
-                                    <ChevronDown size={18} className="transition-transform ${isExpanded ? 'rotate-180' : ''}" aria-hidden="true" />
+                                    <ChevronDown size={18} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
                                     {group.product?.image_url && (
                                         <img
                                             src={getThumbnailUrl(group.product.image_url, 60, 60)}
@@ -1101,7 +1262,7 @@ const ProductDemands: React.FC = () => {
                                             <span className="hidden sm:inline">Descontinuar</span>
                                         </button>
                                     ) : (
-                                        <div className="bg-danger text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold text-xs shadow-sm">
+                                        <div className="bg-danger text-danger-fg px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold text-xs shadow-sm">
                                             <TriangleAlert size={16} aria-hidden="true" />
                                             Descontinuado
                                         </div>
@@ -1117,7 +1278,7 @@ const ProductDemands: React.FC = () => {
                                                     <div>
                                                         <span className="font-semibold text-fg block">{demand.customer_name || 'Sin Nombre'}</span>
                                                         <div className="flex items-center gap-2 mt-1 mb-1">
-                                                            <span className="text-2xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
+                                                            <span className="text-xs font-mono bg-primary-soft text-primary-soft-fg px-2 py-0.5 rounded-full font-bold w-fit inline-block">Ticket #{demand.id}</span>
                                                             <OrderFlag demand={demand} />
                                                         </div>
                                                         <PhoneDisplay phone={demand.phone_number} />
@@ -1161,51 +1322,71 @@ const ProductDemands: React.FC = () => {
             {/* Header & Title */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold dark:text-white tracking-tight">Demanda de Stock</h1>
+                    <h1 className="text-2xl font-bold text-fg tracking-tight">Demanda de Stock</h1>
                     <p className="text-fg-muted mt-1">Gestión de la lista de espera de clientes para productos agotados.</p>
                 </div>
                 <button
                     onClick={fetchDemands}
                     className="flex items-center gap-2 px-4 py-2 bg-surface border border-subtle rounded-lg hover:bg-surface-hover transition-colors shadow-sm"
                 >
-                    <RefreshCw size={18} className="${loading ? 'animate-spin' : ''}" aria-hidden="true" />
+                    <RefreshCw size={18} className={`${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
                     Actualizar
                 </button>
             </div>
 
             {/* Metrics Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div onClick={() => { setStatusFilter('all'); }} className={`p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === 'all' ? 'bg-primary-soft border-primary/20 dark:border-primary' : 'bg-white dark:bg-[#0c1117] border-subtle hover:border-primary/20'}`}>
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('all')}
+                    aria-pressed={statusFilter === 'all'}
+                    className={`p-4 rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${statusFilter === 'all' ? 'bg-primary-soft border-primary/20' : 'bg-surface border-subtle hover:border-primary/20'}`}
+                >
                     <div className="flex items-center gap-3 text-primary mb-2">
                         <ClipboardList size={24} aria-hidden="true" />
                         <span className="font-semibold text-sm">Total Solicitudes</span>
                     </div>
-                    <span className="text-3xl font-bold text-fg">{stats.total}</span>
-                </div>
+                    <span className="text-3xl font-bold text-fg tnum">{stats.total}</span>
+                </button>
                 
-                <div onClick={() => { setStatusFilter('active'); }} className={`p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === 'active' ? 'bg-warning-soft border-warning/20 dark:border-warning' : 'bg-white dark:bg-[#0c1117] border-subtle hover:border-warning/20'}`}>
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('active')}
+                    aria-pressed={statusFilter === 'active'}
+                    className={`p-4 rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${statusFilter === 'active' ? 'bg-warning-soft border-warning/20' : 'bg-surface border-subtle hover:border-warning/20'}`}
+                >
                     <div className="flex items-center gap-3 text-warning mb-2">
                         <ClipboardList size={24} aria-hidden="true" />
                         <span className="font-semibold text-sm">Cola Activa</span>
                     </div>
-                    <span className="text-3xl font-bold text-fg">{stats.active}</span>
-                </div>
+                    <span className="text-3xl font-bold text-fg tnum">{stats.active}</span>
+                </button>
 
-                <div onClick={() => { setStatusFilter('inactive'); }} className={`p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === 'inactive' ? 'bg-slate-100 border-slate-400 dark:bg-slate-800 dark:border-slate-600' : 'bg-white dark:bg-[#0c1117] border-subtle hover:border-slate-400'}`}>
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('inactive')}
+                    aria-pressed={statusFilter === 'inactive'}
+                    className={`p-4 rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${statusFilter === 'inactive' ? 'bg-surface-3 border-strong' : 'bg-surface border-subtle hover:border-strong'}`}
+                >
                     <div className="flex items-center gap-3 text-fg-muted mb-2">
                         <History size={24} aria-hidden="true" />
                         <span className="font-semibold text-sm">Historial</span>
                     </div>
-                    <span className="text-3xl font-bold text-fg">{stats.inactive}</span>
-                </div>
+                    <span className="text-3xl font-bold text-fg tnum">{stats.inactive}</span>
+                </button>
 
-                <div onClick={() => { setStatusFilter('stock_available'); }} className={`p-4 rounded-xl border cursor-pointer transition-all ${statusFilter === 'stock_available' ? 'bg-success-soft border-success/20 dark:border-success' : 'bg-white dark:bg-[#0c1117] border-subtle hover:border-success/20'}`}>
+                <button
+                    type="button"
+                    onClick={() => setStatusFilter('stock_available')}
+                    aria-pressed={statusFilter === 'stock_available'}
+                    className={`p-4 rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${statusFilter === 'stock_available' ? 'bg-success-soft border-success/20' : 'bg-surface border-subtle hover:border-success/20'}`}
+                >
                     <div className="flex items-center gap-3 text-success mb-2">
                         <Package size={24} aria-hidden="true" />
                         <span className="font-semibold text-sm">Listos para Notificar</span>
                     </div>
-                    <span className="text-3xl font-bold text-fg">{stats.readyToNotify}</span>
-                </div>
+                    <span className="text-3xl font-bold text-fg tnum">{stats.readyToNotify}</span>
+                </button>
             </div>
 
             {/* Controls Bar */}
@@ -1214,16 +1395,16 @@ const ProductDemands: React.FC = () => {
                 {/* Vistas */}
                 <div className="flex items-center gap-3 w-full 2xl:w-auto">
                     <div className="flex bg-surface-3 p-1 rounded-lg overflow-x-auto flex-1 2xl:flex-none">
-                        <button onClick={() => setViewType('table')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'table' ? 'bg-white dark:bg-slate-600 text-fg shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}>
+                        <button onClick={() => setViewType('table')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'table' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
                             <Rows3 size={18} aria-hidden="true" /> Tabla
                         </button>
-                        <button onClick={() => setViewType('list')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'list' ? 'bg-white dark:bg-slate-600 text-fg shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}>
+                        <button onClick={() => setViewType('list')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'list' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
                             <List size={18} aria-hidden="true" /> Lista
                         </button>
-                        <button onClick={() => setViewType('kanban')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'kanban' ? 'bg-white dark:bg-slate-600 text-fg shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}>
+                        <button onClick={() => setViewType('kanban')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'kanban' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
                             <Columns3 size={18} aria-hidden="true" /> Kanban
                         </button>
-                        <button onClick={() => setViewType('grouped')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'grouped' ? 'bg-white dark:bg-slate-600 text-fg shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}>
+                        <button onClick={() => setViewType('grouped')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'grouped' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
                             <LayoutGrid size={18} aria-hidden="true" /> Agrupado
                         </button>
                     </div>
@@ -1231,7 +1412,7 @@ const ProductDemands: React.FC = () => {
                     <button
                         onClick={() => setShowExportModal(true)}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border border-subtle rounded-lg text-fg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm"
-                        title="Exportar demandas a CSV con filtros"
+                        aria-label="Exportar las solicitudes a CSV, con los filtros actuales"
                     >
                         <Download size={18} className="text-success" aria-hidden="true" />
                         <span className="hidden sm:inline">Exportar CSV</span>
@@ -1243,7 +1424,7 @@ const ProductDemands: React.FC = () => {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value as any)}
-                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                         <option value="all">Filtro: Todos los estados</option>
                         <option value="active">Activas (Cola)</option>
@@ -1251,13 +1432,15 @@ const ProductDemands: React.FC = () => {
                         <option value="pending_stock">Esperando Stock</option>
                         <option value="stock_available">Stock Disponible</option>
                         <option value="notified">Notificados</option>
+                        <option value="discontinued">Descontinuados</option>
+                        <option value="expired">Vencidos</option>
                         <option value="cancelled">Cancelados</option>
                     </select>
 
                     <select
                         value={stockFilter}
                         onChange={(e) => setStockFilter(e.target.value as any)}
-                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                         <option value="all">Stock: Todos</option>
                         <option value="has_local">Hay en el local (sin importar la importadora)</option>
@@ -1270,7 +1453,7 @@ const ProductDemands: React.FC = () => {
                     <select
                         value={flagFilter}
                         onChange={(e) => setFlagFilter(e.target.value)}
-                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                         <option value="all">Bandera: Todas</option>
                         <option value="with_flag">Con bandera</option>
@@ -1285,7 +1468,7 @@ const ProductDemands: React.FC = () => {
                     <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as any)}
-                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white"
+                        className="w-full md:w-auto bg-surface-2 border border-subtle rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                         <option value="date_desc">Ordenar: Más reciente</option>
                         <option value="date_asc">Ordenar: Más antiguo</option>
@@ -1301,7 +1484,7 @@ const ProductDemands: React.FC = () => {
                             placeholder="N° Ticket..."
                             value={ticketSearchTerm}
                             onChange={(e) => setTicketSearchTerm(e.target.value)}
-                            className="w-full bg-surface-2 border border-subtle rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-all"
+                            className="w-full bg-surface-2 border border-subtle rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                         />
                     </div>
 
@@ -1312,7 +1495,7 @@ const ProductDemands: React.FC = () => {
                             placeholder="Buscar cliente, teléfono..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-surface-2 border border-subtle rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-all"
+                            className="w-full bg-surface-2 border border-subtle rounded-lg py-2 pl-9 pr-4 text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                         />
                     </div>
                 </div>
@@ -1323,6 +1506,42 @@ const ProductDemands: React.FC = () => {
             {viewType === 'list' && renderListView()}
             {viewType === 'kanban' && renderKanbanView()}
             {viewType === 'grouped' && renderGroupedView()}
+
+            {/* Paginación de Tabla y Lista (ver D-09: antes se pintaban las
+                535 solicitudes de golpe). */}
+            {(viewType === 'table' || viewType === 'list') && filteredAndSortedDemands.length > PAGE_SIZE && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface p-4 rounded-xl border border-subtle shadow-sm">
+                    <span className="text-sm text-fg-muted">
+                        Mostrando{' '}
+                        <strong className="text-fg tnum">
+                            {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, filteredAndSortedDemands.length)}
+                        </strong>{' '}
+                        de <strong className="text-fg tnum">{filteredAndSortedDemands.length.toLocaleString('es-EC')}</strong> solicitudes
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(prev => prev - 1)}
+                            className={`px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${focusRing}`}
+                        >
+                            Anterior
+                        </button>
+                        <span className="px-3 py-1.5 text-sm font-medium text-fg bg-surface-2 border border-subtle rounded-lg tnum">
+                            {currentPage} / {totalPages}
+                        </span>
+                        <button
+                            type="button"
+                            disabled={currentPage >= totalPages}
+                            onClick={() => setCurrentPage(prev => prev + 1)}
+                            className={`px-3 py-1.5 border border-subtle rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${focusRing}`}
+                        >
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <ExportDemandsModal
                 isOpen={showExportModal}
@@ -1406,7 +1625,7 @@ const ProductDemands: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleSaveFlag}
-                                    className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary text-white rounded-lg text-sm font-bold transition-colors"
+                                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-fg hover:bg-primary-hover rounded-lg text-sm font-bold transition-colors"
                                 >
                                     Guardar
                                 </button>
@@ -1451,7 +1670,7 @@ const ProductDemands: React.FC = () => {
                             <button
                                 onClick={handleConfirmDiscontinue}
                                 disabled={isDiscontinuing}
-                                className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+                                className="flex items-center gap-2 px-4 py-2 bg-danger text-danger-fg hover:bg-danger-hover rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
                             >
                                 {isDiscontinuing ? 'Procesando...' : 'Confirmar'}
                             </button>
@@ -1467,6 +1686,61 @@ const ProductDemands: React.FC = () => {
                     initialIndex={lightbox.initialIndex}
                     onClose={() => setLightbox({ ...lightbox, isOpen: false })}
                 />
+            )}
+
+            {/*
+                Aviso / confirmación de la pantalla, en lugar de los `alert()` y
+                `window.confirm()` del navegador: se pintan con el estilo del
+                sistema operativo, ignoran el tema y en el teléfono tapan todo.
+            */}
+            {dialog && (
+                <div
+                    className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={dialog.title}
+                >
+                    <div className="bg-surface rounded-t-2xl sm:rounded-xl shadow-xl border border-subtle w-full max-w-md overflow-hidden">
+                        <div className="px-6 py-4 border-b border-subtle flex items-center gap-2 bg-surface-2">
+                            {dialog.tone === 'danger'
+                                ? <TriangleAlert size={20} className="text-danger shrink-0" aria-hidden="true" />
+                                : <CircleCheck size={20} className="text-primary shrink-0" aria-hidden="true" />}
+                            <h2 className="text-base font-bold text-fg">{dialog.title}</h2>
+                        </div>
+
+                        {dialog.body && (
+                            <p className="px-6 py-5 text-sm text-fg-muted leading-relaxed">{dialog.body}</p>
+                        )}
+
+                        <div className="px-6 py-4 border-t border-subtle bg-surface-2 flex justify-end gap-3">
+                            {dialog.onConfirm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setDialog(null)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium text-fg-muted hover:bg-surface-hover transition-colors ${focusRing}`}
+                                >
+                                    Cancelar
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                autoFocus
+                                onClick={() => {
+                                    const run = dialog.onConfirm;
+                                    setDialog(null);
+                                    run?.();
+                                }}
+                                className={`px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors ${focusRing} ${
+                                    dialog.tone === 'danger'
+                                        ? 'bg-danger text-danger-fg hover:bg-danger-hover'
+                                        : 'bg-primary text-primary-fg hover:bg-primary-hover'
+                                }`}
+                            >
+                                {dialog.confirmLabel || 'Entendido'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

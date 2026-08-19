@@ -107,7 +107,7 @@ const HeaderAccount: React.FC = () => {
                     </div>
                 )}
 
-                <ChevronDown size={18} className="text-fg-subtle transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}" aria-hidden="true" />
+                <ChevronDown size={18} className={`text-fg-subtle transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
 
             {isOpen && (
