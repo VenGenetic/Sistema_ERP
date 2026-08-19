@@ -753,7 +753,7 @@ const ProductDemands: React.FC = () => {
     const OrderFlag = ({ demand }: { demand: ProductDemand }) => (
         <button
             onClick={(e) => handleOpenFlagPopover(demand, e)}
-            className={`flex items-center justify-center px-1.5 py-0.5 rounded-lg transition-colors border ${ demand.order_flag ? 'border-primary/20 text-primary-soft-fg bg-primary-soft hover:brightness-95' : 'border-transparent text-fg-subtle hover:text-slate-600 hover:bg-surface-hover dark:hover:text-slate-300 dark:hover:bg-slate-800' }`}
+            className={`flex items-center justify-center px-1.5 py-0.5 rounded-lg transition-colors border ${ demand.order_flag ? 'border-primary/20 text-primary-soft-fg bg-primary-soft hover:brightness-95' : 'border-transparent text-fg-subtle hover:text-slate-600 hover:bg-surface-hover dark:hover:text-slate-300 dark:hover:bg-slate-800' } ${focusRing}`}
             aria-label={demand.order_flag ? `Orden ${demand.order_flag}. Cambiar la bandera` : 'Agregar una bandera de orden'}
         >
             <Flag size={14} aria-hidden="true" />
@@ -775,7 +775,7 @@ const ProductDemands: React.FC = () => {
             <div className="flex items-center gap-2 mt-2">
                 <button
                     onClick={(e) => handleToggleApproved(demand, e)}
-                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ demand.is_approved ? 'bg-primary' : 'bg-slate-200 dark:bg-slate-700' }`}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ demand.is_approved ? 'bg-primary' : 'bg-slate-200 dark:bg-slate-700' } ${focusRing}`}
                     role="switch"
                     aria-checked={demand.is_approved}
                 >
@@ -884,7 +884,7 @@ const ProductDemands: React.FC = () => {
             <div className="flex flex-col gap-2">
                 {isActive ? (
                     <>
-                        <button onClick={(e) => handleNotify(demand, e)} className={`flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold transition-colors shadow-sm ${isReady ? 'bg-success text-success-fg hover:brightness-110' : 'bg-primary text-primary-fg hover:bg-primary-hover'}`}>
+                        <button onClick={(e) => handleNotify(demand, e)} className={`flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold transition-colors shadow-sm ${isReady ? 'bg-success text-success-fg hover:brightness-110' : 'bg-primary text-primary-fg hover:bg-primary-hover'} ${focusRing}`}>
                             <MessageSquare size={16} aria-hidden="true" /> Notificar
                         </button>
                         <div className="flex items-center justify-center gap-2">
@@ -895,34 +895,34 @@ const ProductDemands: React.FC = () => {
                                 <Share2 size={14} aria-hidden="true" /> Compartir
                             </button>
                             {!isReady && (
-                                <button onClick={(e) => handleMarkAvailable(demand, e)} className="text-xs text-fg-muted hover:text-success transition-colors">Marcar Disp.</button>
+                                <button onClick={(e) => handleMarkAvailable(demand, e)} className={`text-xs text-fg-muted hover:text-success transition-colors ${focusRing}`}>Marcar Disp.</button>
                             )}
                         </div>
-                        <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-fg-muted hover:text-primary transition-colors">Marcar Notificado</button>
-                        <button onClick={(e) => handleStatusChange(demand.id, 'expired')} className="text-xs text-danger hover:text-danger-hover transition-colors">Marcar Vencido</button>
-                        <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-danger hover:text-danger-hover transition-colors">Cancelar</button>
+                        <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className={`text-xs text-fg-muted hover:text-primary transition-colors ${focusRing}`}>Marcar Notificado</button>
+                        <button onClick={(e) => handleStatusChange(demand.id, 'expired')} className={`text-xs text-danger hover:text-danger-hover transition-colors ${focusRing}`}>Marcar Vencido</button>
+                        <button onClick={(e) => handleCancel(demand, e)} className={`text-xs text-danger hover:text-danger-hover transition-colors ${focusRing}`}>Cancelar</button>
                     </>
                 ) : isDiscontinued ? (
                     <>
-                        <button onClick={(e) => handleNotifyDiscontinued(demand, e)} className="flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold transition-colors shadow-sm bg-danger text-danger-fg hover:bg-danger-hover">
+                        <button onClick={(e) => handleNotifyDiscontinued(demand, e)} className={`flex items-center gap-1.5 px-3 py-1.5 justify-center rounded-lg text-sm font-semibold transition-colors shadow-sm bg-danger text-danger-fg hover:bg-danger-hover ${focusRing}`}>
                             <MessageSquare size={16} aria-hidden="true" /> Notificar Descontinuado
                         </button>
                         <div className="flex items-center justify-center gap-2">
-                            <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className="text-xs text-fg-muted hover:text-primary transition-colors">Archivar/Notificado</button>
-                            <button onClick={(e) => handleCancel(demand, e)} className="text-xs text-danger hover:text-danger-hover transition-colors">Cancelar</button>
+                            <button onClick={(e) => handleMarkNotifiedDirectly(demand, e)} className={`text-xs text-fg-muted hover:text-primary transition-colors ${focusRing}`}>Archivar/Notificado</button>
+                            <button onClick={(e) => handleCancel(demand, e)} className={`text-xs text-danger hover:text-danger-hover transition-colors ${focusRing}`}>Cancelar</button>
                         </div>
                     </>
                 ) : isExpired ? (
                     <>
                         <div className="flex flex-col gap-2 justify-center items-center">
                             <span className="text-xs text-fg-subtle">Expiró sin stock</span>
-                            <button onClick={(e) => handleDelete(demand, e)} className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors mx-auto" aria-label="Eliminar este registro del historial">
+                            <button onClick={(e) => handleDelete(demand, e)} className={`p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors mx-auto ${focusRing}`} aria-label="Eliminar este registro del historial">
                                 <Trash2 size={18} aria-hidden="true" />
                             </button>
                         </div>
                     </>
                 ) : (
-                    <button onClick={(e) => handleDelete(demand, e)} className="p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors mx-auto" title="Eliminar registro">
+                    <button onClick={(e) => handleDelete(demand, e)} className={`p-1.5 text-fg-subtle hover:text-danger hover:bg-danger-soft rounded-lg transition-colors mx-auto ${focusRing}`} title="Eliminar registro">
                         <Trash2 size={18} aria-hidden="true" />
                     </button>
                 )}
@@ -1256,7 +1256,7 @@ const ProductDemands: React.FC = () => {
                                                 e.stopPropagation();
                                                 setDiscontinueProductId(group.productId);
                                             }}
-                                            className="bg-danger-soft text-danger-soft-fg hover:bg-danger px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold transition-colors border border-danger/20"
+                                            className={`bg-danger-soft text-danger-soft-fg hover:bg-danger px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold transition-colors border border-danger/20 ${focusRing}`}
                                         >
                                             <TriangleAlert size={16} aria-hidden="true" />
                                             <span className="hidden sm:inline">Descontinuar</span>
@@ -1327,7 +1327,7 @@ const ProductDemands: React.FC = () => {
                 </div>
                 <button
                     onClick={fetchDemands}
-                    className="flex items-center gap-2 px-4 py-2 bg-surface border border-subtle rounded-lg hover:bg-surface-hover transition-colors shadow-sm"
+                    className={`flex items-center gap-2 px-4 py-2 bg-surface border border-subtle rounded-lg hover:bg-surface-hover transition-colors shadow-sm ${focusRing}`}
                 >
                     <RefreshCw size={18} className={`${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
                     Actualizar
@@ -1395,23 +1395,23 @@ const ProductDemands: React.FC = () => {
                 {/* Vistas */}
                 <div className="flex items-center gap-3 w-full 2xl:w-auto">
                     <div className="flex bg-surface-3 p-1 rounded-lg overflow-x-auto flex-1 2xl:flex-none">
-                        <button onClick={() => setViewType('table')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'table' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
+                        <button onClick={() => setViewType('table')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'table' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'} ${focusRing}`}>
                             <Rows3 size={18} aria-hidden="true" /> Tabla
                         </button>
-                        <button onClick={() => setViewType('list')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'list' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
+                        <button onClick={() => setViewType('list')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'list' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'} ${focusRing}`}>
                             <List size={18} aria-hidden="true" /> Lista
                         </button>
-                        <button onClick={() => setViewType('kanban')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'kanban' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
+                        <button onClick={() => setViewType('kanban')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'kanban' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'} ${focusRing}`}>
                             <Columns3 size={18} aria-hidden="true" /> Kanban
                         </button>
-                        <button onClick={() => setViewType('grouped')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'grouped' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
+                        <button onClick={() => setViewType('grouped')} className={`flex-1 2xl:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewType === 'grouped' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg'} ${focusRing}`}>
                             <LayoutGrid size={18} aria-hidden="true" /> Agrupado
                         </button>
                     </div>
 
                     <button
                         onClick={() => setShowExportModal(true)}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border border-subtle rounded-lg text-fg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm"
+                        className={`flex items-center justify-center gap-2 px-4 py-2.5 bg-surface border border-subtle rounded-lg text-fg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm ${focusRing}`}
                         aria-label="Exportar las solicitudes a CSV, con los filtros actuales"
                     >
                         <Download size={18} className="text-success" aria-hidden="true" />
@@ -1575,7 +1575,7 @@ const ProductDemands: React.FC = () => {
                                 <Flag size={18} className="text-primary" aria-hidden="true" />
                                 Asignar Orden
                             </h3>
-                            <button onClick={() => setFlagActionDemand(null)} className="text-fg-subtle hover:text-slate-600 transition-colors">
+                            <button onClick={() => setFlagActionDemand(null)} className={`text-fg-subtle hover:text-slate-600 transition-colors ${focusRing}`}>
                                 <X size={20} aria-hidden="true" />
                             </button>
                         </div>
@@ -1612,20 +1612,20 @@ const ProductDemands: React.FC = () => {
                         <div className="p-4 border-t border-subtle bg-surface-2 flex justify-between gap-3">
                             <button
                                 onClick={handleDeleteFlag}
-                                className="px-4 py-2 rounded-lg text-sm font-medium text-danger hover:bg-danger-soft transition-colors"
+                                className={`px-4 py-2 rounded-lg text-sm font-medium text-danger hover:bg-danger-soft transition-colors ${focusRing}`}
                             >
                                 Eliminar Bandera
                             </button>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setFlagActionDemand(null)}
-                                    className="px-4 py-2 rounded-lg text-sm font-medium text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors ${focusRing}`}
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={handleSaveFlag}
-                                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-fg hover:bg-primary-hover rounded-lg text-sm font-bold transition-colors"
+                                    className={`flex items-center gap-2 px-4 py-2 bg-primary text-primary-fg hover:bg-primary-hover rounded-lg text-sm font-bold transition-colors ${focusRing}`}
                                 >
                                     Guardar
                                 </button>
@@ -1663,14 +1663,14 @@ const ProductDemands: React.FC = () => {
                         <div className="p-4 border-t border-subtle bg-surface-2 flex justify-end gap-3">
                             <button
                                 onClick={() => setDiscontinueProductId(null)}
-                                className="px-4 py-2 rounded-lg text-sm font-medium text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                className={`px-4 py-2 rounded-lg text-sm font-medium text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors ${focusRing}`}
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleConfirmDiscontinue}
                                 disabled={isDiscontinuing}
-                                className="flex items-center gap-2 px-4 py-2 bg-danger text-danger-fg hover:bg-danger-hover rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+                                className={`flex items-center gap-2 px-4 py-2 bg-danger text-danger-fg hover:bg-danger-hover rounded-lg text-sm font-bold transition-colors disabled:opacity-50 ${focusRing}`}
                             >
                                 {isDiscontinuing ? 'Procesando...' : 'Confirmar'}
                             </button>
