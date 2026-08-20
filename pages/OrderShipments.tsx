@@ -24,8 +24,34 @@ const EMPTY_DESTINATARIO: Destinatario = {
     cedulaRuc: '',
 };
 
+type LabelSize = 'pequeno' | 'mediano' | 'grande';
+
+interface LabelSizeSpec {
+    label: string;
+    hint: string;
+    widthCm: number;
+    labelFontPx: number;
+    bodyFontPx: number;
+    nameFontPx: number;
+    destNameFontPx: number;
+    lineHeight: number;
+    paddingClass: string;
+}
+
+// Pequeño conserva las medidas originales (11.25cm, 25% más grande que el
+// 9cm de partida) para no romper lo que ya funcionaba en repuestos chicos.
+// Mediano y Grande escalan ancho y tipografía juntos -- Grande pensado para
+// cajas de envío grandes, donde una guía diminuta se pierde en la superficie.
+const LABEL_SIZES: Record<LabelSize, LabelSizeSpec> = {
+    pequeno: { label: 'Pequeño', hint: 'Repuestos chicos', widthCm: 11.25, labelFontPx: 10, bodyFontPx: 11, nameFontPx: 12, destNameFontPx: 13.5, lineHeight: 1.65, paddingClass: 'px-2.5 py-3' },
+    mediano: { label: 'Mediano', hint: 'Cajas medianas', widthCm: 15, labelFontPx: 12, bodyFontPx: 14, nameFontPx: 15, destNameFontPx: 17, lineHeight: 1.7, paddingClass: 'px-3.5 py-4' },
+    grande: { label: 'Grande', hint: 'Cajas grandes', widthCm: 21, labelFontPx: 15, bodyFontPx: 18, nameFontPx: 19, destNameFontPx: 22, lineHeight: 1.75, paddingClass: 'px-5 py-6' },
+};
+
 const OrderShipments: React.FC = () => {
     const [destinatario, setDestinatario] = useState<Destinatario>(EMPTY_DESTINATARIO);
+    const [labelSize, setLabelSize] = useState<LabelSize>('pequeno');
+    const sizeSpec = LABEL_SIZES[labelSize];
 
     const isComplete = Object.values(destinatario).every((v) => v.trim().length > 0);
 
@@ -59,6 +85,32 @@ const OrderShipments: React.FC = () => {
                         <div><span className="text-fg-muted">Ciudad:</span> <span className="font-medium text-fg">{REMITENTE.ciudad}</span></div>
                         <div><span className="text-fg-muted">Teléfono:</span> <span className="font-medium text-fg">{REMITENTE.telefono}</span></div>
                         <div><span className="text-fg-muted">Cédula/RUC:</span> <span className="font-medium text-fg">{REMITENTE.cedulaRuc}</span></div>
+                    </div>
+                </div>
+
+                {/* Tamaño de etiqueta */}
+                <div className="bg-surface-2 border border-subtle rounded-lg p-4 mb-4">
+                    <h2 className="text-sm font-semibold text-fg mb-3">Tamaño de etiqueta</h2>
+                    <div className="grid grid-cols-3 gap-2">
+                        {(Object.keys(LABEL_SIZES) as LabelSize[]).map((key) => {
+                            const spec = LABEL_SIZES[key];
+                            const active = labelSize === key;
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => setLabelSize(key)}
+                                    className={`rounded-lg border p-2.5 text-center transition-colors ${
+                                        active
+                                            ? 'border-primary bg-primary/10 text-primary'
+                                            : 'border-subtle text-fg-muted hover:bg-surface-hover'
+                                    }`}
+                                >
+                                    <div className="text-sm font-semibold">{spec.label}</div>
+                                    <div className="text-xs mt-0.5">{spec.hint}</div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -117,30 +169,29 @@ const OrderShipments: React.FC = () => {
             </div>
 
             {/* ── Guía imprimible (oculta en pantalla, visible solo al imprimir) ──
-                 Tamaño de etiqueta pequeña (~11.25cm de ancho, 25% más grande
-                 que el original de 9cm) para que quepa en repuestos chicos:
+                 Ancho y tipografía según el tamaño elegido arriba (sizeSpec):
                  no ocupa toda la hoja, solo un recuadro que se recorta y se
                  pega en el paquete. */}
             {/* `on-paper`: la guía se imprime sobre papel blanco, así que los
                 tokens de texto deben resolver siempre a tinta oscura. Con el tema
                 oscuro activo, las etiquetas "De" / "Para" (`text-fg-muted`) salían
                 casi blancas y desaparecían al imprimir. Ver index.html. */}
-            <div className="on-paper hidden print:block text-black" style={{ width: '11.25cm', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+            <div className="on-paper hidden print:block text-black" style={{ width: `${sizeSpec.widthCm}cm`, fontFamily: 'Arial, Helvetica, sans-serif' }}>
                 <div className="border-2 border-black rounded-lg overflow-hidden">
                     {/* Dos columnas: remitente (izquierda) / destinatario (derecha) */}
                     <div className="flex">
-                        <div className="flex-1 px-2.5 py-3 border-r-2 border-black" style={{ fontSize: '11px', lineHeight: 1.65 }}>
-                            <p className="font-bold uppercase tracking-wide text-fg-muted mb-1" style={{ fontSize: '10px' }}>De</p>
-                            <p className="font-bold" style={{ fontSize: '12px' }}>{REMITENTE.nombre}</p>
+                        <div className={`flex-1 ${sizeSpec.paddingClass} border-r-2 border-black`} style={{ fontSize: `${sizeSpec.bodyFontPx}px`, lineHeight: sizeSpec.lineHeight }}>
+                            <p className="font-bold uppercase tracking-wide text-fg-muted mb-1" style={{ fontSize: `${sizeSpec.labelFontPx}px` }}>De</p>
+                            <p className="font-bold" style={{ fontSize: `${sizeSpec.nameFontPx}px` }}>{REMITENTE.nombre}</p>
                             <p>{REMITENTE.direccion}</p>
                             <p>{REMITENTE.ciudad}</p>
                             <p>Tel: {REMITENTE.telefono}</p>
                             <p>C.I./RUC: {REMITENTE.cedulaRuc}</p>
                         </div>
 
-                        <div className="flex-1 px-2.5 py-3" style={{ fontSize: '11px', lineHeight: 1.65 }}>
-                            <p className="font-bold uppercase tracking-wide text-fg-muted mb-1" style={{ fontSize: '10px' }}>Para</p>
-                            <p className="font-bold" style={{ fontSize: '13.5px' }}>{destinatario.nombre}</p>
+                        <div className={`flex-1 ${sizeSpec.paddingClass}`} style={{ fontSize: `${sizeSpec.bodyFontPx}px`, lineHeight: sizeSpec.lineHeight }}>
+                            <p className="font-bold uppercase tracking-wide text-fg-muted mb-1" style={{ fontSize: `${sizeSpec.labelFontPx}px` }}>Para</p>
+                            <p className="font-bold" style={{ fontSize: `${sizeSpec.destNameFontPx}px` }}>{destinatario.nombre}</p>
                             <p>{destinatario.direccion}</p>
                             <p className="font-bold">{destinatario.ciudad}</p>
                             <p>Tel: {destinatario.telefono}</p>
