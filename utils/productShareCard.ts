@@ -33,14 +33,14 @@ const CENTER = SIZE / 2;
 const FONT = '"Inter", "Helvetica Neue", Arial, sans-serif';
 
 /**
- * Precio tal como se le muestra al cliente: redondeado al entero de arriba y
- * sin centavos (16.15 y 16.99 salen igual, $17).
+ * Precio tal como se le muestra al cliente en la ficha de WhatsApp: PVP + $2
+ * de margen para este canal, redondeado al entero de arriba y sin centavos.
  *
- * Es la misma convención que ya usan ShareDemandModal y la proforma, así que
- * un repuesto cotizado por WhatsApp y el mismo repuesto en una proforma dan la
- * misma cifra; mostrar el PVP crudo aquí abriría discusiones por centavos.
+ * El +2 es a propósito distinto de ShareDemandModal/la proforma (que muestran
+ * el PVP redondeado tal cual) -- es un margen exclusivo de esta ficha, pedido
+ * para compensar el envío/negociación típica de WhatsApp.
  */
-const customerPriceText = (price?: number | null): string => `$${Math.ceil(Number(price) || 0)}`;
+const customerPriceText = (price?: number | null): string => `$${Math.ceil((Number(price) || 0) + 2)}`;
 
 /**
  * Carga la imagen del repuesto para dibujarla en el canvas.
