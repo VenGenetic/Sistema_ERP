@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Contact,
   HandCoins,
+  Headset,
   LayoutDashboard,
   Menu,
   Package,
@@ -175,6 +176,9 @@ const Layout: React.FC = () => {
         <NavSection>Operaciones</NavSection>
         {(isAdmin || permissions?.customers?.read) && (
           <NavItem to="/customers" icon={Contact} label="Clientes" active={isActive('customers')} />
+        )}
+        {(isAdmin || permissions?.customers?.read) && (
+          <NavItem to="/whatsapp-inbox" icon={Headset} label="Bandeja de WhatsApp" active={isActive('whatsapp-inbox')} />
         )}
         {canProducts && (
           <>

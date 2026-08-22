@@ -32,6 +32,7 @@ const SourcingPipeline = React.lazy(() => import('./pages/SourcingPipeline'));
 const InventoryMode = React.lazy(() => import('./pages/InventoryMode').then(module => ({ default: module.InventoryMode })));
 const InventorySession = React.lazy(() => import('./pages/InventorySession').then(module => ({ default: module.InventorySession })));
 const POE = React.lazy(() => import('./pages/POE'));
+const WhatsAppInbox = React.lazy(() => import('./pages/WhatsAppInbox'));
 
 // Lazy load mobile pages
 const MobileLayout = React.lazy(() => import('./components/mobile/MobileLayout'));
@@ -87,6 +88,7 @@ const App: React.FC = () => {
                 <Route path="inventory-mode/:id" element={<InventorySession />} />
                 <Route path="replenishment" element={<Replenishment />} />
                 <Route path="product-demands" element={<ProductDemands />} />
+                <Route path="whatsapp-inbox" element={<WhatsAppInbox />} />
                 <Route path="sourcing" element={<SourcingPipeline />} />
                 <Route path="orders/*" element={<Orders />} />
                 <Route path="commissions" element={<CommissionDashboard />} />
