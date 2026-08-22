@@ -17,7 +17,8 @@ import { ProductLabelModal } from '../components/ProductLabelModal';
 import { InventoryGroupSelectModal } from '../components/InventoryGroupSelectModal';
 import { PrintQueuePreviewModal } from '../components/PrintQueuePreviewModal';
 import { addToQueue, getPrintQueue, clearQueue, removeFromQueue, updateQueueItemQty, getQueueTotalLabels, getQueuePageCount, downloadQueuePDF, PrintQueueItem } from '../utils/mobilePrintQueue';
-import { shareProductCard } from '../utils/productShareCard';
+import { ShareCardOutcome } from '../utils/productShareCard';
+import { ShareCardPreviewModal } from '../components/ShareCardPreviewModal';
 import { ProformaPanel } from '../components/ProformaPanel';
 import { useProformaStore } from '../store/useProformaStore';
 import { cn, badge, button, input, focusRing, skeleton } from '../components/ui/styles';
@@ -400,7 +401,7 @@ const Products: React.FC = () => {
 
     // Compartir ficha del repuesto (imagen para WhatsApp)
     const [shareToast, setShareToast] = useState<string | null>(null);
-    const [sharingSku, setSharingSku] = useState<string | null>(null);
+    const [shareCardProduct, setShareCardProduct] = useState<any>(null);
 
     // Menú "Acciones" de la cabecera: agrupa importar / multimedia / exportar
     // para que sólo quede un botón primario visible en la pantalla.
@@ -492,30 +493,21 @@ const Products: React.FC = () => {
         });
     };
 
-    // Deja la ficha del repuesto en el portapapeles para pegarla en WhatsApp,
-    // con la misma tarjeta que ve el cliente en el catálogo público.
-    const handleShareCard = async (prod: any, e: React.MouseEvent) => {
+    // Abre la vista previa de la ficha del repuesto; la copia/entrega real
+    // pasa por ShareCardPreviewModal, recién cuando el usuario la confirma.
+    const handleShareCard = (prod: any, e: React.MouseEvent) => {
         e.stopPropagation();
-        setSharingSku(prod.sku);
-        setShareToast(`Generando ficha de ${prod.sku}...`);
-        try {
-            const outcome = await shareProductCard(prod);
-            if (outcome === 'cancelled') {
-                setShareToast(null);
-                return;
-            }
-            setShareToast(
-                outcome === 'copied' ? 'Ficha copiada: pégala en WhatsApp'
-                : outcome === 'shared' ? 'Ficha compartida'
-                : 'Ficha descargada'
-            );
-            setTimeout(() => setShareToast(null), 2600);
-        } catch (err: any) {
-            setShareToast('No se pudo generar la ficha: ' + (err?.message || 'error'));
-            setTimeout(() => setShareToast(null), 3200);
-        } finally {
-            setSharingSku(null);
-        }
+        setShareCardProduct(prod);
+    };
+
+    const handleShareCardDelivered = (outcome: ShareCardOutcome) => {
+        if (outcome === 'cancelled') return;
+        setShareToast(
+            outcome === 'copied' ? 'Ficha copiada: pégala en WhatsApp'
+            : outcome === 'shared' ? 'Ficha compartida'
+            : 'Ficha descargada'
+        );
+        setTimeout(() => setShareToast(null), 2600);
     };
 
     const navigate = useNavigate();
@@ -1423,17 +1415,14 @@ const Products: React.FC = () => {
                         <button
                             type="button"
                             onClick={(e) => handleShareCard(prod, e)}
-                            disabled={sharingSku === prod.sku}
                             className={cn(
                                 'p-1.5 rounded-md flex items-center justify-center transition-colors',
-                                'text-fg-subtle hover:text-primary hover:bg-primary-soft disabled:opacity-60',
+                                'text-fg-subtle hover:text-primary hover:bg-primary-soft',
                                 focusRing
                             )}
                             title="Copiar ficha del repuesto (imagen para WhatsApp)"
                         >
-                            {sharingSku === prod.sku
-                                ? <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-                                : <ImageDown size={15} aria-hidden="true" />}
+                            <ImageDown size={15} aria-hidden="true" />
                         </button>
                     </div>
                 </td>
@@ -1710,17 +1699,14 @@ const Products: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={(e) => handleShareCard(prod, e)}
-                                disabled={sharingSku === prod.sku}
                                 className={cn(
                                     'p-1 rounded-md transition-colors flex items-center justify-center shrink-0',
-                                    'text-fg-subtle hover:text-primary hover:bg-primary-soft disabled:opacity-60',
+                                    'text-fg-subtle hover:text-primary hover:bg-primary-soft',
                                     focusRing
                                 )}
                                 title="Copiar ficha del repuesto (imagen para WhatsApp)"
                             >
-                                {sharingSku === prod.sku
-                                    ? <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-                                    : <ImageDown size={14} aria-hidden="true" />}
+                                <ImageDown size={14} aria-hidden="true" />
                             </button>
                         </div>
 
@@ -2743,6 +2729,14 @@ const Products: React.FC = () => {
                     {shareToast}
                 </div>
             )}
+
+            {/* ═══════ VISTA PREVIA DE LA FICHA (WHATSAPP) ═══════ */}
+            <ShareCardPreviewModal
+                isOpen={!!shareCardProduct}
+                product={shareCardProduct}
+                onClose={() => setShareCardProduct(null)}
+                onDelivered={handleShareCardDelivered}
+            />
 
             {/* ═══════ PRINT QUEUE FLOATING INDICATOR ═══════ */}
             {(() => {

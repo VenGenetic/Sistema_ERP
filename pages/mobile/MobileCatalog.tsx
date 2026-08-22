@@ -19,7 +19,7 @@ import { InventoryGroupSelectModal } from '../../components/InventoryGroupSelect
 
 import { addToPrintHistory } from '../../utils/mobilePrintHistory';
 import { addToQueue } from '../../utils/mobilePrintQueue';
-import { shareProductCard } from '../../utils/productShareCard';
+import { deliverProductCard, renderProductCard } from '../../utils/productShareCard';
 import { compressImageForUpload } from '../../utils/imageCompression';
 import { useProformaStore } from '../../store/useProformaStore';
 
@@ -721,6 +721,40 @@ const MobileCatalog: React.FC = () => {
     const [queueSheetProduct, setQueueSheetProduct] = useState<any>(null);
     const [queueSheetQty, setQueueSheetQty] = useState(1);
 
+    // Vista previa de la ficha del repuesto (imagen para WhatsApp)
+    const [shareCardProduct, setShareCardProduct] = useState<any>(null);
+    const [shareCardCanvas, setShareCardCanvas] = useState<HTMLCanvasElement | null>(null);
+    const [shareCardPreviewUrl, setShareCardPreviewUrl] = useState<string | null>(null);
+    const [shareCardRendering, setShareCardRendering] = useState(false);
+    const [shareCardDelivering, setShareCardDelivering] = useState(false);
+    const [shareCardError, setShareCardError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!shareCardProduct) {
+            setShareCardCanvas(null);
+            setShareCardPreviewUrl(null);
+            setShareCardError(null);
+            return;
+        }
+        let cancelled = false;
+        setShareCardRendering(true);
+        setShareCardError(null);
+        renderProductCard(shareCardProduct)
+            .then((canvas) => {
+                if (cancelled) return;
+                setShareCardCanvas(canvas);
+                setShareCardPreviewUrl(canvas.toDataURL('image/png'));
+            })
+            .catch((err: any) => {
+                if (cancelled) return;
+                setShareCardError(err?.message || 'No se pudo generar la ficha');
+            })
+            .finally(() => {
+                if (!cancelled) setShareCardRendering(false);
+            });
+        return () => { cancelled = true; };
+    }, [shareCardProduct]);
+
     // Cámara
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const cameraProductRef = useRef<any>(null);
@@ -1105,19 +1139,30 @@ const MobileCatalog: React.FC = () => {
         }
     };
 
-    const handleShareCard = async (prod: any) => {
+    // Abre la vista previa de la ficha; la copia/entrega real se dispara desde
+    // la hoja recién cuando el usuario la confirma.
+    const handleShareCard = (prod: any) => {
         buzz(40);
-        notify(`Generando ficha de ${prod.sku}...`);
+        setShareCardProduct(prod);
+    };
+
+    const handleShareCardConfirm = async () => {
+        if (!shareCardCanvas || !shareCardProduct) return;
+        setShareCardDelivering(true);
         try {
-            const outcome = await shareProductCard(prod);
-            if (outcome === 'cancelled') return;
-            notify(
-                outcome === 'shared' ? 'Ficha compartida'
-                : outcome === 'copied' ? 'Ficha copiada, ya puedes pegarla'
-                : 'Ficha descargada'
-            );
+            const outcome = await deliverProductCard(shareCardCanvas, shareCardProduct);
+            if (outcome !== 'cancelled') {
+                notify(
+                    outcome === 'shared' ? 'Ficha compartida'
+                    : outcome === 'copied' ? 'Ficha copiada, ya puedes pegarla'
+                    : 'Ficha descargada'
+                );
+                setShareCardProduct(null);
+            }
         } catch (err: any) {
-            notify('No se pudo generar la ficha: ' + (err?.message || 'error desconocido'));
+            setShareCardError('No se pudo copiar la ficha: ' + (err?.message || 'error desconocido'));
+        } finally {
+            setShareCardDelivering(false);
         }
     };
 
@@ -1686,6 +1731,48 @@ const MobileCatalog: React.FC = () => {
                         >
                             <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
                             Agregar {queueSheetQty} a la cola
+                        </button>
+                    </>
+                )}
+            </Sheet>
+
+            {/* ── HOJA: VISTA PREVIA DE LA FICHA (WHATSAPP) ── */}
+            <Sheet open={!!shareCardProduct} onClose={() => setShareCardProduct(null)} title="Vista previa de la ficha" icon={ImageDown}>
+                {shareCardProduct && (
+                    <>
+                        {shareCardRendering && (
+                            <div className="flex flex-col items-center gap-2 text-slate-400 py-10">
+                                <Loader2 size={28} className="animate-spin" aria-hidden="true" />
+                                <span className="text-sm font-medium">Generando ficha...</span>
+                            </div>
+                        )}
+                        {!shareCardRendering && shareCardError && (
+                            <div className="text-sm font-medium text-red-400 py-10 text-center">{shareCardError}</div>
+                        )}
+                        {!shareCardRendering && !shareCardError && shareCardPreviewUrl && (
+                            <img
+                                src={shareCardPreviewUrl}
+                                alt={shareCardProduct.name}
+                                className="w-full rounded-xl border border-slate-700 mb-4"
+                            />
+                        )}
+                        <button
+                            type="button"
+                            onClick={handleShareCardConfirm}
+                            disabled={shareCardDelivering || shareCardRendering || !shareCardCanvas}
+                            className="w-full min-h-[52px] rounded-xl bg-amber-500 text-slate-950 font-bold flex items-center justify-center gap-2 active:bg-amber-600 disabled:opacity-50"
+                        >
+                            {shareCardDelivering ? (
+                                <>
+                                    <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                                    Copiando...
+                                </>
+                            ) : (
+                                <>
+                                    <ImageDown size={18} aria-hidden="true" />
+                                    Copiar ficha
+                                </>
+                            )}
                         </button>
                     </>
                 )}
