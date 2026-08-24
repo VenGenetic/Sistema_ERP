@@ -200,12 +200,33 @@ const WhatsAppInbox: React.FC = () => {
         fetchEscalations();
         fetchConversations();
         fetchSettings();
+
+        /**
+         * Los eventos de realtime llegan en ráfaga: una importación de
+         * historial puede insertar miles de conversaciones y disparar un
+         * evento por cada una. Sin agrupar, cada evento re-consultaba la
+         * lista entera -- miles de consultas para mostrar lo mismo, y
+         * factura de Supabase al pepe. Se agrupan en una sola recarga.
+         */
+        let escalationsTimer: ReturnType<typeof setTimeout> | undefined;
+        let conversationsTimer: ReturnType<typeof setTimeout> | undefined;
+        const AGRUPAR_MS = 3000;
+
         const channel = supabase
             .channel('agent_escalations_inbox')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_escalations' }, () => fetchEscalations())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_conversations' }, () => fetchConversations())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_escalations' }, () => {
+                clearTimeout(escalationsTimer);
+                escalationsTimer = setTimeout(() => fetchEscalations(), AGRUPAR_MS);
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_conversations' }, () => {
+                clearTimeout(conversationsTimer);
+                conversationsTimer = setTimeout(() => fetchConversations(), AGRUPAR_MS);
+            })
             .subscribe();
+
         return () => {
+            clearTimeout(escalationsTimer);
+            clearTimeout(conversationsTimer);
             channel.unsubscribe();
         };
     }, [fetchEscalations, fetchConversations, fetchSettings]);
