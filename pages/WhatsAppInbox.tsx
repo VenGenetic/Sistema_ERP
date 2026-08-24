@@ -162,6 +162,9 @@ const WhatsAppInbox: React.FC = () => {
     const [search, setSearch] = useState('');
     /** Se incrementa para forzar una relectura del chat abierto. */
     const [recargarMensajes, setRecargarMensajes] = useState(0);
+    const [borrador, setBorrador] = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
     const fetchConversations = useCallback(async () => {
         const { data, error } = await supabase
@@ -463,6 +466,38 @@ const WhatsAppInbox: React.FC = () => {
             prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
         );
     }, []);
+
+    /**
+     * Encola el mensaje para que el proceso del agente lo envíe.
+     *
+     * No se manda desde acá porque el navegador no tiene la sesión de
+     * WhatsApp -- la tiene el agente. Y se responde desde el ERP y no
+     * desde el teléfono porque los mensajes escritos en el teléfono
+     * llegan cifrados al agente y nunca quedan registrados: es la única
+     * forma de que la conversación quede completa.
+     */
+    const enviarMensaje = async () => {
+        const texto = borrador.trim();
+        if (!texto || !selected || enviando) return;
+
+        setEnviando(true);
+        setErrorEnvio(null);
+        const { error } = await supabase.from('agent_outbox').insert({
+            conversation_id: selected.conversationId,
+            body: texto,
+            created_by: userId,
+        });
+        setEnviando(false);
+
+        if (error) {
+            setErrorEnvio(error.message);
+            return;
+        }
+        setBorrador('');
+        // El agente tarda unos segundos en despachar; se relee para que
+        // aparezca en el hilo apenas salga.
+        setTimeout(() => setRecargarMensajes((n) => n + 1), 4000);
+    };
 
     const handleResolve = async (escalation: Escalation) => {
         setActionLoading(true);
@@ -778,6 +813,40 @@ const WhatsAppInbox: React.FC = () => {
                                         </div>
                                     ))
                                 )}
+                            </div>
+
+                            {/* Responder desde acá y no desde el teléfono: lo que se
+                                escribe en el teléfono llega cifrado al agente y no
+                                queda registrado en la conversación. */}
+                            <div className="px-5 pt-3 border-t border-subtle">
+                                <div className="flex items-end gap-2">
+                                    <textarea
+                                        value={borrador}
+                                        onChange={(e) => setBorrador(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            // Enter envía, Shift+Enter hace salto de línea.
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                enviarMensaje();
+                                            }
+                                        }}
+                                        rows={2}
+                                        placeholder="Escribí tu respuesta… (Enter para enviar, Shift+Enter para salto de línea)"
+                                        aria-label="Mensaje para el cliente"
+                                        className={cn(input.base, 'py-2 px-3 text-sm resize-none')}
+                                    />
+                                    <button
+                                        onClick={enviarMensaje}
+                                        disabled={enviando || !borrador.trim()}
+                                        className={cn(button.base, button.variant.primary, button.size.md, 'shrink-0')}
+                                    >
+                                        {enviando ? 'Enviando…' : 'Enviar'}
+                                    </button>
+                                </div>
+                                {errorEnvio && <p className="text-xs text-danger mt-1.5">No se pudo encolar: {errorEnvio}</p>}
+                                <p className="text-2xs text-fg-subtle mt-1.5">
+                                    El mensaje sale por WhatsApp en unos segundos y queda guardado en esta conversación.
+                                </p>
                             </div>
 
                             <div className={cn(card.footer, 'flex items-center gap-3 flex-wrap')}>
