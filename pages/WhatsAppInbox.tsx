@@ -37,13 +37,32 @@ interface Escalation {
     } | null;
 }
 
+type DeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+
 interface AgentMessage {
     id: number;
     direction: 'inbound' | 'outbound';
     content_type: 'text' | 'image' | 'audio' | 'system';
     body: string | null;
     created_at: string;
+    /** Acuse real de WhatsApp. NULL en entrantes y en mensajes viejos. */
+    delivery_status: DeliveryStatus | null;
+    action_taken: string | null;
 }
+
+/**
+ * Lo que WhatsApp confirmó de cada mensaje que mandó el agente. Es
+ * deliberadamente explícito: antes el ERP mostraba el mensaje y uno
+ * asumía que había llegado, cuando WhatsApp podía haberlo descartado
+ * sin avisar.
+ */
+const ENTREGA: Record<DeliveryStatus, { texto: string; tono: keyof typeof badge.tone }> = {
+    pending: { texto: 'Sin confirmar', tono: 'warning' },
+    sent: { texto: 'Enviado', tono: 'info' },
+    delivered: { texto: 'Entregado', tono: 'success' },
+    read: { texto: 'Leído', tono: 'success' },
+    failed: { texto: 'No se entregó', tono: 'danger' },
+};
 
 const REASON_LABEL: Record<EscalationReason, string> = {
     discount_request: 'Pidió descuento',
@@ -141,6 +160,8 @@ const WhatsAppInbox: React.FC = () => {
     const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
     const [globalBotEnabled, setGlobalBotEnabled] = useState<boolean | null>(null);
     const [search, setSearch] = useState('');
+    /** Se incrementa para forzar una relectura del chat abierto. */
+    const [recargarMensajes, setRecargarMensajes] = useState(0);
 
     const fetchConversations = useCallback(async () => {
         const { data, error } = await supabase
@@ -345,7 +366,7 @@ const WhatsAppInbox: React.FC = () => {
         // descendente y se revierte, para quedarse con los MÁS RECIENTES).
         supabase
             .from('agent_messages')
-            .select('id, direction, content_type, body, created_at')
+            .select('id, direction, content_type, body, created_at, delivery_status, action_taken')
             .eq('conversation_id', selected.conversationId)
             .order('created_at', { ascending: false })
             .limit(MENSAJES_VISIBLES)
@@ -383,7 +404,7 @@ const WhatsAppInbox: React.FC = () => {
         // Solo re-consultamos cuando cambia LA CONVERSACIÓN seleccionada, no en
         // cada re-render de `selected` (cambia de referencia en cada fetch).
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selected?.conversationId]);
+    }, [selected?.conversationId, recargarMensajes]);
 
     // Abrir un chat con mensajes sin leer lo marca como leído en el ERP.
     useEffect(() => {
@@ -735,8 +756,23 @@ const WhatsAppInbox: React.FC = () => {
                                                 )}
                                             >
                                                 {bodyPreview(m)}
-                                                <div className="text-2xs text-fg-subtle mt-1">
-                                                    {new Date(m.created_at).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
+                                                <div className="text-2xs text-fg-subtle mt-1 flex items-center gap-1.5 flex-wrap">
+                                                    <span>
+                                                        {new Date(m.created_at).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                    {m.action_taken === 'human_reply' && <span>· vendedor</span>}
+                                                    {/* El acuse solo aplica a lo que mandó el agente. */}
+                                                    {m.direction === 'outbound' && m.action_taken !== 'human_reply' && m.delivery_status && (
+                                                        <span
+                                                            className={cn(
+                                                                badge.base,
+                                                                badge.size.sm,
+                                                                badge.tone[ENTREGA[m.delivery_status].tono],
+                                                            )}
+                                                        >
+                                                            {ENTREGA[m.delivery_status].texto}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -745,6 +781,14 @@ const WhatsAppInbox: React.FC = () => {
                             </div>
 
                             <div className={cn(card.footer, 'flex items-center gap-3 flex-wrap')}>
+                                <button
+                                    onClick={() => setRecargarMensajes((n) => n + 1)}
+                                    disabled={messagesLoading}
+                                    className={cn(button.base, button.variant.secondary, button.size.md)}
+                                    title="Vuelve a leer la conversación y el estado de entrega de cada mensaje"
+                                >
+                                    <RefreshCw size={15} aria-hidden="true" /> Actualizar chat
+                                </button>
                                 <button
                                     onClick={() => handleToggleBot(selected)}
                                     disabled={actionLoading}
