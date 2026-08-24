@@ -33,6 +33,7 @@ interface Escalation {
         phone_number: string;
         customer_name: string | null;
         status: ConversationStatus;
+        bot_enabled: boolean;
     } | null;
 }
 
@@ -72,7 +73,30 @@ function timeAgo(iso: string): string {
 const bodyPreview = (m: Pick<AgentMessage, 'body' | 'content_type'>): string =>
     m.body || (m.content_type === 'image' ? '(foto)' : m.content_type === 'audio' ? '(nota de voz)' : '(sin texto)');
 
-type Tab = 'pending' | 'resolved';
+/** Fila de agent_conversations -- la pestaña "Todas" no depende de escalamientos. */
+interface Conversation {
+    id: number;
+    phone_number: string;
+    customer_name: string | null;
+    status: ConversationStatus;
+    bot_enabled: boolean;
+    last_message_at: string | null;
+}
+
+type Tab = 'pending' | 'resolved' | 'all';
+
+/**
+ * Lo que el panel de detalle necesita, venga de un escalamiento o de una
+ * conversación suelta -- así el detalle es uno solo para las tres pestañas.
+ */
+interface SelectedContext {
+    conversationId: number;
+    phoneNumber: string;
+    customerName: string | null;
+    conversationStatus: ConversationStatus;
+    botEnabled: boolean;
+    escalation: Escalation | null;
+}
 
 const WhatsAppInbox: React.FC = () => {
     const { session } = useAuth();
@@ -87,13 +111,42 @@ const WhatsAppInbox: React.FC = () => {
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [closeInsteadOfReopen, setCloseInsteadOfReopen] = useState(false);
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+    const [globalBotEnabled, setGlobalBotEnabled] = useState<boolean | null>(null);
+
+    const fetchConversations = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('agent_conversations')
+            .select('id, phone_number, customer_name, status, bot_enabled, last_message_at')
+            .order('last_message_at', { ascending: false, nullsFirst: false })
+            .limit(200);
+        if (error) {
+            console.error('Error cargando conversaciones:', error.message);
+            return;
+        }
+        setConversations((data ?? []) as unknown as Conversation[]);
+    }, []);
+
+    const fetchSettings = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('agent_settings')
+            .select('bot_auto_reply_enabled')
+            .eq('id', 1)
+            .maybeSingle();
+        if (error) {
+            console.error('Error cargando agent_settings:', error.message);
+            return;
+        }
+        setGlobalBotEnabled(Boolean(data?.bot_auto_reply_enabled));
+    }, []);
 
     const fetchEscalations = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('agent_escalations')
             .select(
-                'id, conversation_id, reason, message_snapshot, status, claimed_by, claimed_at, resolved_at, created_at, agent_conversations ( phone_number, customer_name, status )',
+                'id, conversation_id, reason, message_snapshot, status, claimed_by, claimed_at, resolved_at, created_at, agent_conversations ( phone_number, customer_name, status, bot_enabled )',
             )
             .order('created_at', { ascending: false })
             .limit(150);
@@ -122,14 +175,17 @@ const WhatsAppInbox: React.FC = () => {
 
     useEffect(() => {
         fetchEscalations();
+        fetchConversations();
+        fetchSettings();
         const channel = supabase
             .channel('agent_escalations_inbox')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_escalations' }, () => fetchEscalations())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_conversations' }, () => fetchConversations())
             .subscribe();
         return () => {
             channel.unsubscribe();
         };
-    }, [fetchEscalations]);
+    }, [fetchEscalations, fetchConversations, fetchSettings]);
 
     const filtered = useMemo(
         () => escalations.filter((e) => (tab === 'pending' ? e.status !== 'resolved' : e.status === 'resolved')),
@@ -138,7 +194,37 @@ const WhatsAppInbox: React.FC = () => {
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
-    const selected = escalations.find((e) => e.id === selectedId) ?? null;
+    const selectedEscalation = escalations.find((e) => e.id === selectedId) ?? null;
+
+    // Un solo "seleccionado" para las tres pestañas: en Pendientes/Resueltas
+    // viene de un escalamiento, en Todas de la conversación suelta. El
+    // `bot_enabled` se lee siempre de `conversations` cuando está cargada,
+    // así el botón refleja el estado real aunque el escalamiento se haya
+    // traído antes del último cambio.
+    const selected: SelectedContext | null = useMemo(() => {
+        if (tab === 'all') {
+            const conv = conversations.find((c) => c.id === selectedConversationId);
+            if (!conv) return null;
+            return {
+                conversationId: conv.id,
+                phoneNumber: conv.phone_number,
+                customerName: conv.customer_name,
+                conversationStatus: conv.status,
+                botEnabled: conv.bot_enabled,
+                escalation: null,
+            };
+        }
+        if (!selectedEscalation) return null;
+        const conv = conversations.find((c) => c.id === selectedEscalation.conversation_id);
+        return {
+            conversationId: selectedEscalation.conversation_id,
+            phoneNumber: conv?.phone_number ?? selectedEscalation.agent_conversations?.phone_number ?? '',
+            customerName: conv?.customer_name ?? selectedEscalation.agent_conversations?.customer_name ?? null,
+            conversationStatus: conv?.status ?? selectedEscalation.agent_conversations?.status ?? 'bot_active',
+            botEnabled: conv?.bot_enabled ?? selectedEscalation.agent_conversations?.bot_enabled ?? false,
+            escalation: selectedEscalation,
+        };
+    }, [tab, conversations, selectedConversationId, selectedEscalation]);
 
     useEffect(() => {
         if (!selected) {
@@ -150,7 +236,7 @@ const WhatsAppInbox: React.FC = () => {
         supabase
             .from('agent_messages')
             .select('id, direction, content_type, body, created_at')
-            .eq('conversation_id', selected.conversation_id)
+            .eq('conversation_id', selected.conversationId)
             .order('created_at', { ascending: true })
             .then(({ data, error }) => {
                 if (cancelled) return;
@@ -163,7 +249,7 @@ const WhatsAppInbox: React.FC = () => {
         // Solo re-consultamos cuando cambia LA CONVERSACIÓN seleccionada, no en
         // cada re-render de `selected` (cambia de referencia en cada fetch).
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selected?.conversation_id]);
+    }, [selected?.conversationId]);
 
     const handleClaim = async (escalation: Escalation) => {
         if (!userId) return;
@@ -174,7 +260,32 @@ const WhatsAppInbox: React.FC = () => {
             .eq('id', escalation.id);
         await supabase.from('agent_conversations').update({ status: 'human_active' }).eq('id', escalation.conversation_id);
         setActionLoading(false);
-        fetchEscalations();
+        await Promise.all([fetchEscalations(), fetchConversations()]);
+    };
+
+    // El agente NO le contesta a nadie por su cuenta: solo responde en las
+    // conversaciones habilitadas explícitamente acá (ver migración 0017 del
+    // repo del agente). Arranca apagado para cada cliente nuevo.
+    const handleToggleBot = async (ctx: SelectedContext) => {
+        setActionLoading(true);
+        await supabase.from('agent_conversations').update({ bot_enabled: !ctx.botEnabled }).eq('id', ctx.conversationId);
+        setActionLoading(false);
+        await Promise.all([fetchConversations(), fetchEscalations()]);
+    };
+
+    /**
+     * Interruptor MAESTRO (agent_settings, migración 0018). Apagado acá, el
+     * agente no le contesta a nadie aunque una conversación esté habilitada.
+     */
+    const handleToggleGlobalBot = async () => {
+        if (globalBotEnabled === null) return;
+        setActionLoading(true);
+        await supabase
+            .from('agent_settings')
+            .update({ bot_auto_reply_enabled: !globalBotEnabled, updated_at: new Date().toISOString(), updated_by: userId })
+            .eq('id', 1);
+        setActionLoading(false);
+        fetchSettings();
     };
 
     const handleResolve = async (escalation: Escalation) => {
@@ -189,7 +300,7 @@ const WhatsAppInbox: React.FC = () => {
             .eq('id', escalation.conversation_id);
         setActionLoading(false);
         setCloseInsteadOfReopen(false);
-        fetchEscalations();
+        await Promise.all([fetchEscalations(), fetchConversations()]);
     };
 
     return (
@@ -198,15 +309,59 @@ const WhatsAppInbox: React.FC = () => {
                 <div>
                     <h1 className={page.title}>Bandeja de WhatsApp</h1>
                     <p className={page.subtitle}>
-                        Conversaciones que el agente escaló a un humano. Contestale al cliente desde tu propio WhatsApp
-                        (vinculado como dispositivo del número del bot) -- acá solo se hace seguimiento.
+                        Conversaciones de WhatsApp del agente. Contestale al cliente desde tu propio WhatsApp
+                        (vinculado como dispositivo del número del bot) -- acá se hace seguimiento y se decide
+                        a quién le responde el agente.
                     </p>
                 </div>
                 <button
-                    onClick={fetchEscalations}
+                    onClick={() => {
+                        fetchEscalations();
+                        fetchConversations();
+                        fetchSettings();
+                    }}
                     className={cn(button.base, button.variant.secondary, button.size.sm)}
                 >
                     <RefreshCw size={14} aria-hidden="true" /> Actualizar
+                </button>
+            </div>
+
+            {/* Interruptor maestro: apagado acá, el agente no le contesta a
+                nadie aunque haya conversaciones habilitadas. */}
+            <div
+                className={cn(
+                    card.base,
+                    'px-4 py-3 flex items-center justify-between gap-4 flex-wrap',
+                    globalBotEnabled ? 'border-success/30' : 'border-strong',
+                )}
+            >
+                <div>
+                    <p className="text-sm font-medium text-fg">
+                        Agente automático:{' '}
+                        {globalBotEnabled === null ? (
+                            <span className="text-fg-muted">cargando…</span>
+                        ) : globalBotEnabled ? (
+                            <span className="text-success">encendido</span>
+                        ) : (
+                            <span className="text-fg-muted">apagado</span>
+                        )}
+                    </p>
+                    <p className="text-xs text-fg-muted mt-0.5">
+                        {globalBotEnabled
+                            ? 'Responde solo en las conversaciones que tengan el agente activado.'
+                            : 'No le responde a nadie. Los mensajes igual quedan registrados acá.'}
+                    </p>
+                </div>
+                <button
+                    onClick={handleToggleGlobalBot}
+                    disabled={actionLoading || globalBotEnabled === null}
+                    className={cn(
+                        button.base,
+                        button.size.sm,
+                        globalBotEnabled ? button.variant.secondary : button.variant.success,
+                    )}
+                >
+                    {globalBotEnabled ? 'Apagar agente' : 'Encender agente'}
                 </button>
             </div>
 
@@ -223,6 +378,12 @@ const WhatsAppInbox: React.FC = () => {
                 >
                     Resueltas
                 </button>
+                <button
+                    onClick={() => setTab('all')}
+                    className={cn(button.base, button.size.sm, tab === 'all' ? button.variant.primary : button.variant.secondary)}
+                >
+                    Todas ({conversations.length})
+                </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
@@ -230,6 +391,50 @@ const WhatsAppInbox: React.FC = () => {
                 <div className={cn(card.base, 'divide-y divide-subtle overflow-hidden')}>
                     {loading ? (
                         <div className="p-8 text-center text-sm text-fg-muted">Cargando…</div>
+                    ) : tab === 'all' ? (
+                        conversations.length === 0 ? (
+                            <div className="p-10 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
+                                <Inbox size={22} className="text-fg-subtle" aria-hidden="true" />
+                                Todavía no hay conversaciones de WhatsApp.
+                            </div>
+                        ) : (
+                            conversations.map((c) => (
+                                <button
+                                    key={c.id}
+                                    onClick={() => setSelectedConversationId(c.id)}
+                                    className={cn(
+                                        'w-full text-left px-4 py-3 transition-colors',
+                                        selectedConversationId === c.id ? 'bg-primary-soft/60' : 'hover:bg-surface-hover',
+                                    )}
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="font-medium text-fg text-sm truncate">
+                                            {c.customer_name || c.phone_number || 'Cliente'}
+                                        </span>
+                                        {c.last_message_at && (
+                                            <span className="text-2xs text-fg-subtle shrink-0 flex items-center gap-1">
+                                                <Clock size={11} aria-hidden="true" />
+                                                {timeAgo(c.last_message_at)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                                        <span
+                                            className={cn(
+                                                badge.base,
+                                                badge.size.sm,
+                                                c.bot_enabled ? badge.tone.success : badge.tone.neutral,
+                                            )}
+                                        >
+                                            {c.bot_enabled ? 'Agente activado' : 'Agente apagado'}
+                                        </span>
+                                        {c.customer_name && (
+                                            <span className="text-2xs text-fg-subtle">{c.phone_number}</span>
+                                        )}
+                                    </div>
+                                </button>
+                            ))
+                        )
                     ) : filtered.length === 0 ? (
                         <div className="p-10 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
                             <Inbox size={22} className="text-fg-subtle" aria-hidden="true" />
@@ -285,13 +490,26 @@ const WhatsAppInbox: React.FC = () => {
                             <div className={card.header}>
                                 <div>
                                     <h2 className="text-base font-semibold text-fg">
-                                        {selected.agent_conversations?.customer_name || selected.agent_conversations?.phone_number}
+                                        {selected.customerName || selected.phoneNumber}
                                     </h2>
-                                    <p className="text-xs text-fg-muted">{selected.agent_conversations?.phone_number}</p>
+                                    <p className="text-xs text-fg-muted">{selected.phoneNumber}</p>
                                 </div>
-                                <span className={cn(badge.base, badge.size.md, badge.tone[REASON_TONE[selected.reason]])}>
-                                    {REASON_LABEL[selected.reason]}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span
+                                        className={cn(
+                                            badge.base,
+                                            badge.size.md,
+                                            selected.botEnabled ? badge.tone.success : badge.tone.neutral,
+                                        )}
+                                    >
+                                        {selected.botEnabled ? 'Agente activado' : 'Agente apagado'}
+                                    </span>
+                                    {selected.escalation && (
+                                        <span className={cn(badge.base, badge.size.md, badge.tone[REASON_TONE[selected.escalation.reason]])}>
+                                            {REASON_LABEL[selected.escalation.reason]}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="p-5 max-h-[52vh] overflow-y-auto space-y-3">
@@ -319,16 +537,33 @@ const WhatsAppInbox: React.FC = () => {
                             </div>
 
                             <div className={cn(card.footer, 'flex items-center gap-3 flex-wrap')}>
-                                {selected.status === 'open' && (
+                                <button
+                                    onClick={() => handleToggleBot(selected)}
+                                    disabled={actionLoading}
+                                    className={cn(
+                                        button.base,
+                                        selected.botEnabled ? button.variant.secondary : button.variant.success,
+                                        button.size.md,
+                                    )}
+                                    title="El agente solo responde en las conversaciones que habilites acá"
+                                >
+                                    {selected.botEnabled ? 'Desactivar agente' : 'Activar agente'}
+                                </button>
+                                {selected.botEnabled && globalBotEnabled === false && (
+                                    <p className="text-2xs text-fg-muted">
+                                        Ojo: el agente está apagado en general, así que igual no va a responder.
+                                    </p>
+                                )}
+                                {selected.escalation?.status === 'open' && (
                                     <button
-                                        onClick={() => handleClaim(selected)}
+                                        onClick={() => handleClaim(selected.escalation!)}
                                         disabled={actionLoading}
                                         className={cn(button.base, button.variant.primary, button.size.md)}
                                     >
                                         <User size={15} aria-hidden="true" /> Reclamar
                                     </button>
                                 )}
-                                {selected.status === 'claimed' && (
+                                {selected.escalation?.status === 'claimed' && (
                                     <>
                                         <label className="flex items-center gap-1.5 text-xs text-fg-muted mr-auto">
                                             <input
@@ -340,7 +575,7 @@ const WhatsAppInbox: React.FC = () => {
                                             No devolver al bot (dejar la conversación cerrada)
                                         </label>
                                         <button
-                                            onClick={() => handleResolve(selected)}
+                                            onClick={() => handleResolve(selected.escalation!)}
                                             disabled={actionLoading}
                                             className={cn(button.base, button.variant.success, button.size.md)}
                                         >
@@ -348,10 +583,10 @@ const WhatsAppInbox: React.FC = () => {
                                         </button>
                                     </>
                                 )}
-                                {selected.status === 'resolved' && (
+                                {selected.escalation?.status === 'resolved' && (
                                     <p className="text-xs text-fg-muted">
-                                        Resuelta {selected.resolved_at ? timeAgo(selected.resolved_at) : ''}
-                                        {selected.agent_conversations?.status === 'closed' && ' -- conversación cerrada, el bot no retoma sola'}
+                                        Resuelta {selected.escalation.resolved_at ? timeAgo(selected.escalation.resolved_at) : ''}
+                                        {selected.conversationStatus === 'closed' && ' -- conversación cerrada, el bot no retoma sola'}
                                     </p>
                                 )}
                             </div>
