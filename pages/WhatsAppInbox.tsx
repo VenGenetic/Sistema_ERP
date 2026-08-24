@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, page, card, badge, button, input } from '../components/ui/styles';
-import { CheckCheck, Clock, Headset, Inbox, RefreshCw, User } from 'lucide-react';
+import { CheckCheck, Clock, Headset, Inbox, RefreshCw, Search, User, X } from 'lucide-react';
 
 /**
  * Bandeja de conversaciones de WhatsApp escaladas por el agente
@@ -136,6 +136,7 @@ const WhatsAppInbox: React.FC = () => {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
     const [globalBotEnabled, setGlobalBotEnabled] = useState<boolean | null>(null);
+    const [search, setSearch] = useState('');
 
     const fetchConversations = useCallback(async () => {
         const { data, error } = await supabase
@@ -209,9 +210,50 @@ const WhatsAppInbox: React.FC = () => {
         };
     }, [fetchEscalations, fetchConversations, fetchSettings]);
 
-    const filtered = useMemo(
-        () => escalations.filter((e) => (tab === 'pending' ? e.status !== 'resolved' : e.status === 'resolved')),
-        [escalations, tab],
+    /**
+     * El teléfono se guarda como solo dígitos, pero la gente lo escribe de
+     * cualquier forma ("+593 99...", "0993..."). Se comparan solo los
+     * dígitos de los dos lados, y además se acepta buscar sin el código de
+     * país o con el 0 inicial que se usa acá.
+     */
+    const matchesSearch = useCallback(
+        (conv: { phone_number: string; customer_name: string | null; lid?: string | null }) => {
+            const term = search.trim();
+            if (!term) return true;
+
+            const digits = term.replace(/\D/g, '');
+            if (digits) {
+                const phone = conv.phone_number ?? '';
+                if (phone.includes(digits)) return true;
+                if (conv.lid?.includes(digits)) return true;
+                // "0993279707" -> "993279707" (como queda tras el 593)
+                if (digits.startsWith('0') && phone.includes(digits.slice(1))) return true;
+            }
+
+            const name = conv.customer_name?.toLowerCase() ?? '';
+            return name.includes(term.toLowerCase());
+        },
+        [search],
+    );
+
+    const filtered = useMemo(() => {
+        const byTab = escalations.filter((e) => (tab === 'pending' ? e.status !== 'resolved' : e.status === 'resolved'));
+        if (!search.trim()) return byTab;
+        // En las pestañas de escalamientos el dato del cliente puede venir
+        // del embed o de `conversations` (que está más fresco).
+        return byTab.filter((e) => {
+            const conv = conversations.find((c) => c.id === e.conversation_id);
+            return matchesSearch({
+                phone_number: conv?.phone_number ?? e.agent_conversations?.phone_number ?? '',
+                customer_name: conv?.customer_name ?? e.agent_conversations?.customer_name ?? null,
+                lid: conv?.lid,
+            });
+        });
+    }, [escalations, tab, search, conversations, matchesSearch]);
+
+    const filteredConversations = useMemo(
+        () => conversations.filter(matchesSearch),
+        [conversations, matchesSearch],
     );
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
@@ -389,7 +431,7 @@ const WhatsAppInbox: React.FC = () => {
                 </button>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center flex-wrap">
                 <button
                     onClick={() => setTab('pending')}
                     className={cn(button.base, button.size.sm, tab === 'pending' ? button.variant.primary : button.variant.secondary)}
@@ -408,6 +450,31 @@ const WhatsAppInbox: React.FC = () => {
                 >
                     Todas ({conversations.length})
                 </button>
+
+                <div className="relative ml-auto w-full sm:w-72">
+                    <Search
+                        size={15}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none"
+                        aria-hidden="true"
+                    />
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Buscar por teléfono o nombre…"
+                        aria-label="Buscar cliente por teléfono o nombre"
+                        className={cn(input.base, input.size.sm, 'pl-9', search && 'pr-9')}
+                    />
+                    {search && (
+                        <button
+                            onClick={() => setSearch('')}
+                            aria-label="Limpiar búsqueda"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-hover"
+                        >
+                            <X size={14} aria-hidden="true" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
@@ -416,13 +483,15 @@ const WhatsAppInbox: React.FC = () => {
                     {loading ? (
                         <div className="p-8 text-center text-sm text-fg-muted">Cargando…</div>
                     ) : tab === 'all' ? (
-                        conversations.length === 0 ? (
+                        filteredConversations.length === 0 ? (
                             <div className="p-10 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
                                 <Inbox size={22} className="text-fg-subtle" aria-hidden="true" />
-                                Todavía no hay conversaciones de WhatsApp.
+                                {search.trim()
+                                    ? `Ningún cliente coincide con "${search.trim()}".`
+                                    : 'Todavía no hay conversaciones de WhatsApp.'}
                             </div>
                         ) : (
-                            conversations.map((c) => (
+                            filteredConversations.map((c) => (
                                 <button
                                     key={c.id}
                                     onClick={() => setSelectedConversationId(c.id)}
@@ -467,7 +536,11 @@ const WhatsAppInbox: React.FC = () => {
                     ) : filtered.length === 0 ? (
                         <div className="p-10 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
                             <Inbox size={22} className="text-fg-subtle" aria-hidden="true" />
-                            {tab === 'pending' ? 'No hay nada pendiente. Todo tranquilo.' : 'Todavía no hay conversaciones resueltas.'}
+                            {search.trim()
+                                ? `Ningún cliente coincide con "${search.trim()}".`
+                                : tab === 'pending'
+                                  ? 'No hay nada pendiente. Todo tranquilo.'
+                                  : 'Todavía no hay conversaciones resueltas.'}
                         </div>
                     ) : (
                         filtered.map((e) => (
