@@ -309,8 +309,31 @@ const WhatsAppInbox: React.FC = () => {
                 if (!error && data) setMessages(data as AgentMessage[]);
                 setMessagesLoading(false);
             });
+        // Mensajes en vivo del chat abierto: sin esto había que refrescar la
+        // página para ver lo que iba llegando (el filtro es por conversación,
+        // así que no llegan eventos de otros chats).
+        const conversationId = selected.conversationId;
+        const channel = supabase
+            .channel(`agent_messages_conversation_${conversationId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'agent_messages',
+                    filter: `conversation_id=eq.${conversationId}`,
+                },
+                (payload) => {
+                    if (cancelled) return;
+                    const nuevo = payload.new as AgentMessage;
+                    setMessages((prev) => (prev.some((m) => m.id === nuevo.id) ? prev : [...prev, nuevo]));
+                },
+            )
+            .subscribe();
+
         return () => {
             cancelled = true;
+            channel.unsubscribe();
         };
         // Solo re-consultamos cuando cambia LA CONVERSACIÓN seleccionada, no en
         // cada re-render de `selected` (cambia de referencia en cada fetch).
