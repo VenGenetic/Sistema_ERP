@@ -106,6 +106,9 @@ function formatPhone(conv: Pick<Conversation, 'phone_number' | 'lid'>): string {
 
 type Tab = 'pending' | 'resolved' | 'all';
 
+/** Tope de mensajes que se traen de una conversación (los más recientes). */
+const MENSAJES_VISIBLES = 100;
+
 /**
  * Lo que el panel de detalle necesita, venga de un escalamiento o de una
  * conversación suelta -- así el detalle es uno solo para las tres pestañas.
@@ -117,6 +120,7 @@ interface SelectedContext {
     conversationStatus: ConversationStatus;
     botEnabled: boolean;
     lid: string | null;
+    unreadCount: number;
     escalation: Escalation | null;
 }
 
@@ -279,6 +283,20 @@ const WhatsAppInbox: React.FC = () => {
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
+    /**
+     * Métricas del día, calculadas sobre lo ya cargado (sin consultas
+     * extra a Supabase). Sirven para ver de un vistazo si el agente está
+     * ayudando: cuántos chats atiende y cuántos terminaron necesitando a
+     * una persona.
+     */
+    const metricas = useMemo(() => {
+        const activos = conversations.filter((c) => c.bot_enabled).length;
+        const sinLeer = conversations.filter((c) => c.unread_count > 0).length;
+        const hoy = new Date().toISOString().slice(0, 10);
+        const escaladosHoy = escalations.filter((e) => e.created_at.slice(0, 10) === hoy).length;
+        return { activos, sinLeer, escaladosHoy, total: conversations.length };
+    }, [conversations, escalations]);
+
     const selectedEscalation = escalations.find((e) => e.id === selectedId) ?? null;
 
     // Un solo "seleccionado" para las tres pestañas: en Pendientes/Resueltas
@@ -297,6 +315,7 @@ const WhatsAppInbox: React.FC = () => {
                 conversationStatus: conv.status,
                 botEnabled: conv.bot_enabled,
                 lid: conv.lid,
+                unreadCount: conv.unread_count,
                 escalation: null,
             };
         }
@@ -309,6 +328,7 @@ const WhatsAppInbox: React.FC = () => {
             conversationStatus: conv?.status ?? selectedEscalation.agent_conversations?.status ?? 'bot_active',
             botEnabled: conv?.bot_enabled ?? selectedEscalation.agent_conversations?.bot_enabled ?? false,
             lid: conv?.lid ?? null,
+            unreadCount: conv?.unread_count ?? 0,
             escalation: selectedEscalation,
         };
     }, [tab, conversations, selectedConversationId, selectedEscalation]);
@@ -320,14 +340,18 @@ const WhatsAppInbox: React.FC = () => {
         }
         let cancelled = false;
         setMessagesLoading(true);
+        // Solo los últimos N: una conversación larga puede tener cientos de
+        // mensajes y traerlos todos es lento y caro (se piden en orden
+        // descendente y se revierte, para quedarse con los MÁS RECIENTES).
         supabase
             .from('agent_messages')
             .select('id, direction, content_type, body, created_at')
             .eq('conversation_id', selected.conversationId)
-            .order('created_at', { ascending: true })
+            .order('created_at', { ascending: false })
+            .limit(MENSAJES_VISIBLES)
             .then(({ data, error }) => {
                 if (cancelled) return;
-                if (!error && data) setMessages(data as AgentMessage[]);
+                if (!error && data) setMessages((data as AgentMessage[]).slice().reverse());
                 setMessagesLoading(false);
             });
         // Mensajes en vivo del chat abierto: sin esto había que refrescar la
@@ -358,6 +382,14 @@ const WhatsAppInbox: React.FC = () => {
         };
         // Solo re-consultamos cuando cambia LA CONVERSACIÓN seleccionada, no en
         // cada re-render de `selected` (cambia de referencia en cada fetch).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selected?.conversationId]);
+
+    // Abrir un chat con mensajes sin leer lo marca como leído en el ERP.
+    useEffect(() => {
+        if (selected && selected.unreadCount > 0) {
+            marcarLeida(selected.conversationId);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selected?.conversationId]);
 
@@ -397,6 +429,19 @@ const WhatsAppInbox: React.FC = () => {
         setActionLoading(false);
         fetchSettings();
     };
+
+    /**
+     * Marca la conversación como leída al abrirla. Es un espejo LOCAL: no
+     * marca leído en el teléfono (WhatsApp no lo permite desde acá), pero
+     * evita que el contador quede encendido para siempre en el ERP una vez
+     * que alguien del equipo ya miró el chat.
+     */
+    const marcarLeida = useCallback(async (conversationId: number) => {
+        await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', conversationId);
+        setConversations((prev) =>
+            prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
+        );
+    }, []);
 
     const handleResolve = async (escalation: Escalation) => {
         setActionLoading(true);
@@ -473,6 +518,21 @@ const WhatsAppInbox: React.FC = () => {
                 >
                     {globalBotEnabled ? 'Apagar agente' : 'Encender agente'}
                 </button>
+            </div>
+
+            {/* Resumen rápido: se calcula sobre lo ya cargado, sin consultas extra. */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                    { label: 'Conversaciones', valor: metricas.total },
+                    { label: 'Con agente activo', valor: metricas.activos },
+                    { label: 'Sin leer', valor: metricas.sinLeer },
+                    { label: 'Escaladas hoy', valor: metricas.escaladosHoy },
+                ].map((m) => (
+                    <div key={m.label} className={cn(card.base, 'px-4 py-3')}>
+                        <p className="text-2xl font-semibold text-fg tabular-nums">{m.valor}</p>
+                        <p className="text-xs text-fg-muted mt-0.5">{m.label}</p>
+                    </div>
+                ))}
             </div>
 
             <div className="flex gap-2 items-center flex-wrap">
