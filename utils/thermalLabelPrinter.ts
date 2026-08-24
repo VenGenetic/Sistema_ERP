@@ -92,41 +92,51 @@ const toPackedBitmap = (source: HTMLCanvasElement, dotsW: number, dotsH: number)
 };
 
 const ascii = (s: string): Uint8Array => Uint8Array.from(s, (c) => c.charCodeAt(0));
+/**
+ * Page-setup preamble: everything that describes the *roll*, not the label
+ * being printed. Emitted once per job -- see printLabelsOnThermalPrinter
+ * for why a whole batch is a single job.
+ */
+const buildTsplPreamble = (widthMm: number, heightMm: number, gapMm: number): Uint8Array =>
+    ascii(
+        `SIZE ${widthMm} mm,${heightMm} mm\r\n` +
+            `GAP ${gapMm} mm,0 mm\r\n` +
+            `DIRECTION 1\r\n` +
+            `DENSITY 10\r\n` +
+            `SPEED 4\r\n`
+    );
 
 /**
- * Assembles one complete TSPL job: page geometry, the bitmap, and the PRINT
- * trigger. SIZE/GAP/DENSITY/SPEED are resent on every job rather than once
- * per batch -- confirmed harmless against the real printer (each of the
- * manual verification prints during setup included the full preamble and
- * produced one correctly-registered label every time), and it means a job
- * is self-contained: nothing about how one label prints depends on what
- * shape the previous one in the batch was.
+ * One label's worth of TSPL: clear the image buffer, stage the bitmap, print
+ * `copies` of it. TSPL's own PRINT n prints n copies of the buffer just
+ * staged, so an item's whole quantity costs one block -- rendering happens
+ * once per SKU regardless of how many copies are requested.
  */
-const buildTsplJob = (
-    widthMm: number,
-    heightMm: number,
-    gapMm: number,
+const buildTsplLabelBlock = (
     dotsW: number,
     dotsH: number,
     bitmap: Uint8Array,
     copies: number
 ): Uint8Array => {
     const widthBytes = dotsW / 8;
-    const header = ascii(
-        `SIZE ${widthMm} mm,${heightMm} mm\r\n` +
-            `GAP ${gapMm} mm,0 mm\r\n` +
-            `DIRECTION 1\r\n` +
-            `DENSITY 10\r\n` +
-            `SPEED 4\r\n` +
-            `CLS\r\n` +
-            `BITMAP 0,0,${widthBytes},${dotsH},0,`
-    );
+    const header = ascii(`CLS\r\nBITMAP 0,0,${widthBytes},${dotsH},0,`);
     const footer = ascii(`\r\nPRINT ${copies},1\r\n`);
 
     const out = new Uint8Array(header.length + bitmap.length + footer.length);
     out.set(header, 0);
     out.set(bitmap, header.length);
     out.set(footer, header.length + bitmap.length);
+    return out;
+};
+
+const concatBytes = (parts: Uint8Array[]): Uint8Array => {
+    const total = parts.reduce((sum, p) => sum + p.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const p of parts) {
+        out.set(p, offset);
+        offset += p.length;
+    }
     return out;
 };
 
@@ -144,6 +154,18 @@ export interface ThermalRollOptions {
     gapMm?: number;
 }
 
+/**
+ * Prints a whole batch as ONE job: a single page-setup preamble followed by
+ * one CLS/BITMAP/PRINT block per item, sent in a single QZ Tray round trip.
+ *
+ * The batch must not be split into one job per SKU. Each QZ Tray call is a
+ * separate Windows spooler job, and the printer treats a job boundary as an
+ * end-of-form: it feeds to the next gap, ejecting a blank label between one
+ * product and the next. Printing a queue of N products that way wasted N-1
+ * labels -- the "sometimes it leaves blank labels" the shop reported.
+ * Keeping the batch in one byte stream removes the boundaries entirely; the
+ * printer just runs the blocks back to back.
+ */
 export const printLabelsOnThermalPrinter = async (
     items: ThermalLabelItem[],
     requestedSize: LabelCanvasSize,
@@ -159,11 +181,14 @@ export const printLabelsOnThermalPrinter = async (
     const dotsW = mmToDots(size.widthMm, true);
     const dotsH = mmToDots(size.heightMm);
 
+    const printable = items.filter((item) => item.quantity >= 1);
+    if (printable.length === 0) return;
+
     const targetPrinter = printerName ?? (await resolveThermalPrinterName());
 
-    for (const item of items) {
-        if (item.quantity < 1) continue;
+    const parts: Uint8Array[] = [buildTsplPreamble(size.widthMm, size.heightMm, gapMm)];
 
+    for (const item of printable) {
         // Render at an exact whole multiple of the final dot grid so the
         // downsample in toPackedBitmap is a clean OVERSAMPLE:1 box average
         // -- what keeps barcode bars solid black instead of anti-aliased
@@ -174,12 +199,8 @@ export const printLabelsOnThermalPrinter = async (
             { width: dotsW * OVERSAMPLE, height: dotsH * OVERSAMPLE }
         );
         const bitmap = toPackedBitmap(sourceCanvas, dotsW, dotsH);
-
-        // TSPL's own PRINT n prints n copies of the bitmap just staged, so
-        // one job carries the item's whole quantity -- rendering happens
-        // once per SKU regardless of how many copies are requested, and one
-        // QZ Tray round trip does the same for the actual printing.
-        const job = buildTsplJob(size.widthMm, size.heightMm, gapMm, dotsW, dotsH, bitmap, item.quantity);
-        await printTsplJob(targetPrinter, job);
+        parts.push(buildTsplLabelBlock(dotsW, dotsH, bitmap, item.quantity));
     }
+
+    await printTsplJob(targetPrinter, concatBytes(parts));
 };
