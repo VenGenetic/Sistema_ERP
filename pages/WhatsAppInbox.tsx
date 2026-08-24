@@ -81,6 +81,27 @@ interface Conversation {
     status: ConversationStatus;
     bot_enabled: boolean;
     last_message_at: string | null;
+    unread_count: number;
+    lid: string | null;
+}
+
+/**
+ * Los números se guardan como solo dígitos (ver migración 0021). Acá se
+ * les da formato para leerlos: "+593 99 327 9707".
+ *
+ * Un chat identificado por LID (id interno de WhatsApp, cuando no expone
+ * el teléfono) se muestra como tal en vez de fingir que es un número --
+ * son 14-15 dígitos y no arrancan con código de país.
+ */
+function formatPhone(conv: Pick<Conversation, 'phone_number' | 'lid'>): string {
+    const digits = conv.phone_number ?? '';
+    const looksLikeLid = conv.lid === digits || digits.length > 13;
+    if (looksLikeLid) return `ID interno ${digits}`;
+    if (digits.startsWith('593') && digits.length >= 11) {
+        const local = digits.slice(3);
+        return `+593 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`.trim();
+    }
+    return `+${digits}`;
 }
 
 type Tab = 'pending' | 'resolved' | 'all';
@@ -95,6 +116,7 @@ interface SelectedContext {
     customerName: string | null;
     conversationStatus: ConversationStatus;
     botEnabled: boolean;
+    lid: string | null;
     escalation: Escalation | null;
 }
 
@@ -118,7 +140,7 @@ const WhatsAppInbox: React.FC = () => {
     const fetchConversations = useCallback(async () => {
         const { data, error } = await supabase
             .from('agent_conversations')
-            .select('id, phone_number, customer_name, status, bot_enabled, last_message_at')
+            .select('id, phone_number, customer_name, status, bot_enabled, last_message_at, unread_count, lid')
             .order('last_message_at', { ascending: false, nullsFirst: false })
             .limit(200);
         if (error) {
@@ -211,6 +233,7 @@ const WhatsAppInbox: React.FC = () => {
                 customerName: conv.customer_name,
                 conversationStatus: conv.status,
                 botEnabled: conv.bot_enabled,
+                lid: conv.lid,
                 escalation: null,
             };
         }
@@ -222,6 +245,7 @@ const WhatsAppInbox: React.FC = () => {
             customerName: conv?.customer_name ?? selectedEscalation.agent_conversations?.customer_name ?? null,
             conversationStatus: conv?.status ?? selectedEscalation.agent_conversations?.status ?? 'bot_active',
             botEnabled: conv?.bot_enabled ?? selectedEscalation.agent_conversations?.bot_enabled ?? false,
+            lid: conv?.lid ?? null,
             escalation: selectedEscalation,
         };
     }, [tab, conversations, selectedConversationId, selectedEscalation]);
@@ -408,8 +432,8 @@ const WhatsAppInbox: React.FC = () => {
                                     )}
                                 >
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="font-medium text-fg text-sm truncate">
-                                            {c.customer_name || c.phone_number || 'Cliente'}
+                                        <span className={cn('text-sm truncate', c.unread_count > 0 ? 'font-bold text-fg' : 'font-medium text-fg')}>
+                                            {formatPhone(c)}
                                         </span>
                                         {c.last_message_at && (
                                             <span className="text-2xs text-fg-subtle shrink-0 flex items-center gap-1">
@@ -418,7 +442,15 @@ const WhatsAppInbox: React.FC = () => {
                                             </span>
                                         )}
                                     </div>
+                                    {c.customer_name && (
+                                        <p className="text-2xs text-fg-muted truncate mt-0.5">{c.customer_name}</p>
+                                    )}
                                     <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                                        {c.unread_count > 0 && (
+                                            <span className={cn(badge.base, badge.size.sm, badge.tone.danger)}>
+                                                {c.unread_count} sin leer
+                                            </span>
+                                        )}
                                         <span
                                             className={cn(
                                                 badge.base,
@@ -428,9 +460,6 @@ const WhatsAppInbox: React.FC = () => {
                                         >
                                             {c.bot_enabled ? 'Agente activado' : 'Agente apagado'}
                                         </span>
-                                        {c.customer_name && (
-                                            <span className="text-2xs text-fg-subtle">{c.phone_number}</span>
-                                        )}
                                     </div>
                                 </button>
                             ))
@@ -490,9 +519,11 @@ const WhatsAppInbox: React.FC = () => {
                             <div className={card.header}>
                                 <div>
                                     <h2 className="text-base font-semibold text-fg">
-                                        {selected.customerName || selected.phoneNumber}
+                                        {formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })}
                                     </h2>
-                                    <p className="text-xs text-fg-muted">{selected.phoneNumber}</p>
+                                    {selected.customerName && (
+                                        <p className="text-xs text-fg-muted">{selected.customerName}</p>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span
