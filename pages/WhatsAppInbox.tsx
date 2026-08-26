@@ -1,18 +1,36 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, page, card, badge, button, input } from '../components/ui/styles';
-import { CheckCheck, Clock, Headset, Inbox, RefreshCw, Search, User, X } from 'lucide-react';
+import { Ban, CheckCheck, Clock, FileText, Headset, Inbox, RefreshCw, RotateCw, Search, User, X } from 'lucide-react';
+import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
+import ChatComposer from '../components/whatsapp/ChatComposer';
+import {
+    CAMPOS_COLA,
+    cancelarMensaje,
+    encolarMensajes,
+    reintentarMensaje,
+    type MensajeEnCola,
+    type NuevoMensaje,
+} from '../utils/whatsappOutbox';
 
 /**
- * Bandeja de conversaciones de WhatsApp escaladas por el agente
- * (agente/src/agent/handleMessage.ts -> tabla agent_escalations).
+ * Bandeja de WhatsApp: la conversación completa con cada cliente, y el
+ * lugar desde donde se le contesta.
  *
- * El humano NO contesta desde acá -- eso se hace desde el WhatsApp personal
- * vinculado como dispositivo del número del bot (decisión de diseño: evitar
- * duplicar el envío de mensajes en dos sistemas). Esta pantalla es solo para
- * triage: ver qué se escaló y por qué, marcar quién lo está atendiendo, y
- * avisarle al bot que puede retomar la conversación una vez resuelta.
+ * Se contesta desde acá y no desde el teléfono por una razón concreta: lo
+ * que se escribe en el teléfono le llega CIFRADO al proceso del agente y
+ * nunca se puede abrir (se comprobó en vivo: 6 de 6 mensajes llegaron
+ * vacíos), así que por esa vía el ERP jamás tendría la conversación
+ * entera. Escribiendo desde acá, el sistema conoce el mensaje antes de
+ * cifrarlo y queda registrado sí o sí.
+ *
+ * El navegador no tiene la sesión de WhatsApp -- la tiene el proceso del
+ * agente. Por eso todo lo que se manda se ENCOLA en `agent_outbox` y ese
+ * proceso lo despacha (ver utils/whatsappOutbox.ts).
+ *
+ * Además del chat, la pantalla hace triage de lo que el agente escaló:
+ * quién lo atiende y cuándo el bot puede retomar.
  */
 
 type EscalationReason = 'discount_request' | 'complaint_or_return' | 'ambiguous_after_retries' | 'angry_or_urgent' | 'other';
@@ -39,16 +57,34 @@ interface Escalation {
 
 type DeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
 
+type ContentType = 'text' | 'image' | 'audio' | 'system' | 'video' | 'document' | 'sticker' | 'location' | 'contact' | 'other';
+
 interface AgentMessage {
     id: number;
     direction: 'inbound' | 'outbound';
-    content_type: 'text' | 'image' | 'audio' | 'system';
+    content_type: ContentType;
     body: string | null;
     created_at: string;
     /** Acuse real de WhatsApp. NULL en entrantes y en mensajes viejos. */
     delivery_status: DeliveryStatus | null;
     action_taken: string | null;
+    /**
+     * Copia en Storage de la foto/audio/archivo del mensaje (migración
+     * 0026). NULL en los mensajes de solo texto y en todo lo importado del
+     * historial: WhatsApp no reentrega la media vieja, así que de esos
+     * mensajes solo queda el texto.
+     */
+    media_url: string | null;
+    product_id: number | null;
 }
+
+/** Campos del mensaje que necesita el hilo. */
+const CAMPOS_MENSAJE =
+    'id, direction, content_type, body, created_at, delivery_status, action_taken, media_url, product_id';
+
+/** Tipos que se muestran como imagen dentro de la burbuja. */
+const ES_IMAGEN = (m: AgentMessage): boolean =>
+    !!m.media_url && (m.content_type === 'image' || m.content_type === 'sticker');
 
 /**
  * Lo que WhatsApp confirmó de cada mensaje que mandó el agente. Es
@@ -89,8 +125,37 @@ function timeAgo(iso: string): string {
     return `hace ${Math.round(hours / 24)} d`;
 }
 
+/** Cómo se nombra un mensaje sin texto, según lo que traiga. */
+const SIN_TEXTO: Partial<Record<ContentType, string>> = {
+    image: '(foto)',
+    audio: '(nota de voz)',
+    video: '(video)',
+    document: '(archivo)',
+    sticker: '(sticker)',
+    location: '(ubicación)',
+    contact: '(contacto)',
+};
+
 const bodyPreview = (m: Pick<AgentMessage, 'body' | 'content_type'>): string =>
-    m.body || (m.content_type === 'image' ? '(foto)' : m.content_type === 'audio' ? '(nota de voz)' : '(sin texto)');
+    m.body || SIN_TEXTO[m.content_type] || '(sin texto)';
+
+/**
+ * Estado que reporta el proceso del agente (migración 0027). Es lo que
+ * permite avisar que un mensaje encolado NO va a salir -- antes de que
+ * alguien escriba tres veces al vacío.
+ */
+interface EstadoAgente {
+    agent_last_seen_at: string | null;
+    agent_connection: 'connected' | 'connecting' | 'disconnected' | null;
+    agent_outbound_mode: 'blocked' | 'erp_only' | 'full' | null;
+}
+
+/**
+ * Cuánto puede tardar el latido antes de dar el proceso por caído. El
+ * agente late cada 30s, así que 2 minutos tolera un par de fallos seguidos
+ * sin dar una falsa alarma.
+ */
+const LATIDO_MAXIMO_MS = 2 * 60 * 1000;
 
 /** Fila de agent_conversations -- la pestaña "Todas" no depende de escalamientos. */
 interface Conversation {
@@ -129,6 +194,37 @@ type Tab = 'pending' | 'resolved' | 'all';
 const MENSAJES_VISIBLES = 100;
 
 /**
+ * Cuántas conversaciones se traen por vuelta. Vienen ordenadas por
+ * actividad, así que son las más recientes.
+ */
+const CONVERSACIONES_POR_PAGINA = 200;
+
+/**
+ * Filtro de búsqueda para PostgREST.
+ *
+ * Antes la búsqueda solo miraba las conversaciones YA cargadas (las 200
+ * más recientes): con el historial de WhatsApp importado son miles, así
+ * que buscar un cliente que no hablara hace poco no devolvía nada aunque
+ * estuviera en la base. Ahora se busca contra la tabla entera.
+ *
+ * El término se limpia de los caracteres que PostgREST usa como sintaxis
+ * (comas, paréntesis) para que un nombre con coma no rompa la consulta.
+ */
+function filtroBusqueda(termino: string): string | null {
+    const limpio = termino.trim().replace(/[,()*\\"]/g, ' ').trim();
+    if (!limpio) return null;
+
+    const condiciones = [`customer_name.ilike.*${limpio}*`];
+    const digitos = limpio.replace(/\D/g, '');
+    if (digitos) {
+        condiciones.push(`phone_number.ilike.*${digitos}*`, `lid.ilike.*${digitos}*`);
+        // "0993279707" -> "993279707" (como queda guardado tras el 593)
+        if (digitos.startsWith('0')) condiciones.push(`phone_number.ilike.*${digitos.slice(1)}*`);
+    }
+    return condiciones.join(',');
+}
+
+/**
  * Lo que el panel de detalle necesita, venga de un escalamiento o de una
  * conversación suelta -- así el detalle es uno solo para las tres pestañas.
  */
@@ -162,21 +258,120 @@ const WhatsAppInbox: React.FC = () => {
     const [search, setSearch] = useState('');
     /** Se incrementa para forzar una relectura del chat abierto. */
     const [recargarMensajes, setRecargarMensajes] = useState(0);
-    const [borrador, setBorrador] = useState('');
-    const [enviando, setEnviando] = useState(false);
-    const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+    /**
+     * Lo que se encoló y todavía no salió (o falló). Se muestra al final
+     * del hilo: sin esto, entre que alguien manda un mensaje y el agente lo
+     * despacha, la pantalla se ve como si no hubiera pasado nada y la gente
+     * lo manda de nuevo.
+     */
+    const [enCola, setEnCola] = useState<MensajeEnCola[]>([]);
+    /** Foto abierta a pantalla completa. */
+    const [visor, setVisor] = useState<{ media: MediaItem[]; index: number } | null>(null);
+    /** Estado del proceso del agente (migración 0027). null = no se sabe. */
+    const [estadoAgente, setEstadoAgente] = useState<EstadoAgente | null>(null);
+    const [conversationsLoading, setConversationsLoading] = useState(true);
+    /** Total real en la base (o de la búsqueda), no el de las filas traídas. */
+    const [totalConversaciones, setTotalConversaciones] = useState<number | null>(null);
+    /**
+     * Antes, si Supabase rechazaba una lectura o una acción (RLS, red), el
+     * error solo iba a la consola: en pantalla parecía que todo había
+     * funcionado. Ahora se muestra.
+     */
+    const [errorCarga, setErrorCarga] = useState<string | null>(null);
+    const [errorAccion, setErrorAccion] = useState<string | null>(null);
 
-    const fetchConversations = useCallback(async () => {
-        const { data, error } = await supabase
-            .from('agent_conversations')
-            .select('id, phone_number, customer_name, status, bot_enabled, last_message_at, unread_count, lid')
-            .order('last_message_at', { ascending: false, nullsFirst: false })
-            .limit(200);
-        if (error) {
-            console.error('Error cargando conversaciones:', error.message);
+    /**
+     * La búsqueda vigente, legible desde los callbacks sin recrearlos. Los
+     * eventos de realtime llaman a `fetchConversations` sin argumentos y
+     * tienen que respetar el filtro que el usuario tenga puesto.
+     */
+    const searchRef = useRef(search);
+    searchRef.current = search;
+
+    /** Contenedor del hilo, para dejarlo scrolleado en el último mensaje. */
+    const hiloRef = useRef<HTMLDivElement | null>(null);
+
+    /**
+     * La conversación abierta, legible desde los callbacks estables (misma
+     * razón que `searchRef`: los eventos de realtime los llaman sin
+     * argumentos y tienen que trabajar sobre el chat que está a la vista).
+     */
+    const selectedConversationIdRef = useRef<number | null>(null);
+
+    /**
+     * Lo que está esperando salir en esta conversación.
+     *
+     * Solo `pending` y `failed`: lo que ya salió aparece en el hilo real
+     * (`agent_messages`), y mostrarlo dos veces haría dudar de si se mandó
+     * una vez o dos.
+     */
+    const cargarCola = useCallback(async () => {
+        const conversationId = selectedConversationIdRef.current;
+        if (!conversationId) {
+            setEnCola([]);
             return;
         }
+        const { data, error } = await supabase
+            .from('agent_outbox')
+            .select(CAMPOS_COLA)
+            .eq('conversation_id', conversationId)
+            .in('status', ['pending', 'failed'])
+            .order('created_at', { ascending: true });
+        if (error) {
+            console.error('No se pudo leer la cola de salida:', error.message);
+            return;
+        }
+        setEnCola((data ?? []) as unknown as MensajeEnCola[]);
+    }, []);
+
+    const fetchConversations = useCallback(async () => {
+        setConversationsLoading(true);
+        let query = supabase
+            .from('agent_conversations')
+            // `count: 'exact'` da el total REAL de la tabla (o de la
+            // búsqueda), no el de las filas traídas: sin esto la tarjeta
+            // "Conversaciones" se quedaba clavada en 200 apenas entró el
+            // historial.
+            .select('id, phone_number, customer_name, status, bot_enabled, last_message_at, unread_count, lid', {
+                count: 'exact',
+            })
+            .order('last_message_at', { ascending: false, nullsFirst: false })
+            .limit(CONVERSACIONES_POR_PAGINA);
+
+        const filtro = filtroBusqueda(searchRef.current);
+        if (filtro) query = query.or(filtro);
+
+        const { data, error, count } = await query;
+        setConversationsLoading(false);
+        if (error) {
+            console.error('Error cargando conversaciones:', error.message);
+            setErrorCarga(`No se pudieron cargar las conversaciones: ${error.message}`);
+            return;
+        }
+        setErrorCarga(null);
         setConversations((data ?? []) as unknown as Conversation[]);
+        setTotalConversaciones(count ?? null);
+    }, []);
+
+    /**
+     * Estado del proceso del agente (migración 0027).
+     *
+     * Va en su propia consulta y se traga los errores a propósito: si esa
+     * migración todavía no se aplicó, la columna no existe y la consulta
+     * falla -- pero eso no puede dejar sin funcionar al interruptor
+     * maestro, que se lee de la misma tabla.
+     */
+    const fetchEstadoAgente = useCallback(async () => {
+        const { data, error } = await supabase
+            .from('agent_settings')
+            .select('agent_last_seen_at, agent_connection, agent_outbound_mode')
+            .eq('id', 1)
+            .maybeSingle();
+        if (error) {
+            setEstadoAgente(null);
+            return;
+        }
+        setEstadoAgente((data ?? null) as EstadoAgente | null);
     }, []);
 
     const fetchSettings = useCallback(async () => {
@@ -226,8 +421,15 @@ const WhatsAppInbox: React.FC = () => {
 
     useEffect(() => {
         fetchEscalations();
-        fetchConversations();
+        // `fetchConversations` no se llama acá: ya lo dispara el efecto de
+        // búsqueda de más abajo, que corre también en el montaje. Llamarlo
+        // en los dos lados duplicaba la consulta en cada carga.
         fetchSettings();
+        fetchEstadoAgente();
+
+        // El latido se relee solo: si el agente se cae con la pantalla
+        // abierta, el aviso tiene que aparecer sin que nadie recargue.
+        const latido = setInterval(() => fetchEstadoAgente(), 30000);
 
         /**
          * Los eventos de realtime llegan en ráfaga: una importación de
@@ -255,9 +457,29 @@ const WhatsAppInbox: React.FC = () => {
         return () => {
             clearTimeout(escalationsTimer);
             clearTimeout(conversationsTimer);
+            clearInterval(latido);
             channel.unsubscribe();
         };
-    }, [fetchEscalations, fetchConversations, fetchSettings]);
+    }, [fetchEscalations, fetchConversations, fetchSettings, fetchEstadoAgente]);
+
+    /**
+     * La búsqueda de conversaciones va contra la base, así que se espera a
+     * que la persona termine de tipear en vez de consultar por tecla.
+     */
+    useEffect(() => {
+        const t = setTimeout(() => fetchConversations(), 350);
+        return () => clearTimeout(t);
+    }, [search, fetchConversations]);
+
+    /**
+     * Deja el hilo abajo del todo: al abrir un chat con historial se
+     * entraba viendo los mensajes MÁS VIEJOS y había que scrollear a mano
+     * hasta el final para ver de qué se estaba hablando.
+     */
+    useEffect(() => {
+        const cont = hiloRef.current;
+        if (cont) cont.scrollTop = cont.scrollHeight;
+    }, [messages]);
 
     /**
      * El teléfono se guarda como solo dígitos, pero la gente lo escribe de
@@ -300,10 +522,10 @@ const WhatsAppInbox: React.FC = () => {
         });
     }, [escalations, tab, search, conversations, matchesSearch]);
 
-    const filteredConversations = useMemo(
-        () => conversations.filter(matchesSearch),
-        [conversations, matchesSearch],
-    );
+    // La pestaña "Todas" ya viene filtrada por la base (ver
+    // `filtroBusqueda`), así que no se vuelve a filtrar acá: hacerlo
+    // descartaría resultados legítimos que la consulta sí encontró.
+    const filteredConversations = conversations;
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
@@ -318,8 +540,49 @@ const WhatsAppInbox: React.FC = () => {
         const sinLeer = conversations.filter((c) => c.unread_count > 0).length;
         const hoy = new Date().toISOString().slice(0, 10);
         const escaladosHoy = escalations.filter((e) => e.created_at.slice(0, 10) === hoy).length;
-        return { activos, sinLeer, escaladosHoy, total: conversations.length };
-    }, [conversations, escalations]);
+        // El total sale del `count` de la consulta; el resto se calcula
+        // sobre lo cargado y por eso se aclara en pantalla que es "de las
+        // recientes" cuando hay más de las que entran en una página.
+        return { activos, sinLeer, escaladosHoy, total: totalConversaciones ?? conversations.length };
+    }, [conversations, escalations, totalConversaciones]);
+
+    /** Hay más conversaciones que las traídas en esta página. */
+    const hayMas = totalConversaciones !== null && totalConversaciones > conversations.length;
+
+    /**
+     * Por qué lo que se mande ahora NO le va a llegar al cliente, si es que
+     * hay un motivo. Null = todo en orden.
+     *
+     * Se muestra ANTES de escribir, no después: descubrir que el mensaje
+     * quedó trabado recién cuando el cliente reclama es el peor final
+     * posible para esta pantalla.
+     */
+    const avisoDeEnvio = useMemo(() => {
+        if (!estadoAgente) return null;
+
+        const ultimo = estadoAgente.agent_last_seen_at ? new Date(estadoAgente.agent_last_seen_at).getTime() : 0;
+        if (!ultimo || Date.now() - ultimo > LATIDO_MAXIMO_MS) {
+            return {
+                titulo: 'El agente está caído',
+                detalle: ultimo
+                    ? `No da señales desde ${timeAgo(estadoAgente.agent_last_seen_at!)}. Lo que escribas queda en cola y sale cuando vuelva.`
+                    : 'Nunca reportó estar activo. Lo que escribas queda en cola y sale cuando arranque.',
+            };
+        }
+        if (estadoAgente.agent_connection !== 'connected') {
+            return {
+                titulo: 'El agente no está conectado a WhatsApp',
+                detalle: 'Está intentando reconectar. Los mensajes quedan en cola y salen cuando la sesión vuelva.',
+            };
+        }
+        if (estadoAgente.agent_outbound_mode === 'blocked') {
+            return {
+                titulo: 'La salida a clientes está bloqueada en el servidor',
+                detalle: 'Con OUTBOUND_MODE=blocked no sale nada, ni siquiera lo que escribas vos. Hay que cambiarlo en el .env del agente.',
+            };
+        }
+        return null;
+    }, [estadoAgente]);
 
     const selectedEscalation = escalations.find((e) => e.id === selectedId) ?? null;
 
@@ -357,6 +620,8 @@ const WhatsAppInbox: React.FC = () => {
         };
     }, [tab, conversations, selectedConversationId, selectedEscalation]);
 
+    selectedConversationIdRef.current = selected?.conversationId ?? null;
+
     useEffect(() => {
         if (!selected) {
             setMessages([]);
@@ -369,7 +634,7 @@ const WhatsAppInbox: React.FC = () => {
         // descendente y se revierte, para quedarse con los MÁS RECIENTES).
         supabase
             .from('agent_messages')
-            .select('id, direction, content_type, body, created_at, delivery_status, action_taken')
+            .select(CAMPOS_MENSAJE)
             .eq('conversation_id', selected.conversationId)
             .order('created_at', { ascending: false })
             .limit(MENSAJES_VISIBLES)
@@ -417,14 +682,91 @@ const WhatsAppInbox: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selected?.conversationId]);
 
+    /**
+     * Cola de salida del chat abierto, en vivo.
+     *
+     * Es lo que hace visible el tramo entre "le di a enviar" y "el cliente
+     * lo recibió": mientras el agente no lo despache, el mensaje se ve al
+     * final del hilo marcado como en cola, y se puede cancelar. Sin esto,
+     * ese hueco de unos segundos parece que el envío no funcionó.
+     */
+    useEffect(() => {
+        const conversationId = selected?.conversationId;
+        if (!conversationId) {
+            setEnCola([]);
+            return;
+        }
+        cargarCola();
+
+        const channel = supabase
+            .channel(`agent_outbox_conversation_${conversationId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'agent_outbox',
+                    filter: `conversation_id=eq.${conversationId}`,
+                },
+                () => cargarCola(),
+            )
+            .subscribe();
+
+        return () => {
+            channel.unsubscribe();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selected?.conversationId, cargarCola]);
+
+    /**
+     * Deja el hilo abajo del todo también cuando aparece o se despacha algo
+     * de la cola -- si no, el mensaje recién enviado queda fuera de vista.
+     */
+    // Se mira la CANTIDAD y no el arreglo: la cola se relee cada pocos
+    // segundos, y saltar al final en cada relectura le arrancaría el scroll
+    // de las manos a quien está leyendo mensajes viejos.
+    useEffect(() => {
+        const cont = hiloRef.current;
+        if (cont) cont.scrollTop = cont.scrollHeight;
+    }, [enCola.length]);
+
+    const hayPendientes = enCola.some((q) => q.status === 'pending');
+
+    /**
+     * Mientras haya algo esperando salir, se relee la cola cada pocos
+     * segundos.
+     *
+     * Es a propósito además del realtime: `agent_outbox` tiene que estar
+     * agregada a la publicación `supabase_realtime` para que lleguen
+     * eventos (migración 0028), y si esa migración no se aplicó el mensaje
+     * se quedaría marcado como "En cola" para siempre aunque el cliente ya
+     * lo tenga. Solo corre mientras hay pendientes, así que en un chat
+     * quieto no consulta nada.
+     */
+    useEffect(() => {
+        if (!hayPendientes) return;
+        const t = setInterval(() => cargarCola(), 4000);
+        return () => clearInterval(t);
+    }, [hayPendientes, cargarCola]);
+
     const handleClaim = async (escalation: Escalation) => {
         if (!userId) return;
         setActionLoading(true);
-        await supabase
+        setErrorAccion(null);
+        const { error } = await supabase
             .from('agent_escalations')
             .update({ status: 'claimed', claimed_by: userId, claimed_at: new Date().toISOString() })
             .eq('id', escalation.id);
-        await supabase.from('agent_conversations').update({ status: 'human_active' }).eq('id', escalation.conversation_id);
+        if (error) {
+            setActionLoading(false);
+            setErrorAccion(`No se pudo reclamar: ${error.message}`);
+            return;
+        }
+        const { error: errorConv } = await supabase
+            .from('agent_conversations')
+            .update({ status: 'human_active' })
+            .eq('id', escalation.conversation_id);
+        if (errorConv) setErrorAccion(`Se reclamó, pero la conversación no quedó marcada: ${errorConv.message}`);
         setActionLoading(false);
         await Promise.all([fetchEscalations(), fetchConversations()]);
     };
@@ -434,8 +776,19 @@ const WhatsAppInbox: React.FC = () => {
     // repo del agente). Arranca apagado para cada cliente nuevo.
     const handleToggleBot = async (ctx: SelectedContext) => {
         setActionLoading(true);
-        await supabase.from('agent_conversations').update({ bot_enabled: !ctx.botEnabled }).eq('id', ctx.conversationId);
+        setErrorAccion(null);
+        const { error } = await supabase
+            .from('agent_conversations')
+            .update({ bot_enabled: !ctx.botEnabled })
+            .eq('id', ctx.conversationId);
         setActionLoading(false);
+        if (error) {
+            // Importante que se vea: si esto falla en silencio, el equipo
+            // cree que apagó el agente para un cliente y el agente sigue
+            // contestándole.
+            setErrorAccion(`No se pudo cambiar el agente de esta conversación: ${error.message}`);
+            return;
+        }
         await Promise.all([fetchConversations(), fetchEscalations()]);
     };
 
@@ -446,11 +799,15 @@ const WhatsAppInbox: React.FC = () => {
     const handleToggleGlobalBot = async () => {
         if (globalBotEnabled === null) return;
         setActionLoading(true);
-        await supabase
+        setErrorAccion(null);
+        const { error } = await supabase
             .from('agent_settings')
             .update({ bot_auto_reply_enabled: !globalBotEnabled, updated_at: new Date().toISOString(), updated_by: userId })
             .eq('id', 1);
         setActionLoading(false);
+        // Es el interruptor maestro: creer que quedó apagado cuando sigue
+        // encendido es exactamente el error que no se puede permitir.
+        if (error) setErrorAccion(`No se pudo cambiar el interruptor general: ${error.message}`);
         fetchSettings();
     };
 
@@ -461,54 +818,92 @@ const WhatsAppInbox: React.FC = () => {
      * que alguien del equipo ya miró el chat.
      */
     const marcarLeida = useCallback(async (conversationId: number) => {
-        await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', conversationId);
+        const { error } = await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', conversationId);
+        // Si la base lo rechazó, no se apaga el contador en pantalla: dejarlo
+        // en cero mentiría hasta el próximo refresco, que lo traería
+        // encendido de nuevo.
+        if (error) {
+            console.error('No se pudo marcar como leída:', error.message);
+            return;
+        }
         setConversations((prev) =>
             prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
         );
     }, []);
 
+
     /**
-     * Encola el mensaje para que el proceso del agente lo envíe.
+     * Encola lo que se escribió (texto, fotos, archivos o fichas del
+     * catálogo) para que el proceso del agente lo envíe.
      *
-     * No se manda desde acá porque el navegador no tiene la sesión de
-     * WhatsApp -- la tiene el agente. Y se responde desde el ERP y no
-     * desde el teléfono porque los mensajes escritos en el teléfono
-     * llegan cifrados al agente y nunca quedan registrados: es la única
-     * forma de que la conversación quede completa.
+     * Lanza si Supabase lo rechaza: la caja de escribir muestra el error y
+     * NO limpia el borrador -- perder lo que alguien acaba de escribir
+     * porque falló la red es inaceptable.
      */
-    const enviarMensaje = async () => {
-        const texto = borrador.trim();
-        if (!texto || !selected || enviando) return;
+    const enviarMensajes = useCallback(
+        async (mensajes: NuevoMensaje[]) => {
+            await encolarMensajes(mensajes, userId);
+            // Aparece de inmediato en el hilo como "en cola"; el realtime de
+            // agent_outbox lo va actualizando hasta que sale.
+            await cargarCola();
+        },
+        // `cargarCola` se define abajo con useCallback estable.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [userId, selected?.conversationId],
+    );
 
-        setEnviando(true);
-        setErrorEnvio(null);
-        const { error } = await supabase.from('agent_outbox').insert({
-            conversation_id: selected.conversationId,
-            body: texto,
-            created_by: userId,
-        });
-        setEnviando(false);
-
-        if (error) {
-            setErrorEnvio(error.message);
-            return;
+    /** Cancela un mensaje que todavía no salió. */
+    const handleCancelar = async (item: MensajeEnCola) => {
+        try {
+            const cancelado = await cancelarMensaje(item.id);
+            if (!cancelado) {
+                // Se despachó entre el clic y el update: decirle a la persona
+                // que se canceló sería mentirle sobre algo que el cliente ya
+                // tiene en el teléfono.
+                setErrorAccion('Ese mensaje ya había salido, no se pudo cancelar.');
+                setRecargarMensajes((n) => n + 1);
+            }
+            await cargarCola();
+        } catch (err: any) {
+            setErrorAccion(`No se pudo cancelar: ${err?.message ?? err}`);
         }
-        setBorrador('');
-        // El agente tarda unos segundos en despachar; se relee para que
-        // aparezca en el hilo apenas salga.
-        setTimeout(() => setRecargarMensajes((n) => n + 1), 4000);
+    };
+
+    /** Vuelve a intentar un mensaje que falló. */
+    const handleReintentar = async (item: MensajeEnCola) => {
+        try {
+            await reintentarMensaje(item.id);
+            await cargarCola();
+        } catch (err: any) {
+            setErrorAccion(`No se pudo reintentar: ${err?.message ?? err}`);
+        }
+    };
+
+    /** Abre la foto a pantalla completa, con las demás del hilo al lado. */
+    const abrirVisor = (mensaje: AgentMessage) => {
+        const fotos = messages.filter(ES_IMAGEN);
+        const media: MediaItem[] = fotos.map((m) => ({ type: 'image', url: m.media_url!, title: m.body ?? undefined }));
+        const index = Math.max(0, fotos.findIndex((m) => m.id === mensaje.id));
+        setVisor({ media, index });
     };
 
     const handleResolve = async (escalation: Escalation) => {
         setActionLoading(true);
-        await supabase
+        setErrorAccion(null);
+        const { error } = await supabase
             .from('agent_escalations')
             .update({ status: 'resolved', resolved_at: new Date().toISOString() })
             .eq('id', escalation.id);
-        await supabase
+        if (error) {
+            setActionLoading(false);
+            setErrorAccion(`No se pudo marcar como resuelta: ${error.message}`);
+            return;
+        }
+        const { error: errorConv } = await supabase
             .from('agent_conversations')
             .update({ status: closeInsteadOfReopen ? 'closed' : 'bot_active' })
             .eq('id', escalation.conversation_id);
+        if (errorConv) setErrorAccion(`Quedó resuelta, pero la conversación no cambió de estado: ${errorConv.message}`);
         setActionLoading(false);
         setCloseInsteadOfReopen(false);
         await Promise.all([fetchEscalations(), fetchConversations()]);
@@ -520,9 +915,9 @@ const WhatsAppInbox: React.FC = () => {
                 <div>
                     <h1 className={page.title}>Bandeja de WhatsApp</h1>
                     <p className={page.subtitle}>
-                        Conversaciones de WhatsApp del agente. Contestale al cliente desde tu propio WhatsApp
-                        (vinculado como dispositivo del número del bot) -- acá se hace seguimiento y se decide
-                        a quién le responde el agente.
+                        Contestale al cliente desde acá: texto, fotos y repuestos del catálogo con su precio.
+                        Todo lo que se manda queda guardado en la conversación -- lo que se escribe desde el
+                        teléfono, no.
                     </p>
                 </div>
                 <button
@@ -530,12 +925,43 @@ const WhatsAppInbox: React.FC = () => {
                         fetchEscalations();
                         fetchConversations();
                         fetchSettings();
+                        fetchEstadoAgente();
                     }}
                     className={cn(button.base, button.variant.secondary, button.size.sm)}
                 >
                     <RefreshCw size={14} aria-hidden="true" /> Actualizar
                 </button>
             </div>
+
+            {/* Fallos de Supabase (RLS, red): antes solo iban a la consola y
+                en pantalla parecía que todo había salido bien. */}
+            {(errorCarga || errorAccion) && (
+                <div className={cn(card.base, 'px-4 py-3 border-danger/40 flex items-start justify-between gap-3')}>
+                    <p className="text-sm text-danger">{errorCarga ?? errorAccion}</p>
+                    <button
+                        onClick={() => {
+                            setErrorCarga(null);
+                            setErrorAccion(null);
+                        }}
+                        aria-label="Cerrar aviso de error"
+                        className="p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-hover shrink-0"
+                    >
+                        <X size={14} aria-hidden="true" />
+                    </button>
+                </div>
+            )}
+
+            {/* Lo que se encole ahora no va a salir. Se avisa arriba de todo
+                y no en la caja de escribir: hay que verlo ANTES de escribir. */}
+            {avisoDeEnvio && (
+                <div className={cn(card.base, 'px-4 py-3 border-warning/40 bg-warning-soft flex items-start gap-3')}>
+                    <RotateCw size={16} className="text-warning-soft-fg shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                        <p className="text-sm font-semibold text-warning-soft-fg">{avisoDeEnvio.titulo}</p>
+                        <p className="text-xs text-warning-soft-fg/90 mt-0.5">{avisoDeEnvio.detalle}</p>
+                    </div>
+                </div>
+            )}
 
             {/* Interruptor maestro: apagado acá, el agente no le contesta a
                 nadie aunque haya conversaciones habilitadas. */}
@@ -608,7 +1034,7 @@ const WhatsAppInbox: React.FC = () => {
                     onClick={() => setTab('all')}
                     className={cn(button.base, button.size.sm, tab === 'all' ? button.variant.primary : button.variant.secondary)}
                 >
-                    Todas ({conversations.length})
+                    Todas ({totalConversaciones ?? conversations.length})
                 </button>
 
                 <div className="relative ml-auto w-full sm:w-72">
@@ -640,7 +1066,10 @@ const WhatsAppInbox: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
                 {/* Lista */}
                 <div className={cn(card.base, 'divide-y divide-subtle overflow-hidden')}>
-                    {loading ? (
+                    {/* Cada pestaña espera SU propia carga: la de "Todas" usaba
+                        el loading de escalamientos y por eso mostraba "no hay
+                        conversaciones" mientras la consulta seguía en vuelo. */}
+                    {(tab === 'all' ? conversationsLoading : loading) ? (
                         <div className="p-8 text-center text-sm text-fg-muted">Cargando…</div>
                     ) : tab === 'all' ? (
                         filteredConversations.length === 0 ? (
@@ -693,7 +1122,14 @@ const WhatsAppInbox: React.FC = () => {
                                 </button>
                             ))
                         )
-                    ) : filtered.length === 0 ? (
+                    ) : null}
+                    {tab === 'all' && !conversationsLoading && hayMas && (
+                        <p className="px-4 py-3 text-2xs text-fg-subtle text-center">
+                            Mostrando las {conversations.length} más recientes de {totalConversaciones}.
+                            {' '}Usá el buscador para encontrar una conversación puntual.
+                        </p>
+                    )}
+                    {tab !== 'all' && (loading ? null : filtered.length === 0 ? (
                         <div className="p-10 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
                             <Inbox size={22} className="text-fg-subtle" aria-hidden="true" />
                             {search.trim()
@@ -737,7 +1173,7 @@ const WhatsAppInbox: React.FC = () => {
                                 )}
                             </button>
                         ))
-                    )}
+                    ))}
                 </div>
 
                 {/* Detalle */}
@@ -776,7 +1212,12 @@ const WhatsAppInbox: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="p-5 max-h-[52vh] overflow-y-auto space-y-3">
+                            <div ref={hiloRef} className="p-5 max-h-[52vh] overflow-y-auto space-y-3">
+                                {messages.length >= MENSAJES_VISIBLES && (
+                                    <p className="text-2xs text-fg-subtle text-center pb-1">
+                                        Mostrando los últimos {MENSAJES_VISIBLES} mensajes de esta conversación.
+                                    </p>
+                                )}
                                 {messagesLoading ? (
                                     <p className="text-sm text-fg-muted">Cargando conversación…</p>
                                 ) : messages.length === 0 ? (
@@ -786,18 +1227,54 @@ const WhatsAppInbox: React.FC = () => {
                                         <div key={m.id} className={cn('flex', m.direction === 'inbound' ? 'justify-start' : 'justify-end')}>
                                             <div
                                                 className={cn(
-                                                    'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm',
+                                                    'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words',
                                                     m.direction === 'inbound' ? 'bg-surface-2 text-fg' : 'bg-primary-soft text-primary-soft-fg',
                                                 )}
                                             >
-                                                {bodyPreview(m)}
+                                                {/* La foto, adentro de la burbuja. Antes acá solo decía
+                                                    "(foto)" y para verla había que abrir el WhatsApp del
+                                                    teléfono -- justo cuando hay que decidir qué contestar. */}
+                                                {ES_IMAGEN(m) && (
+                                                    <button
+                                                        onClick={() => abrirVisor(m)}
+                                                        className="block mb-1.5 rounded-xl overflow-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                                                        title="Ver la foto en grande"
+                                                    >
+                                                        <img
+                                                            src={m.media_url!}
+                                                            alt={m.body ?? 'Foto del chat'}
+                                                            loading="lazy"
+                                                            className="max-h-64 w-auto object-cover"
+                                                        />
+                                                    </button>
+                                                )}
+                                                {m.media_url && !ES_IMAGEN(m) && (
+                                                    <a
+                                                        href={m.media_url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="mb-1.5 flex items-center gap-2 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs text-fg hover:bg-surface-hover"
+                                                    >
+                                                        <FileText size={14} aria-hidden="true" />
+                                                        {m.content_type === 'audio'
+                                                            ? 'Escuchar la nota de voz'
+                                                            : m.content_type === 'video'
+                                                              ? 'Ver el video'
+                                                              : 'Abrir el archivo'}
+                                                    </a>
+                                                )}
+                                                {/* Con foto, el texto de relleno "(foto)" sobra: la foto ya está a la vista. */}
+                                                {(m.body || !m.media_url) && bodyPreview(m)}
                                                 <div className="text-2xs text-fg-subtle mt-1 flex items-center gap-1.5 flex-wrap">
                                                     <span>
                                                         {new Date(m.created_at).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                     {m.action_taken === 'human_reply' && <span>· vendedor</span>}
-                                                    {/* El acuse solo aplica a lo que mandó el agente. */}
-                                                    {m.direction === 'outbound' && m.action_taken !== 'human_reply' && m.delivery_status && (
+                                                    {/* El acuse existe para todo lo que salió por el agente:
+                                                        sus respuestas automáticas y lo que se manda desde el
+                                                        ERP. Lo escrito desde el teléfono del vendedor no lo
+                                                        tiene -- no pasó por acá y no hay nada que confirmar. */}
+                                                    {m.direction === 'outbound' && m.delivery_status && (
                                                         <span
                                                             className={cn(
                                                                 badge.base,
@@ -813,41 +1290,105 @@ const WhatsAppInbox: React.FC = () => {
                                         </div>
                                     ))
                                 )}
+
+                                {/* Lo que todavía no salió. Va al final del hilo, con el
+                                    mismo aspecto que un mensaje enviado pero atenuado: se
+                                    ve dónde va a quedar sin fingir que el cliente ya lo
+                                    recibió. */}
+                                {enCola.map((q) => (
+                                    <div key={`cola-${q.id}`} className="flex justify-end">
+                                        <div
+                                            className={cn(
+                                                'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words border border-dashed',
+                                                q.status === 'failed'
+                                                    ? 'border-danger/50 bg-danger-soft text-danger-soft-fg'
+                                                    : 'border-strong bg-surface-2 text-fg-muted',
+                                            )}
+                                        >
+                                            {q.media_url && q.kind === 'image' && (
+                                                <img
+                                                    src={q.media_url}
+                                                    alt={q.body ?? 'Foto por enviar'}
+                                                    className="mb-1.5 max-h-48 w-auto rounded-xl object-cover opacity-80"
+                                                />
+                                            )}
+                                            {q.media_url && q.kind !== 'image' && (
+                                                <p className="mb-1 flex items-center gap-1.5 text-xs">
+                                                    <FileText size={13} aria-hidden="true" />
+                                                    {q.media_filename ?? 'archivo'}
+                                                </p>
+                                            )}
+                                            {q.body}
+
+                                            <div className="text-2xs mt-1 flex items-center gap-2 flex-wrap">
+                                                {q.status === 'failed' ? (
+                                                    <>
+                                                        <span className={cn(badge.base, badge.size.sm, badge.tone.danger)}>
+                                                            No se pudo enviar
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleReintentar(q)}
+                                                            className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
+                                                        >
+                                                            <RotateCw size={11} aria-hidden="true" /> Reintentar
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span className={cn(badge.base, badge.size.sm, badge.tone.warning)}>
+                                                            En cola
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleCancelar(q)}
+                                                            className="inline-flex items-center gap-1 text-fg-subtle underline underline-offset-2 hover:no-underline"
+                                                        >
+                                                            <Ban size={11} aria-hidden="true" /> Cancelar
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* El motivo exacto del fallo: sin esto, "no se pudo
+                                                enviar" no le dice a nadie qué hacer al respecto. */}
+                                            {q.error && <p className="text-2xs mt-1 opacity-80">{q.error}</p>}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
+
+                            {/* Si el agente sigue habilitado en este chat, puede
+                                contestar encima de la persona que está atendiendo.
+                                No se apaga solo -- eso dejaría al bot mudo para
+                                siempre sin que nadie lo haya decidido -- pero se
+                                avisa y se apaga de un clic. */}
+                            {selected.botEnabled && globalBotEnabled && (
+                                <div className="mx-5 mt-3 px-3 py-2 rounded-lg bg-warning-soft border border-warning/30 flex items-center justify-between gap-3 flex-wrap">
+                                    <p className="text-xs text-warning-soft-fg">
+                                        El agente también contesta en este chat: pueden cruzarse las respuestas.
+                                    </p>
+                                    <button
+                                        onClick={() => handleToggleBot(selected)}
+                                        disabled={actionLoading}
+                                        className={cn(button.base, button.variant.secondary, button.size.sm)}
+                                    >
+                                        Apagar el agente acá
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Responder desde acá y no desde el teléfono: lo que se
                                 escribe en el teléfono llega cifrado al agente y no
                                 queda registrado en la conversación. */}
-                            <div className="px-5 pt-3 border-t border-subtle">
-                                <div className="flex items-end gap-2">
-                                    <textarea
-                                        value={borrador}
-                                        onChange={(e) => setBorrador(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            // Enter envía, Shift+Enter hace salto de línea.
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                enviarMensaje();
-                                            }
-                                        }}
-                                        rows={2}
-                                        placeholder="Escribí tu respuesta… (Enter para enviar, Shift+Enter para salto de línea)"
-                                        aria-label="Mensaje para el cliente"
-                                        className={cn(input.base, 'py-2 px-3 text-sm resize-none')}
-                                    />
-                                    <button
-                                        onClick={enviarMensaje}
-                                        disabled={enviando || !borrador.trim()}
-                                        className={cn(button.base, button.variant.primary, button.size.md, 'shrink-0')}
-                                    >
-                                        {enviando ? 'Enviando…' : 'Enviar'}
-                                    </button>
-                                </div>
-                                {errorEnvio && <p className="text-xs text-danger mt-1.5">No se pudo encolar: {errorEnvio}</p>}
-                                <p className="text-2xs text-fg-subtle mt-1.5">
-                                    El mensaje sale por WhatsApp en unos segundos y queda guardado en esta conversación.
-                                </p>
-                            </div>
+                            <ChatComposer
+                                key={selected.conversationId}
+                                conversationId={selected.conversationId}
+                                clienteLabel={
+                                    selected.customerName ||
+                                    formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })
+                                }
+                                userId={userId}
+                                onEnviar={enviarMensajes}
+                            />
 
                             <div className={cn(card.footer, 'flex items-center gap-3 flex-wrap')}>
                                 <button
@@ -915,6 +1456,15 @@ const WhatsAppInbox: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Visor de fotos del hilo: la foto del repuesto se mira en
+                grande sin salir de la conversación. */}
+            <MediaLightbox
+                isOpen={!!visor}
+                media={visor?.media ?? []}
+                initialIndex={visor?.index ?? 0}
+                onClose={() => setVisor(null)}
+            />
         </div>
     );
 };
