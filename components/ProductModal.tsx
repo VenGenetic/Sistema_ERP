@@ -12,6 +12,7 @@ import {
   CirclePlay,
   CirclePlus,
   ClipboardPaste,
+  Dices,
   Download,
   History,
   Image as ImageIcon,
@@ -85,6 +86,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
     const [loading, setLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isVideoUploading, setIsVideoUploading] = useState(false);
+    const [isGeneratingSku, setIsGeneratingSku] = useState(false);
     const [isDraggingMain, setIsDraggingMain] = useState(false);
     const [isDraggingGallery, setIsDraggingGallery] = useState(false);
     const [entryByPrice, setEntryByPrice] = useState(false);
@@ -609,6 +611,48 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         });
     };
 
+    const generateRandomSkuCode = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < 10; i++) {
+            code += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return code;
+    };
+
+    const handleGenerateRandomSku = async () => {
+        const confirmed = window.confirm(
+            '¡Cuidado! El SKU está vinculado al SKU de la importadora. Si lo cambias, este producto puede desvincularse de la importadora y perder la sincronización de stock/precio.\n\n¿Deseás continuar y generar un SKU aleatorio de todos modos?'
+        );
+        if (!confirmed) return;
+
+        setIsGeneratingSku(true);
+        try {
+            let candidate = '';
+            let isUnique = false;
+            for (let attempt = 0; attempt < 10 && !isUnique; attempt++) {
+                candidate = generateRandomSkuCode();
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('id')
+                    .eq('sku', candidate)
+                    .maybeSingle();
+                if (error) throw error;
+                isUnique = !data;
+            }
+            if (!isUnique) {
+                alert('No se pudo generar un SKU único, por favor intentá de nuevo.');
+                return;
+            }
+            setFormData(prev => ({ ...prev, sku: candidate }));
+        } catch (err) {
+            console.error('Error generando SKU aleatorio:', err);
+            alert('Ocurrió un error al generar el SKU aleatorio.');
+        } finally {
+            setIsGeneratingSku(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -1094,8 +1138,19 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
 
                         <div>
                             <label className={labelClass}>SKU *</label>
-                            <input required type="text" className={`${inputClass} font-mono uppercase`}
-                                value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value.toUpperCase() })} />
+                            <div className="flex items-center gap-2">
+                                <input required type="text" className={`${inputClass} font-mono uppercase`}
+                                    value={formData.sku} onChange={e => setFormData({ ...formData, sku: e.target.value.toUpperCase() })} />
+                                <button
+                                    type="button"
+                                    onClick={handleGenerateRandomSku}
+                                    disabled={isGeneratingSku}
+                                    title="Generar SKU aleatorio (¡puede desvincular el producto de la importadora!)"
+                                    className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg border border-subtle bg-surface hover:bg-danger-soft hover:border-danger/30 hover:text-danger text-fg-subtle transition-all disabled:opacity-50"
+                                >
+                                    {isGeneratingSku ? <Loader2 size={16} className="animate-spin" /> : <Dices size={16} />}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="col-span-1 md:col-span-2">
