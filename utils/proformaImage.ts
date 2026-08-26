@@ -37,27 +37,21 @@ export async function capturarProformaComoArchivo(
 }
 
 /**
- * Resumen en texto de la proforma.
+ * El texto que acompaña a la imagen: el TOTAL y la nota. Nada más.
  *
- * Va ADEMÁS de la imagen, no en lugar de ella: la imagen no se puede
- * copiar ni buscar, y el cliente muchas veces quiere reenviarle el total a
- * alguien o buscarlo después en el chat. El texto también es lo que queda
- * legible en el historial del ERP.
+ * El detalle de los repuestos NO se repite acá. Ya está en la hoja, bien
+ * maquetado, con SKU, cantidad y disponibilidad: escribirlo otra vez
+ * debajo le deja al cliente la misma lista dos veces —una prolija y otra
+ * en viñetas— y en el teléfono esa segunda lista empuja la foto fuera de
+ * la pantalla, que es justo lo que se le quería mostrar.
+ *
+ * El total sí va en texto, porque es el dato que el cliente después busca
+ * en el chat, copia o le reenvía a alguien, y una imagen no se puede
+ * buscar ni copiar. La nota va con él porque suele ser una condición
+ * (garantía, plazo de entrega) que conviene poder releer sin abrir la foto.
  */
-export function resumenDeProforma(params: {
-    items: Array<{ name: string; quantity: number; unitPrice: number }>;
-    envio: number | null;
-    total: number;
-    nota: string;
-}): string {
-    const lineas = params.items.map(
-        (i) =>
-            `• ${i.name}` +
-            (i.quantity > 1 ? ` x${i.quantity}` : '') +
-            ` — $${(i.quantity * i.unitPrice).toFixed(2)}`,
-    );
-    if (params.envio !== null) lineas.push(`• Envío — $${params.envio.toFixed(2)}`);
-    lineas.push('', `*Total: $${params.total.toFixed(2)}*`);
+export function resumenDeProforma(params: { total: number; nota: string }): string {
+    const lineas = [`*Total: $${params.total.toFixed(2)}*`];
     if (params.nota.trim()) lineas.push('', params.nota.trim());
     return lineas.join('\n');
 }

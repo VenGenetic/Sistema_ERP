@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ImageOff, Loader2, Package, Search, Send, Trash2, X } from 'lucide-react';
+import { Check, ImageOff, Loader2, Minus, Package, Plus, Search, Send, Trash2, X } from 'lucide-react';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { badge, button, cn, input, modal } from '../ui/styles';
 import {
@@ -48,12 +48,21 @@ interface Armado {
     texto: string;
     incluirPrecio: boolean;
     incluirDisponibilidad: boolean;
+    /**
+     * Precio a cotizar. Arranca en el del catálogo y se puede subir o
+     * bajar: el de lista no siempre es el que se cierra.
+     */
+    precio: number;
     /** Si alguien tocó el texto a mano, los interruptores dejan de pisarlo. */
     textoEditado: boolean;
 }
 
 function armadoInicial(producto: ProductoCatalogo): Armado {
-    const opciones = { incluirPrecio: true, incluirDisponibilidad: true };
+    const opciones = {
+        incluirPrecio: true,
+        incluirDisponibilidad: true,
+        precio: producto.price != null ? precioParaCliente(producto.price) : 0,
+    };
     const fotos = fotosDe(producto);
     return {
         producto,
@@ -173,11 +182,14 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                 // salvo que alguien ya lo haya escrito a su manera: pisarle lo
                 // que escribió sería perder trabajo hecho.
                 const tocaronInterruptores =
-                    cambios.incluirPrecio !== undefined || cambios.incluirDisponibilidad !== undefined;
+                    cambios.incluirPrecio !== undefined ||
+                    cambios.incluirDisponibilidad !== undefined ||
+                    cambios.precio !== undefined;
                 if (tocaronInterruptores && !siguiente.textoEditado) {
                     siguiente.texto = textoDeProducto(siguiente.producto, {
                         incluirPrecio: siguiente.incluirPrecio,
                         incluirDisponibilidad: siguiente.incluirDisponibilidad,
+                        precio: siguiente.precio,
                     });
                 }
                 return siguiente;
@@ -446,6 +458,56 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                                 />
                                                 Precio
                                             </label>
+
+                                            {/* Ajustar el precio sin tener que apagarlo y escribirlo
+                                                a mano dentro del texto: así lo que se cotiza queda
+                                                como número y no perdido en texto libre. */}
+                                            {a.incluirPrecio && (
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() =>
+                                                            actualizar(a.producto.product_id, {
+                                                                precio: Math.max(0, a.precio - 1),
+                                                            })
+                                                        }
+                                                        aria-label="Bajar un dólar"
+                                                        className={cn(button.base, button.variant.secondary, button.icon.xs)}
+                                                    >
+                                                        <Minus size={11} aria-hidden="true" />
+                                                    </button>
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        step="0.5"
+                                                        value={a.precio}
+                                                        onChange={(e) =>
+                                                            actualizar(a.producto.product_id, {
+                                                                precio: Math.max(0, Number(e.target.value)),
+                                                            })
+                                                        }
+                                                        aria-label={`Precio de ${a.producto.name}`}
+                                                        className={cn(input.base, input.size.sm, input.numeric, 'w-16')}
+                                                    />
+                                                    <button
+                                                        onClick={() =>
+                                                            actualizar(a.producto.product_id, { precio: a.precio + 1 })
+                                                        }
+                                                        aria-label="Subir un dólar"
+                                                        className={cn(button.base, button.variant.secondary, button.icon.xs)}
+                                                    >
+                                                        <Plus size={11} aria-hidden="true" />
+                                                    </button>
+                                                    {/* Si se movió del de lista se avisa: es fácil
+                                                        mandar un precio ajustado sin darse cuenta. */}
+                                                    {a.producto.price != null &&
+                                                        a.precio !== precioParaCliente(a.producto.price) && (
+                                                            <span className="text-2xs text-warning-soft-fg">
+                                                                lista {formatearPrecio(precioParaCliente(a.producto.price))}
+                                                            </span>
+                                                        )}
+                                                </div>
+                                            )}
+
                                             <label className="flex items-center gap-1.5 text-2xs text-fg-muted">
                                                 <input
                                                     type="checkbox"

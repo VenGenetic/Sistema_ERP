@@ -140,6 +140,12 @@ export interface NuevoMensaje {
      * muestra distinto: la nota sale con la onda y se escucha de una.
      */
     isVoiceNote?: boolean;
+    /**
+     * Mensaje que se está citando. WhatsApp dibuja la tarjetita arriba de
+     * la respuesta -- necesario cuando el cliente mandó cinco mensajes
+     * seguidos y hay que contestar el tercero.
+     */
+    replyToWaId?: string | null;
 }
 
 /**
@@ -159,11 +165,13 @@ export async function encolarMensajes(mensajes: NuevoMensaje[], userId: string |
         media_filename: m.mediaFilename ?? null,
         product_id: m.productId ?? null,
         created_by: userId,
-        // Solo se manda cuando es true. `is_voice_note` llegó con la
-        // migración 0030 y si esa no se aplicó, incluirla siempre haría
-        // fallar TODO envío -- también el texto, que funcionaba desde
-        // antes. Una migración pendiente no puede romper lo que ya andaba.
+        // Las columnas nuevas solo se mandan cuando hacen falta. Llegaron
+        // con las migraciones 0030 y 0031, y si esas no se aplicaron,
+        // incluirlas siempre haría fallar TODO envío -- también el texto,
+        // que funcionaba desde antes. Una migración pendiente no puede
+        // romper lo que ya andaba.
         ...(m.isVoiceNote ? { is_voice_note: true } : {}),
+        ...(m.replyToWaId ? { reply_to_wa_id: m.replyToWaId } : {}),
     }));
 
     const { error } = await supabase.from('agent_outbox').insert(filas);
@@ -193,6 +201,82 @@ export async function cancelarMensaje(id: number): Promise<boolean> {
         .select('id');
     if (error) throw error;
     return (data?.length ?? 0) > 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  ACCIONES SOBRE UN MENSAJE YA ENVIADO (migración 0031)                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Todas van por la MISMA cola que un envío: son cosas que el proceso del
+ * agente tiene que ejecutar contra WhatsApp, y compartir la cola significa
+ * compartir los reintentos, el freno de salida y el registro de fallos que
+ * ya funcionan.
+ */
+async function encolarAccion(fila: Record<string, unknown>, userId: string | null): Promise<void> {
+    const { error } = await supabase.from('agent_outbox').insert({ ...fila, created_by: userId });
+    if (error) {
+        if (error.code === '42703') {
+            throw new Error(
+                'Falta aplicar la migración 0031 del agente ' +
+                    '(supabase/migrations/0031_agent_outbox_acciones.sql).',
+            );
+        }
+        throw error;
+    }
+}
+
+/**
+ * Borra un mensaje para todos ("eliminar para todos").
+ *
+ * Es la función que más importa de este grupo: se cotiza un precio
+ * equivocado y el cliente ya lo tiene en el teléfono. Sin esto, lo único
+ * que se puede hacer es escribir "perdón, es otro precio" y confiar en que
+ * lea el segundo mensaje.
+ *
+ * WhatsApp solo deja borrar mensajes PROPIOS y dentro de un plazo; pasado
+ * ese tiempo la acción falla y queda registrada como fallida en la cola.
+ */
+export async function borrarMensaje(
+    conversationId: number,
+    whatsappMessageId: string,
+    userId: string | null,
+): Promise<void> {
+    await encolarAccion(
+        { conversation_id: conversationId, kind: 'delete', target_wa_id: whatsappMessageId },
+        userId,
+    );
+}
+
+/** Pone (o quita, con emoji vacío) una reacción sobre un mensaje. */
+export async function reaccionarMensaje(
+    conversationId: number,
+    whatsappMessageId: string,
+    emoji: string,
+    userId: string | null,
+): Promise<void> {
+    await encolarAccion(
+        {
+            conversation_id: conversationId,
+            kind: 'reaction',
+            target_wa_id: whatsappMessageId,
+            reaction_emoji: emoji,
+        },
+        userId,
+    );
+}
+
+/**
+ * Marca como leídos los mensajes del cliente -- el doble tilde azul.
+ *
+ * Se llama al RESPONDER, no al abrir el chat. Si alguien abre la
+ * conversación para mirarla y no contesta, ver el tilde azul le dice al
+ * cliente "te leí y te dejé esperando", que molesta más que no haberla
+ * abierto. Junto con la respuesta, el tilde llega cuando ya tiene su
+ * contestación.
+ */
+export async function marcarLeidoEnWhatsApp(conversationId: number, userId: string | null): Promise<void> {
+    await encolarAccion({ conversation_id: conversationId, kind: 'read' }, userId);
 }
 
 /** Vuelve a poner en cola un mensaje que falló, con los intentos en cero. */
@@ -255,6 +339,16 @@ export function stockUtil(p: ProductoCatalogo): { local: number; importador: num
 export interface OpcionesTextoProducto {
     incluirPrecio: boolean;
     incluirDisponibilidad: boolean;
+    /**
+     * Precio a cotizar. Si no viene, el del catálogo redondeado.
+     *
+     * Se puede ajustar porque el de lista no siempre es el que se cierra:
+     * un cliente que lleva varias piezas, uno que vuelve seguido, o un
+     * repuesto con un detalle. Antes eso obligaba a apagar el precio y
+     * escribirlo a mano dentro del texto, con lo que no quedaba registrado
+     * qué se cotizó de verdad.
+     */
+    precio?: number;
 }
 
 /**
@@ -268,8 +362,9 @@ export interface OpcionesTextoProducto {
 export function textoDeProducto(p: ProductoCatalogo, opciones: OpcionesTextoProducto): string {
     const lineas: string[] = [p.name];
 
-    if (opciones.incluirPrecio && p.price != null) {
-        lineas.push(`Precio: ${formatearPrecio(precioParaCliente(p.price))}`);
+    const precio = opciones.precio ?? (p.price != null ? precioParaCliente(p.price) : null);
+    if (opciones.incluirPrecio && precio != null) {
+        lineas.push(`Precio: ${formatearPrecio(precio)}`);
     }
 
     if (opciones.incluirDisponibilidad) {

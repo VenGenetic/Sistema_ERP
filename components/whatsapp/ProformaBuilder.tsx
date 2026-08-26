@@ -223,14 +223,9 @@ export const ProformaBuilder: React.FC<Props> = ({
                     conversationId,
                     // El texto va como pie de la imagen: en WhatsApp se lee
                     // junto a la foto en vez de quedar como un mensaje suelto.
-                    body: incluirTexto
-                        ? resumenDeProforma({
-                              items: proforma.items,
-                              envio: proforma.shippingEnabled ? proforma.shippingCost : null,
-                              total,
-                              nota: proforma.nota,
-                          })
-                        : null,
+                    // Solo el total y la nota -- el detalle ya está en la hoja
+                    // (ver resumenDeProforma).
+                    body: incluirTexto ? resumenDeProforma({ total, nota: proforma.nota }) : null,
                     kind: 'image',
                     mediaUrl: subido.url,
                     mediaMime: subido.mime,
@@ -584,7 +579,7 @@ export const ProformaBuilder: React.FC<Props> = ({
                                 checked={incluirTexto}
                                 onChange={(e) => setIncluirTexto(e.target.checked)}
                             />
-                            Incluir el detalle también en texto
+                            Incluir el total en texto
                         </label>
                     )}
                     <button onClick={onClose} className={cn(button.base, button.variant.secondary, button.size.md)}>

@@ -7,11 +7,15 @@ import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import MessageMedia from '../components/whatsapp/MessageMedia';
+import MessageActions, { CitaEnComposer } from '../components/whatsapp/MessageActions';
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
+    borrarMensaje,
     CAMPOS_COLA,
     cancelarMensaje,
     encolarMensajes,
+    marcarLeidoEnWhatsApp,
+    reaccionarMensaje,
     reintentarMensaje,
     type MensajeEnCola,
     type NuevoMensaje,
@@ -79,11 +83,17 @@ interface AgentMessage {
      */
     media_url: string | null;
     product_id: number | null;
+    /** Identifica el mensaje en WhatsApp: hace falta para citar, reaccionar o borrar. */
+    whatsapp_message_id: string | null;
+    /** Borrado para todos (migración 0031). El mensaje se conserva, tachado. */
+    deleted_at: string | null;
+    reaction: string | null;
+    reply_to_wa_id: string | null;
 }
 
 /** Campos del mensaje que necesita el hilo. */
 const CAMPOS_MENSAJE =
-    'id, direction, content_type, body, created_at, delivery_status, action_taken, media_url, product_id';
+    'id, direction, content_type, body, created_at, delivery_status, action_taken, media_url, product_id, whatsapp_message_id, deleted_at, reaction, reply_to_wa_id';
 
 /** Tipos que DEBERÍAN traer un archivo. Si no lo traen, se aclara. */
 const CON_ARCHIVO = new Set<ContentType>(['image', 'audio', 'video', 'document', 'sticker']);
@@ -273,6 +283,40 @@ const WhatsAppInbox: React.FC = () => {
     const [estadoAgente, setEstadoAgente] = useState<EstadoAgente | null>(null);
     /** Se incrementa para releer la ficha del cliente (tras anotar un pedido). */
     const [recargarFicha, setRecargarFicha] = useState(0);
+    /** Mensaje que se está citando en la próxima respuesta. */
+    const [citando, setCitando] = useState<AgentMessage | null>(null);
+
+    /**
+     * Pone una reacción. Se pinta al instante y se corrige si falla: es
+     * una acción trivial y esperar el ida y vuelta la haría sentir rota.
+     */
+    const reaccionar = async (m: AgentMessage, emoji: string) => {
+        if (!selected || !m.whatsapp_message_id) return;
+        const previo = m.reaction;
+        setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reaction: emoji } : x)));
+        try {
+            await reaccionarMensaje(selected.conversationId, m.whatsapp_message_id, emoji, userId);
+        } catch (err: any) {
+            setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reaction: previo } : x)));
+            setErrorAccion(`No se pudo reaccionar: ${err?.message ?? err}`);
+        }
+    };
+
+    /**
+     * Borra para todos. Se confirma porque no tiene vuelta atrás, y
+     * NO se pinta al instante: hasta que WhatsApp lo acepte, el cliente lo
+     * sigue teniendo en el teléfono, y tacharlo antes sería mentir sobre
+     * algo que todavía está a la vista del otro lado.
+     */
+    const borrar = async (m: AgentMessage) => {
+        if (!selected || !m.whatsapp_message_id) return;
+        if (!window.confirm('¿Borrar este mensaje para el cliente también?')) return;
+        try {
+            await borrarMensaje(selected.conversationId, m.whatsapp_message_id, userId);
+        } catch (err: any) {
+            setErrorAccion(`No se pudo borrar: ${err?.message ?? err}`);
+        }
+    };
 
     /**
      * Mete un repuesto en la proforma de esa conversación. Lo usa la ficha
@@ -880,7 +924,22 @@ const WhatsAppInbox: React.FC = () => {
      */
     const enviarMensajes = useCallback(
         async (mensajes: NuevoMensaje[]) => {
-            await encolarMensajes(mensajes, userId);
+            // Si hay un mensaje citado, la cita viaja con el primero: es el
+            // que WhatsApp muestra con la tarjetita arriba.
+            const conCita = citando?.whatsapp_message_id
+                ? mensajes.map((m, i) => (i === 0 ? { ...m, replyToWaId: citando.whatsapp_message_id } : m))
+                : mensajes;
+
+            await encolarMensajes(conCita, userId);
+            setCitando(null);
+
+            // El doble tilde azul llega junto con la respuesta, no al abrir
+            // el chat (ver marcarLeidoEnWhatsApp). El id sale del propio
+            // mensaje y no de `selected`, que pudo cambiar mientras tanto.
+            // No se espera: que falle el tilde no puede romper el envío.
+            const conversationId = mensajes[0]?.conversationId;
+            if (conversationId) marcarLeidoEnWhatsApp(conversationId, userId).catch(() => {});
+
             // Aparece de inmediato en el hilo como "en cola"; el realtime de
             // agent_outbox lo va actualizando hasta que sale.
             await cargarCola();
@@ -1278,6 +1337,9 @@ const WhatsAppInbox: React.FC = () => {
                                             <div
                                                 className={cn(
                                                     'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words',
+                                                    // Borrado para todos: se conserva pero se ve
+                                                    // que ya no está del lado del cliente.
+                                                    m.deleted_at && 'line-through opacity-50',
                                                     m.direction === 'inbound' ? 'bg-surface-2 text-fg' : 'bg-primary-soft text-primary-soft-fg',
                                                 )}
                                             >
@@ -1304,11 +1366,32 @@ const WhatsAppInbox: React.FC = () => {
                                                 {!m.media_url && CON_ARCHIVO.has(m.content_type) && (
                                                     <span className="ml-1 text-2xs text-fg-subtle">· archivo no guardado</span>
                                                 )}
+                                                {/* La reacción va pegada al pie de la burbuja, como en
+                                                    WhatsApp -- no como un mensaje aparte. */}
+                                                {m.reaction && (
+                                                    <span className="ml-1 inline-block rounded-full border border-subtle bg-surface px-1.5 text-sm leading-none">
+                                                        {m.reaction}
+                                                    </span>
+                                                )}
                                                 <div className="text-2xs text-fg-subtle mt-1 flex items-center gap-1.5 flex-wrap">
                                                     <span>
                                                         {new Date(m.created_at).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                     {m.action_taken === 'human_reply' && <span>· vendedor</span>}
+                                                    {/* Citar, reaccionar y borrar. Borrar solo se ofrece
+                                                        sobre lo PROPIO: WhatsApp no deja borrar para todos
+                                                        un mensaje del cliente, así que ofrecerlo sería
+                                                        prometer algo que va a fallar. */}
+                                                    {m.whatsapp_message_id && !m.deleted_at && (
+                                                        <span className="ml-auto">
+                                                            <MessageActions
+                                                                onResponder={() => setCitando(m)}
+                                                                onReaccionar={(emoji) => reaccionar(m, emoji)}
+                                                                onBorrar={m.direction === 'outbound' ? () => borrar(m) : undefined}
+                                                                alineacion={m.direction === 'inbound' ? 'izquierda' : 'derecha'}
+                                                            />
+                                                        </span>
+                                                    )}
                                                     {/* El acuse existe para todo lo que salió por el agente:
                                                         sus respuestas automáticas y lo que se manda desde el
                                                         ERP. Lo escrito desde el teléfono del vendedor no lo
@@ -1424,6 +1507,14 @@ const WhatsAppInbox: React.FC = () => {
                             {/* Responder desde acá y no desde el teléfono: lo que se
                                 escribe en el teléfono llega cifrado al agente y no
                                 queda registrado en la conversación. */}
+                            {citando && (
+                                <div className="px-5 pt-3">
+                                    <CitaEnComposer
+                                        texto={bodyPreview(citando)}
+                                        onQuitar={() => setCitando(null)}
+                                    />
+                                </div>
+                            )}
                             <ChatComposer
                                 key={selected.conversationId}
                                 conversationId={selected.conversationId}

@@ -1,24 +1,55 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ImageIcon, Loader2, MessageCircle, Paperclip, RefreshCw, Search, Send, X } from 'lucide-react';
+import {
+    ArrowLeft,
+    ClipboardList,
+    FileText,
+    ImageIcon,
+    Loader2,
+    MessageCircle,
+    Package,
+    Paperclip,
+    RefreshCw,
+    Search,
+    Send,
+    X,
+    Zap,
+} from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import MessageMedia from '../../components/whatsapp/MessageMedia';
 import VoiceRecorder from '../../components/whatsapp/VoiceRecorder';
-import { encolarMensajes, subirAdjunto, type NuevoMensaje } from '../../utils/whatsappOutbox';
+import MessageActions, { CitaEnComposer } from '../../components/whatsapp/MessageActions';
+import CatalogSendModal from '../../components/whatsapp/CatalogSendModal';
+import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
+import RegistrarPedidoModal from '../../components/whatsapp/RegistrarPedidoModal';
+import {
+    borrarMensaje,
+    encolarMensajes,
+    marcarLeidoEnWhatsApp,
+    reaccionarMensaje,
+    subirAdjunto,
+    type NuevoMensaje,
+} from '../../utils/whatsappOutbox';
 
 /**
  * WhatsApp en el teléfono: leer la conversación y contestarle al cliente.
  *
- * Deliberadamente MÁS CHICA que la bandeja de escritorio. Acá no están el
- * buscador del catálogo, el armador de proformas ni la ficha del cliente:
- * son pantallas de trabajo sentado, y meterlas en 360px las volvería
- * incómodas para todos sin que nadie las use así. En el teléfono lo que se
- * necesita es lo urgente -- ver qué mandó el cliente (foto de la pieza,
- * nota de voz) y contestarle rápido.
+ * Tiene LO MISMO que la bandeja de escritorio: leer el hilo con sus fotos,
+ * audios y archivos, contestar con texto, adjuntos o una nota de voz
+ * grabada, mandar repuestos del catálogo, armar una proforma, anotar un
+ * pedido, y citar, reaccionar o borrar un mensaje.
  *
- * Todo lo que decide QUÉ se manda vive en `utils/whatsappOutbox.ts`,
- * compartido con el escritorio: acá no se repite ninguna regla de negocio.
- * Los reproductores y el grabador también son los mismos componentes.
+ * Y lo tiene sin duplicar NADA. Las reglas de qué se manda viven en
+ * `utils/whatsappOutbox.ts`; los reproductores, el grabador, las acciones
+ * sobre un mensaje y los tres modales (catálogo, proforma, pedido) son los
+ * mismos componentes que usa el escritorio. Así una regla no puede quedar
+ * corregida en una pantalla y rota en la otra -- que es exactamente lo que
+ * pasa cuando el modo móvil se reescribe aparte (ver la nota de CLAUDE.md
+ * sobre inventario y catálogo, que sí son implementaciones separadas).
+ *
+ * Lo único propio de acá es la disposición: lista y chat en vez de tres
+ * columnas, zonas táctiles de 44px y hojas que entran por abajo, según
+ * `design-system/modo-movil-industrial/MASTER.md`.
  *
  * Dos vistas en una sola ruta (lista <-> chat) en vez de dos rutas: el
  * botón «atrás» del teléfono tiene que volver a la lista, no salirse del
@@ -43,13 +74,19 @@ interface Mensaje {
     media_url: string | null;
     created_at: string;
     action_taken: string | null;
+    /** Identifica el mensaje en WhatsApp: hace falta para citar, reaccionar o borrar. */
+    whatsapp_message_id: string | null;
+    /** Borrado para todos (migración 0031). Se conserva, tachado. */
+    deleted_at: string | null;
+    reaction: string | null;
 }
 
 /** Cuántas conversaciones se traen. Bajo a propósito: es un teléfono. */
 const POR_PAGINA = 40;
 const MENSAJES_VISIBLES = 40;
 
-const CAMPOS_MSG = 'id, direction, content_type, body, media_url, created_at, action_taken';
+const CAMPOS_MSG =
+    'id, direction, content_type, body, media_url, created_at, action_taken, whatsapp_message_id, deleted_at, reaction';
 
 /** Los números se guardan como solo dígitos (migración 0021). */
 function formatearTelefono(c: Pick<Conversacion, 'phone_number' | 'lid'>): string {
@@ -94,6 +131,14 @@ const MobileWhatsApp: React.FC = () => {
     const [borrador, setBorrador] = useState('');
     const [enviando, setEnviando] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    /** Mensaje que se está citando en la próxima respuesta. */
+    const [citando, setCitando] = useState<Mensaje | null>(null);
+    const [catalogoAbierto, setCatalogoAbierto] = useState(false);
+    const [proformaAbierta, setProformaAbierta] = useState(false);
+    const [pedidoAbierto, setPedidoAbierto] = useState(false);
+    /** Textos que el equipo repite todo el dia (tabla agent_quick_replies). */
+    const [rapidas, setRapidas] = useState<Array<{ id: number; label: string; body: string }>>([]);
+    const [menuRapidas, setMenuRapidas] = useState(false);
 
     const hiloRef = useRef<HTMLDivElement | null>(null);
     const fileRef = useRef<HTMLInputElement | null>(null);
@@ -127,6 +172,17 @@ const MobileWhatsApp: React.FC = () => {
         setError(null);
         setConversaciones((data ?? []) as Conversacion[]);
     }, [busqueda]);
+
+    // Las respuestas rapidas se cargan una vez: son pocas y no cambian
+    // mientras se atiende.
+    useEffect(() => {
+        supabase
+            .from('agent_quick_replies')
+            .select('id, label, body')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
+            .then(({ data }) => setRapidas(data ?? []));
+    }, []);
 
     // La búsqueda va contra la base: se espera a que termine de tipear.
     useEffect(() => {
@@ -272,6 +328,32 @@ const MobileWhatsApp: React.FC = () => {
         ]);
     };
 
+    const reaccionar = async (m: Mensaje, emoji: string) => {
+        if (!abierta || !m.whatsapp_message_id) return;
+        const previo = m.reaction;
+        setMensajes((prev) => prev.map((x) => (x.id === m.id ? { ...x, reaction: emoji } : x)));
+        try {
+            await reaccionarMensaje(abierta.id, m.whatsapp_message_id, emoji, userId);
+        } catch (err: any) {
+            setMensajes((prev) => prev.map((x) => (x.id === m.id ? { ...x, reaction: previo } : x)));
+            setError(err?.message ?? 'No se pudo reaccionar.');
+        }
+    };
+
+    /**
+     * Borra para todos. NO se tacha al instante: hasta que WhatsApp lo
+     * acepte, el cliente lo sigue teniendo en el telefono.
+     */
+    const borrar = async (m: Mensaje) => {
+        if (!abierta || !m.whatsapp_message_id) return;
+        if (!window.confirm('¿Borrar este mensaje para el cliente tambien?')) return;
+        try {
+            await borrarMensaje(abierta.id, m.whatsapp_message_id, userId);
+        } catch (err: any) {
+            setError(err?.message ?? 'No se pudo borrar.');
+        }
+    };
+
     const sinLeer = useMemo(
         () => conversaciones.reduce((n, c) => n + (c.unread_count > 0 ? 1 : 0), 0),
         [conversaciones],
@@ -324,6 +406,10 @@ const MobileWhatsApp: React.FC = () => {
                         <div key={m.id} className={`flex ${m.direction === 'inbound' ? 'justify-start' : 'justify-end'}`}>
                             <div
                                 className={`max-w-[85%] rounded-2xl px-3 py-2 text-[15px] whitespace-pre-wrap break-words ${
+                                    // Borrado para todos: se conserva, pero se ve que
+                                    // ya no está del lado del cliente.
+                                    m.deleted_at ? 'line-through opacity-50 ' : ''
+                                }${
                                     m.direction === 'inbound'
                                         ? 'bg-slate-800 text-slate-100'
                                         : 'bg-amber-500/15 text-amber-50 border border-amber-500/25'
@@ -335,12 +421,33 @@ const MobileWhatsApp: React.FC = () => {
                                     </div>
                                 )}
                                 {(m.body || !m.media_url) && (m.body || SIN_TEXTO[m.content_type] || '(sin texto)')}
-                                <div className="text-xs text-slate-500 mt-1">
-                                    {new Date(m.created_at).toLocaleTimeString('es-EC', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                    })}
-                                    {m.action_taken === 'human_reply' && ' · vendedor'}
+                                {/* La reacción, pegada al pie de la burbuja como en WhatsApp. */}
+                                {m.reaction && (
+                                    <span className="ml-1 inline-block rounded-full border border-slate-700 bg-slate-900 px-1.5 text-base leading-none">
+                                        {m.reaction}
+                                    </span>
+                                )}
+                                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                                    <span>
+                                        {new Date(m.created_at).toLocaleTimeString('es-EC', {
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                        })}
+                                        {m.action_taken === 'human_reply' && ' · vendedor'}
+                                    </span>
+                                    {/* Citar, reaccionar y borrar -- el mismo componente que
+                                        el escritorio, con el disparador a 44px para el dedo. */}
+                                    {m.whatsapp_message_id && !m.deleted_at && (
+                                        <span className="ml-auto">
+                                            <MessageActions
+                                                onResponder={() => setCitando(m)}
+                                                onReaccionar={(emoji) => reaccionar(m, emoji)}
+                                                onBorrar={m.direction === 'outbound' ? () => borrar(m) : undefined}
+                                                alineacion={m.direction === 'inbound' ? 'izquierda' : 'derecha'}
+                                                claseBoton="min-w-[44px] min-h-[44px] -my-2 flex items-center justify-center rounded-xl text-slate-500 active:bg-slate-800"
+                                            />
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -356,6 +463,29 @@ const MobileWhatsApp: React.FC = () => {
                     className="shrink-0 border-t border-slate-800 bg-slate-900 px-3 py-2 space-y-2"
                     style={{ paddingBottom: 'calc(var(--mobile-nav-peak) - var(--mobile-nav-h) + 12px)' }}
                 >
+                    {menuRapidas && (
+                        <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 divide-y divide-slate-700">
+                            {rapidas.map((r) => (
+                                <button
+                                    key={r.id}
+                                    onClick={() => {
+                                        // Se agrega a lo ya escrito en vez de pisarlo:
+                                        // muchas veces la respuesta rápida completa
+                                        // algo que ya se estaba escribiendo.
+                                        setBorrador((prev) => (prev.trim() ? `${prev.trim()}\n${r.body}` : r.body));
+                                        setMenuRapidas(false);
+                                    }}
+                                    className="w-full text-left px-3 py-3 min-h-[44px] active:bg-slate-700"
+                                >
+                                    <p className="text-sm font-semibold text-slate-200">{r.label}</p>
+                                    <p className="text-xs text-slate-400 line-clamp-2">{r.body}</p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {citando && (
+                        <CitaEnComposer texto={citando.body || 'Mensaje'} onQuitar={() => setCitando(null)} oscuro />
+                    )}
                     {error && <p className="text-xs text-rose-300">{error}</p>}
 
                     <div className="flex items-center gap-2 flex-wrap">
@@ -380,6 +510,29 @@ const MobileWhatsApp: React.FC = () => {
                         {/* 44px mínimo: los botones del escritorio son de 32 y
                             en una pantalla táctil por debajo de 44 se falla el
                             toque (design-system/modo-movil-industrial/MASTER.md). */}
+                        <button
+                            onClick={() => setCatalogoAbierto(true)}
+                            className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5"
+                        >
+                            <Package size={15} aria-hidden="true" /> Catálogo
+                        </button>
+                        <button
+                            onClick={() => setProformaAbierta(true)}
+                            className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5"
+                        >
+                            <FileText size={15} aria-hidden="true" /> Proforma
+                        </button>
+                        <button
+                            onClick={() => setPedidoAbierto(true)}
+                            className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5"
+                        >
+                            <ClipboardList size={15} aria-hidden="true" /> Pedido
+                        </button>
+                        {rapidas.length > 0 && (
+                            <button onClick={() => setMenuRapidas((v) => !v)} className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5">
+                                <Zap size={15} aria-hidden="true" /> Rápidas
+                            </button>
+                        )}
                         <VoiceRecorder
                             onEnviar={enviarNotaDeVoz}
                             disabled={enviando}
