@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { setPreferredViewMode } from '../../utils/deviceDetection';
 import { getPrintQueue } from '../../utils/mobilePrintQueue';
+import { supabase } from '../../supabaseClient';
 import { useProformaStore } from '../../store/useProformaStore';
 import { useInstallPrompt } from '../../hooks/useInstallPrompt';
-import { Download, FileText, House, LayoutGrid, Monitor, Printer, ScanLine, Smartphone, X } from 'lucide-react';
+import { Download, FileText, House, LayoutGrid, MessageCircle, Monitor, Printer, ScanLine, Smartphone, X } from 'lucide-react';
 
 /** Un solo sitio para el estilo de las pestañas: activo = ámbar y algo más grande. */
 const navItem = (isActive: boolean) =>
@@ -16,6 +17,8 @@ const MobileLayout: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [queueCount, setQueueCount] = useState(0);
+    /** Chats de WhatsApp con mensajes sin leer. */
+    const [sinLeer, setSinLeer] = useState(0);
     // El store persiste en localStorage, así que el contador sobrevive a
     // recargas y refleja lo agregado desde el catálogo sin pedir nada a la red.
     const proformaCount = useProformaStore(s => s.items.length);
@@ -61,6 +64,33 @@ const MobileLayout: React.FC = () => {
         const queue = await getPrintQueue();
         setQueueCount(queue.reduce((total, item) => total + item.quantity, 0));
     }, []);
+
+    /**
+     * Chats sin leer, para el punto del icono de WhatsApp.
+     *
+     * `head: true` con `count: 'exact'`: pide SOLO el número, sin traer una
+     * sola fila. En un teléfono con datos móviles importa -- traer las
+     * conversaciones para contarlas serían decenas de KB cada vez, y esto
+     * son unos bytes.
+     *
+     * Se relee al cambiar de pantalla y cada dos minutos. No usa realtime a
+     * propósito: `agent_conversations` cambia con CADA mensaje que entra, y
+     * una suscripción abierta todo el día en el teléfono gastaría datos y
+     * cuota para actualizar un numerito.
+     */
+    const refreshSinLeer = useCallback(async () => {
+        const { count, error } = await supabase
+            .from('agent_conversations')
+            .select('id', { count: 'exact', head: true })
+            .gt('unread_count', 0);
+        if (!error) setSinLeer(count ?? 0);
+    }, []);
+
+    useEffect(() => {
+        refreshSinLeer();
+        const t = setInterval(refreshSinLeer, 120000);
+        return () => clearInterval(t);
+    }, [location.pathname, refreshSinLeer]);
 
     // Se refresca al montar y en cada cambio de ruta (por ejemplo al volver del
     // catálogo después de encolar). El efecto de montaje aparte sobraba: éste ya
@@ -114,6 +144,31 @@ const MobileLayout: React.FC = () => {
                     <span className="text-xs font-bold tracking-widest uppercase text-slate-300">Modo Móvil</span>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/*
+                        WhatsApp entra por aquí por el mismo motivo que la proforma:
+                        la barra inferior está llena. Va como icono a secas, con el
+                        contador de chats sin leer encima -- que es lo único que
+                        hace falta saber de un vistazo: si hay alguien esperando
+                        respuesta.
+                    */}
+                    <NavLink
+                        to="/mobile/whatsapp"
+                        aria-label={sinLeer > 0 ? `WhatsApp, ${sinLeer} chats sin leer` : 'WhatsApp'}
+                        className={({ isActive }) =>
+                            `relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border transition-colors ${
+                                isActive
+                                    ? 'bg-amber-500 text-slate-950 border-amber-400'
+                                    : 'bg-slate-900 text-slate-300 border-slate-800 active:bg-slate-800 active:text-white'
+                            }`
+                        }
+                    >
+                        <MessageCircle size={18} aria-hidden="true" />
+                        {sinLeer > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full border-2 border-slate-950">
+                                {sinLeer > 9 ? '9+' : sinLeer}
+                            </span>
+                        )}
+                    </NavLink>
                     {/*
                         La barra inferior ya está llena con cuatro destinos, así que
                         la proforma entra por aquí. Se muestra siempre, no sólo con

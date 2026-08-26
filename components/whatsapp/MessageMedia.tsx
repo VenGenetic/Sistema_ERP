@@ -111,12 +111,16 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
     return (
         <div className="flex items-center gap-2 min-w-[190px]">
             <audio ref={audioRef} src={url} preload="metadata" />
+            {/* 44px: el mismo reproductor se usa en el modo móvil, donde una
+                zona táctil más chica falla el toque y dispara la acción de al
+                lado (design-system/modo-movil-industrial/MASTER.md). En el
+                escritorio no molesta. */}
             <button
                 onClick={alternar}
                 aria-label={sonando ? 'Pausar la nota de voz' : 'Escuchar la nota de voz'}
-                className="shrink-0 h-8 w-8 rounded-full bg-primary text-primary-fg flex items-center justify-center hover:bg-primary-hover"
+                className="shrink-0 h-11 w-11 rounded-full bg-primary text-primary-fg flex items-center justify-center hover:bg-primary-hover"
             >
-                {sonando ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+                {sonando ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
             </button>
             <div className="flex-1 min-w-0">
                 <input
@@ -132,7 +136,10 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
                         setPosicion(a.currentTime);
                     }}
                     aria-label="Posición de la nota de voz"
-                    className="w-full h-1 accent-primary cursor-pointer"
+                    // `py-2` con `bg-clip-content`: la barra se ve fina pero la
+                    // zona que agarra el dedo mide 20px. Una barra de 4px es
+                    // imposible de arrastrar en un teléfono.
+                    className="w-full h-1 py-2 box-content bg-clip-content accent-primary cursor-pointer"
                     style={{
                         background: `linear-gradient(to right, rgb(var(--primary)) ${progreso}%, rgb(var(--surface-3)) ${progreso}%)`,
                     }}

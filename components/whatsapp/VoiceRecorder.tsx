@@ -39,9 +39,19 @@ interface Props {
     /** Recibe la grabación lista para subir y enviar. */
     onEnviar: (archivo: File) => Promise<void>;
     disabled?: boolean;
+    /**
+     * Clases del botón, para que quien lo usa mande el tamaño.
+     *
+     * El modo móvil las necesita: sus botones miden 44px como mínimo
+     * (`design-system/modo-movil-industrial/MASTER.md` -- por debajo se
+     * falla el toque y se dispara la acción vecina), y los del escritorio
+     * son de 32px. Sin esto habría que duplicar el grabador entero para
+     * cambiarle dos clases.
+     */
+    claseBoton?: string;
 }
 
-export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled }) => {
+export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton }) => {
     const [grabando, setGrabando] = useState(false);
     const [segundos, setSegundos] = useState(0);
     const [grabacion, setGrabacion] = useState<{ blob: Blob; url: string; mime: string } | null>(null);
@@ -145,7 +155,7 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled }) => {
                 <button
                     onClick={enviar}
                     disabled={enviando}
-                    className={cn(button.base, button.variant.primary, button.size.sm)}
+                    className={claseBoton ?? cn(button.base, button.variant.primary, button.size.sm)}
                 >
                     {enviando ? (
                         <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -158,7 +168,7 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled }) => {
                     onClick={descartar}
                     disabled={enviando}
                     aria-label="Descartar la grabación"
-                    className={cn(button.base, button.variant.ghost, button.size.sm)}
+                    className={claseBoton ?? cn(button.base, button.variant.ghost, button.size.sm)}
                 >
                     <Trash2 size={14} aria-hidden="true" />
                 </button>
@@ -172,11 +182,10 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled }) => {
             <button
                 onClick={grabando ? detener : empezar}
                 disabled={disabled}
-                className={cn(
-                    button.base,
-                    grabando ? button.variant.danger : button.variant.secondary,
-                    button.size.sm,
-                )}
+                className={
+                    claseBoton ??
+                    cn(button.base, grabando ? button.variant.danger : button.variant.secondary, button.size.sm)
+                }
                 title={grabando ? 'Detener la grabación' : 'Grabar una nota de voz'}
             >
                 {grabando ? <Square size={14} aria-hidden="true" /> : <Mic size={14} aria-hidden="true" />}
