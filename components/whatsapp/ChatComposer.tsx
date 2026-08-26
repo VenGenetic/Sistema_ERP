@@ -5,6 +5,7 @@ import { badge, button, cn, input } from '../ui/styles';
 import CatalogSendModal from './CatalogSendModal';
 import ProformaBuilder from './ProformaBuilder';
 import RegistrarPedidoModal from './RegistrarPedidoModal';
+import VoiceRecorder from './VoiceRecorder';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
 import {
     borrarAdjunto,
@@ -225,6 +226,28 @@ export const ChatComposer: React.FC<Props> = ({
         }
     };
 
+    /**
+     * Sube la grabación y la encola como NOTA DE VOZ.
+     *
+     * Va sola, sin el borrador de texto: WhatsApp ignora el pie de foto en
+     * los audios (ver migración 0030), así que si acá se mandara el texto
+     * junto se perdería en silencio. Lo que esté escrito queda en la caja
+     * para mandarse aparte.
+     */
+    const enviarNotaDeVoz = async (archivo: File) => {
+        const subido = await subirAdjunto(archivo);
+        await onEnviar([
+            {
+                conversationId,
+                kind: 'audio',
+                mediaUrl: subido.url,
+                mediaMime: subido.mime,
+                mediaFilename: subido.filename,
+                isVoiceNote: true,
+            },
+        ]);
+    };
+
     /* ---------------------------------------------------------------- */
     /*  Respuestas rápidas                                               */
     /* ---------------------------------------------------------------- */
@@ -376,7 +399,7 @@ export const ChatComposer: React.FC<Props> = ({
                     ref={fileRef}
                     type="file"
                     multiple
-                    accept="image/*,video/*,application/pdf"
+                    accept="image/*,video/*,audio/*,application/pdf"
                     className="hidden"
                     onChange={(e) => {
                         agregarArchivos(Array.from(e.target.files ?? []));
@@ -429,6 +452,11 @@ export const ChatComposer: React.FC<Props> = ({
                         <span className={cn(badge.base, badge.size.sm, badge.tone.neutral)}>{rapidas.length}</span>
                     )}
                 </button>
+                {/* Contestar hablando: el cliente que preguntó por audio suele
+                    preferir que le respondan igual, y explicar la diferencia
+                    entre dos repuestos parecidos toma diez segundos hablando y
+                    tres párrafos escritos. */}
+                <VoiceRecorder onEnviar={enviarNotaDeVoz} disabled={enviando} />
                 {borrador.trim().length > 0 && (
                     <button
                         onClick={guardarComoRapida}

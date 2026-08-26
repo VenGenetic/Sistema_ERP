@@ -18,7 +18,7 @@ import { supabase } from '../supabaseClient';
 /** Bucket público con la media del chat (migración 0026). */
 export const CHAT_MEDIA_BUCKET = 'agent_chat_media';
 
-export type OutboxKind = 'text' | 'image' | 'video' | 'document';
+export type OutboxKind = 'text' | 'image' | 'video' | 'document' | 'audio';
 export type OutboxStatus = 'pending' | 'sent' | 'failed' | 'canceled';
 
 /** Lo máximo que WhatsApp acepta por archivo sin partirlo. */
@@ -62,6 +62,9 @@ export const CAMPOS_COLA =
 export function tipoDeArchivo(mime: string): OutboxKind {
     if (mime.startsWith('image/')) return 'image';
     if (mime.startsWith('video/')) return 'video';
+    // El audio va como audio y no como documento: así WhatsApp lo
+    // reproduce en el chat en vez de mostrarlo como un archivo a descargar.
+    if (mime.startsWith('audio/')) return 'audio';
     return 'document';
 }
 
@@ -132,6 +135,11 @@ export interface NuevoMensaje {
     mediaMime?: string | null;
     mediaFilename?: string | null;
     productId?: number | null;
+    /**
+     * Nota de voz grabada, no un archivo de audio adjunto. WhatsApp las
+     * muestra distinto: la nota sale con la onda y se escucha de una.
+     */
+    isVoiceNote?: boolean;
 }
 
 /**
@@ -151,10 +159,24 @@ export async function encolarMensajes(mensajes: NuevoMensaje[], userId: string |
         media_filename: m.mediaFilename ?? null,
         product_id: m.productId ?? null,
         created_by: userId,
+        // Solo se manda cuando es true. `is_voice_note` llegó con la
+        // migración 0030 y si esa no se aplicó, incluirla siempre haría
+        // fallar TODO envío -- también el texto, que funcionaba desde
+        // antes. Una migración pendiente no puede romper lo que ya andaba.
+        ...(m.isVoiceNote ? { is_voice_note: true } : {}),
     }));
 
     const { error } = await supabase.from('agent_outbox').insert(filas);
-    if (error) throw error;
+    if (error) {
+        // 42703 = falta la columna; solo puede pasar mandando una nota de voz.
+        if (error.code === '42703') {
+            throw new Error(
+                'Para mandar notas de voz falta aplicar la migración 0030 del agente ' +
+                    '(supabase/migrations/0030_agent_outbox_audio.sql).',
+            );
+        }
+        throw error;
+    }
 }
 
 /**

@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, page, card, badge, button, input } from '../components/ui/styles';
-import { Ban, CheckCheck, Clock, FileText, Headset, Inbox, RefreshCw, RotateCw, Search, User, X } from 'lucide-react';
+import { Ban, CheckCheck, Clock, FileText, Headset, Inbox, Mic, RefreshCw, RotateCw, Search, User, X } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
+import MessageMedia from '../components/whatsapp/MessageMedia';
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     CAMPOS_COLA,
@@ -84,9 +85,8 @@ interface AgentMessage {
 const CAMPOS_MENSAJE =
     'id, direction, content_type, body, created_at, delivery_status, action_taken, media_url, product_id';
 
-/** Tipos que se muestran como imagen dentro de la burbuja. */
-const ES_IMAGEN = (m: AgentMessage): boolean =>
-    !!m.media_url && (m.content_type === 'image' || m.content_type === 'sticker');
+/** Tipos que DEBERÍAN traer un archivo. Si no lo traen, se aclara. */
+const CON_ARCHIVO = new Set<ContentType>(['image', 'audio', 'video', 'document', 'sticker']);
 
 /**
  * Lo que WhatsApp confirmó de cada mensaje que mandó el agente. Es
@@ -917,9 +917,15 @@ const WhatsAppInbox: React.FC = () => {
         }
     };
 
-    /** Abre la foto a pantalla completa, con las demás del hilo al lado. */
+    /**
+     * Abre la foto a pantalla completa, con las demás del hilo al lado.
+     *
+     * Solo FOTOS: los stickers también son imágenes, pero pasar de la foto
+     * de un repuesto a un pulgar arriba de 96px mientras se amplía una
+     * pieza no es lo que nadie está buscando.
+     */
     const abrirVisor = (mensaje: AgentMessage) => {
-        const fotos = messages.filter(ES_IMAGEN);
+        const fotos = messages.filter((m) => !!m.media_url && m.content_type === 'image');
         const media: MediaItem[] = fotos.map((m) => ({ type: 'image', url: m.media_url!, title: m.body ?? undefined }));
         const index = Math.max(0, fotos.findIndex((m) => m.id === mensaje.id));
         setVisor({ media, index });
@@ -1275,40 +1281,29 @@ const WhatsAppInbox: React.FC = () => {
                                                     m.direction === 'inbound' ? 'bg-surface-2 text-fg' : 'bg-primary-soft text-primary-soft-fg',
                                                 )}
                                             >
-                                                {/* La foto, adentro de la burbuja. Antes acá solo decía
-                                                    "(foto)" y para verla había que abrir el WhatsApp del
-                                                    teléfono -- justo cuando hay que decidir qué contestar. */}
-                                                {ES_IMAGEN(m) && (
-                                                    <button
-                                                        onClick={() => abrirVisor(m)}
-                                                        className="block mb-1.5 rounded-xl overflow-hidden focus-visible:ring-2 focus-visible:ring-primary"
-                                                        title="Ver la foto en grande"
-                                                    >
-                                                        <img
-                                                            src={m.media_url!}
-                                                            alt={m.body ?? 'Foto del chat'}
-                                                            loading="lazy"
-                                                            className="max-h-64 w-auto object-cover"
+                                                {/* La foto, la nota de voz, el video o el archivo, adentro
+                                                    de la burbuja. Antes acá solo decía "(foto)" / "(nota de
+                                                    voz)" y había que abrir el WhatsApp del teléfono para
+                                                    verlos -- justo cuando hay que decidir qué contestar. */}
+                                                {m.media_url && (
+                                                    <div className="mb-1.5">
+                                                        <MessageMedia
+                                                            url={m.media_url}
+                                                            contentType={m.content_type}
+                                                            body={m.body}
+                                                            onAbrirFoto={() => abrirVisor(m)}
                                                         />
-                                                    </button>
+                                                    </div>
                                                 )}
-                                                {m.media_url && !ES_IMAGEN(m) && (
-                                                    <a
-                                                        href={m.media_url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="mb-1.5 flex items-center gap-2 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs text-fg hover:bg-surface-hover"
-                                                    >
-                                                        <FileText size={14} aria-hidden="true" />
-                                                        {m.content_type === 'audio'
-                                                            ? 'Escuchar la nota de voz'
-                                                            : m.content_type === 'video'
-                                                              ? 'Ver el video'
-                                                              : 'Abrir el archivo'}
-                                                    </a>
-                                                )}
-                                                {/* Con foto, el texto de relleno "(foto)" sobra: la foto ya está a la vista. */}
+                                                {/* Con la media a la vista, el "(foto)" de relleno sobra. */}
                                                 {(m.body || !m.media_url) && bodyPreview(m)}
+                                                {/* Media vieja: la del historial importado y la que llegó
+                                                    antes de que se empezara a guardar. WhatsApp no la vuelve
+                                                    a entregar, así que se aclara en vez de dejar un "(foto)"
+                                                    que parece un enlace que no anda. */}
+                                                {!m.media_url && CON_ARCHIVO.has(m.content_type) && (
+                                                    <span className="ml-1 text-2xs text-fg-subtle">· archivo no guardado</span>
+                                                )}
                                                 <div className="text-2xs text-fg-subtle mt-1 flex items-center gap-1.5 flex-wrap">
                                                     <span>
                                                         {new Date(m.created_at).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
@@ -1356,7 +1351,13 @@ const WhatsAppInbox: React.FC = () => {
                                                     className="mb-1.5 max-h-48 w-auto rounded-xl object-cover opacity-80"
                                                 />
                                             )}
-                                            {q.media_url && q.kind !== 'image' && (
+                                            {q.media_url && q.kind === 'audio' && (
+                                                <p className="mb-1 flex items-center gap-1.5 text-xs">
+                                                    <Mic size={13} aria-hidden="true" />
+                                                    Nota de voz
+                                                </p>
+                                            )}
+                                            {q.media_url && q.kind !== 'image' && q.kind !== 'audio' && (
                                                 <p className="mb-1 flex items-center gap-1.5 text-xs">
                                                     <FileText size={13} aria-hidden="true" />
                                                     {q.media_filename ?? 'archivo'}
