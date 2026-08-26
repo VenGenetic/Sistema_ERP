@@ -2,6 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabase } from '../supabaseClient';
 import { reprintOrderReceipt } from '../utils/thermalReceipt';
 import {
+    FREE_SALE_WAREHOUSE_ID,
+    InventoryLevelRow,
+    isFreeSaleProduct,
+    readDefaultWarehouseId,
+    resolveWarehouseForLine,
+} from '../utils/warehouseResolution';
+import {
   BadgeCheck,
   BanknoteX,
   Calendar,
@@ -122,6 +129,8 @@ const DailyRegistry: React.FC = () => {
     // Profile names map
     const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
     const [currentUser, setCurrentUser] = useState<any>(null);
+    // Bodegas activas, para resolver de cuál sale cada línea al editar una orden
+    const [warehouseNames, setWarehouseNames] = useState<Map<number, string>>(new Map());
 
     // Audit logs for expanded orders
     const [orderHistory, setOrderHistory] = useState<Record<number, any[]>>({});
@@ -147,6 +156,12 @@ const DailyRegistry: React.FC = () => {
             const map = new Map<string, string>();
             profiles.forEach(p => map.set(p.id, p.full_name));
             setProfilesMap(map);
+        }
+
+        const { data: warehouses } = await supabase
+            .from('warehouses').select('id, name').eq('is_active', true);
+        if (warehouses) {
+            setWarehouseNames(new Map<number, string>(warehouses.map((w: any) => [w.id, w.name])));
         }
     };
 
@@ -490,30 +505,25 @@ const DailyRegistry: React.FC = () => {
         setLoading(true);
 
         try {
-            // Load current stock levels for each item in the order's warehouse
-            const itemsWithStock = await Promise.all(order.order_items.map(async (item) => {
-                const whId = order.warehouse_id || 0;
-                let stock = 999;
-                let whName = 'Manual';
+            const defaultWarehouseId = readDefaultWarehouseId();
 
-                if (whId !== 0) {
-                    const { data } = await supabase
-                        .from('inventory_levels')
-                        .select(`
-                            current_stock,
-                            warehouses (name)
-                        `)
-                        .eq('product_id', item.product_id)
-                        .eq('warehouse_id', whId)
-                        .maybeSingle();
-                    
-                    if (data) {
-                        stock = Number(data.current_stock || 0);
-                        whName = Array.isArray(data.warehouses) 
-                            ? (data.warehouses as any)[0]?.name 
-                            : (data.warehouses as any)?.name || 'Desconocido';
-                    }
-                }
+            // La bodega se resuelve por producto, no desde orders.warehouse_id:
+            // esa columna nunca se llena, así que caía siempre en 0 ("Manual")
+            // y los ajustes de una orden editada no tocaban el inventario.
+            const itemsWithStock = await Promise.all(order.order_items.map(async (item) => {
+                const { data: levels } = await supabase
+                    .from('inventory_levels')
+                    .select('current_stock, warehouse_id, warehouses (name)')
+                    .eq('product_id', item.product_id);
+
+                const rows = (levels || []) as InventoryLevelRow[];
+                const resolved = isFreeSaleProduct(item.products?.sku, rows)
+                    ? { warehouse_id: FREE_SALE_WAREHOUSE_ID, warehouse_name: 'Manual', current_stock: 999 }
+                    : resolveWarehouseForLine(rows, item.quantity, warehouseNames, defaultWarehouseId);
+
+                const whId = resolved?.warehouse_id ?? FREE_SALE_WAREHOUSE_ID;
+                const whName = resolved?.warehouse_name ?? 'Manual';
+                const stock = resolved ? resolved.current_stock : 999;
 
                 return {
                     product_id: item.product_id,
@@ -1129,11 +1139,18 @@ const DailyRegistry: React.FC = () => {
                                         </div>
                                     ) : (
                                         searchResults.map((prod) => {
-                                            const whId = orderToEdit.warehouse_id || 0;
-                                            const stockLevel = prod.inventory_levels?.find((il: any) => il.warehouse_id === whId);
-                                            const currentStock = stockLevel?.current_stock || 0;
-                                            const hasStock = whId === 0 || currentStock > 0;
-                                            const whName = stockLevel?.warehouses?.name || 'Manual';
+                                            // La bodega sale del propio producto. Con
+                                            // orderToEdit.warehouse_id (siempre null) todo
+                                            // caía en 0 y se agregaba como "Manual", sin
+                                            // descontar nunca del inventario.
+                                            const levels = (prod.inventory_levels || []) as InventoryLevelRow[];
+                                            const resolved = isFreeSaleProduct(prod.sku, levels)
+                                                ? { warehouse_id: FREE_SALE_WAREHOUSE_ID, warehouse_name: 'Manual', current_stock: 9999 }
+                                                : resolveWarehouseForLine(levels, 1, warehouseNames, readDefaultWarehouseId());
+                                            const whId = resolved?.warehouse_id ?? FREE_SALE_WAREHOUSE_ID;
+                                            const currentStock = resolved?.current_stock ?? 0;
+                                            const hasStock = whId === FREE_SALE_WAREHOUSE_ID || currentStock > 0;
+                                            const whName = resolved?.warehouse_name || 'Manual';
 
                                             return (
                                                 <button

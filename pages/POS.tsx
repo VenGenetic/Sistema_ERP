@@ -16,6 +16,14 @@ import {
   XCircle,
 } from 'lucide-react';
 import { isProductDiscontinued } from '../utils/discontinuedHelper';
+import {
+    FREE_SALE_WAREHOUSE_ID,
+    InventoryLevelRow,
+    ResolvedWarehouse,
+    isFreeSaleProduct,
+    readDefaultWarehouseId,
+    resolveWarehouseForLine,
+} from '../utils/warehouseResolution';
 import { supabase } from '../supabaseClient';
 import { useCartStore, defaultConsumidorFinal, InventoryResult, CartItem, Product, Customer } from '../store/cartStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -150,18 +158,28 @@ const POS: React.FC = () => {
     const loadDraftOrder = async (draftId: number) => {
         setLoadingDraft(true);
         try {
-            const { data: order, error: orderError } = await supabase
-                .from('orders')
-                .select(`
-                    id, status, customer_id, shipping_cost, warehouse_id,
-                    customers (id, identification_number, name, email, phone, is_final_consumer, customer_type, discount_percentage, claimed_by),
-                    order_items (
-                        id, quantity, unit_price, unit_cost,
-                        products (id, sku, name, price, cost_without_vat, vat_percentage)
-                    )
-                `)
-                .eq('id', draftId)
-                .single();
+            // Se traen los niveles de inventario junto con el borrador: los
+            // borradores no guardan de qué bodega salió cada línea (order_items
+            // no tiene esa columna y orders.warehouse_id nunca se llena), así
+            // que hay que resolverla de nuevo al recargarlos.
+            const [{ data: order, error: orderError }, { data: warehousesData }] = await Promise.all([
+                supabase
+                    .from('orders')
+                    .select(`
+                        id, status, customer_id, shipping_cost, warehouse_id,
+                        customers (id, identification_number, name, email, phone, is_final_consumer, customer_type, discount_percentage, claimed_by),
+                        order_items (
+                            id, quantity, unit_price, unit_cost,
+                            products (
+                                id, sku, name, price, cost_without_vat, vat_percentage,
+                                inventory_levels (current_stock, warehouse_id, warehouses (name))
+                            )
+                        )
+                    `)
+                    .eq('id', draftId)
+                    .single(),
+                supabase.from('warehouses').select('id, name').eq('is_active', true),
+            ]);
 
             if (orderError || !order) {
                 console.error('Error loading draft:', orderError);
@@ -193,7 +211,12 @@ const POS: React.FC = () => {
 
             // Add each item to cart
             const items = order.order_items as any[];
-            const orderWarehouseId = (order as any).warehouse_id || 0;
+            const warehouseNameById = new Map<number, string>(
+                (warehousesData || []).map((w: any) => [w.id, w.name])
+            );
+            const defaultWarehouseId = readDefaultWarehouseId();
+            const unresolvedSkus: string[] = [];
+
             if (items) {
                 for (const item of items) {
                     const p = item.products as any;
@@ -202,6 +225,33 @@ const POS: React.FC = () => {
                     const cost = p.cost_without_vat || 0;
                     const vat = p.vat_percentage || 0;
                     const finalCost = cost * (1 + vat / 100);
+
+                    // Cada línea recupera su bodega real. Antes todas entraban
+                    // con bodega 0, que el RPC de venta interpreta como
+                    // "producto manual": la venta se cobraba pero el repuesto
+                    // nunca salía del inventario ni dejaba movimiento.
+                    const levels = (p.inventory_levels || []) as InventoryLevelRow[];
+                    let resolved: ResolvedWarehouse | null;
+
+                    if (isFreeSaleProduct(p.sku, levels)) {
+                        resolved = {
+                            warehouse_id: FREE_SALE_WAREHOUSE_ID,
+                            warehouse_name: 'Venta Libre',
+                            current_stock: 9999,
+                        };
+                    } else {
+                        resolved = resolveWarehouseForLine(
+                            levels,
+                            item.quantity,
+                            warehouseNameById,
+                            defaultWarehouseId
+                        );
+                    }
+
+                    if (!resolved) {
+                        unresolvedSkus.push(p.sku);
+                        continue;
+                    }
 
                     const inventoryResult: InventoryResult = {
                         product: {
@@ -213,9 +263,9 @@ const POS: React.FC = () => {
                             vat_percentage: vat,
                             final_cost_with_vat: finalCost,
                         },
-                        warehouse_id: orderWarehouseId,
-                        warehouse_name: 'Borrador',
-                        current_stock: 999,
+                        warehouse_id: resolved.warehouse_id,
+                        warehouse_name: resolved.warehouse_name,
+                        current_stock: resolved.current_stock,
                     };
 
                     addToCart(inventoryResult);
@@ -231,6 +281,16 @@ const POS: React.FC = () => {
                         updateUnitPrice(lastItem.id, item.unit_price);
                     }
                 }
+            }
+
+            // Callar esto dejaría al vendedor cobrando un borrador incompleto
+            // sin saber que le faltan líneas.
+            if (unresolvedSkus.length > 0) {
+                alert(
+                    `OJO: ${unresolvedSkus.length} repuesto(s) del borrador no se pudieron cargar porque no ` +
+                    `tienen bodega asignada:\n\n${unresolvedSkus.join(', ')}\n\n` +
+                    `Agrégalos a mano buscándolos en el POS antes de cobrar.`
+                );
             }
 
             setActiveDraftId(draftId);
@@ -769,22 +829,37 @@ const POS: React.FC = () => {
         if (!stockEditItem || typeof stockEditNewValue !== 'number' || stockEditNewValue < 0) return;
         setIsSavingStock(true);
         try {
+            // El movimiento va firmado: la política RLS de inventory_logs exige
+            // auth.uid() = user_id, y sin este campo el insert se rechazaba y
+            // cortaba el guardado antes de tocar el stock.
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+
             const { error: logError } = await supabase.from('inventory_logs').insert([{
                 product_id: stockEditItem.product.id,
                 warehouse_id: stockEditItem.warehouse_id,
                 quantity_change: stockEditNewValue - stockEditItem.current_stock,
-                reason: 'Ajuste rápido desde POS'
+                reason: 'Ajuste rápido desde POS',
+                reference_type: 'stock_adjustment',
+                user_id: session.user.id
             }]);
 
             if (logError) throw logError;
 
-            const { error: updateError } = await supabase
+            const { data: updatedRows, error: updateError } = await supabase
                 .from('inventory_levels')
-                .update({ current_stock: stockEditNewValue })
+                .update({ current_stock: stockEditNewValue, last_updated: new Date().toISOString() })
                 .eq('product_id', stockEditItem.product.id)
-                .eq('warehouse_id', stockEditItem.warehouse_id);
+                .eq('warehouse_id', stockEditItem.warehouse_id)
+                .select();
 
             if (updateError) throw updateError;
+            // Un UPDATE que no toca ninguna fila no es un error para Supabase:
+            // sin esta comprobación el POS avisaba "Inventario actualizado"
+            // sobre un stock que seguía intacto.
+            if (!updatedRows || updatedRows.length === 0) {
+                throw new Error('La base de datos no aplicó el ajuste (revisa permisos o si el producto tiene inventario en esa bodega).');
+            }
 
             useCartStore.getState().syncStock(stockEditItem.product.id, stockEditItem.warehouse_id, stockEditNewValue);
 
