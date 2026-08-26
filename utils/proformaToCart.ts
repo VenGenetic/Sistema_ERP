@@ -9,6 +9,7 @@
 import { supabase } from '../supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import { ProformaItem } from '../store/useProformaStore';
+import { readDefaultWarehouseId, resolveWarehouseForLine } from './warehouseResolution';
 
 export interface ProformaConversionResult {
     /** SKUs que no se pudieron cargar por no tener bodega asignable. */
@@ -46,8 +47,7 @@ export const convertProformaToPosCart = async (
     if (whError) throw whError;
 
     const warehouseNameById = new Map<number, string>((warehouses || []).map((w: any) => [w.id, w.name]));
-    const defaultWarehouseIdRaw = localStorage.getItem('erp_default_warehouse_id');
-    const defaultWarehouseId = defaultWarehouseIdRaw ? parseInt(defaultWarehouseIdRaw, 10) : null;
+    const defaultWarehouseId = readDefaultWarehouseId();
 
     const unresolved: string[] = [];
     const lowStock: string[] = [];
@@ -63,32 +63,19 @@ export const convertProformaToPosCart = async (
         }
 
         const levels: any[] = prod.inventory_levels || [];
-        // Se prefiere una bodega que cubra la cantidad pedida; si no hay,
-        // cualquiera con stock; y como último recurso la primera registrada.
-        const chosen =
-            levels.find((l) => l.current_stock >= item.quantity) ||
-            levels.find((l) => l.current_stock > 0) ||
-            levels[0];
+        const resolved = resolveWarehouseForLine(
+            levels,
+            item.quantity,
+            warehouseNameById,
+            defaultWarehouseId
+        );
 
-        let warehouse_id: number;
-        let warehouse_name: string;
-        let current_stock: number;
-
-        if (chosen) {
-            warehouse_id = chosen.warehouse_id;
-            warehouse_name =
-                (Array.isArray(chosen.warehouses) ? chosen.warehouses[0]?.name : chosen.warehouses?.name) ||
-                warehouseNameById.get(chosen.warehouse_id) ||
-                'Bodega';
-            current_stock = chosen.current_stock;
-        } else if (defaultWarehouseId && warehouseNameById.has(defaultWarehouseId)) {
-            warehouse_id = defaultWarehouseId;
-            warehouse_name = warehouseNameById.get(defaultWarehouseId)!;
-            current_stock = 0;
-        } else {
+        if (!resolved) {
             unresolved.push(item.sku);
             continue;
         }
+
+        const { warehouse_id, warehouse_name, current_stock } = resolved;
 
         if (current_stock < item.quantity) lowStock.push(item.sku);
 

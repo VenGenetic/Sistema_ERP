@@ -5,6 +5,8 @@ import { cn, page, card, badge, button, input } from '../components/ui/styles';
 import { Ban, CheckCheck, Clock, FileText, Headset, Inbox, RefreshCw, RotateCw, Search, User, X } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
+import CustomerPanel from '../components/whatsapp/CustomerPanel';
+import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     CAMPOS_COLA,
     cancelarMensaje,
@@ -269,6 +271,16 @@ const WhatsAppInbox: React.FC = () => {
     const [visor, setVisor] = useState<{ media: MediaItem[]; index: number } | null>(null);
     /** Estado del proceso del agente (migración 0027). null = no se sabe. */
     const [estadoAgente, setEstadoAgente] = useState<EstadoAgente | null>(null);
+    /** Se incrementa para releer la ficha del cliente (tras anotar un pedido). */
+    const [recargarFicha, setRecargarFicha] = useState(0);
+
+    /**
+     * Mete un repuesto en la proforma de esa conversación. Lo usa la ficha
+     * del cliente para el botón "Cotizar" de un pedido que ya llegó: ese es
+     * el caso donde más rápido hay que reaccionar -- el repuesto está en
+     * bodega y el cliente está escribiendo justo ahora.
+     */
+    const agregarAProforma = useChatProformaStore((s) => s.agregar);
     const [conversationsLoading, setConversationsLoading] = useState(true);
     /** Total real en la base (o de la búsqueda), no el de las filas traídas. */
     const [totalConversaciones, setTotalConversaciones] = useState<number | null>(null);
@@ -448,7 +460,33 @@ const WhatsAppInbox: React.FC = () => {
                 clearTimeout(escalationsTimer);
                 escalationsTimer = setTimeout(() => fetchEscalations(), AGRUPAR_MS);
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_conversations' }, () => {
+            /**
+             * Un UPDATE trae la fila nueva completa, así que se parchea en
+             * memoria en vez de volver a pedir la lista.
+             *
+             * Antes cualquier cambio disparaba una relectura de 200
+             * conversaciones. Como `last_message_at` se actualiza en CADA
+             * mensaje, con la pantalla abierta y el chat activo eso era ~40 KB
+             * cada 3 segundos -- más de 1 GB por día de una sola pestaña
+             * abierta, contra los 5 GB mensuales de la cuota. Parcheando,
+             * el evento ya trae lo que hace falta y no cuesta nada.
+             *
+             * Un INSERT sí necesita relectura: la conversación nueva puede
+             * entrar en cualquier posición del orden por actividad.
+             */
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agent_conversations' }, (payload) => {
+                const fila = payload.new as Conversation;
+                setConversations((prev) => {
+                    if (!prev.some((c) => c.id === fila.id)) return prev;
+                    const parcheadas = prev.map((c) => (c.id === fila.id ? { ...c, ...fila } : c));
+                    // Se reordena por actividad, igual que la consulta.
+                    return parcheadas.sort(
+                        (a, b) =>
+                            new Date(b.last_message_at ?? 0).getTime() - new Date(a.last_message_at ?? 0).getTime(),
+                    );
+                });
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agent_conversations' }, () => {
                 clearTimeout(conversationsTimer);
                 conversationsTimer = setTimeout(() => fetchConversations(), AGRUPAR_MS);
             })
@@ -1063,7 +1101,13 @@ const WhatsAppInbox: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4 items-start">
+            {/* Tres columnas en pantalla ancha: lista de chats, la conversación,
+                y la ficha del cliente. La ficha va al costado y no en un modal
+                a propósito -- lo que dice (si tiene descuento, qué repuestos
+                dejó pedidos, cuáles ya llegaron) hay que tenerlo a la vista
+                MIENTRAS se cotiza, no detrás de un clic. En pantallas angostas
+                se apila debajo del chat. */}
+            <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] xl:grid-cols-[340px_1fr_300px] gap-4 items-start">
                 {/* Lista */}
                 <div className={cn(card.base, 'divide-y divide-subtle overflow-hidden')}>
                     {/* Cada pestaña espera SU propia carga: la de "Todas" usaba
@@ -1386,8 +1430,11 @@ const WhatsAppInbox: React.FC = () => {
                                     selected.customerName ||
                                     formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })
                                 }
+                                clienteNombre={selected.customerName}
+                                phoneNumber={selected.phoneNumber}
                                 userId={userId}
                                 onEnviar={enviarMensajes}
+                                onPedidoRegistrado={() => setRecargarFicha((n) => n + 1)}
                             />
 
                             <div className={cn(card.footer, 'flex items-center gap-3 flex-wrap')}>
@@ -1455,6 +1502,20 @@ const WhatsAppInbox: React.FC = () => {
                         </>
                     )}
                 </div>
+
+                {/* Ficha del cliente. Solo con un chat abierto: sin eso no hay
+                    de quién mostrar nada. */}
+                {selected && (
+                    <div className="xl:sticky xl:top-4">
+                        <CustomerPanel
+                            key={`${selected.conversationId}-${recargarFicha}`}
+                            conversationId={selected.conversationId}
+                            phoneNumber={selected.phoneNumber}
+                            customerName={selected.customerName}
+                            onCotizar={(producto) => agregarAProforma(selected.conversationId, producto)}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Visor de fotos del hilo: la foto del repuesto se mira en

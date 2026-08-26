@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Image as ImageIcon, Loader2, Package, Paperclip, Plus, Send, X, Zap } from 'lucide-react';
+import { ClipboardList, FileText, Image as ImageIcon, Loader2, Package, Paperclip, Plus, Send, X, Zap } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { badge, button, cn, input } from '../ui/styles';
 import CatalogSendModal from './CatalogSendModal';
+import ProformaBuilder from './ProformaBuilder';
+import RegistrarPedidoModal from './RegistrarPedidoModal';
+import { useChatProformaStore } from '../../store/useChatProformaStore';
 import {
     borrarAdjunto,
     MAX_ADJUNTO_MB,
@@ -34,9 +37,15 @@ interface RespuestaRapida {
 interface Props {
     conversationId: number;
     clienteLabel: string;
+    /** Nombre real del cliente, si se conoce. Encabeza la proforma. */
+    clienteNombre: string | null;
+    /** Teléfono en dígitos, para anotar pedidos. */
+    phoneNumber: string;
     userId: string | null;
     /** Encola los mensajes. La página decide cómo (y refresca el hilo). */
     onEnviar: (mensajes: NuevoMensaje[]) => Promise<void>;
+    /** Se llama al anotar un pedido, para refrescar la ficha del cliente. */
+    onPedidoRegistrado?: () => void;
 }
 
 /** Adjunto en pantalla: mientras sube todavía no tiene URL. */
@@ -50,13 +59,32 @@ interface AdjuntoLocal {
     error: string | null;
 }
 
-export const ChatComposer: React.FC<Props> = ({ conversationId, clienteLabel, userId, onEnviar }) => {
+export const ChatComposer: React.FC<Props> = ({
+    conversationId,
+    clienteLabel,
+    clienteNombre,
+    phoneNumber,
+    userId,
+    onEnviar,
+    onPedidoRegistrado,
+}) => {
     const [borrador, setBorrador] = useState('');
     const [adjuntos, setAdjuntos] = useState<AdjuntoLocal[]>([]);
     const [enviando, setEnviando] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [arrastrando, setArrastrando] = useState(false);
     const [catalogoAbierto, setCatalogoAbierto] = useState(false);
+    const [proformaAbierta, setProformaAbierta] = useState(false);
+    const [pedidoAbierto, setPedidoAbierto] = useState(false);
+
+    /**
+     * Cuántos repuestos tiene la proforma de ESTE chat. Se muestra en el
+     * botón: una proforma a medio armar es fácil de olvidar al saltar de
+     * conversación, y el número la mantiene a la vista.
+     */
+    const itemsEnProforma = useChatProformaStore(
+        (s) => s.porConversacion[conversationId]?.items.length ?? 0,
+    );
     const [rapidas, setRapidas] = useState<RespuestaRapida[]>([]);
     const [menuRapidas, setMenuRapidas] = useState(false);
     const [guardandoRapida, setGuardandoRapida] = useState(false);
@@ -371,6 +399,27 @@ export const ChatComposer: React.FC<Props> = ({ conversationId, clienteLabel, us
                     <Package size={14} aria-hidden="true" /> Catálogo
                 </button>
                 <button
+                    onClick={() => setProformaAbierta(true)}
+                    className={cn(
+                        button.base,
+                        itemsEnProforma > 0 ? button.variant.primary : button.variant.secondary,
+                        button.size.sm,
+                    )}
+                    title="Armar una cotización con varios repuestos y mandarla como imagen"
+                >
+                    <FileText size={14} aria-hidden="true" /> Proforma
+                    {itemsEnProforma > 0 && (
+                        <span className={cn(badge.base, badge.size.sm, badge.tone.neutral)}>{itemsEnProforma}</span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setPedidoAbierto(true)}
+                    className={cn(button.base, button.variant.secondary, button.size.sm)}
+                    title="Anotar un repuesto que no hay, para avisarle cuando llegue"
+                >
+                    <ClipboardList size={14} aria-hidden="true" /> Anotar pedido
+                </button>
+                <button
                     onClick={() => setMenuRapidas((v) => !v)}
                     className={cn(button.base, button.variant.secondary, button.size.sm)}
                     title="Respuestas rápidas (o escribí / al principio)"
@@ -442,6 +491,24 @@ export const ChatComposer: React.FC<Props> = ({ conversationId, clienteLabel, us
                 conversationId={conversationId}
                 clienteLabel={clienteLabel}
                 onEnviar={onEnviar}
+            />
+
+            <ProformaBuilder
+                isOpen={proformaAbierta}
+                onClose={() => setProformaAbierta(false)}
+                conversationId={conversationId}
+                clienteLabel={clienteLabel}
+                clienteNombre={clienteNombre}
+                onEnviar={onEnviar}
+            />
+
+            <RegistrarPedidoModal
+                isOpen={pedidoAbierto}
+                onClose={() => setPedidoAbierto(false)}
+                phoneNumber={phoneNumber}
+                customerName={clienteNombre}
+                userId={userId}
+                onRegistrado={() => onPedidoRegistrado?.()}
             />
         </div>
     );
