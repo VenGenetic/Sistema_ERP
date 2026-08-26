@@ -2,19 +2,24 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, page, card, badge, button, input } from '../components/ui/styles';
-import { Ban, CheckCheck, Clock, FileText, Headset, Inbox, Mic, RefreshCw, RotateCw, Search, User, X } from 'lucide-react';
+import { Ban, CheckCheck, Clock, FileText, Headset, Inbox, MailQuestion, Mic, RefreshCw, RotateCw, Search, User, X } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import MessageMedia from '../components/whatsapp/MessageMedia';
-import MessageActions, { CitaEnComposer } from '../components/whatsapp/MessageActions';
+import { CitaEnComposer } from '../components/whatsapp/MessageActions';
+import ChatThread, { ENTREGA, textoDe, type MensajeHilo } from '../components/whatsapp/ChatThread';
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     borrarMensaje,
     CAMPOS_COLA,
+    CAMPOS_CONV_BASE,
+    CAMPOS_CONV_PREVIEW,
     cancelarMensaje,
     encolarMensajes,
+    faltaColumna,
     marcarLeidoEnWhatsApp,
+    marcarNoLeido,
     reaccionarMensaje,
     reintentarMensaje,
     type MensajeEnCola,
@@ -97,21 +102,6 @@ const CAMPOS_MENSAJE =
 
 /** Tipos que DEBERÍAN traer un archivo. Si no lo traen, se aclara. */
 const CON_ARCHIVO = new Set<ContentType>(['image', 'audio', 'video', 'document', 'sticker']);
-
-/**
- * Lo que WhatsApp confirmó de cada mensaje que mandó el agente. Es
- * deliberadamente explícito: antes el ERP mostraba el mensaje y uno
- * asumía que había llegado, cuando WhatsApp podía haberlo descartado
- * sin avisar.
- */
-const ENTREGA: Record<DeliveryStatus, { texto: string; tono: keyof typeof badge.tone }> = {
-    pending: { texto: 'Sin confirmar', tono: 'warning' },
-    sent: { texto: 'Enviado', tono: 'info' },
-    delivered: { texto: 'Entregado', tono: 'success' },
-    read: { texto: 'Leído', tono: 'success' },
-    failed: { texto: 'No se entregó', tono: 'danger' },
-};
-
 const REASON_LABEL: Record<EscalationReason, string> = {
     discount_request: 'Pidió descuento',
     complaint_or_return: 'Reclamo / devolución',
@@ -136,20 +126,6 @@ function timeAgo(iso: string): string {
     if (hours < 24) return `hace ${hours} h`;
     return `hace ${Math.round(hours / 24)} d`;
 }
-
-/** Cómo se nombra un mensaje sin texto, según lo que traiga. */
-const SIN_TEXTO: Partial<Record<ContentType, string>> = {
-    image: '(foto)',
-    audio: '(nota de voz)',
-    video: '(video)',
-    document: '(archivo)',
-    sticker: '(sticker)',
-    location: '(ubicación)',
-    contact: '(contacto)',
-};
-
-const bodyPreview = (m: Pick<AgentMessage, 'body' | 'content_type'>): string =>
-    m.body || SIN_TEXTO[m.content_type] || '(sin texto)';
 
 /**
  * Estado que reporta el proceso del agente (migración 0027). Es lo que
@@ -179,6 +155,13 @@ interface Conversation {
     last_message_at: string | null;
     unread_count: number;
     lid: string | null;
+    /**
+     * Último mensaje, para saber de qué habla el chat sin abrirlo
+     * (migración 0032). Es una vista previa para triar: la fuente de
+     * verdad del hilo sigue siendo `agent_messages`.
+     */
+    last_message_preview: string | null;
+    last_message_direction: string | null;
 }
 
 /**
@@ -199,6 +182,39 @@ function formatPhone(conv: Pick<Conversation, 'phone_number' | 'lid'>): string {
     }
     return `+${digits}`;
 }
+
+/**
+ * Inicial del cliente sobre un color estable.
+ *
+ * El color sale del propio teléfono, no de un azar: el mismo cliente tiene
+ * siempre el mismo, así que al recorrer la lista se lo reconoce por la
+ * mancha de color antes de leer el nombre. Son tonos del sistema, para que
+ * no aparezcan colores fuera de la paleta.
+ */
+const COLORES_AVATAR = [
+    'bg-primary-soft text-primary-soft-fg',
+    'bg-success-soft text-success-soft-fg',
+    'bg-warning-soft text-warning-soft-fg',
+    'bg-danger-soft text-danger-soft-fg',
+    'bg-surface-3 text-fg-muted',
+];
+
+const Avatar: React.FC<{ nombre: string | null; telefono: string }> = ({ nombre, telefono }) => {
+    const inicial = (nombre?.trim()?.[0] ?? telefono.slice(-2, -1) ?? '?').toUpperCase();
+    let suma = 0;
+    for (const ch of telefono) suma += ch.charCodeAt(0);
+    return (
+        <span
+            aria-hidden="true"
+            className={cn(
+                'shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold select-none',
+                COLORES_AVATAR[suma % COLORES_AVATAR.length],
+            )}
+        >
+            {inicial}
+        </span>
+    );
+};
 
 type Tab = 'pending' | 'resolved' | 'all';
 
@@ -284,7 +300,7 @@ const WhatsAppInbox: React.FC = () => {
     /** Se incrementa para releer la ficha del cliente (tras anotar un pedido). */
     const [recargarFicha, setRecargarFicha] = useState(0);
     /** Mensaje que se está citando en la próxima respuesta. */
-    const [citando, setCitando] = useState<AgentMessage | null>(null);
+    const [citando, setCitando] = useState<MensajeHilo | null>(null);
 
     /**
      * Pone una reacción. Se pinta al instante y se corrige si falla: es
@@ -382,22 +398,28 @@ const WhatsAppInbox: React.FC = () => {
 
     const fetchConversations = useCallback(async () => {
         setConversationsLoading(true);
-        let query = supabase
-            .from('agent_conversations')
-            // `count: 'exact'` da el total REAL de la tabla (o de la
-            // búsqueda), no el de las filas traídas: sin esto la tarjeta
-            // "Conversaciones" se quedaba clavada en 200 apenas entró el
-            // historial.
-            .select('id, phone_number, customer_name, status, bot_enabled, last_message_at, unread_count, lid', {
-                count: 'exact',
-            })
-            .order('last_message_at', { ascending: false, nullsFirst: false })
-            .limit(CONVERSACIONES_POR_PAGINA);
 
-        const filtro = filtroBusqueda(searchRef.current);
-        if (filtro) query = query.or(filtro);
+        const consulta = (campos: string) => {
+            let q = supabase
+                .from('agent_conversations')
+                // `count: 'exact'` da el total REAL de la tabla (o de la
+                // búsqueda), no el de las filas traídas: sin esto la tarjeta
+                // "Conversaciones" se quedaba clavada en 200 apenas entró el
+                // historial.
+                .select(campos, { count: 'exact' })
+                .order('last_message_at', { ascending: false, nullsFirst: false })
+                .limit(CONVERSACIONES_POR_PAGINA);
+            const filtro = filtroBusqueda(searchRef.current);
+            if (filtro) q = q.or(filtro);
+            return q;
+        };
 
-        const { data, error, count } = await query;
+        // Con la vista previa si la migración 0032 está aplicada; sin ella
+        // si no. Pedirla a secas dejaría la bandeja SIN LISTA, no sin vista
+        // previa (ver CAMPOS_CONV_PREVIEW).
+        let { data, error, count } = await consulta(CAMPOS_CONV_PREVIEW);
+        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE));
+
         setConversationsLoading(false);
         if (error) {
             console.error('Error cargando conversaciones:', error.message);
@@ -977,6 +999,30 @@ const WhatsAppInbox: React.FC = () => {
     };
 
     /**
+     * Deja el chat como pendiente y CIERRA el detalle.
+     *
+     * Lo segundo no es un capricho: si el chat quedara abierto, el efecto
+     * que marca leído al abrirlo lo apagaría de nuevo en el siguiente
+     * render y el botón parecería no hacer nada.
+     */
+    const marcarComoNoLeido = async (conversationId: number) => {
+        setActionLoading(true);
+        setErrorAccion(null);
+        try {
+            await marcarNoLeido(conversationId);
+            setConversations((prev) =>
+                prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 1 } : c)),
+            );
+            setSelectedConversationId(null);
+            setSelectedId(null);
+        } catch (err: any) {
+            setErrorAccion(`No se pudo marcar sin leer: ${err?.message ?? err}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    /**
      * Abre la foto a pantalla completa, con las demás del hilo al lado.
      *
      * Solo FOTOS: los stickers también son imágenes, pero pasar de la foto
@@ -1198,35 +1244,66 @@ const WhatsAppInbox: React.FC = () => {
                                         selectedConversationId === c.id ? 'bg-primary-soft/60' : 'hover:bg-surface-hover',
                                     )}
                                 >
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className={cn('text-sm truncate', c.unread_count > 0 ? 'font-bold text-fg' : 'font-medium text-fg')}>
-                                            {formatPhone(c)}
-                                        </span>
-                                        {c.last_message_at && (
-                                            <span className="text-2xs text-fg-subtle shrink-0 flex items-center gap-1">
-                                                <Clock size={11} aria-hidden="true" />
-                                                {timeAgo(c.last_message_at)}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {c.customer_name && (
-                                        <p className="text-2xs text-fg-muted truncate mt-0.5">{c.customer_name}</p>
-                                    )}
-                                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                                        {c.unread_count > 0 && (
-                                            <span className={cn(badge.base, badge.size.sm, badge.tone.danger)}>
-                                                {c.unread_count} sin leer
-                                            </span>
-                                        )}
-                                        <span
-                                            className={cn(
-                                                badge.base,
-                                                badge.size.sm,
-                                                c.bot_enabled ? badge.tone.success : badge.tone.neutral,
-                                            )}
-                                        >
-                                            {c.bot_enabled ? 'Agente activado' : 'Agente apagado'}
-                                        </span>
+                                    {/* El NOMBRE manda, no el teléfono: es lo que se busca
+                                        al recorrer la lista. El número baja de línea, y
+                                        solo ocupa el lugar principal cuando no hay nombre. */}
+                                    <div className="flex items-start gap-2.5">
+                                        <Avatar nombre={c.customer_name} telefono={c.phone_number} />
+
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-baseline justify-between gap-2">
+                                                <span
+                                                    className={cn(
+                                                        'text-sm truncate',
+                                                        c.unread_count > 0 ? 'font-bold text-fg' : 'font-medium text-fg',
+                                                    )}
+                                                >
+                                                    {c.customer_name || formatPhone(c)}
+                                                </span>
+                                                {c.last_message_at && (
+                                                    <span className="text-2xs text-fg-subtle shrink-0">
+                                                        {timeAgo(c.last_message_at)}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* De qué habla el chat, sin abrirlo: antes había
+                                                que entrar uno por uno para poder triar. */}
+                                            <p
+                                                className={cn(
+                                                    'text-2xs truncate mt-0.5',
+                                                    c.unread_count > 0 ? 'text-fg font-medium' : 'text-fg-muted',
+                                                )}
+                                            >
+                                                {c.last_message_preview ? (
+                                                    <>
+                                                        {c.last_message_direction === 'outbound' && (
+                                                            <span className="text-fg-subtle">Vos: </span>
+                                                        )}
+                                                        {c.last_message_preview}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-fg-subtle">{formatPhone(c)}</span>
+                                                )}
+                                            </p>
+
+                                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                {c.unread_count > 0 && (
+                                                    <span className={cn(badge.base, badge.size.sm, badge.tone.danger)}>
+                                                        {c.unread_count} sin leer
+                                                    </span>
+                                                )}
+                                                {/* "Agente apagado" es el estado por defecto de
+                                                    casi todos: repetirlo en cada fila es ruido
+                                                    que tapa lo que sí distingue una de otra.
+                                                    Solo se marca lo excepcional. */}
+                                                {c.bot_enabled && (
+                                                    <span className={cn(badge.base, badge.size.sm, badge.tone.success)}>
+                                                        Agente activado
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 </button>
                             ))
@@ -1332,85 +1409,13 @@ const WhatsAppInbox: React.FC = () => {
                                 ) : messages.length === 0 ? (
                                     <p className="text-sm text-fg-muted">Sin mensajes registrados todavía.</p>
                                 ) : (
-                                    messages.map((m) => (
-                                        <div key={m.id} className={cn('flex', m.direction === 'inbound' ? 'justify-start' : 'justify-end')}>
-                                            <div
-                                                className={cn(
-                                                    'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words',
-                                                    // Borrado para todos: se conserva pero se ve
-                                                    // que ya no está del lado del cliente.
-                                                    m.deleted_at && 'line-through opacity-50',
-                                                    m.direction === 'inbound' ? 'bg-surface-2 text-fg' : 'bg-primary-soft text-primary-soft-fg',
-                                                )}
-                                            >
-                                                {/* La foto, la nota de voz, el video o el archivo, adentro
-                                                    de la burbuja. Antes acá solo decía "(foto)" / "(nota de
-                                                    voz)" y había que abrir el WhatsApp del teléfono para
-                                                    verlos -- justo cuando hay que decidir qué contestar. */}
-                                                {m.media_url && (
-                                                    <div className="mb-1.5">
-                                                        <MessageMedia
-                                                            url={m.media_url}
-                                                            contentType={m.content_type}
-                                                            body={m.body}
-                                                            onAbrirFoto={() => abrirVisor(m)}
-                                                        />
-                                                    </div>
-                                                )}
-                                                {/* Con la media a la vista, el "(foto)" de relleno sobra. */}
-                                                {(m.body || !m.media_url) && bodyPreview(m)}
-                                                {/* Media vieja: la del historial importado y la que llegó
-                                                    antes de que se empezara a guardar. WhatsApp no la vuelve
-                                                    a entregar, así que se aclara en vez de dejar un "(foto)"
-                                                    que parece un enlace que no anda. */}
-                                                {!m.media_url && CON_ARCHIVO.has(m.content_type) && (
-                                                    <span className="ml-1 text-2xs text-fg-subtle">· archivo no guardado</span>
-                                                )}
-                                                {/* La reacción va pegada al pie de la burbuja, como en
-                                                    WhatsApp -- no como un mensaje aparte. */}
-                                                {m.reaction && (
-                                                    <span className="ml-1 inline-block rounded-full border border-subtle bg-surface px-1.5 text-sm leading-none">
-                                                        {m.reaction}
-                                                    </span>
-                                                )}
-                                                <div className="text-2xs text-fg-subtle mt-1 flex items-center gap-1.5 flex-wrap">
-                                                    <span>
-                                                        {new Date(m.created_at).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                    {m.action_taken === 'human_reply' && <span>· vendedor</span>}
-                                                    {/* Citar, reaccionar y borrar. Borrar solo se ofrece
-                                                        sobre lo PROPIO: WhatsApp no deja borrar para todos
-                                                        un mensaje del cliente, así que ofrecerlo sería
-                                                        prometer algo que va a fallar. */}
-                                                    {m.whatsapp_message_id && !m.deleted_at && (
-                                                        <span className="ml-auto">
-                                                            <MessageActions
-                                                                onResponder={() => setCitando(m)}
-                                                                onReaccionar={(emoji) => reaccionar(m, emoji)}
-                                                                onBorrar={m.direction === 'outbound' ? () => borrar(m) : undefined}
-                                                                alineacion={m.direction === 'inbound' ? 'izquierda' : 'derecha'}
-                                                            />
-                                                        </span>
-                                                    )}
-                                                    {/* El acuse existe para todo lo que salió por el agente:
-                                                        sus respuestas automáticas y lo que se manda desde el
-                                                        ERP. Lo escrito desde el teléfono del vendedor no lo
-                                                        tiene -- no pasó por acá y no hay nada que confirmar. */}
-                                                    {m.direction === 'outbound' && m.delivery_status && (
-                                                        <span
-                                                            className={cn(
-                                                                badge.base,
-                                                                badge.size.sm,
-                                                                badge.tone[ENTREGA[m.delivery_status].tono],
-                                                            )}
-                                                        >
-                                                            {ENTREGA[m.delivery_status].texto}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
+                                    <ChatThread
+                                        mensajes={messages}
+                                        onAbrirFoto={abrirVisor}
+                                        onResponder={setCitando}
+                                        onReaccionar={reaccionar}
+                                        onBorrar={borrar}
+                                    />
                                 )}
 
                                 {/* Lo que todavía no salió. Va al final del hilo, con el
@@ -1510,7 +1515,7 @@ const WhatsAppInbox: React.FC = () => {
                             {citando && (
                                 <div className="px-5 pt-3">
                                     <CitaEnComposer
-                                        texto={bodyPreview(citando)}
+                                        texto={textoDe(citando)}
                                         onQuitar={() => setCitando(null)}
                                     />
                                 </div>
@@ -1530,6 +1535,17 @@ const WhatsAppInbox: React.FC = () => {
                             />
 
                             <div className={cn(card.footer, 'flex items-center gap-3 flex-wrap')}>
+                                {/* Dejar el chat pendiente. Abrirlo para ver de qué se
+                                    trataba lo apagaba de la lista y quedaba enterrado
+                                    entre miles; esto lo devuelve a los que esperan. */}
+                                <button
+                                    onClick={() => marcarComoNoLeido(selected.conversationId)}
+                                    disabled={actionLoading}
+                                    className={cn(button.base, button.variant.secondary, button.size.md)}
+                                    title="Lo deja como pendiente en la lista (no cambia nada en el teléfono del cliente)"
+                                >
+                                    <MailQuestion size={15} aria-hidden="true" /> Marcar sin leer
+                                </button>
                                 <button
                                     onClick={() => setRecargarMensajes((n) => n + 1)}
                                     disabled={messagesLoading}

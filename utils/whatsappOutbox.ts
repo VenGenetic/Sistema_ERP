@@ -18,6 +18,25 @@ import { supabase } from '../supabaseClient';
 /** Bucket público con la media del chat (migración 0026). */
 export const CHAT_MEDIA_BUCKET = 'agent_chat_media';
 
+/**
+ * Campos de la lista de conversaciones, en dos variantes.
+ *
+ * `last_message_preview` llegó con la migración 0032. Si esa no se aplicó,
+ * pedirla hace fallar la consulta ENTERA con 42703 -- o sea, la bandeja se
+ * queda sin lista, no sin vista previa. Una migración pendiente no puede
+ * romper lo que ya funcionaba, así que se pide la versión completa y se
+ * cae a la básica cuando falta la columna. Mismo criterio que usa el
+ * agente con la cola de salida.
+ */
+export const CAMPOS_CONV_BASE =
+    'id, phone_number, customer_name, status, bot_enabled, last_message_at, unread_count, lid';
+export const CAMPOS_CONV_PREVIEW = `${CAMPOS_CONV_BASE}, last_message_preview, last_message_direction`;
+
+/** true cuando el error de PostgREST es "esa columna no existe". */
+export function faltaColumna(error: { code?: string } | null | undefined): boolean {
+    return error?.code === '42703';
+}
+
 export type OutboxKind = 'text' | 'image' | 'video' | 'document' | 'audio';
 export type OutboxStatus = 'pending' | 'sent' | 'failed' | 'canceled';
 
@@ -277,6 +296,25 @@ export async function reaccionarMensaje(
  */
 export async function marcarLeidoEnWhatsApp(conversationId: number, userId: string | null): Promise<void> {
     await encolarAccion({ conversation_id: conversationId, kind: 'read' }, userId);
+}
+
+/**
+ * Marca un chat como NO leído en el ERP.
+ *
+ * Es un espejo local, no toca WhatsApp: sirve para dejar un chat
+ * pendiente cuando se lo abrió sin poder atenderlo. Sin esto, abrir un
+ * chat para mirar de qué se trataba lo apagaba de la lista de pendientes
+ * y quedaba enterrado entre miles.
+ *
+ * Se pone en 1 y no en el conteo real: lo que importa es que vuelva a
+ * aparecer como pendiente, y el número exacto ya se perdió al abrirlo.
+ */
+export async function marcarNoLeido(conversationId: number): Promise<void> {
+    const { error } = await supabase
+        .from('agent_conversations')
+        .update({ unread_count: 1 })
+        .eq('id', conversationId);
+    if (error) throw error;
 }
 
 /** Vuelve a poner en cola un mensaje que falló, con los intentos en cero. */

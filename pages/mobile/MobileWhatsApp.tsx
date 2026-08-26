@@ -24,8 +24,12 @@ import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
 import RegistrarPedidoModal from '../../components/whatsapp/RegistrarPedidoModal';
 import {
     borrarMensaje,
+    CAMPOS_CONV_BASE,
+    CAMPOS_CONV_PREVIEW,
     encolarMensajes,
+    faltaColumna,
     marcarLeidoEnWhatsApp,
+    marcarNoLeido,
     reaccionarMensaje,
     subirAdjunto,
     type NuevoMensaje,
@@ -64,6 +68,9 @@ interface Conversacion {
     last_message_at: string | null;
     unread_count: number;
     lid: string | null;
+    /** De qué habla el chat, sin abrirlo (migración 0032). */
+    last_message_preview: string | null;
+    last_message_direction: string | null;
 }
 
 interface Mensaje {
@@ -149,28 +156,35 @@ const MobileWhatsApp: React.FC = () => {
 
     const cargarLista = useCallback(async () => {
         setCargando(true);
-        let q = supabase
-            .from('agent_conversations')
-            .select('id, phone_number, customer_name, last_message_at, unread_count, lid')
-            .order('last_message_at', { ascending: false, nullsFirst: false })
-            .limit(POR_PAGINA);
 
-        const texto = busqueda.trim();
-        if (texto) {
-            const digitos = texto.replace(/\D/g, '');
-            const condiciones = [`customer_name.ilike.*${texto.replace(/[,()*\\"]/g, ' ')}*`];
-            if (digitos) condiciones.push(`phone_number.ilike.*${digitos}*`);
-            q = q.or(condiciones.join(','));
-        }
+        const consulta = (campos: string) => {
+            let q = supabase
+                .from('agent_conversations')
+                .select(campos)
+                .order('last_message_at', { ascending: false, nullsFirst: false })
+                .limit(POR_PAGINA);
+            const texto = busqueda.trim();
+            if (texto) {
+                const digitos = texto.replace(/\D/g, '');
+                const condiciones = [`customer_name.ilike.*${texto.replace(/[,()*\\"]/g, ' ')}*`];
+                if (digitos) condiciones.push(`phone_number.ilike.*${digitos}*`);
+                q = q.or(condiciones.join(','));
+            }
+            return q;
+        };
 
-        const { data, error: err } = await q;
+        // Con la vista previa si está la migración 0032, sin ella si no.
+        // Pedirla a secas dejaría la pantalla SIN LISTA, no sin vista previa.
+        let { data, error: err } = await consulta(CAMPOS_CONV_PREVIEW);
+        if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_BASE));
+
         setCargando(false);
         if (err) {
             setError(`No se pudieron cargar los chats: ${err.message}`);
             return;
         }
         setError(null);
-        setConversaciones((data ?? []) as Conversacion[]);
+        setConversaciones((data ?? []) as unknown as Conversacion[]);
     }, [busqueda]);
 
     // Las respuestas rapidas se cargan una vez: son pocas y no cambian
@@ -644,12 +658,29 @@ const MobileWhatsApp: React.FC = () => {
                                 {c.last_message_at ? hace(c.last_message_at) : ''}
                             </span>
                         </div>
+                        {/* De qué habla el chat, sin abrirlo. En un teléfono
+                            importa más que en el escritorio: no hay lugar para
+                            tener la lista y el chat al mismo tiempo, así que
+                            cada apertura equivocada cuesta dos toques. */}
                         <div className="flex items-center gap-2 mt-1">
-                            {c.customer_name && (
-                                <span className="text-xs text-slate-500 truncate">{formatearTelefono(c)}</span>
-                            )}
+                            <span
+                                className={`text-xs truncate flex-1 min-w-0 ${
+                                    c.unread_count > 0 ? 'text-slate-200 font-medium' : 'text-slate-400'
+                                }`}
+                            >
+                                {c.last_message_preview ? (
+                                    <>
+                                        {c.last_message_direction === 'outbound' && (
+                                            <span className="text-slate-500">Vos: </span>
+                                        )}
+                                        {c.last_message_preview}
+                                    </>
+                                ) : (
+                                    <span className="text-slate-500">{formatearTelefono(c)}</span>
+                                )}
+                            </span>
                             {c.unread_count > 0 && (
-                                <span className="ml-auto shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full">
+                                <span className="shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full">
                                     {c.unread_count}
                                 </span>
                             )}
