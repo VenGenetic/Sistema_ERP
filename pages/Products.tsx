@@ -2278,7 +2278,7 @@ const Products: React.FC = () => {
                         cuál a mitad de scroll.
                     */
                     <div className="overflow-auto max-h-[70dvh]">
-                        <table className="w-full text-left border-collapse table-fixed">
+                        <table className="w-full text-left border-separate border-spacing-0 table-fixed">
                             {/*
                                 Anchos declarados. Sin esto el navegador reparte según el
                                 contenido y la columna "Repuesto" cambiaba de ancho en
@@ -2292,9 +2292,9 @@ const Products: React.FC = () => {
                                 <col style={{ width: '120px' }} />
                                 <col style={{ width: '150px' }} />
                             </colgroup>
-                            <thead className="bg-surface-2 border-b border-subtle sticky top-0 z-10">
+                            <thead>
                                 <tr>
-                                    <th scope="col" className="px-4 py-2.5">
+                                    <th scope="col" className="px-4 py-2.5 bg-surface-2 border-b border-subtle sticky top-0 z-20">
                                         <input
                                             type="checkbox"
                                             checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
@@ -2309,7 +2309,7 @@ const Products: React.FC = () => {
                                             <th
                                                 key={col.key}
                                                 scope="col"
-                                                className="px-4 py-2.5 align-top"
+                                                className="px-4 py-2.5 align-top bg-surface-2 border-b border-subtle sticky top-0 z-20"
                                                 aria-sort={isSorted ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
                                             >
                                                 <div className="flex flex-col gap-1.5">
@@ -2351,10 +2351,10 @@ const Products: React.FC = () => {
                                             </th>
                                         );
                                     })}
-                                    <th scope="col" className="px-4 py-2.5 text-2xs font-semibold uppercase tracking-wider text-fg-muted text-center align-top">
+                                    <th scope="col" className="px-4 py-2.5 text-2xs font-semibold uppercase tracking-wider text-fg-muted text-center align-top bg-surface-2 border-b border-subtle sticky top-0 z-20">
                                         Stock
                                     </th>
-                                    <th scope="col" className="px-4 py-2.5 text-2xs font-semibold uppercase tracking-wider text-fg-muted text-center align-top">
+                                    <th scope="col" className="px-4 py-2.5 text-2xs font-semibold uppercase tracking-wider text-fg-muted text-center align-top bg-surface-2 border-b border-subtle sticky top-0 z-20">
                                         Acciones
                                     </th>
                                 </tr>
