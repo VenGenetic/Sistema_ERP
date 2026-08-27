@@ -4,6 +4,7 @@ import {
     ClipboardList,
     FileText,
     ImageIcon,
+    Images,
     Loader2,
     MailQuestion,
     MessageCircle,
@@ -20,7 +21,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import VoiceRecorder from '../../components/whatsapp/VoiceRecorder';
 import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
 import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
-import ChatThread, { horaLista, PildoraChat, textoDe, type MensajeHilo } from '../../components/whatsapp/ChatThread';
+import MediaGallery from '../../components/whatsapp/MediaGallery';
+import ChatThread, {
+    horaLista,
+    PildoraChat,
+    textoDe,
+    useHiloPegadoAbajo,
+    type MensajeHilo,
+} from '../../components/whatsapp/ChatThread';
 import { cn } from '../../components/ui/styles';
 import CatalogSendModal from '../../components/whatsapp/CatalogSendModal';
 import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
@@ -164,6 +172,8 @@ const MobileWhatsApp: React.FC = () => {
     const [grabadorOcupado, setGrabadorOcupado] = useState(false);
     /** Foto abierta a pantalla completa, con las demás del hilo al costado. */
     const [visor, setVisor] = useState<{ media: MediaItem[]; index: number } | null>(null);
+    /** La galería de fotos recibidas (buscar un comprobante). */
+    const [galeria, setGaleria] = useState(false);
 
     const hiloRef = useRef<HTMLDivElement | null>(null);
     const fileRef = useRef<HTMLInputElement | null>(null);
@@ -322,6 +332,18 @@ const MobileWhatsApp: React.FC = () => {
                     setMensajes((prev) => (prev.some((m) => m.id === nuevo.id) ? prev : [...prev, nuevo]));
                 },
             )
+            // Y los cambios sobre un mensaje que ya está en el hilo: el tilde
+            // que se pone azul cuando el cliente lo lee, el tachado de un
+            // borrado, la reacción que pone el cliente. Lo mismo que en la
+            // bandeja de escritorio.
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'agent_messages', filter: `conversation_id=eq.${abierta.id}` },
+                (payload) => {
+                    const fila = payload.new as Mensaje;
+                    setMensajes((prev) => prev.map((m) => (m.id === fila.id ? { ...m, ...fila } : m)));
+                },
+            )
             .subscribe();
         return () => {
             canal.unsubscribe();
@@ -329,23 +351,17 @@ const MobileWhatsApp: React.FC = () => {
     }, [abierta]);
 
     // El hilo arranca abajo del todo, donde está lo último que se dijo.
+    useHiloPegadoAbajo(hiloRef, abierta?.id ?? null);
+
+    // Lo mismo para la galería: «atrás» la cierra y deja la lista, en vez de
+    // salirse del modo móvil de un saque.
     useEffect(() => {
-        const c = hiloRef.current;
-        if (!c) return;
-        const abajo = () => {
-            c.scrollTop = c.scrollHeight;
-        };
-        abajo();
-        // Y otra vez cuando las fotos terminan de cargar: hasta que la imagen
-        // no tiene alto, el hilo mide menos de lo que va a medir y el "abajo
-        // del todo" queda a media conversación.
-        const t1 = setTimeout(abajo, 120);
-        const t2 = setTimeout(abajo, 600);
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-        };
-    }, [mensajes]);
+        if (!galeria) return;
+        window.history.pushState({ galeria: true }, '');
+        const volver = () => setGaleria(false);
+        window.addEventListener('popstate', volver);
+        return () => window.removeEventListener('popstate', volver);
+    }, [galeria]);
 
     // El botón «atrás» del teléfono vuelve a la lista en vez de salirse.
     useEffect(() => {
@@ -459,6 +475,29 @@ const MobileWhatsApp: React.FC = () => {
         }
     };
 
+    /**
+     * Abre el chat de una foto de la galería. La lista trae 40 chats, así
+     * que el de una foto vieja puede no estar cargado: si falta, se trae
+     * ese solo.
+     */
+    const irAlChatDeLaFoto = async (id: number) => {
+        setGaleria(false);
+        const cargado = conversaciones.find((c) => c.id === id);
+        if (cargado) {
+            abrirChat(cargado);
+            return;
+        }
+        const traer = (campos: string) =>
+            supabase.from('agent_conversations').select(campos).eq('id', id).maybeSingle();
+        let { data, error: err } = await traer(CAMPOS_CONV_PREVIEW);
+        if (faltaColumna(err)) ({ data, error: err } = await traer(CAMPOS_CONV_BASE));
+        if (err || !data) {
+            setError('No se pudo abrir esa conversación.');
+            return;
+        }
+        abrirChat(data as unknown as Conversacion);
+    };
+
     const sinLeer = useMemo(
         () => conversaciones.reduce((n, c) => n + (c.unread_count > 0 ? 1 : 0), 0),
         [conversaciones],
@@ -556,7 +595,12 @@ const MobileWhatsApp: React.FC = () => {
                 </div>
 
                 {/* ----------------------------- Hilo ----------------------------- */}
-                <div ref={hiloRef} className="wa-wallpaper wa-scroll flex-1 overflow-y-auto py-2">
+                <div ref={hiloRef} className="wa-wallpaper wa-scroll flex min-h-0 flex-1 flex-col overflow-y-auto [overflow-anchor:none] py-2">
+                    {/* Los mensajes se apoyan ABAJO cuando son pocos, como en el
+                        teléfono. El `mt-auto` va en un envoltorio y no como
+                        `justify-end` en el contenedor con scroll: con eso el
+                        contenido que desborda se sale por arriba y no se alcanza. */}
+                    <div className="mt-auto">
                     <PildoraChat tono="aviso">
                         Lo que mandes desde acá sale por WhatsApp y queda guardado en esta
                         conversación. Lo que escribas desde el teléfono, no.
@@ -578,6 +622,7 @@ const MobileWhatsApp: React.FC = () => {
                         onReaccionar={reaccionar}
                         onBorrar={borrar}
                     />
+                    </div>
                 </div>
 
                 {/* ------------------------ Caja de escribir ----------------------- */}
@@ -758,6 +803,19 @@ const MobileWhatsApp: React.FC = () => {
         );
     }
 
+    if (galeria) {
+        return (
+            <div className="wa-dark flex h-full flex-col bg-wa-panel">
+                <MediaGallery
+                    onIrAlChat={irAlChatDeLaFoto}
+                    onCerrar={() => setGaleria(false)}
+                    formatearTelefono={formatearTelefono}
+                    tactil
+                />
+            </div>
+        );
+    }
+
     /* ---------------------------- Lista de chats ---------------------------- */
 
     return (
@@ -768,11 +826,22 @@ const MobileWhatsApp: React.FC = () => {
                         <MessageCircle size={20} className="text-wa-accent" aria-hidden="true" />
                         WhatsApp
                     </h1>
-                    {sinLeer > 0 && (
-                        <span className="rounded-full bg-wa-accent px-2 py-0.5 text-xs font-bold text-wa-accent-fg">
-                            {sinLeer} sin leer
-                        </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {sinLeer > 0 && (
+                            <span className="rounded-full bg-wa-accent-strong px-2 py-0.5 text-xs font-bold text-wa-accent-fg">
+                                {sinLeer} sin leer
+                            </span>
+                        )}
+                        {/* Buscar un comprobante entre las fotos que mandaron
+                            los clientes, sin abrir chats de a uno. */}
+                        <button
+                            onClick={() => setGaleria(true)}
+                            aria-label="Ver las fotos que mandaron los clientes"
+                            className="flex h-11 w-11 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10"
+                        >
+                            <Images size={22} aria-hidden="true" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="relative">

@@ -110,7 +110,11 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
 
     return (
         <div className="flex items-center gap-2.5 min-w-[210px] py-0.5">
-            <audio ref={audioRef} src={url} preload="metadata" />
+            {/* Oculto: no lleva `controls`, pero en cuanto carga los metadatos
+                Chrome le da igual el alto de su reproductor (~54px) y cada nota
+                de voz arrastraba un hueco invisible debajo de la burbuja. Se
+                controla desde el codigo, asi que no necesita ocupar sitio. */}
+            <audio ref={audioRef} src={url} preload="metadata" className="hidden" />
             {/* 44px: el mismo reproductor se usa en el modo móvil, donde una
                 zona táctil más chica falla el toque y dispara la acción de al
                 lado (design-system/modo-movil-industrial/MASTER.md). En el

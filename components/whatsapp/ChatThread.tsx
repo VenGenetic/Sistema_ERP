@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useRef } from 'react';
+import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, Check, CheckCheck, Clock3 } from 'lucide-react';
 import { cn } from '../ui/styles';
 import MessageMedia from './MessageMedia';
@@ -129,14 +129,11 @@ const SIN_TEXTO: Partial<Record<ContentType, string>> = {
 const CON_ARCHIVO = new Set<ContentType>(['image', 'audio', 'video', 'document', 'sticker']);
 
 /**
- * Medios que ocupan la burbuja entera. Sin pie de foto no se escribe
- * "(foto)" debajo: la hora se apoya sobre el medio, como en WhatsApp.
- *
- * El video está incluido pero recibe la hora DEBAJO, no encima: el
- * reproductor es el nativo y el degradado le tapaba la barra de controles
- * justo donde está el botón de reproducir.
+ * Medios que llegan hasta el borde de la burbuja, sin margen: la foto, el
+ * video y el sticker SON la burbuja. El reproductor de la nota de voz y la
+ * tarjeta de un archivo, en cambio, necesitan su respiro adentro.
  */
-const MEDIA_VISUAL = new Set<ContentType>(['image', 'video', 'sticker']);
+const MEDIA_AL_BORDE = new Set<ContentType>(['image', 'video', 'sticker']);
 
 export const textoDe = (m: Pick<MensajeHilo, 'body' | 'content_type'>): string =>
     m.body || SIN_TEXTO[m.content_type] || '(sin texto)';
@@ -187,6 +184,100 @@ export function horaLista(iso: string): string {
     return f.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
+/**
+ * Mantiene el hilo pegado abajo, donde está lo último que se dijo.
+ *
+ * No alcanza con poner `scrollTop = scrollHeight` cuando cambian los mensajes:
+ * en ese momento las fotos todavía no tienen alto, así que "abajo del todo" se
+ * calcula sobre un hilo más corto del que va a quedar y la última foto aparece
+ * cortada a la mitad. Tampoco alcanza con reintentar a los 600ms -- con la
+ * conexión lenta la foto tarda más y con la rápida se desplaza dos veces.
+ *
+ * Se observa el ALTO REAL del contenido y se vuelve a bajar cada vez que
+ * crece: cuando carga una foto, cuando llega un mensaje por realtime, cuando
+ * aparece algo en la cola de salida. Pero SOLO si la persona ya estaba abajo:
+ * si está leyendo mensajes viejos, no se le arranca la pantalla de las manos.
+ */
+export function useHiloPegadoAbajo(
+    ref: { current: HTMLDivElement | null },
+    conversacion: unknown,
+) {
+    /** La persona está mirando el final del hilo (y no leyendo algo viejo). */
+    const pegado = useRef(true);
+
+    useEffect(() => {
+        const cont = ref.current;
+        if (!cont) return;
+
+        const alFondo = () => cont.scrollHeight - cont.scrollTop - cont.clientHeight;
+        const bajar = () => {
+            cont.scrollTop = cont.scrollHeight;
+        };
+
+        /* Solo un GESTO de la persona cambia el "estoy abajo".
+         *
+         * Mirar el evento `scroll` a secas no sirve: al abrir un chat con fotos
+         * el hilo crece varias veces mientras cargan, y el evento de un
+         * desplazamiento propio llegaba cuando el contenido ya había crecido
+         * otros 300px. Se leía como "la persona se fue para arriba", el hilo
+         * dejaba de bajar y el último mensaje quedaba cortado contra la caja de
+         * escribir. Con el gesto de por medio, el contenido puede crecer todo
+         * lo que quiera sin que nadie confunda eso con leer hacia atrás.
+         */
+        let ultimoGesto = 0;
+        const gesto = () => {
+            ultimoGesto = Date.now();
+        };
+        const GESTOS = ['wheel', 'touchstart', 'touchmove', 'mousedown', 'keydown'] as const;
+        GESTOS.forEach((e) => cont.addEventListener(e, gesto, { passive: true }));
+
+        const alDesplazar = () => {
+            // 400ms: cubre el desplazamiento suave que sigue a una rueda o a un
+            // dedo que se levanta.
+            if (Date.now() - ultimoGesto > 400) return;
+            // 120px de tolerancia: nadie deja el hilo clavado al píxel.
+            pegado.current = alFondo() < 120;
+        };
+        cont.addEventListener('scroll', alDesplazar, { passive: true });
+
+        // Cuando una foto termina de cargar. Va en fase de captura porque el
+        // `load` de una <img> no burbujea.
+        const alCargarMedio = () => {
+            if (pegado.current) bajar();
+        };
+        cont.addEventListener('load', alCargarMedio, true);
+
+        // Y ante cualquier cambio de alto del contenido: mensajes que llegan por
+        // realtime, algo que entra en la cola de salida, una foto que carga.
+        const contenido = cont.firstElementChild;
+        const observador = new ResizeObserver(() => {
+            if (pegado.current) bajar();
+        });
+
+        /* Y al volver a la pestaña. Mientras está en segundo plano el navegador
+           congela el observador de tamaño, así que los mensajes que llegaron
+           entre medio crecieron sin que nadie bajara el hilo: se vuelve del
+           café y el último mensaje está cortado contra la caja de escribir. */
+        const alVolver = () => {
+            if (document.visibilityState === 'visible' && pegado.current) bajar();
+        };
+        document.addEventListener('visibilitychange', alVolver);
+
+        // Al abrir un chat se arranca abajo sí o sí.
+        pegado.current = true;
+        bajar();
+        if (contenido) observador.observe(contenido);
+
+        return () => {
+            GESTOS.forEach((e) => cont.removeEventListener(e, gesto));
+            cont.removeEventListener('scroll', alDesplazar);
+            cont.removeEventListener('load', alCargarMedio, true);
+            document.removeEventListener('visibilitychange', alVolver);
+            observador.disconnect();
+        };
+    }, [ref, conversacion]);
+}
+
 interface BurbujaProps {
     m: MensajeHilo;
     /**
@@ -207,14 +298,19 @@ const Burbuja = memo<BurbujaProps>(
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
 
-        // Foto, video o sticker sin pie: no hace falta línea de texto.
-        const soloMedia = !!m.media_url && !m.body && MEDIA_VISUAL.has(m.content_type) && !borrado;
+        /* Archivo sin pie de foto: no se escribe "Foto" ni "Nota de voz"
+           debajo. El reproductor ya dice que es una nota de voz y la tarjeta
+           ya dice el nombre del archivo -- repetirlo es una línea de texto que
+           WhatsApp no pone y que en un hilo largo solo hace ruido. */
+        const soloMedia = !!m.media_url && !m.body && !borrado;
         // El sticker no lleva burbuja: en WhatsApp flota sobre el papel
         // tapiz. Con pie de foto (que WhatsApp ni permite) vuelve a la burbuja
         // normal: sin fondo, ese texto quedaba suelto sobre el tapiz.
         const sticker = m.content_type === 'sticker' && !!m.media_url && !m.body && !borrado;
-        // La hora encima solo sobre una foto. Sobre el video taparía los
-        // controles, y el sticker no tiene fondo donde apoyarla.
+        const mediaAlBorde = soloMedia && MEDIA_AL_BORDE.has(m.content_type);
+        /* La hora encima solo sobre una foto. Sobre el video taparía la barra
+           de controles justo donde está el botón de reproducir, y el sticker
+           no tiene fondo donde apoyarla. */
         const horaEncima = soloMedia && m.content_type === 'image';
         const horaDebajo = soloMedia && !horaEncima;
 
@@ -253,7 +349,7 @@ const Burbuja = memo<BurbujaProps>(
                                   // lado del autor.
                                   primeraDelGrupo &&
                                       (entrante ? 'wa-tail-in rounded-tl-none' : 'wa-tail-out rounded-tr-none'),
-                                  soloMedia ? 'p-[3px]' : 'px-2 py-[6px]',
+                                  mediaAlBorde ? 'p-[3px]' : 'px-2 py-[6px]',
                               ),
                     )}
                 >
@@ -269,7 +365,7 @@ const Burbuja = memo<BurbujaProps>(
                     )}
 
                     {m.media_url && !borrado && (
-                        <div className={cn(soloMedia ? 'overflow-hidden rounded-[6px]' : 'mb-1')}>
+                        <div className={cn(mediaAlBorde ? 'overflow-hidden rounded-[6px]' : !soloMedia && 'mb-1')}>
                             <MessageMedia
                                 url={m.media_url}
                                 contentType={m.content_type}
@@ -349,11 +445,19 @@ const Burbuja = memo<BurbujaProps>(
                     {m.whatsapp_message_id && !borrado && (
                         <div
                             className={cn(
-                                // Lleva el color de la burbuja detrás: si no, el
-                                // galoncito queda apoyado sobre las primeras
-                                // letras del mensaje y no se lee ninguno de los dos.
+                                /* Lleva algo detrás: si no, el galoncito queda
+                                   apoyado sobre las primeras letras del mensaje o
+                                   sobre la foto, y no se lee ninguno de los dos.
+                                   Sobre una foto va un velo oscuro (el color de la
+                                   burbuja ahí sería un recuadro pegado encima). */
                                 'absolute right-0 top-0 z-20 rounded-tr-lg transition-opacity',
-                                sticker ? '' : entrante ? 'bg-wa-in' : 'bg-wa-out',
+                                sticker
+                                    ? ''
+                                    : mediaAlBorde
+                                      ? 'rounded-bl-lg bg-black/35'
+                                      : entrante
+                                        ? 'bg-wa-in'
+                                        : 'bg-wa-out',
                                 tactil
                                     ? 'opacity-60'
                                     : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
@@ -366,7 +470,8 @@ const Burbuja = memo<BurbujaProps>(
                                 alineacion="derecha"
                                 abrirHacia="abajo"
                                 claseBoton={cn(
-                                    'flex items-center justify-center rounded-full text-wa-meta',
+                                    'flex items-center justify-center rounded-full',
+                                    mediaAlBorde ? 'text-white/90' : 'text-wa-meta',
                                     tactil ? 'h-9 w-9' : 'h-6 w-6 hover:bg-wa-inset/10',
                                 )}
                             />

@@ -1,16 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-import { cn, page, card, badge, button, input } from '../components/ui/styles';
+import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
-    ArrowLeft, Ban, Bot, BotOff, CheckCheck, Clock, Clock3, FileText, Headset, Inbox,
+    ArrowLeft, Ban, Bot, BotOff, CheckCheck, Clock, Clock3, FileText, Headset, Images, Inbox,
     MailQuestion, Mic, RefreshCw, RotateCw, Search, User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
+import MediaGallery from '../components/whatsapp/MediaGallery';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
-import ChatThread, { horaLista, PildoraChat, textoDe, type MensajeHilo } from '../components/whatsapp/ChatThread';
+import ChatThread, {
+    horaLista,
+    PildoraChat,
+    textoDe,
+    useHiloPegadoAbajo,
+    type MensajeHilo,
+} from '../components/whatsapp/ChatThread';
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     borrarMensaje,
@@ -291,6 +298,14 @@ const WhatsAppInbox: React.FC = () => {
      * entrar es la conversación de un cliente, y esa está en "Todas".
      */
     const [tab, setTab] = useState<Tab>('all');
+    /**
+     * La galería de fotos recibidas, en la columna de la conversación.
+     *
+     * El caso es el comprobante de pago: el cliente manda la foto, media
+     * hora después hay que confirmarla y lo único que se recuerda es la
+     * foto. Con 3.500 conversaciones, abrirlas de a una es imposible.
+     */
+    const [galeria, setGaleria] = useState(false);
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [messagesLoading, setMessagesLoading] = useState(false);
@@ -596,23 +611,7 @@ const WhatsAppInbox: React.FC = () => {
      * entraba viendo los mensajes MÁS VIEJOS y había que scrollear a mano
      * hasta el final para ver de qué se estaba hablando.
      */
-    useEffect(() => {
-        const cont = hiloRef.current;
-        if (!cont) return;
-        const abajo = () => {
-            cont.scrollTop = cont.scrollHeight;
-        };
-        abajo();
-        // Y otra vez cuando las fotos terminan de cargar: hasta que la imagen
-        // no tiene alto, el hilo mide menos de lo que va a medir y el "abajo
-        // del todo" queda a media conversación.
-        const t1 = setTimeout(abajo, 120);
-        const t2 = setTimeout(abajo, 600);
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-        };
-    }, [messages]);
+    useHiloPegadoAbajo(hiloRef, selectedConversationId ?? selectedId);
 
     /**
      * El teléfono se guarda como solo dígitos, pero la gente lo escribe de
@@ -773,7 +772,11 @@ const WhatsAppInbox: React.FC = () => {
             .limit(MENSAJES_VISIBLES)
             .then(({ data, error }) => {
                 if (cancelled) return;
-                if (!error && data) setMessages((data as AgentMessage[]).slice().reverse());
+                // Un fallo acá (RLS, red) dejaba la pantalla diciendo "Sin
+                // mensajes registrados todavía", que es una conversación vacía
+                // -- exactamente lo contrario de lo que pasó.
+                if (error) setErrorCarga(`No se pudo abrir la conversación: ${error.message}`);
+                else if (data) setMessages((data as AgentMessage[]).slice().reverse());
                 setMessagesLoading(false);
             });
         // Mensajes en vivo del chat abierto: sin esto había que refrescar la
@@ -794,6 +797,34 @@ const WhatsAppInbox: React.FC = () => {
                     if (cancelled) return;
                     const nuevo = payload.new as AgentMessage;
                     setMessages((prev) => (prev.some((m) => m.id === nuevo.id) ? prev : [...prev, nuevo]));
+                },
+            )
+            /**
+             * Y los cambios sobre un mensaje que ya está en el hilo.
+             *
+             * Es lo que hace que el tilde pase de gris a azul cuando el cliente
+             * lo lee, sin tocar "Actualizar chat" -- que es el gesto que uno
+             * espera de WhatsApp. También trae el tachado de un mensaje borrado
+             * en el momento en que WhatsApp lo acepta (antes había que refrescar
+             * para saber si el borrado había salido) y las reacciones que pone
+             * el cliente.
+             *
+             * Solo del chat ABIERTO: son tres o cuatro eventos por mensaje y
+             * mientras la conversación está a la vista, así que no mueve la
+             * aguja de la cuota.
+             */
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'agent_messages',
+                    filter: `conversation_id=eq.${conversationId}`,
+                },
+                (payload) => {
+                    if (cancelled) return;
+                    const fila = payload.new as AgentMessage;
+                    setMessages((prev) => prev.map((m) => (m.id === fila.id ? { ...m, ...fila } : m)));
                 },
             )
             .subscribe();
@@ -850,18 +881,6 @@ const WhatsAppInbox: React.FC = () => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selected?.conversationId, cargarCola]);
-
-    /**
-     * Deja el hilo abajo del todo también cuando aparece o se despacha algo
-     * de la cola -- si no, el mensaje recién enviado queda fuera de vista.
-     */
-    // Se mira la CANTIDAD y no el arreglo: la cola se relee cada pocos
-    // segundos, y saltar al final en cada relectura le arrancaría el scroll
-    // de las manos a quien está leyendo mensajes viejos.
-    useEffect(() => {
-        const cont = hiloRef.current;
-        if (cont) cont.scrollTop = cont.scrollHeight;
-    }, [enCola.length]);
 
     const hayPendientes = enCola.some((q) => q.status === 'pending');
 
@@ -950,6 +969,39 @@ const WhatsAppInbox: React.FC = () => {
      * evita que el contador quede encendido para siempre en el ERP una vez
      * que alguien del equipo ya miró el chat.
      */
+    /**
+     * Abre una conversación por su id, venga de donde venga (hoy, de la
+     * galería de fotos).
+     *
+     * La lista carga las 200 más recientes, así que la conversación de una
+     * foto vieja puede no estar cargada: seleccionar su id a secas dejaría
+     * la pantalla en blanco. Si falta, se trae esa sola y se mete al
+     * principio de la lista.
+     */
+    const abrirConversacionPorId = useCallback(
+        async (id: number) => {
+            setGaleria(false);
+            setTab('all');
+            setSelectedId(null);
+            setSelectedConversationId(id);
+
+            if (conversations.some((c) => c.id === id)) return;
+
+            const traer = (campos: string) =>
+                supabase.from('agent_conversations').select(campos).eq('id', id).maybeSingle();
+            let { data, error } = await traer(CAMPOS_CONV_PREVIEW);
+            if (faltaColumna(error)) ({ data, error } = await traer(CAMPOS_CONV_BASE));
+
+            if (error || !data) {
+                setErrorCarga('No se pudo abrir esa conversación.');
+                return;
+            }
+            const fila = data as unknown as Conversation;
+            setConversations((prev) => (prev.some((c) => c.id === fila.id) ? prev : [fila, ...prev]));
+        },
+        [conversations],
+    );
+
     const marcarLeida = useCallback(async (conversationId: number) => {
         const { error } = await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', conversationId);
         // Si la base lo rechazó, no se apaga el contador en pantalla: dejarlo
@@ -1088,16 +1140,78 @@ const WhatsAppInbox: React.FC = () => {
     };
 
     return (
-        <div className={page.root}>
-            <div className={page.header}>
-                <div>
-                    <h1 className={page.title}>Bandeja de WhatsApp</h1>
-                    <p className={page.subtitle}>
-                        Contestale al cliente desde acá: texto, fotos y repuestos del catálogo con su precio.
-                        Todo lo que se manda queda guardado en la conversación -- lo que se escribe desde el
-                        teléfono, no.
+        /* Un espacio de trabajo de alto completo, como WhatsApp Web: la PÁGINA
+           no se desplaza, se desplazan la lista y el hilo cada uno por su
+           cuenta. Antes el encabezado ocupaba 380px -- título largo, tarjeta
+           del agente, cuatro tarjetas de métricas, pestañas y buscador -- y el
+           chat quedaba comprimido debajo, así que para leer el último mensaje
+           había que bajar la página entera. */
+        <div className="flex h-[calc(100dvh-3.5rem)] flex-col gap-3 overflow-hidden p-4 md:p-5">
+            {/* --------------------------- Barra superior --------------------------- */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="min-w-0">
+                    <h1 className="text-xl font-bold tracking-tight text-fg">Bandeja de WhatsApp</h1>
+                    <p className="text-xs text-fg-muted">
+                        Lo que mandes desde acá queda guardado en la conversación. Lo que escribas
+                        desde el teléfono, no.
                     </p>
                 </div>
+
+                {/* Los cuatro números en una tira. Eran cuatro tarjetas de 60px de
+                    alto para cuatro cifras que casi siempre tienen un dígito. */}
+                <div className="ml-auto hidden items-stretch divide-x divide-subtle overflow-hidden rounded-lg border border-subtle bg-surface lg:flex">
+                    {[
+                        { label: 'Chats', valor: metricas.total },
+                        { label: 'Sin leer', valor: metricas.sinLeer },
+                        { label: 'Con agente', valor: metricas.activos },
+                        { label: 'Escaladas hoy', valor: metricas.escaladosHoy },
+                    ].map((m) => (
+                        <div key={m.label} className="px-3 py-1 text-center">
+                            <p className="text-sm font-semibold leading-tight tabular-nums text-fg">{m.valor}</p>
+                            <p className="text-2xs leading-tight text-fg-muted">{m.label}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Interruptor maestro: apagado acá, el agente no le contesta a nadie
+                    aunque haya conversaciones habilitadas. Es un interruptor de
+                    verdad (role="switch") y no un botón que dice el estado: "Agente
+                    encendido" en un botón no deja claro si es lo que pasa o lo que va
+                    a pasar al tocarlo. */}
+                <button
+                    onClick={handleToggleGlobalBot}
+                    disabled={actionLoading || globalBotEnabled === null}
+                    role="switch"
+                    aria-checked={!!globalBotEnabled}
+                    title={
+                        globalBotEnabled
+                            ? 'El agente responde solo en las conversaciones que tengan el agente activado.'
+                            : 'El agente no le responde a nadie. Los mensajes igual quedan registrados acá.'
+                    }
+                    className={cn(
+                        'ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 lg:ml-0',
+                        'text-xs font-semibold text-fg transition-colors disabled:opacity-50',
+                        focusRing,
+                        globalBotEnabled ? 'border-success/40 bg-success-soft' : 'border-subtle bg-surface hover:bg-surface-hover',
+                    )}
+                >
+                    <span
+                        aria-hidden="true"
+                        className={cn(
+                            'relative h-4 w-7 shrink-0 rounded-full transition-colors',
+                            globalBotEnabled ? 'bg-success' : 'bg-surface-3',
+                        )}
+                    >
+                        <span
+                            className={cn(
+                                'absolute top-0.5 h-3 w-3 rounded-full bg-white shadow ring-1 ring-black/10 transition-all',
+                                globalBotEnabled ? 'left-3.5' : 'left-0.5',
+                            )}
+                        />
+                    </span>
+                    Agente automático
+                </button>
+
                 <button
                     onClick={() => {
                         fetchEscalations();
@@ -1105,142 +1219,43 @@ const WhatsAppInbox: React.FC = () => {
                         fetchSettings();
                         fetchEstadoAgente();
                     }}
-                    className={cn(button.base, button.variant.secondary, button.size.sm)}
+                    aria-label="Actualizar la bandeja"
+                    title="Vuelve a leer la lista, los escalamientos y el estado del agente"
+                    className={cn(button.base, button.variant.secondary, button.icon.md)}
                 >
-                    <RefreshCw size={14} aria-hidden="true" /> Actualizar
+                    <RefreshCw size={15} aria-hidden="true" />
                 </button>
             </div>
 
-            {/* Fallos de Supabase (RLS, red): antes solo iban a la consola y
-                en pantalla parecía que todo había salido bien. */}
+            {/* Fallos de Supabase (RLS, red): antes solo iban a la consola y en
+                pantalla parecía que todo había salido bien. */}
             {(errorCarga || errorAccion) && (
-                <div className={cn(card.base, 'px-4 py-3 border-danger/40 flex items-start justify-between gap-3')}>
-                    <p className="text-sm text-danger">{errorCarga ?? errorAccion}</p>
+                <div className="flex shrink-0 items-start justify-between gap-3 rounded-lg border border-danger/40 bg-danger-soft px-3 py-2">
+                    <p className="text-sm text-danger-soft-fg">{errorCarga ?? errorAccion}</p>
                     <button
                         onClick={() => {
                             setErrorCarga(null);
                             setErrorAccion(null);
                         }}
                         aria-label="Cerrar aviso de error"
-                        className="p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-hover shrink-0"
+                        className="shrink-0 rounded p-1 text-danger-soft-fg/70 hover:bg-danger/10 hover:text-danger-soft-fg"
                     >
                         <X size={14} aria-hidden="true" />
                     </button>
                 </div>
             )}
 
-            {/* Lo que se encole ahora no va a salir. Se avisa arriba de todo
-                y no en la caja de escribir: hay que verlo ANTES de escribir. */}
+            {/* Lo que se encole ahora no va a salir. Se avisa arriba de todo y no
+                en la caja de escribir: hay que verlo ANTES de escribir. */}
             {avisoDeEnvio && (
-                <div className={cn(card.base, 'px-4 py-3 border-warning/40 bg-warning-soft flex items-start gap-3')}>
-                    <RotateCw size={16} className="text-warning-soft-fg shrink-0 mt-0.5" aria-hidden="true" />
-                    <div>
+                <div className="flex shrink-0 items-start gap-2.5 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2">
+                    <RotateCw size={15} className="mt-0.5 shrink-0 text-warning-soft-fg" aria-hidden="true" />
+                    <div className="min-w-0">
                         <p className="text-sm font-semibold text-warning-soft-fg">{avisoDeEnvio.titulo}</p>
-                        <p className="text-xs text-warning-soft-fg/90 mt-0.5">{avisoDeEnvio.detalle}</p>
+                        <p className="mt-0.5 text-xs text-warning-soft-fg/90">{avisoDeEnvio.detalle}</p>
                     </div>
                 </div>
             )}
-
-            {/* Interruptor maestro: apagado acá, el agente no le contesta a
-                nadie aunque haya conversaciones habilitadas. */}
-            <div
-                className={cn(
-                    card.base,
-                    'px-4 py-3 flex items-center justify-between gap-4 flex-wrap',
-                    globalBotEnabled ? 'border-success/30' : 'border-strong',
-                )}
-            >
-                <div>
-                    <p className="text-sm font-medium text-fg">
-                        Agente automático:{' '}
-                        {globalBotEnabled === null ? (
-                            <span className="text-fg-muted">cargando…</span>
-                        ) : globalBotEnabled ? (
-                            <span className="text-success">encendido</span>
-                        ) : (
-                            <span className="text-fg-muted">apagado</span>
-                        )}
-                    </p>
-                    <p className="text-xs text-fg-muted mt-0.5">
-                        {globalBotEnabled
-                            ? 'Responde solo en las conversaciones que tengan el agente activado.'
-                            : 'No le responde a nadie. Los mensajes igual quedan registrados acá.'}
-                    </p>
-                </div>
-                <button
-                    onClick={handleToggleGlobalBot}
-                    disabled={actionLoading || globalBotEnabled === null}
-                    className={cn(
-                        button.base,
-                        button.size.sm,
-                        globalBotEnabled ? button.variant.secondary : button.variant.success,
-                    )}
-                >
-                    {globalBotEnabled ? 'Apagar agente' : 'Encender agente'}
-                </button>
-            </div>
-
-            {/* Resumen rápido: se calcula sobre lo ya cargado, sin consultas extra. */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                    { label: 'Conversaciones', valor: metricas.total },
-                    { label: 'Con agente activo', valor: metricas.activos },
-                    { label: 'Sin leer', valor: metricas.sinLeer },
-                    { label: 'Escaladas hoy', valor: metricas.escaladosHoy },
-                ].map((m) => (
-                    <div key={m.label} className={cn(card.base, 'px-4 py-3')}>
-                        <p className="text-2xl font-semibold text-fg tabular-nums">{m.valor}</p>
-                        <p className="text-xs text-fg-muted mt-0.5">{m.label}</p>
-                    </div>
-                ))}
-            </div>
-
-            <div className="flex gap-2 items-center flex-wrap">
-                <button
-                    onClick={() => setTab('pending')}
-                    className={cn(button.base, button.size.sm, tab === 'pending' ? button.variant.primary : button.variant.secondary)}
-                >
-                    Pendientes ({pendingCount})
-                </button>
-                <button
-                    onClick={() => setTab('resolved')}
-                    className={cn(button.base, button.size.sm, tab === 'resolved' ? button.variant.primary : button.variant.secondary)}
-                >
-                    Resueltas
-                </button>
-                <button
-                    onClick={() => setTab('all')}
-                    className={cn(button.base, button.size.sm, tab === 'all' ? button.variant.primary : button.variant.secondary)}
-                >
-                    Todas ({totalConversaciones ?? conversations.length})
-                </button>
-
-                <div className="relative ml-auto w-full sm:w-72">
-                    <Search
-                        size={15}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none"
-                        aria-hidden="true"
-                    />
-                    <input
-                        type="search"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Buscar por teléfono o nombre…"
-                        aria-label="Buscar cliente por teléfono o nombre"
-                        className={cn(input.base, input.size.sm, 'pl-9', search && 'pr-9')}
-                    />
-                    {search && (
-                        <button
-                            onClick={() => setSearch('')}
-                            aria-label="Limpiar búsqueda"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-hover"
-                        >
-                            <X size={14} aria-hidden="true" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
             {/* WhatsApp Web en una sola lámina: la lista, la conversación y la
                 ficha del cliente pegadas, con altura fija y cada columna con su
                 propio desplazamiento.
@@ -1255,16 +1270,100 @@ const WhatsAppInbox: React.FC = () => {
                 lo que dice (si tiene descuento, qué repuestos dejó pedidos,
                 cuáles ya llegaron) hay que tenerlo a la vista MIENTRAS se
                 cotiza, no detrás de un clic. */}
-            <div className="flex h-[72vh] min-h-[520px] overflow-hidden rounded-xl border border-subtle bg-wa-panel shadow-sm">
+            <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-subtle bg-wa-panel shadow-sm">
                 {/* ============================ LISTA ============================ */}
                 {/* En pantalla angosta se ve una columna por vez: al abrir un chat
                     la lista se aparta, igual que en el teléfono. */}
                 <div
                     className={cn(
-                        'w-full shrink-0 flex-col overflow-y-auto wa-scroll border-r border-wa-divider bg-wa-panel lg:flex lg:w-[360px]',
-                        selected ? 'hidden' : 'flex',
+                        'w-full shrink-0 flex-col border-r border-wa-divider bg-wa-panel lg:flex lg:w-[360px]',
+                        selected || galeria ? 'hidden' : 'flex',
                     )}
                 >
+                    {/* El buscador y los filtros viven DENTRO de la columna, como en
+                        WhatsApp Web. Estaban sueltos arriba de la página, a lo ancho
+                        de todo: el buscador de chats quedaba a un metro de la lista
+                        de chats y encima empujaba el chat hacia abajo. */}
+                    <div className="shrink-0 border-b border-wa-divider px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                        <div className="relative min-w-0 flex-1">
+                            <Search
+                                size={15}
+                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-wa-meta"
+                                aria-hidden="true"
+                            />
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Buscar por nombre o teléfono"
+                                aria-label="Buscar cliente por teléfono o nombre"
+                                className="h-9 w-full rounded-lg border-none bg-wa-input pl-9 pr-9 text-[13.5px] text-wa-text outline-none placeholder:text-wa-meta focus:ring-0"
+                            />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch('')}
+                                    aria-label="Limpiar la búsqueda"
+                                    className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10 hover:text-wa-text"
+                                >
+                                    <X size={14} aria-hidden="true" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Buscar por lo que MANDÓ el cliente y no por su nombre:
+                            el caso es el comprobante de pago, que se recuerda
+                            como foto y no como nombre ni como hora. Va al lado
+                            del buscador porque es eso, otra forma de buscar. */}
+                        <button
+                            onClick={() => setGaleria((v) => !v)}
+                            aria-pressed={galeria}
+                            aria-label="Fotos que mandaron los clientes"
+                            title="Buscar un comprobante o una pieza entre las fotos que mandaron los clientes"
+                            className={cn(
+                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors',
+                                focusRing,
+                                galeria
+                                    ? 'bg-wa-accent-strong/[0.14] text-wa-accent-strong'
+                                    : 'text-wa-meta hover:bg-wa-inset/10',
+                            )}
+                        >
+                            <Images size={19} aria-hidden="true" />
+                        </button>
+                        </div>
+
+                        {/* Filtros como los de WhatsApp: pastillas, no botones. Son un
+                            filtro de la lista de al lado, no acciones de la pantalla. */}
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            {(
+                                [
+                                    { id: 'all' as Tab, texto: 'Todas', cuenta: null },
+                                    { id: 'pending' as Tab, texto: 'Pendientes', cuenta: pendingCount },
+                                    { id: 'resolved' as Tab, texto: 'Resueltas', cuenta: null },
+                                ]
+                            ).map((c) => (
+                                <button
+                                    key={c.id}
+                                    onClick={() => setTab(c.id)}
+                                    aria-pressed={tab === c.id}
+                                    className={cn(
+                                        'rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors',
+                                        focusRing,
+                                        tab === c.id
+                                            ? 'bg-wa-accent-strong/[0.14] text-wa-accent-strong'
+                                            : 'bg-wa-inset/[0.06] text-wa-meta hover:bg-wa-inset/10',
+                                    )}
+                                >
+                                    {c.texto}
+                                    {c.cuenta !== null && c.cuenta > 0 && (
+                                        <span className="ml-1 tabular-nums opacity-70">{c.cuenta}</span>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="wa-scroll min-h-0 flex-1 overflow-y-auto">
                     {/* Cada pestaña espera SU propia carga: la de "Todas" usaba el
                         loading de escalamientos y por eso mostraba "no hay
                         conversaciones" mientras la consulta seguía en vuelo. */}
@@ -1309,7 +1408,7 @@ const WhatsAppInbox: React.FC = () => {
                                                 <span
                                                     className={cn(
                                                         'shrink-0 text-[12px] leading-[16px]',
-                                                        c.unread_count > 0 ? 'font-semibold text-wa-accent' : 'text-wa-meta',
+                                                        c.unread_count > 0 ? 'font-semibold text-wa-accent-strong' : 'text-wa-meta',
                                                     )}
                                                 >
                                                     {horaLista(c.last_message_at)}
@@ -1346,13 +1445,13 @@ const WhatsAppInbox: React.FC = () => {
                                             {c.bot_enabled && (
                                                 <Bot
                                                     size={15}
-                                                    className="shrink-0 text-wa-accent"
+                                                    className="shrink-0 text-wa-accent-strong"
                                                     aria-label="El agente responde en este chat"
                                                 />
                                             )}
 
                                             {c.unread_count > 0 && (
-                                                <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
+                                                <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent-strong px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
                                                     {c.unread_count}
                                                 </span>
                                             )}
@@ -1423,16 +1522,23 @@ const WhatsAppInbox: React.FC = () => {
                             </button>
                         ))
                     ))}
+                    </div>
                 </div>
 
                 {/* ========================= CONVERSACIÓN ========================= */}
                 <div
                     className={cn(
                         'min-w-0 flex-1 flex-col bg-wa-bg lg:flex',
-                        selected ? 'flex' : 'hidden',
+                        selected || galeria ? 'flex' : 'hidden',
                     )}
                 >
-                    {!selected ? (
+                    {galeria ? (
+                        <MediaGallery
+                            onIrAlChat={abrirConversacionPorId}
+                            onCerrar={() => setGaleria(false)}
+                            formatearTelefono={formatPhone}
+                        />
+                    ) : !selected ? (
                         <div className="m-auto flex max-w-sm flex-col items-center gap-3 p-10 text-center">
                             <Headset size={40} className="text-wa-meta" aria-hidden="true" />
                             <p className="text-lg font-light text-wa-text">Bandeja de WhatsApp</p>
@@ -1550,7 +1656,8 @@ const WhatsAppInbox: React.FC = () => {
                             )}
 
                             {/* ------------------------ Hilo ------------------------ */}
-                            <div ref={hiloRef} className="wa-wallpaper wa-scroll flex-1 overflow-y-auto py-3">
+                            <div ref={hiloRef} className="wa-wallpaper wa-scroll flex min-h-0 flex-1 flex-col overflow-y-auto [overflow-anchor:none] py-3">
+                                <div className="mt-auto">
                                 <PildoraChat tono="aviso">
                                     Lo que mandes desde acá sale por WhatsApp y queda guardado en esta
                                     conversación. Lo que escribas desde el teléfono, no.
@@ -1646,6 +1753,7 @@ const WhatsAppInbox: React.FC = () => {
                                         </div>
                                     </div>
                                 ))}
+                                </div>
                             </div>
 
                             {/* ------------------- Caja de escribir ------------------ */}
