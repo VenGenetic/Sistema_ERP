@@ -143,10 +143,13 @@ export const CustomerPanel: React.FC<Props> = ({
         "Llegó lo que pidió (0)" con el repuesto en la bodega -- y es
         justamente el dato por el que existe la ficha.
 
-        Es la misma regla que usan el botón "Por avisar" de la bandeja y la
-        tarjeta de Solicitudes: activa + `stockUtil().hay`.
+        Y "con stock" acá quiere decir EN LA BODEGA, no en la importadora:
+        el bloque dice "llegó lo que pidió" y ofrece avisarle, y eso no se
+        le puede decir a alguien mientras el repuesto todavía viene en
+        camino. Misma regla que el botón "Por avisar" de la bandeja y que
+        la tarjeta de Solicitudes.
     */
-    const llegaron = activas.filter((d) => d.product && stockUtil(d.product).hay);
+    const llegaron = activas.filter((d) => d.product && stockUtil(d.product).local > 0);
 
     return (
         <div className={cn(card.base, 'overflow-hidden')}>

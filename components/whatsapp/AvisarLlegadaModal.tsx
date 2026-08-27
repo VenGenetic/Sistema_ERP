@@ -346,19 +346,19 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                 </div>
                             </div>
 
-                            {/* El stock se relee al cargar la lista. Si se vendió mientras
-                                tanto, avisar que llegó es peor que no avisar nada. */}
-                            {stock && !stock.hay && (
+                            {/* Lo que se puede avisar es lo que está EN LA
+                                BODEGA. Las listas ya filtran por eso, así que
+                                este aviso solo se ve abriendo una solicitud
+                                puntual desde Solicitudes, donde "Notificar"
+                                aparece en toda solicitud activa. Es justo el
+                                momento en que hace falta decirlo: la persona
+                                ya eligió a quién avisarle. */}
+                            {stock && stock.local === 0 && (
                                 <p className="flex items-start gap-1.5 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
                                     <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
-                                    Este repuesto ya NO tiene stock. Si se vendió mientras tanto, avisar que llegó te
-                                    deja en falta con el cliente.
-                                </p>
-                            )}
-                            {stock?.hay && stock.local === 0 && (
-                                <p className="rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-warning-soft-fg">
-                                    Solo hay en la importadora: no está en la bodega todavía. Conviene decirle en cuánto
-                                    le llega.
+                                    {stock.hay
+                                        ? 'Este repuesto NO está en la bodega: solo figura en la importadora. Avisar que llegó es prometer una fecha que no controlás, y el cliente viene al mostrador y no está.'
+                                        : 'Este repuesto ya NO tiene stock en ningún lado. Si se vendió mientras tanto, avisar que llegó te deja en falta con el cliente.'}
                                 </p>
                             )}
 

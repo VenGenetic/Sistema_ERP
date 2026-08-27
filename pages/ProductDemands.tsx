@@ -647,7 +647,10 @@ const ProductDemands: React.FC = () => {
         const total = demands.length;
         const active = demands.filter(d => ACTIVE_STATUSES.includes(d.status)).length;
         const inactive = demands.filter(d => INACTIVE_STATUSES.includes(d.status)).length;
-        const readyToNotify = demands.filter(d => ACTIVE_STATUSES.includes(d.status) && getStockValue(d.product) > 0).length;
+        // Solo la bodega propia: avisar "ya llegó" con el repuesto todavía
+        // en la importadora es prometer una fecha que no controlamos, y el
+        // cliente viene al mostrador y no está.
+        const readyToNotify = demands.filter(d => ACTIVE_STATUSES.includes(d.status) && getStockValue(d.product, 'local') > 0).length;
         return { total, active, inactive, readyToNotify };
     }, [demands]);
 
@@ -662,7 +665,7 @@ const ProductDemands: React.FC = () => {
                     // y con la misma función de stock: si se escribiera dos
                     // veces, el número y la lista volverían a separarse.
                     if (!ACTIVE_STATUSES.includes(d.status)) return false;
-                    if (getStockValue(d.product) <= 0) return false;
+                    if (getStockValue(d.product, 'local') <= 0) return false;
                 } else if (statusFilter === 'inactive') {
                     // `discontinued` faltaba aquí, y tampoco estaba en el
                     // desplegable: las solicitudes de repuestos descontinuados
@@ -1456,7 +1459,7 @@ const ProductDemands: React.FC = () => {
                         <option value="all">Filtro: Todos los estados</option>
                         <option value="active">Activas (Cola)</option>
                         <option value="inactive">Inactivas (Historial)</option>
-                        <option value="ready_to_notify">Listos para Notificar (hay stock)</option>
+                        <option value="ready_to_notify">Listos para Notificar (en bodega)</option>
                         <option value="pending_stock">Esperando Stock</option>
                         <option value="stock_available">Marcados como Stock Disponible</option>
                         <option value="notified">Notificados</option>

@@ -23,10 +23,12 @@ import {
  * registrado. El aviso que sale por la cola queda en el hilo, así el que
  * atiende la respuesta del cliente ve qué se le dijo y cuándo.
  *
- * Las reglas de precio y de stock NO se reescriben acá: se reusan las de
- * `whatsappOutbox` (`precioParaCliente`, `stockUtil`), que a su vez
- * espejan las del bot. Un aviso que cotice distinto que el bot es un
- * cliente que reclama.
+ * La regla de precio NO se reescribe acá: se reusa `precioParaCliente` de
+ * `whatsappOutbox`, que a su vez espeja la del bot. Un aviso que cotice
+ * distinto que el bot es un cliente que reclama.
+ *
+ * La de stock sí es propia y más estricta que la del bot: para AVISAR hace
+ * falta tenerlo en la bodega (ver `FILTRO_EN_BODEGA`).
  */
 
 export interface ProductoDeAviso {
@@ -87,11 +89,17 @@ const CAMPOS_DEMANDA = `id, status, phone_number, customer_name, notes, created_
 /**
  * QUÉ ES "por avisar", en un solo lugar.
  *
- * Un pedido activo cuyo repuesto tiene stock hoy: hay en la bodega, o hay
- * en la importadora y nadie marcó a mano que ahí no hay de verdad
- * (`importer_unavailable_override`, la marca "Agotado en Importadora").
- * Es la misma regla de stock que aplican el bot y el chat (`stockUtil`),
- * escrita en SQL para que la haga la base.
+ * Un pedido activo cuyo repuesto está EN LA BODEGA. Nada más.
+ *
+ * El stock de la importadora no cuenta, aunque el repuesto exista y esté
+ * en camino: avisarle a alguien "ya llegó lo que pediste" cuando todavía
+ * no lo tenemos en la mano es prometer una fecha que no controlamos. El
+ * cliente viene al mostrador y no está. Un aviso que hay que salir a
+ * explicar es peor que no haber avisado.
+ *
+ * Por eso tampoco hace falta mirar `importer_unavailable_override` acá:
+ * esa marca solo corrige el número del proveedor, y el número del
+ * proveedor ya no entra en esta cuenta.
  *
  * Vive en una constante y no repetida en cada consulta porque el contador
  * del botón y la lista del modal TIENEN que decir lo mismo. Cuando esas
@@ -99,8 +107,7 @@ const CAMPOS_DEMANDA = `id, status, phone_number, customer_name, notes, created_
  * pasaba en la pantalla de Solicitudes, donde la tarjeta decía "141 listos
  * para notificar" y al tocarla no salía ni un cliente.
  */
-const FILTRO_CON_STOCK =
-    'local_stock.gt.0,and(importer_stock.gt.0,importer_unavailable_override.not.is.true)';
+const FILTRO_EN_BODEGA = 'local_stock.gt.0';
 
 const ESTADOS_AVISABLES: EstadoAvisable[] = ['stock_available', 'pending_stock'];
 
@@ -281,7 +288,7 @@ export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<Lista
     if (soloDemandaId) {
         consulta = consulta.eq('id', soloDemandaId);
     } else {
-        consulta = consulta.or(FILTRO_CON_STOCK, { referencedTable: 'product' });
+        consulta = consulta.or(FILTRO_EN_BODEGA, { referencedTable: 'product' });
     }
 
     if (soloTelefono) {
@@ -327,7 +334,7 @@ export async function contarPorAvisar(): Promise<number> {
         .from('product_demands')
         .select('id, product:products!inner(id)', { count: 'exact', head: true })
         .in('status', ESTADOS_AVISABLES)
-        .or(FILTRO_CON_STOCK, { referencedTable: 'product' });
+        .or(FILTRO_EN_BODEGA, { referencedTable: 'product' });
     if (error) throw error;
     return count ?? 0;
 }
