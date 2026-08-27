@@ -61,6 +61,19 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
             // Status Filter
             if (statusFilter === 'active') {
                 if (d.status !== 'pending_stock' && d.status !== 'stock_available') return false;
+            } else if (statusFilter === 'ready_to_notify') {
+                // Mismo criterio que la tarjeta de la pantalla: activa y con
+                // stock hoy, sin mirar el estado `stock_available` (que casi
+                // nunca se pone). Tiene que estar acá porque el modal hereda
+                // el filtro de la pantalla: sin esta rama, abrir la
+                // exportación con "Listos para Notificar" puesto no exportaba
+                // NADA -- cae en `d.status !== statusFilter` y no coincide
+                // ninguna fila.
+                if (!['pending_stock', 'stock_available'].includes(d.status)) return false;
+                const local = d.product?.inventory_levels
+                    ? d.product.inventory_levels.reduce((acc: number, lvl: any) => acc + (lvl.current_stock || 0), 0)
+                    : 0;
+                if (local + (d.product?.importer_stock || 0) <= 0) return false;
             } else if (statusFilter === 'inactive') {
                 // La pantalla cuenta como inactivas notificado, cancelado,
                 // vencido y descontinuado. Aquí faltaban las dos últimas, así
@@ -235,8 +248,9 @@ export const ExportDemandsModal: React.FC<ExportDemandsModalProps> = ({
                             <option value="all">Todos los estados</option>
                             <option value="active">Activas (Cola)</option>
                             <option value="inactive">Inactivas (Historial)</option>
+                            <option value="ready_to_notify">Listos para Notificar (hay stock)</option>
                             <option value="pending_stock">Esperando Stock</option>
-                            <option value="stock_available">Stock Disponible</option>
+                            <option value="stock_available">Marcados como Stock Disponible</option>
                             <option value="notified">Notificados</option>
                             <option value="cancelled">Cancelados</option>
                             <option value="discontinued">Descontinuados</option>

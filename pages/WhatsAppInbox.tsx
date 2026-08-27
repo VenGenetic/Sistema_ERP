@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
-    ArrowLeft, Bot, BotOff, CheckCheck, Clock, Headset, Images, Inbox,
+    ArrowLeft, Bell, Bot, BotOff, CheckCheck, Clock, Headset, Images, Inbox,
     MailQuestion, RefreshCw, RotateCw, Search, User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
@@ -16,6 +16,9 @@ import {
     type EstadoAgente,
 } from '../components/whatsapp/agente';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
+import AvisarLlegadaModal from '../components/whatsapp/AvisarLlegadaModal';
+import { contarPorAvisar } from '../components/whatsapp/avisarLlegada';
+import { fusionarMensajes, useRepasoDelHilo } from '../components/whatsapp/hiloEnVivo';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
 import ChatThread, {
     horaLista,
@@ -260,6 +263,32 @@ interface SelectedContext {
 const WhatsAppInbox: React.FC = () => {
     const { session } = useAuth();
     const userId = session?.user?.id ?? null;
+    // Por referencia para las funciones estables (`marcarLeida`), que no
+    // pueden reconstruirse cuando cambia la sesión sin reiniciar de paso
+    // los efectos que dependen de ellas.
+    const userIdRef = useRef<string | null>(userId);
+    userIdRef.current = userId;
+
+    /**
+     * "Ya llegó lo que pediste": clientes esperando un repuesto que hoy
+     * está. `avisarTelefono` limita el modal a un cliente -- es el botón
+     * de la ficha, dentro del chat --; sin él salen todos.
+     */
+    const [avisarAbierto, setAvisarAbierto] = useState(false);
+    const [avisarTelefono, setAvisarTelefono] = useState<string | undefined>(undefined);
+    const [porAvisar, setPorAvisar] = useState(0);
+
+    // Solo el número, sin traer las filas: el botón vive en una pantalla
+    // que queda abierta todo el día.
+    const contarAvisos = useCallback(async () => {
+        try {
+            setPorAvisar(await contarPorAvisar());
+        } catch (err) {
+            // Que no se pueda contar no puede romper la bandeja: el botón
+            // se muestra sin número y el modal dirá qué pasó.
+            console.error('No se pudo contar los pedidos por avisar:', err);
+        }
+    }, []);
 
     const [escalations, setEscalations] = useState<Escalation[]>([]);
     const [profileNames, setProfileNames] = useState<Map<string, string>>(new Map());
@@ -482,6 +511,7 @@ const WhatsAppInbox: React.FC = () => {
         // en los dos lados duplicaba la consulta en cada carga.
         fetchSettings();
         fetchEstadoAgente();
+        contarAvisos();
 
         // El latido se relee solo: si el agente se cae con la pantalla
         // abierta, el aviso tiene que aparecer sin que nadie recargue.
@@ -542,7 +572,7 @@ const WhatsAppInbox: React.FC = () => {
             clearInterval(latido);
             channel.unsubscribe();
         };
-    }, [fetchEscalations, fetchConversations, fetchSettings, fetchEstadoAgente]);
+    }, [fetchEscalations, fetchConversations, fetchSettings, fetchEstadoAgente, contarAvisos]);
 
     /**
      * La búsqueda de conversaciones va contra la base, así que se espera a
@@ -691,6 +721,46 @@ const WhatsAppInbox: React.FC = () => {
         onYaHabiaSalido: () => setRecargarMensajes((n) => n + 1),
     });
 
+    /**
+     * Vuelve a traer los últimos mensajes y los funde con los que ya están
+     * en pantalla.
+     *
+     * Es la red de abajo del realtime, y hace falta de verdad: los eventos
+     * de `agent_messages` solo llegan si esa tabla está en la publicación
+     * `supabase_realtime` (migración 0033 del agente). Sin eso, la
+     * suscripción se conecta perfecto y no llega NADA -- que es como se
+     * veía: escribías un mensaje, aparecía "En cola", el agente lo
+     * despachaba y la burbuja DESAPARECÍA de la pantalla hasta recargar,
+     * porque el mensaje ya vivía en `agent_messages` y de ahí no llegaba
+     * ningún aviso. También cubre la suscripción que se cae sola (wifi,
+     * laptop dormida) y la pestaña en segundo plano.
+     *
+     * Solo con un chat abierto y solo con la pestaña a la vista: eso lo
+     * decide `useRepasoDelHilo`.
+     */
+    const conversacionAbiertaRef = useRef<number | null>(null);
+    conversacionAbiertaRef.current = selected?.conversationId ?? null;
+
+    const repasarHilo = useCallback(async () => {
+        const id = conversacionAbiertaRef.current;
+        if (!id) return;
+        const { data, error } = await supabase
+            .from('agent_messages')
+            .select(CAMPOS_MENSAJE)
+            .eq('conversation_id', id)
+            .order('created_at', { ascending: false })
+            .limit(MENSAJES_VISIBLES);
+        // Un repaso que falla no se muestra: el hilo que ya está en
+        // pantalla sigue siendo válido y el siguiente turno reintenta.
+        if (error || !data) return;
+        // Pudieron cambiar de chat mientras viajaba la consulta.
+        if (conversacionAbiertaRef.current !== id) return;
+        const recientes = (data as AgentMessage[]).slice().reverse();
+        setMessages((prev) => fusionarMensajes(prev, recientes));
+    }, []);
+
+    useRepasoDelHilo(!!selected, repasarHilo);
+
     useEffect(() => {
         if (!selected) {
             setMessages([]);
@@ -775,13 +845,25 @@ const WhatsAppInbox: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selected?.conversationId, recargarMensajes]);
 
-    // Abrir un chat con mensajes sin leer lo marca como leído en el ERP.
+    /**
+     * Tener el chat a la vista con algo sin leer lo marca como leído -- acá
+     * y en WhatsApp.
+     *
+     * Depende del CONTEO y no solo de qué chat está abierto: si el cliente
+     * escribe mientras la conversación está en pantalla, esa vuelta también
+     * tiene que apagarse. Mirando solo el id, el mensaje que llegaba con el
+     * chat abierto quedaba sin leer en el teléfono para siempre.
+     *
+     * No hay riesgo de repetición: `marcarLeida` deja el contador en cero en
+     * la lista, así que el efecto no se vuelve a disparar hasta que entre
+     * algo nuevo.
+     */
     useEffect(() => {
         if (selected && selected.unreadCount > 0) {
             marcarLeida(selected.conversationId);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selected?.conversationId]);
+    }, [selected?.conversationId, selected?.unreadCount]);
 
     const handleClaim = async (escalation: Escalation) => {
         if (!userId) return;
@@ -846,14 +928,8 @@ const WhatsAppInbox: React.FC = () => {
     };
 
     /**
-     * Marca la conversación como leída al abrirla. Es un espejo LOCAL: no
-     * marca leído en el teléfono (WhatsApp no lo permite desde acá), pero
-     * evita que el contador quede encendido para siempre en el ERP una vez
-     * que alguien del equipo ya miró el chat.
-     */
-    /**
-     * Abre una conversación por su id, venga de donde venga (hoy, de la
-     * galería de fotos).
+     * Abre una conversación por su id, venga de donde venga: la galería de
+     * fotos y la cola de "por avisar".
      *
      * La lista carga las 200 más recientes, así que la conversación de una
      * foto vieja puede no estar cargada: seleccionar su id a secas dejaría
@@ -884,7 +960,23 @@ const WhatsAppInbox: React.FC = () => {
         [conversations],
     );
 
+    /**
+     * Marca la conversación como leída en los DOS lados.
+     *
+     * El UPDATE local es solo el adelanto para que la lista responda al
+     * toque; el que manda es el acuse que se encola para WhatsApp, porque
+     * el contador de no leídos lo espeja WhatsApp y no lo decide el ERP
+     * (ver `marcarLeidoEnWhatsApp`). Sin la parte encolada, el chat seguía
+     * pendiente en el teléfono y el siguiente `chats.update` lo devolvía a
+     * la lista como si nadie lo hubiera abierto.
+     */
     const marcarLeida = useCallback(async (conversationId: number) => {
+        // No se espera ni rompe la apertura del chat: es un acuse, y que
+        // el agente esté caído no puede impedir abrir una conversación.
+        marcarLeidoEnWhatsApp(conversationId, userIdRef.current).catch((err) =>
+            console.error('No se pudo encolar el acuse de lectura:', err?.message ?? err),
+        );
+
         const { error } = await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', conversationId);
         // Si la base lo rechazó, no se apaga el contador en pantalla: dejarlo
         // en cero mentiría hasta el próximo refresco, que lo traería
@@ -918,10 +1010,12 @@ const WhatsAppInbox: React.FC = () => {
             await encolarMensajes(conCita, userId);
             setCitando(null);
 
-            // El doble tilde azul llega junto con la respuesta, no al abrir
-            // el chat (ver marcarLeidoEnWhatsApp). El id sale del propio
-            // mensaje y no de `selected`, que pudo cambiar mientras tanto.
-            // No se espera: que falle el tilde no puede romper el envío.
+            // El tilde azul también al responder, además de al abrir el
+            // chat: si el cliente escribió mientras se le contestaba, ese
+            // último mensaje queda leído sin esperar la vuelta del contador.
+            // El id sale del propio mensaje y no de `selected`, que pudo
+            // cambiar mientras tanto. No se espera: que falle el tilde no
+            // puede romper el envío.
             const conversationId = mensajes[0]?.conversationId;
             if (conversationId) marcarLeidoEnWhatsApp(conversationId, userId).catch(() => {});
 
@@ -936,17 +1030,18 @@ const WhatsAppInbox: React.FC = () => {
 
     /** Cancela un mensaje que todavía no salió. */
     /**
-     * Deja el chat como pendiente y CIERRA el detalle.
+     * Deja el chat como pendiente -- acá y en el teléfono -- y CIERRA el
+     * detalle.
      *
      * Lo segundo no es un capricho: si el chat quedara abierto, el efecto
-     * que marca leído al abrirlo lo apagaría de nuevo en el siguiente
-     * render y el botón parecería no hacer nada.
+     * que marca leído al tenerlo a la vista lo apagaría de nuevo en el
+     * siguiente render y el botón parecería no hacer nada.
      */
     const marcarComoNoLeido = async (conversationId: number) => {
         setActionLoading(true);
         setErrorAccion(null);
         try {
-            await marcarNoLeido(conversationId);
+            await marcarNoLeido(conversationId, userId);
             setConversations((prev) =>
                 prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 1 } : c)),
             );
@@ -1068,12 +1163,39 @@ const WhatsAppInbox: React.FC = () => {
                     Agente automático
                 </button>
 
+                {/* La cola de "ya llegó lo que pediste".
+                    Va en la barra de arriba y con el número a la vista porque
+                    es trabajo que se pierde en silencio: el repuesto entra,
+                    nadie se entera de quién lo estaba esperando y el cliente
+                    lo termina comprando en otro lado. */}
+                <button
+                    onClick={() => {
+                        setAvisarTelefono(undefined);
+                        setAvisarAbierto(true);
+                    }}
+                    title="Clientes que dejaron un pedido anotado y cuyo repuesto ya está"
+                    className={cn(
+                        button.base,
+                        porAvisar > 0 ? button.variant.success : button.variant.secondary,
+                        button.size.md,
+                    )}
+                >
+                    <Bell size={15} aria-hidden="true" />
+                    Por avisar
+                    {porAvisar > 0 && (
+                        <span className="ml-0.5 rounded-full bg-black/15 px-1.5 text-2xs font-semibold tnum">
+                            {porAvisar}
+                        </span>
+                    )}
+                </button>
+
                 <button
                     onClick={() => {
                         fetchEscalations();
                         fetchConversations();
                         fetchSettings();
                         fetchEstadoAgente();
+                        contarAvisos();
                     }}
                     aria-label="Actualizar la bandeja"
                     title="Vuelve a leer la lista, los escalamientos y el estado del agente"
@@ -1631,6 +1753,10 @@ const WhatsAppInbox: React.FC = () => {
                             phoneNumber={selected.phoneNumber}
                             customerName={selected.customerName}
                             onCotizar={(producto) => agregarAProforma(selected.conversationId, producto)}
+                            onAvisar={() => {
+                                setAvisarTelefono(selected.phoneNumber);
+                                setAvisarAbierto(true);
+                            }}
                         />
                     </div>
                 )}
@@ -1643,6 +1769,24 @@ const WhatsAppInbox: React.FC = () => {
                 media={visor?.media ?? []}
                 initialIndex={visor?.index ?? 0}
                 onClose={() => setVisor(null)}
+            />
+
+            <AvisarLlegadaModal
+                isOpen={avisarAbierto}
+                onClose={() => setAvisarAbierto(false)}
+                userId={userId}
+                soloTelefono={avisarTelefono}
+                onAvisado={() => {
+                    // El aviso ya está en la cola: se refresca el número del
+                    // botón y la ficha, que muestra el pedido como avisado.
+                    contarAvisos();
+                    setRecargarFicha((n) => n + 1);
+                }}
+                // Por `abrirConversacionPorId` y no seleccionando el id a
+                // secas: la lista trae las 200 más recientes, y un cliente
+                // que dejó un pedido hace tres meses puede no estar cargado
+                // -- seleccionar su id dejaría la pantalla en blanco.
+                onAbrirChat={abrirConversacionPorId}
             />
         </div>
     );

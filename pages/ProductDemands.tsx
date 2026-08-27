@@ -114,7 +114,19 @@ const ProductDemands: React.FC = () => {
     // View and Filters State
     const [viewType, setViewType] = useState<'table' | 'list' | 'kanban' | 'grouped'>('table');
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'product_asc' | 'customer_asc' | 'stock_desc'>('date_desc');
-    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
+    /*
+        `ready_to_notify` no es un estado de la base: es "activa y con stock
+        hoy", exactamente lo que cuenta la tarjeta de Listos para Notificar.
+
+        Existe porque la tarjeta y el filtro decían cosas distintas. La
+        tarjeta contaba activas-con-stock (141) y al tocarla se filtraba por
+        el ESTADO `stock_available`, que casi nunca tiene nada: ese estado
+        solo lo pone un disparador que corre al hacer UPDATE del stock en
+        `products`, así que el stock que entra por cualquier otro camino
+        deja la solicitud en `pending_stock` para siempre. Resultado: la
+        tarjeta decía 141 y la lista salía vacía.
+    */
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'ready_to_notify' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
     const [stockFilter, setStockFilter] = useState<'all' | 'has_local' | 'importer_only' | 'local_only' | 'no_stock' | 'approved_only'>('all');
     const [flagFilter, setFlagFilter] = useState<string>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
@@ -636,6 +648,12 @@ const ProductDemands: React.FC = () => {
             if (viewType !== 'kanban') {
                 if (statusFilter === 'active') {
                     if (d.status !== 'pending_stock' && d.status !== 'stock_available') return false;
+                } else if (statusFilter === 'ready_to_notify') {
+                    // La MISMA condición que cuenta la tarjeta (`stats.readyToNotify`),
+                    // y con la misma función de stock: si se escribiera dos
+                    // veces, el número y la lista volverían a separarse.
+                    if (!ACTIVE_STATUSES.includes(d.status)) return false;
+                    if (getStockValue(d.product) <= 0) return false;
                 } else if (statusFilter === 'inactive') {
                     // `discontinued` faltaba aquí, y tampoco estaba en el
                     // desplegable: las solicitudes de repuestos descontinuados
@@ -1377,9 +1395,9 @@ const ProductDemands: React.FC = () => {
 
                 <button
                     type="button"
-                    onClick={() => setStatusFilter('stock_available')}
-                    aria-pressed={statusFilter === 'stock_available'}
-                    className={`p-4 rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${statusFilter === 'stock_available' ? 'bg-success-soft border-success/20' : 'bg-surface border-subtle hover:border-success/20'}`}
+                    onClick={() => setStatusFilter('ready_to_notify')}
+                    aria-pressed={statusFilter === 'ready_to_notify'}
+                    className={`p-4 rounded-xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${statusFilter === 'ready_to_notify' ? 'bg-success-soft border-success/20' : 'bg-surface border-subtle hover:border-success/20'}`}
                 >
                     <div className="flex items-center gap-3 text-success mb-2">
                         <Package size={24} aria-hidden="true" />
@@ -1429,8 +1447,9 @@ const ProductDemands: React.FC = () => {
                         <option value="all">Filtro: Todos los estados</option>
                         <option value="active">Activas (Cola)</option>
                         <option value="inactive">Inactivas (Historial)</option>
+                        <option value="ready_to_notify">Listos para Notificar (hay stock)</option>
                         <option value="pending_stock">Esperando Stock</option>
-                        <option value="stock_available">Stock Disponible</option>
+                        <option value="stock_available">Marcados como Stock Disponible</option>
                         <option value="notified">Notificados</option>
                         <option value="discontinued">Descontinuados</option>
                         <option value="expired">Vencidos</option>

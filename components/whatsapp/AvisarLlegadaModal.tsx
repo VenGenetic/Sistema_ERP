@@ -1,0 +1,563 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Bell,
+    Check,
+    ImageOff,
+    Loader2,
+    MessageCircle,
+    PhoneOff,
+    Send,
+    X,
+} from 'lucide-react';
+import { supabase } from '../../supabaseClient';
+import { useBackDismiss } from '../../hooks/useBackDismiss';
+import { badge, button, cn, input, modal } from '../ui/styles';
+import { avisoDeEnvio, haceCuanto, type EstadoAgente } from './agente';
+import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
+import { buildWhatsAppDemandURL, openWhatsApp } from '../../utils/whatsapp';
+import {
+    avisarLlegada,
+    cargarPorAvisar,
+    marcarAvisadoSinMensaje,
+    mensajesDeAviso,
+    textoDeAviso,
+    type DemandaPorAvisar,
+} from './avisarLlegada';
+
+/**
+ * "Ya llegó el repuesto que pediste", mandado desde la bandeja.
+ *
+ * Dos pasos a propósito -- lista y después vista previa -- en vez de un
+ * botón que manda de una. Lo que sale de acá le llega al teléfono de un
+ * cliente y no se puede volver atrás, así que nadie tiene que poder
+ * mandarlo sin haber leído antes qué dice y a quién le va.
+ *
+ * Se abre en dos alcances:
+ *
+ *  * Desde el chat abierto (`soloTelefono`), para avisarle a la persona
+ *    con la que se está hablando.
+ *  * Desde el botón "Por avisar" de la bandeja, con TODOS los que están
+ *    esperando. Este es el que hace que el sistema sirva: cuando entra un
+ *    pedido a la importadora se destraban treinta clientes de una, y
+ *    buscarlos chat por chat no lo hace nadie.
+ */
+
+interface Props {
+    isOpen: boolean;
+    onClose: () => void;
+    userId: string | null;
+    /** Limita la lista a un cliente. Sin esto, salen todos. */
+    soloTelefono?: string;
+    /** Para que la pantalla de atrás refresque sus contadores. */
+    onAvisado?: () => void;
+    /** Saltar al chat del cliente. Si no se pasa, no se ofrece. */
+    onAbrirChat?: (conversationId: number) => void;
+}
+
+const Miniatura: React.FC<{ url: string | null | undefined; alt: string; grande?: boolean }> = ({
+    url,
+    alt,
+    grande = false,
+}) => {
+    const [falló, setFalló] = useState(false);
+    const medida = grande ? 'h-20 w-20' : 'h-11 w-11';
+    if (!url || falló) {
+        return (
+            <div
+                className={cn(
+                    medida,
+                    'shrink-0 rounded-lg flex items-center justify-center bg-surface-3 text-fg-subtle',
+                )}
+            >
+                <ImageOff size={grande ? 22 : 16} aria-hidden="true" />
+            </div>
+        );
+    }
+    return (
+        <img
+            src={url}
+            alt={alt}
+            loading="lazy"
+            onError={() => setFalló(true)}
+            className={cn(medida, 'shrink-0 rounded-lg object-cover bg-surface-3')}
+        />
+    );
+};
+
+/** "hoy" / "hace 3 días" / "hace 2 meses". */
+function esperandoDesde(iso: string): string {
+    const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (dias <= 0) return 'hoy';
+    if (dias === 1) return 'hace 1 día';
+    if (dias < 30) return `hace ${dias} días`;
+    const meses = Math.round(dias / 30);
+    return meses === 1 ? 'hace 1 mes' : `hace ${meses} meses`;
+}
+
+export const AvisarLlegadaModal: React.FC<Props> = ({
+    isOpen,
+    onClose,
+    userId,
+    soloTelefono,
+    onAvisado,
+    onAbrirChat,
+}) => {
+    const [demandas, setDemandas] = useState<DemandaPorAvisar[]>([]);
+    const [hayMas, setHayMas] = useState(false);
+    const [cargando, setCargando] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    /** El pedido abierto en la vista previa. `null` = estamos en la lista. */
+    const [abierto, setAbierto] = useState<DemandaPorAvisar | null>(null);
+    const [texto, setTexto] = useState('');
+    const [editado, setEditado] = useState(false);
+    const [conPrecio, setConPrecio] = useState(true);
+    const [conFoto, setConFoto] = useState(true);
+    const [enviando, setEnviando] = useState(false);
+    const [avisados, setAvisados] = useState(0);
+    const [ultimo, setUltimo] = useState<string | null>(null);
+    const [estadoAgente, setEstadoAgente] = useState<EstadoAgente | null>(null);
+
+    useBackDismiss(isOpen, onClose);
+
+    const cargar = useCallback(async () => {
+        setCargando(true);
+        setError(null);
+        try {
+            const { demandas: filas, hayMas: mas } = await cargarPorAvisar(soloTelefono);
+            setDemandas(filas);
+            setHayMas(mas);
+        } catch (err: any) {
+            setError(err?.message ?? 'No se pudo cargar la lista.');
+        } finally {
+            setCargando(false);
+        }
+
+        /*
+            Y cómo está el agente.
+
+            Importa acá más que en cualquier otra pantalla: mandar el aviso
+            ARCHIVA el pedido, así que si el agente está caído el pedido sale
+            de la lista de pendientes y el mensaje se queda en la cola. Se
+            mandará solo cuando el agente vuelva -- pero quien avisó a
+            cuarenta clientes tiene que saber que ninguno lo recibió todavía.
+
+            Una sola lectura al abrir, no un latido: la bandeja de atrás ya
+            tiene el suyo cada 30 segundos y no hace falta un segundo.
+        */
+        const { data } = await supabase
+            .from('agent_settings')
+            .select('agent_last_seen_at, agent_connection, agent_outbound_mode')
+            .eq('id', 1)
+            .maybeSingle();
+        setEstadoAgente((data as EstadoAgente) ?? null);
+    }, [soloTelefono]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setAbierto(null);
+        setAvisados(0);
+        setUltimo(null);
+        cargar();
+    }, [isOpen, cargar]);
+
+    /** Cuántos pedidos tiene por avisar cada teléfono, para no avisar de a uno sin saberlo. */
+    const porTelefono = useMemo(() => {
+        const cuenta = new Map<string, number>();
+        for (const d of demandas) cuenta.set(d.phone_number, (cuenta.get(d.phone_number) ?? 0) + 1);
+        return cuenta;
+    }, [demandas]);
+
+    const abrirVistaPrevia = (d: DemandaPorAvisar) => {
+        setAbierto(d);
+        setEditado(false);
+        setConPrecio(true);
+        setConFoto(!!d.product?.image_url);
+        setTexto(textoDeAviso(d, { incluirPrecio: true }));
+        setError(null);
+    };
+
+    // El texto sugerido sigue a los interruptores, salvo que lo hayan
+    // escrito a mano: pisar lo que alguien acaba de redactar porque tocó
+    // "incluir precio" es perder trabajo sin avisar.
+    useEffect(() => {
+        if (!abierto || editado) return;
+        setTexto(textoDeAviso(abierto, { incluirPrecio: conPrecio }));
+    }, [abierto, conPrecio, editado]);
+
+    const quitarDeLaLista = (id: number) => {
+        setDemandas((prev) => prev.filter((d) => d.id !== id));
+    };
+
+    const enviar = async () => {
+        if (!abierto || enviando) return;
+        if (!abierto.conversationId) return;
+        setEnviando(true);
+        setError(null);
+        try {
+            const mensajes = mensajesDeAviso(abierto, abierto.conversationId, texto, conFoto);
+            const resultado = await avisarLlegada({ demanda: abierto, mensajes, userId });
+            if (!resultado.ok) {
+                // No es un error del sistema: es que alguien se le adelantó.
+                // Se saca de la lista igual, porque ya no hay nada que hacer.
+                setError(resultado.detalle);
+                quitarDeLaLista(abierto.id);
+                setAbierto(null);
+                onAvisado?.();
+                return;
+            }
+            quitarDeLaLista(abierto.id);
+            setAvisados((n) => n + 1);
+            setUltimo(abierto.customer_name?.trim() || abierto.phone_number);
+            setAbierto(null);
+            onAvisado?.();
+        } catch (err: any) {
+            setError(err?.message ?? 'No se pudo mandar el aviso.');
+        } finally {
+            setEnviando(false);
+        }
+    };
+
+    const archivarSinMensaje = async () => {
+        if (!abierto || enviando) return;
+        setEnviando(true);
+        setError(null);
+        try {
+            const resultado = await marcarAvisadoSinMensaje(abierto, userId);
+            if (!resultado.ok) setError(resultado.detalle);
+            quitarDeLaLista(abierto.id);
+            setAbierto(null);
+            onAvisado?.();
+        } catch (err: any) {
+            setError(err?.message ?? 'No se pudo archivar el pedido.');
+        } finally {
+            setEnviando(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    // La MISMA regla que usan la bandeja y el modo móvil: si estuviera
+    // escrita otra vez acá, un día una pantalla avisaría y esta no.
+    const aviso = avisoDeEnvio(estadoAgente, haceCuanto);
+    const producto = abierto?.product ?? null;
+    const stock = producto ? stockUtil(producto) : null;
+    const precio = producto?.price != null ? precioParaCliente(producto.price) : null;
+
+    return (
+        <div className={modal.overlay} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+            <div
+                className={cn(modal.panel, abierto ? modal.width.xl : modal.width.full)}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Avisar que llegó el repuesto"
+            >
+                <div className={modal.header}>
+                    <div className="min-w-0">
+                        <h2 className={cn(modal.title, 'flex items-center gap-2')}>
+                            <Bell size={17} className="text-success shrink-0" aria-hidden="true" />
+                            {abierto ? 'Revisá el aviso antes de mandarlo' : 'Avisar que llegó el repuesto'}
+                        </h2>
+                        <p className={modal.subtitle}>
+                            {abierto
+                                ? 'Sale por el chat del cliente y queda registrado en el hilo.'
+                                : soloTelefono
+                                  ? 'Repuestos de este cliente que ya se pueden entregar.'
+                                  : 'Clientes que dejaron un pedido anotado y cuyo repuesto ya está.'}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className={modal.close} aria-label="Cerrar">
+                        <X size={18} aria-hidden="true" />
+                    </button>
+                </div>
+
+                <div className={modal.body}>
+                    {/* Si el agente no está, el aviso se encola igual pero no
+                        sale, y el pedido queda archivado. Hay que decirlo
+                        ANTES, no después de haber avisado a cuarenta. */}
+                    {aviso && (
+                        <div className="mb-3 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2">
+                            <p className="text-xs font-semibold text-warning-soft-fg">{aviso.titulo}</p>
+                            <p className="mt-0.5 text-2xs text-warning-soft-fg">{aviso.detalle}</p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <p className="mb-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
+                            {error}
+                        </p>
+                    )}
+
+                    {avisados > 0 && !abierto && (
+                        <p className="mb-3 rounded-lg border border-success/30 bg-success-soft px-3 py-2 text-xs text-success-soft-fg flex items-center gap-1.5">
+                            <Check size={13} aria-hidden="true" />
+                            {avisados === 1 ? `Avisado a ${ultimo}.` : `${avisados} avisos mandados.`} Salen en cuanto
+                            el agente los despache.
+                        </p>
+                    )}
+
+                    {/* ------------------------------ VISTA PREVIA ---------------------------- */}
+                    {abierto ? (
+                        <div className="space-y-3">
+                            <div className="flex items-start gap-3 rounded-xl border border-subtle bg-surface-2 p-3">
+                                <Miniatura url={producto?.image_url} alt={producto?.name ?? 'Repuesto'} grande />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium leading-snug text-fg">
+                                        {producto?.name ?? 'Repuesto sin vincular'}
+                                    </p>
+                                    <p className="mt-0.5 text-2xs text-fg-subtle">
+                                        {producto?.sku}
+                                        {precio != null && ` · ${formatearPrecio(precio)}`}
+                                    </p>
+                                    <p className="mt-1.5 text-2xs text-fg-muted">
+                                        Para {abierto.customer_name?.trim() || 'este número'} · {abierto.phone_number}
+                                    </p>
+                                    {abierto.notes && (
+                                        <p className="mt-1 text-2xs italic text-fg-subtle line-clamp-2">
+                                            Nota del pedido: {abierto.notes}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* El stock se relee al cargar la lista. Si se vendió mientras
+                                tanto, avisar que llegó es peor que no avisar nada. */}
+                            {stock && !stock.hay && (
+                                <p className="flex items-start gap-1.5 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
+                                    <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
+                                    Este repuesto ya NO tiene stock. Si se vendió mientras tanto, avisar que llegó te
+                                    deja en falta con el cliente.
+                                </p>
+                            )}
+                            {stock?.hay && stock.local === 0 && (
+                                <p className="rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-warning-soft-fg">
+                                    Solo hay en la importadora: no está en la bodega todavía. Conviene decirle en cuánto
+                                    le llega.
+                                </p>
+                            )}
+
+                            {!abierto.conversationId ? (
+                                <div className="rounded-lg border border-dashed border-strong px-3 py-3">
+                                    <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
+                                        <PhoneOff size={13} className="shrink-0" aria-hidden="true" />
+                                        Este número nunca escribió al WhatsApp del negocio
+                                    </p>
+                                    <p className="mt-1 text-2xs text-fg-muted">
+                                        No hay conversación por la que mandarlo, así que el aviso no puede salir desde
+                                        acá. Se le puede escribir por fuera y dejar constancia: cuando conteste, el chat
+                                        queda creado y a partir de ahí sí entra en la bandeja.
+                                    </p>
+                                    <div className="mt-2.5 flex flex-wrap gap-2">
+                                        <button
+                                            onClick={() =>
+                                                openWhatsApp(
+                                                    buildWhatsAppDemandURL({
+                                                        customerPhone: abierto.phone_number,
+                                                        customerName: abierto.customer_name ?? undefined,
+                                                        productSku: producto?.sku ?? '',
+                                                        productName: producto?.name ?? 'el repuesto que pediste',
+                                                    }),
+                                                )
+                                            }
+                                            className={cn(button.base, button.variant.secondary, button.size.sm)}
+                                        >
+                                            <MessageCircle size={14} aria-hidden="true" />
+                                            Abrir WhatsApp por fuera
+                                        </button>
+                                        <button
+                                            onClick={archivarSinMensaje}
+                                            disabled={enviando}
+                                            className={cn(button.base, button.variant.ghost, button.size.sm)}
+                                        >
+                                            Marcar como avisado
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <label className="block">
+                                        <span className="text-xs font-semibold text-fg-muted">
+                                            Lo que le va a llegar
+                                        </span>
+                                        <textarea
+                                            value={texto}
+                                            onChange={(e) => {
+                                                setTexto(e.target.value);
+                                                setEditado(true);
+                                            }}
+                                            rows={7}
+                                            className={cn(input.textarea, 'mt-1')}
+                                        />
+                                    </label>
+
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <label className="flex items-center gap-2 text-xs text-fg-muted">
+                                            <input
+                                                type="checkbox"
+                                                checked={conPrecio}
+                                                onChange={(e) => setConPrecio(e.target.checked)}
+                                                disabled={editado}
+                                            />
+                                            Incluir el precio
+                                        </label>
+                                        <label className="flex items-center gap-2 text-xs text-fg-muted">
+                                            <input
+                                                type="checkbox"
+                                                checked={conFoto}
+                                                onChange={(e) => setConFoto(e.target.checked)}
+                                                disabled={!producto?.image_url}
+                                            />
+                                            Mandar la foto {!producto?.image_url && '(no tiene)'}
+                                        </label>
+                                        {editado && (
+                                            <button
+                                                onClick={() => {
+                                                    setEditado(false);
+                                                    setTexto(textoDeAviso(abierto, { incluirPrecio: conPrecio }));
+                                                }}
+                                                className={cn(button.base, button.variant.link, button.size.xs)}
+                                            >
+                                                Volver al texto sugerido
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {(porTelefono.get(abierto.phone_number) ?? 0) > 1 && (
+                                        <p className="text-2xs text-fg-muted">
+                                            Este cliente tiene {porTelefono.get(abierto.phone_number)} repuestos por
+                                            avisar. Cada uno se manda por separado, con su foto.
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        /* --------------------------------- LISTA -------------------------------- */
+                        <>
+                            {cargando ? (
+                                <p className="flex items-center gap-2 py-10 text-center text-sm text-fg-muted">
+                                    <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Buscando pedidos
+                                    con stock…
+                                </p>
+                            ) : demandas.length === 0 ? (
+                                <p className="py-10 text-center text-sm text-fg-muted">
+                                    {avisados > 0
+                                        ? 'No queda nada por avisar.'
+                                        : soloTelefono
+                                          ? 'Este cliente no tiene ningún pedido cuyo repuesto ya haya llegado.'
+                                          : 'Ningún cliente está esperando un repuesto que ya haya llegado.'}
+                                </p>
+                            ) : (
+                                <div className="divide-y divide-subtle">
+                                    {demandas.map((d) => {
+                                        const s = d.product ? stockUtil(d.product) : null;
+                                        return (
+                                            <div key={d.id} className="flex items-center gap-3 py-2.5">
+                                                <Miniatura url={d.product?.image_url} alt={d.product?.name ?? ''} />
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="line-clamp-2 text-xs font-medium leading-snug text-fg">
+                                                        {d.product?.name ?? 'Repuesto sin vincular'}
+                                                    </p>
+                                                    <p className="truncate text-2xs text-fg-subtle">
+                                                        {d.customer_name?.trim() || d.phone_number} · pedido{' '}
+                                                        {esperandoDesde(d.created_at)}
+                                                    </p>
+                                                </div>
+
+                                                <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+                                                    {/* Que el stock sea solo de la importadora cambia lo
+                                                        que hay que decirle al cliente, así que se ve
+                                                        desde la lista. */}
+                                                    {s && (
+                                                        <span
+                                                            className={cn(
+                                                                badge.base,
+                                                                badge.size.sm,
+                                                                s.local > 0 ? badge.tone.success : badge.tone.warning,
+                                                            )}
+                                                        >
+                                                            {s.local > 0 ? 'en bodega' : 'en importadora'}
+                                                        </span>
+                                                    )}
+                                                    {!d.conversationId && (
+                                                        <span className={cn(badge.base, badge.size.sm, badge.tone.neutral)}>
+                                                            sin chat
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {d.conversationId && onAbrirChat && (
+                                                    <button
+                                                        onClick={() => {
+                                                            onAbrirChat(d.conversationId!);
+                                                            onClose();
+                                                        }}
+                                                        title="Abrir el chat"
+                                                        className={cn(
+                                                            button.base,
+                                                            button.variant.ghost,
+                                                            button.size.sm,
+                                                            button.icon.sm,
+                                                        )}
+                                                    >
+                                                        <MessageCircle size={14} aria-hidden="true" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => abrirVistaPrevia(d)}
+                                                    className={cn(button.base, button.variant.success, button.size.sm)}
+                                                >
+                                                    Avisar
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {hayMas && (
+                                <p className="mt-3 text-2xs text-fg-subtle">
+                                    Se muestran los primeros. A medida que vayas avisando aparecen los que faltan.
+                                </p>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                <div className={modal.footer}>
+                    {abierto ? (
+                        <>
+                            <button
+                                onClick={() => setAbierto(null)}
+                                className={cn(button.base, button.variant.secondary, button.size.md, 'mr-auto')}
+                            >
+                                <ArrowLeft size={15} aria-hidden="true" />
+                                Volver a la lista
+                            </button>
+                            <button
+                                onClick={enviar}
+                                disabled={enviando || !abierto.conversationId || !texto.trim()}
+                                className={cn(button.base, button.variant.success, button.size.md)}
+                            >
+                                {enviando ? (
+                                    <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                                ) : (
+                                    <Send size={15} aria-hidden="true" />
+                                )}
+                                Mandar el aviso
+                            </button>
+                        </>
+                    ) : (
+                        <button onClick={onClose} className={cn(button.base, button.variant.secondary, button.size.md)}>
+                            Cerrar
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default AvisarLlegadaModal;

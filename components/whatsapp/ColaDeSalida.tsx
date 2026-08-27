@@ -5,6 +5,7 @@ import { cn } from '../ui/styles';
 import {
     CAMPOS_COLA,
     cancelarMensaje,
+    KINDS_MENSAJE,
     reintentarMensaje,
     type MensajeEnCola,
 } from '../../utils/whatsappOutbox';
@@ -48,6 +49,13 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
      * Solo `pending` y `failed`: lo que ya salió aparece en el hilo real
      * (`agent_messages`), y mostrarlo dos veces haría dudar de si se mandó
      * una vez o dos.
+     *
+     * Y solo MENSAJES. Por esta misma cola viajan las acciones que el
+     * agente ejecuta contra WhatsApp -- marcar leído, marcar sin leer,
+     * borrar, reaccionar -- y ninguna le muestra nada al cliente. Sin el
+     * filtro, abrir un chat sin leer dibujaba al final del hilo una
+     * burbuja verde vacía diciendo "En cola" con un botón de cancelar: el
+     * acuse de lectura disfrazado de mensaje por enviar.
      */
     const recargar = useCallback(async () => {
         const id = idRef.current;
@@ -60,6 +68,7 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
             .select(CAMPOS_COLA)
             .eq('conversation_id', id)
             .in('status', ['pending', 'failed'])
+            .in('kind', KINDS_MENSAJE)
             .order('created_at', { ascending: true });
         if (error) {
             console.error('No se pudo leer la cola de salida:', error.message);

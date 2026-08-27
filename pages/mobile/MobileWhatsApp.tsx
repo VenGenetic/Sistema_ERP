@@ -29,8 +29,10 @@ import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
 import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
 import MediaGallery from '../../components/whatsapp/MediaGallery';
 import CustomerPanel from '../../components/whatsapp/CustomerPanel';
+import AvisarLlegadaModal from '../../components/whatsapp/AvisarLlegadaModal';
 import { BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
 import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/agente';
+import { fusionarMensajes, useRepasoDelHilo } from '../../components/whatsapp/hiloEnVivo';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
 import ChatThread, {
     horaLista,
@@ -190,6 +192,8 @@ const MobileWhatsApp: React.FC = () => {
     const [galeria, setGaleria] = useState(false);
     /** La ficha del cliente, en una hoja que sube desde abajo. */
     const [ficha, setFicha] = useState(false);
+    /** "Ya llegó lo que pediste", para el cliente del chat abierto. */
+    const [avisarAbierto, setAvisarAbierto] = useState(false);
     /** El menú "⋮" de la cabecera del chat. */
     const [menuChat, setMenuChat] = useState(false);
     /**
@@ -351,16 +355,54 @@ const MobileWhatsApp: React.FC = () => {
         setMensajes((data as Mensaje[]).slice().reverse());
     }, []);
 
+    /**
+     * El repaso del hilo abierto: la red de abajo del realtime.
+     *
+     * Los eventos de `agent_messages` solo llegan si la tabla está en la
+     * publicación `supabase_realtime` (migración 0033 del agente); sin eso
+     * la suscripción se conecta y no llega nada, y el mensaje que el
+     * agente despacha desaparece de la pantalla hasta recargar. En un
+     * teléfono además se corta la red y se apaga la pantalla todo el
+     * tiempo, así que la suscripción se cae sola.
+     *
+     * Funde en vez de reemplazar: cambiar los objetos cada pocos segundos
+     * redibujaría el hilo entero con sus fotos y sus audios.
+     */
+    const abiertaRef = useRef<number | null>(null);
+
+    const repasarHilo = useCallback(async () => {
+        const id = abiertaRef.current;
+        if (!id) return;
+        const { data, error: err } = await supabase
+            .from('agent_messages')
+            .select(CAMPOS_MSG)
+            .eq('conversation_id', id)
+            .order('created_at', { ascending: false })
+            .limit(MENSAJES_VISIBLES);
+        // Un repaso que falla no se muestra: lo que está en pantalla sigue
+        // siendo válido y el siguiente turno reintenta.
+        if (err || !data) return;
+        // Pudieron salir del chat mientras viajaba la consulta.
+        if (abiertaRef.current !== id) return;
+        const recientes = (data as Mensaje[]).slice().reverse();
+        setMensajes((prev) => fusionarMensajes(prev, recientes));
+    }, []);
+
+    abiertaRef.current = abierta?.id ?? null;
+    useRepasoDelHilo(!!abierta, repasarHilo);
+
     const abrirChat = async (c: Conversacion) => {
         setAbierta(c);
         setMensajes([]);
         setBorrador('');
         setError(null);
         await cargarMensajes(c.id);
-        // Abrirlo cuenta como leído, igual que en el escritorio: se apaga el
-        // contador de acá y además se le mandan los tildes azules al cliente,
-        // que es lo que él ve en su teléfono. Que falle el tilde no puede
-        // romper la apertura del chat, así que no se espera.
+        // Abrirlo cuenta como leído en los DOS lados: el UPDATE de acá es
+        // el adelanto para que la lista responda al toque, pero el que
+        // manda es el acuse encolado -- el contador de no leídos lo espeja
+        // WhatsApp, así que apagarlo solo en la base dura hasta el
+        // siguiente `chats.update`. Que falle el acuse no puede romper la
+        // apertura del chat, así que no se espera.
         if (c.unread_count > 0) {
             await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', c.id);
             setConversaciones((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread_count: 0 } : x)));
@@ -369,14 +411,15 @@ const MobileWhatsApp: React.FC = () => {
     };
 
     /**
-     * Deja el chat como pendiente en la lista y vuelve atrás.
+     * Deja el chat como pendiente -- en la lista y en el teléfono -- y
+     * vuelve atrás.
      *
      * Lo segundo no es un capricho: si el chat quedara abierto, abrirlo lo
      * marca leído otra vez y el botón parecería no hacer nada.
      */
     const marcarComoNoLeido = async (c: Conversacion) => {
         try {
-            await marcarNoLeido(c.id);
+            await marcarNoLeido(c.id, userId);
             setConversaciones((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread_count: 1 } : x)));
             setAbierta(null);
         } catch (err: any) {
@@ -995,6 +1038,13 @@ const MobileWhatsApp: React.FC = () => {
                     onClose={() => setVisor(null)}
                 />
 
+                <AvisarLlegadaModal
+                    isOpen={avisarAbierto}
+                    onClose={() => setAvisarAbierto(false)}
+                    userId={userId}
+                    soloTelefono={abierta.phone_number}
+                />
+
                 {/* La ficha del cliente, en una hoja que sube desde abajo.
                     Lo que dice -- si tiene descuento, qué repuestos dejó
                     pedidos, cuáles ya llegaron -- hay que tenerlo MIENTRAS se
@@ -1034,6 +1084,10 @@ const MobileWhatsApp: React.FC = () => {
                                     agregarAProforma(abierta.id, producto);
                                     setFicha(false);
                                     setProformaAbierta(true);
+                                }}
+                                onAvisar={() => {
+                                    setFicha(false);
+                                    setAvisarAbierto(true);
                                 }}
                             />
                         </div>

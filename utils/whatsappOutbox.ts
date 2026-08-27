@@ -40,6 +40,22 @@ export function faltaColumna(error: { code?: string } | null | undefined): boole
 export type OutboxKind = 'text' | 'image' | 'video' | 'document' | 'audio';
 export type OutboxStatus = 'pending' | 'sent' | 'failed' | 'canceled';
 
+/**
+ * Los tipos de fila que son un MENSAJE para el cliente.
+ *
+ * La misma cola lleva además ACCIONES (`delete`, `reaction`, `edit`,
+ * `read`, `unread`): cosas que el proceso del agente ejecuta contra
+ * WhatsApp y que no le muestran ningún mensaje al cliente. Comparten la
+ * cola a propósito -- así comparten los reintentos, el freno de salida y
+ * el registro de fallos -- pero el hilo tiene que poder distinguirlas.
+ *
+ * Sin este filtro, cada vez que se abre un chat sin leer aparecería al
+ * final del hilo una burbuja verde VACÍA que dice "En cola" con un botón
+ * de cancelar al lado: la fila de "marcar leído" dibujada como si fuera un
+ * mensaje que le va a llegar al cliente.
+ */
+export const KINDS_MENSAJE: OutboxKind[] = ['text', 'image', 'video', 'document', 'audio'];
+
 /** Lo máximo que WhatsApp acepta por archivo sin partirlo. */
 export const MAX_ADJUNTO_MB = 16;
 
@@ -241,6 +257,18 @@ async function encolarAccion(fila: Record<string, unknown>, userId: string | nul
                     '(supabase/migrations/0031_agent_outbox_acciones.sql).',
             );
         }
+        // 23514 = lo rechazó un CHECK. En esta tabla eso solo puede ser el
+        // de `kind`: la acción existe en el código pero la migración que la
+        // permite todavía no se aplicó. Sin este mensaje el error que se ve
+        // es "new row violates check constraint", que no le dice a nadie
+        // qué archivo hay que correr.
+        if (error.code === '23514') {
+            throw new Error(
+                `La base todavía no acepta la acción "${String(fila.kind)}". ` +
+                    'Falta aplicar la migración 0033 del agente ' +
+                    '(supabase/migrations/0033_realtime_hilo_y_no_leido.sql).',
+            );
+        }
         throw error;
     }
 }
@@ -288,33 +316,47 @@ export async function reaccionarMensaje(
 /**
  * Marca como leídos los mensajes del cliente -- el doble tilde azul.
  *
- * Se llama al RESPONDER, no al abrir el chat. Si alguien abre la
- * conversación para mirarla y no contesta, ver el tilde azul le dice al
- * cliente "te leí y te dejé esperando", que molesta más que no haberla
- * abierto. Junto con la respuesta, el tilde llega cuando ya tiene su
- * contestación.
+ * Se llama al ABRIR el chat, igual que WhatsApp Web.
+ *
+ * Antes se hacía solo al RESPONDER, para no decirle al cliente "te leí y
+ * te dejé esperando". El problema es que el conteo de no leídos NO lo
+ * decide el ERP: lo espeja WhatsApp (`syncChatUnreadCounts` en el
+ * agente). Apagar el contador acá sin avisarle a WhatsApp dejaba el chat
+ * sin leer en el teléfono, y el siguiente `chats.update` lo devolvía a
+ * pendiente -- chats atendidos que reaparecían solos en la lista.
+ *
+ * Leído es una sola cosa en los dos lados o no es nada.
  */
 export async function marcarLeidoEnWhatsApp(conversationId: number, userId: string | null): Promise<void> {
     await encolarAccion({ conversation_id: conversationId, kind: 'read' }, userId);
 }
 
 /**
- * Marca un chat como NO leído en el ERP.
+ * Deja el chat pendiente -- en el ERP y en el teléfono.
  *
- * Es un espejo local, no toca WhatsApp: sirve para dejar un chat
- * pendiente cuando se lo abrió sin poder atenderlo. Sin esto, abrir un
- * chat para mirar de qué se trataba lo apagaba de la lista de pendientes
- * y quedaba enterrado entre miles.
+ * Sirve para cuando se abre un chat sin poder atenderlo: sin esto,
+ * mirarlo para saber de qué se trataba lo apagaba de la lista de
+ * pendientes y quedaba enterrado entre miles.
  *
- * Se pone en 1 y no en el conteo real: lo que importa es que vuelva a
- * aparecer como pendiente, y el número exacto ya se perdió al abrirlo.
+ * Va por la cola, no con un UPDATE local, por el mismo motivo que el
+ * tilde azul: el contador lo devuelve WhatsApp. Escribir `unread_count`
+ * a mano duraba hasta el siguiente `chats.update`, que lo volvía a poner
+ * en cero -- el botón parecía no hacer nada.
+ *
+ * El espejo local sigue estando, pero como adelanto: la lista tiene que
+ * responder al toque y no dos segundos después, cuando el agente
+ * despacha la acción y WhatsApp contesta.
  */
-export async function marcarNoLeido(conversationId: number): Promise<void> {
+export async function marcarNoLeido(conversationId: number, userId: string | null): Promise<void> {
+    await encolarAccion({ conversation_id: conversationId, kind: 'unread' }, userId);
+
+    // Si esto falla no se cancela nada: la orden ya está encolada y es la
+    // que manda. Lo único que se pierde es el adelanto en pantalla.
     const { error } = await supabase
         .from('agent_conversations')
         .update({ unread_count: 1 })
         .eq('id', conversationId);
-    if (error) throw error;
+    if (error) console.warn('No se pudo adelantar el "sin leer" en la lista:', error.message);
 }
 
 /** Vuelve a poner en cola un mensaje que falló, con los intentos en cero. */
@@ -368,7 +410,9 @@ export function formatearPrecio(valor: number): string {
  * que no es confiable y no cuenta como stock. Misma regla que usa el bot
  * (`agente/src/agent/handleMessage.ts`).
  */
-export function stockUtil(p: ProductoCatalogo): { local: number; importador: number; hay: boolean } {
+export function stockUtil(
+    p: Pick<ProductoCatalogo, 'local_stock' | 'importer_stock' | 'importer_unavailable_override'>,
+): { local: number; importador: number; hay: boolean } {
     const local = p.local_stock ?? 0;
     const importador = p.importer_unavailable_override ? 0 : (p.importer_stock ?? 0);
     return { local, importador, hay: local > 0 || importador > 0 };

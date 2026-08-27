@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BadgeCheck, Bell, ExternalLink, Loader2, Package, RefreshCw, UserPlus } from 'lucide-react';
+import { BadgeCheck, Bell, ExternalLink, Loader2, Package, RefreshCw, Send, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { badge, button, card, cn } from '../ui/styles';
-import { formatearPrecio, precioParaCliente } from '../../utils/whatsappOutbox';
+import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
 
 /**
  * Quién es el cliente que está del otro lado, sin salir del chat.
@@ -26,6 +26,14 @@ interface Props {
     customerName: string | null;
     /** Agrega un repuesto que ya llegó a la proforma en curso. */
     onCotizar?: (producto: { product_id: number; sku: string; name: string; price: number | null; image_url: string | null }) => void;
+    /**
+     * Abre el aviso de "ya llegó lo que pediste" para este cliente.
+     *
+     * La ficha no lo manda ella: la pantalla es la que tiene el modal, y
+     * este panel lo usan las dos (bandeja y modo móvil). Si no se pasa, el
+     * botón no aparece.
+     */
+    onAvisar?: () => void;
 }
 
 interface ClienteErp {
@@ -50,6 +58,7 @@ interface Demanda {
         image_url: string | null;
         local_stock: number | null;
         importer_stock: number | null;
+        importer_unavailable_override: boolean | null;
     } | null;
 }
 
@@ -67,7 +76,13 @@ function cola(numero: string): string {
     return numero.replace(/\D/g, '').slice(-9);
 }
 
-export const CustomerPanel: React.FC<Props> = ({ conversationId, phoneNumber, customerName, onCotizar }) => {
+export const CustomerPanel: React.FC<Props> = ({
+    conversationId,
+    phoneNumber,
+    customerName,
+    onCotizar,
+    onAvisar,
+}) => {
     const [cliente, setCliente] = useState<ClienteErp | null>(null);
     const [demandas, setDemandas] = useState<Demanda[]>([]);
     const [cargando, setCargando] = useState(true);
@@ -99,7 +114,7 @@ export const CustomerPanel: React.FC<Props> = ({ conversationId, phoneNumber, cu
             const { data: dem, error: errorDem } = await supabase
                 .from('product_demands')
                 .select(
-                    'id, status, created_at, notes, product:products(id, name, sku, price, image_url, local_stock, importer_stock)',
+                    'id, status, created_at, notes, product:products(id, name, sku, price, image_url, local_stock, importer_stock, importer_unavailable_override)',
                 )
                 .ilike('phone_number', `%${local}%`)
                 .order('created_at', { ascending: false })
@@ -118,7 +133,20 @@ export const CustomerPanel: React.FC<Props> = ({ conversationId, phoneNumber, cu
     }, [cargar, conversationId]);
 
     const activas = demandas.filter((d) => d.status === 'pending_stock' || d.status === 'stock_available');
-    const llegaron = demandas.filter((d) => d.status === 'stock_available');
+    /*
+        Lo que ya se le puede entregar: pedido activo Y con stock HOY.
+
+        No alcanza con mirar el estado `stock_available`. Ese estado lo pone
+        un disparador que solo corre al hacer UPDATE del stock en `products`,
+        así que el stock que entra por cualquier otro camino deja el pedido en
+        `pending_stock` para siempre. Filtrando por estado, este bloque decía
+        "Llegó lo que pidió (0)" con el repuesto en la bodega -- y es
+        justamente el dato por el que existe la ficha.
+
+        Es la misma regla que usan el botón "Por avisar" de la bandeja y la
+        tarjeta de Solicitudes: activa + `stockUtil().hay`.
+    */
+    const llegaron = activas.filter((d) => d.product && stockUtil(d.product).hay);
 
     return (
         <div className={cn(card.base, 'overflow-hidden')}>
@@ -193,10 +221,24 @@ export const CustomerPanel: React.FC<Props> = ({ conversationId, phoneNumber, cu
                 {/* Lo que ya llegó: es lo que se puede vender AHORA. */}
                 {llegaron.length > 0 && (
                     <div className="rounded-lg border border-success/30 bg-success-soft px-3 py-2">
-                        <p className="text-xs font-semibold text-success-soft-fg flex items-center gap-1.5">
-                            <Bell size={13} aria-hidden="true" />
-                            Llegó lo que pidió ({llegaron.length})
-                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-success-soft-fg flex items-center gap-1.5">
+                                <Bell size={13} aria-hidden="true" />
+                                Llegó lo que pidió ({llegaron.length})
+                            </p>
+                            {/* Avisarle es la mitad que faltaba: el repuesto puede
+                                estar hace una semana en la bodega y el cliente no
+                                tiene forma de saberlo. */}
+                            {onAvisar && (
+                                <button
+                                    onClick={onAvisar}
+                                    className={cn(button.base, button.variant.success, button.size.xs)}
+                                >
+                                    <Send size={12} aria-hidden="true" />
+                                    Avisarle
+                                </button>
+                            )}
+                        </div>
                         <div className="mt-1.5 space-y-1.5">
                             {llegaron.map((d) => (
                                 <div key={d.id} className="flex items-center gap-2">
