@@ -498,10 +498,48 @@ async function asegurarConversacion(demanda: DemandaPorAvisar): Promise<number> 
     return existente.id;
 }
 
+/**
+ * Cuántos avisos se pueden mandar por hora.
+ *
+ * No es un límite de WhatsApp -- para una cuenta que no es Business no
+ * hay ninguno publicado. Es una decisión nuestra, y el número es un
+ * criterio y no una verdad: 25 por hora permite vaciar una lista de
+ * espera de cien en media jornada sin que el patrón se parezca al de un
+ * bot.
+ *
+ * Por qué existe: avisar es escribirle POR PRIMERA VEZ a gente que nunca
+ * le escribió al negocio. Cien primeros contactos en dos minutos es justo
+ * lo que Meta marca como spam, y lo que se pierde no son los mensajes: es
+ * el número del negocio.
+ *
+ * Del lado del agente hay una segunda defensa independiente de esta: la
+ * cola toma ritmo entre envíos (`humanDelay` en outboxJob). Esta frena la
+ * tanda; aquella espacia lo que ya salió.
+ */
+export const AVISOS_POR_HORA = 25;
+
+/**
+ * Cuántos avisos se mandaron en la última hora.
+ *
+ * Cuenta `notified_at`, que escriben tanto el aviso como el "marcar
+ * avisado sin mandar". Contar de más en ese segundo caso es a propósito:
+ * ante la duda, frenar antes. Es un caso raro y el error cae del lado
+ * seguro.
+ */
+export async function contarAvisosRecientes(): Promise<number> {
+    const desde = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+        .from('product_demands')
+        .select('id', { count: 'exact', head: true })
+        .gte('notified_at', desde);
+    if (error) throw error;
+    return count ?? 0;
+}
+
 export interface ResultadoAviso {
     ok: boolean;
     /** Por qué no se hizo. Solo viene cuando `ok` es false. */
-    motivo?: 'ya-avisado';
+    motivo?: 'ya-avisado' | 'tope-por-hora';
     detalle?: string;
 }
 
@@ -540,6 +578,22 @@ export async function avisarLlegada(params: {
 }): Promise<ResultadoAviso> {
     const { demanda, texto, conFoto, userId } = params;
     if (!texto.trim()) throw new Error('No hay nada que mandar: el mensaje quedó vacío.');
+
+    // El tope se comprueba ANTES de reservar: si se reservara primero
+    // habría que devolver el pedido a la lista solo por haber llegado al
+    // límite, y una vuelta atrás que se puede evitar es una vuelta atrás
+    // que puede fallar.
+    const recientes = await contarAvisosRecientes();
+    if (recientes >= AVISOS_POR_HORA) {
+        return {
+            ok: false,
+            motivo: 'tope-por-hora',
+            detalle:
+                `Ya se mandaron ${recientes} avisos en la última hora, que es el tope. ` +
+                'Seguí más tarde: mandarle a mucha gente que nunca escribió, toda junta, ' +
+                'es lo que hace que WhatsApp bloquee el número del negocio.',
+        };
+    }
 
     const ahora = new Date().toISOString();
     const { data: reservada, error: errorReserva } = await supabase

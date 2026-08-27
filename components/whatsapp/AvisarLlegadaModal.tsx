@@ -18,10 +18,11 @@ import { avisoDeEnvio, haceCuanto, type EstadoAgente } from './agente';
 import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
 import { buildWhatsAppDemandURL, openWhatsApp } from '../../utils/whatsapp';
 import {
+    AVISOS_POR_HORA,
     avisarLlegada,
     cargarPorAvisar,
+    contarAvisosRecientes,
     marcarAvisadoSinMensaje,
-
     textoDeAviso,
     type DemandaPorAvisar,
 } from './avisarLlegada';
@@ -131,6 +132,8 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     const [avisados, setAvisados] = useState(0);
     const [ultimo, setUltimo] = useState<string | null>(null);
     const [estadoAgente, setEstadoAgente] = useState<EstadoAgente | null>(null);
+    /** Avisos mandados en la última hora, para el tope. */
+    const [recientes, setRecientes] = useState(0);
 
     useBackDismiss(isOpen, onClose);
 
@@ -176,6 +179,15 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
             .eq('id', 1)
             .maybeSingle();
         setEstadoAgente((data as EstadoAgente) ?? null);
+
+        // Cuánto queda del tope por hora. Se lee al abrir y se recalcula
+        // después de cada aviso, así el número que se ve es el de verdad.
+        try {
+            setRecientes(await contarAvisosRecientes());
+        } catch {
+            // Si no se puede contar, no se bloquea nada: el tope se vuelve
+            // a comprobar en el servidor al mandar.
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [soloTelefono, soloDemandaId]);
 
@@ -222,9 +234,16 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
         try {
             const resultado = await avisarLlegada({ demanda: abierto, texto, conFoto, userId });
             if (!resultado.ok) {
-                // No es un error del sistema: es que alguien se le adelantó.
-                // Se saca de la lista igual, porque ya no hay nada que hacer.
                 setError(resultado.detalle);
+                if (resultado.motivo === 'tope-por-hora') {
+                    // El pedido NO se avisó y sigue pendiente: se queda en
+                    // la lista. Sacarlo sería perderlo de vista justamente
+                    // cuando hay que volver a intentarlo más tarde.
+                    setRecientes(AVISOS_POR_HORA);
+                    return;
+                }
+                // Alguien se le adelantó: ese pedido ya está avisado, así
+                // que se saca de la lista porque no hay nada más que hacer.
                 quitarDeLaLista(abierto.id);
                 setAbierto(null);
                 onAvisado?.();
@@ -232,6 +251,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
             }
             quitarDeLaLista(abierto.id);
             setAvisados((n) => n + 1);
+            setRecientes((n) => n + 1);
             setUltimo(abierto.customer_name?.trim() || abierto.phone_number);
             setAbierto(null);
             onAvisado?.();
@@ -309,6 +329,34 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                     {error && (
                         <p className="mb-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
                             {error}
+                        </p>
+                    )}
+
+                    {/* Cuánto queda del tope por hora. Se muestra siempre,
+                        no solo al chocarlo: enterarse del límite recién
+                        cuando frena, a mitad de una tanda de cien, es
+                        peor que saberlo desde el principio. */}
+                    {recientes > 0 && (
+                        <p
+                            className={cn(
+                                'mb-3 rounded-lg border px-3 py-2 text-xs',
+                                recientes >= AVISOS_POR_HORA
+                                    ? 'border-danger/30 bg-danger-soft text-danger-soft-fg'
+                                    : 'border-subtle bg-surface-2 text-fg-muted',
+                            )}
+                        >
+                            {recientes >= AVISOS_POR_HORA ? (
+                                <>
+                                    Llegaste al tope de {AVISOS_POR_HORA} avisos por hora. Seguí más tarde: mandarle a
+                                    mucha gente que nunca escribió, toda junta, es lo que hace que WhatsApp bloquee el
+                                    número del negocio.
+                                </>
+                            ) : (
+                                <>
+                                    {recientes} de {AVISOS_POR_HORA} avisos en la última hora. Quedan{' '}
+                                    {AVISOS_POR_HORA - recientes}.
+                                </>
+                            )}
                         </p>
                     )}
 
@@ -576,7 +624,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                             )}
                             <button
                                 onClick={enviar}
-                                disabled={enviando || !texto.trim()}
+                                disabled={enviando || !texto.trim() || recientes >= AVISOS_POR_HORA}
                                 className={cn(button.base, button.variant.success, button.size.md)}
                             >
                                 {enviando ? (
