@@ -129,7 +129,7 @@ const ProductDemands: React.FC = () => {
         deja la solicitud en `pending_stock` para siempre. Resultado: la
         tarjeta decía 141 y la lista salía vacía.
     */
-    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'ready_to_notify' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'ready_to_notify' | 'needs_deposit' | 'pending_stock' | 'stock_available' | 'notified' | 'cancelled' | 'discontinued' | 'expired'>('active');
     const [stockFilter, setStockFilter] = useState<'all' | 'has_local' | 'importer_only' | 'local_only' | 'no_stock' | 'approved_only'>('all');
     const [flagFilter, setFlagFilter] = useState<string>('all');
     const [lightbox, setLightbox] = useState<{isOpen: boolean, media: any[], initialIndex: number}>({ isOpen: false, media: [], initialIndex: 0 });
@@ -666,6 +666,14 @@ const ProductDemands: React.FC = () => {
                     // veces, el número y la lista volverían a separarse.
                     if (!ACTIVE_STATUSES.includes(d.status)) return false;
                     if (getStockValue(d.product, 'local') <= 0) return false;
+                } else if (statusFilter === 'needs_deposit') {
+                    // El otro caso: no está en la bodega pero la importadora
+                    // lo tiene. No se le avisa "ya llegó" -- no llegó -- se le
+                    // ofrece traerlo pidiéndole un abono. Es la misma
+                    // condición que usa el botón "Piden abono" de la bandeja.
+                    if (!ACTIVE_STATUSES.includes(d.status)) return false;
+                    if (getStockValue(d.product, 'local') > 0) return false;
+                    if (getStockValue(d.product, 'importer') <= 0) return false;
                 } else if (statusFilter === 'inactive') {
                     // `discontinued` faltaba aquí, y tampoco estaba en el
                     // desplegable: las solicitudes de repuestos descontinuados
@@ -1460,6 +1468,7 @@ const ProductDemands: React.FC = () => {
                         <option value="active">Activas (Cola)</option>
                         <option value="inactive">Inactivas (Historial)</option>
                         <option value="ready_to_notify">Listos para Notificar (en bodega)</option>
+                        <option value="needs_deposit">Piden abono (solo en importadora)</option>
                         <option value="pending_stock">Esperando Stock</option>
                         <option value="stock_available">Marcados como Stock Disponible</option>
                         <option value="notified">Notificados</option>

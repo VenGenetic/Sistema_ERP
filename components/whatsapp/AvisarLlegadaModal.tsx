@@ -18,13 +18,18 @@ import { avisoDeEnvio, haceCuanto, type EstadoAgente } from './agente';
 import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
 import { buildWhatsAppDemandURL, openWhatsApp } from '../../utils/whatsapp';
 import {
+    abonoSugerido,
     AVISOS_POR_HORA,
     avisarLlegada,
     cargarPorAvisar,
     contarAvisosRecientes,
     marcarAvisadoSinMensaje,
+    mensajesDeAviso,
+    solicitarAbono,
+    textoDeAbono,
     textoDeAviso,
     type DemandaPorAvisar,
+    type ModoAviso,
 } from './avisarLlegada';
 
 /**
@@ -62,6 +67,14 @@ interface Props {
      * volver a pedirsela seria hacerla elegir dos veces.
      */
     soloDemandaId?: number;
+    /**
+     * Cuál de los dos avisos.
+     *
+     * `llego`: está en la bodega, se le avisa y el pedido se archiva.
+     * `abono`: está en la importadora, se le ofrece traerlo pidiéndole un
+     * abono, y el pedido SIGUE activo -- el cliente todavía espera.
+     */
+    modo?: ModoAviso;
     /** Para que la pantalla de atrás refresque sus contadores. */
     onAvisado?: () => void;
     /** Saltar al chat del cliente. Si no se pasa, no se ofrece. */
@@ -114,9 +127,11 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     userId,
     soloTelefono,
     soloDemandaId,
+    modo = 'llego',
     onAvisado,
     onAbrirChat,
 }) => {
+    const esAbono = modo === 'abono';
     const [demandas, setDemandas] = useState<DemandaPorAvisar[]>([]);
     const [hayMas, setHayMas] = useState(false);
     const [cargando, setCargando] = useState(true);
@@ -128,6 +143,8 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     const [editado, setEditado] = useState(false);
     const [conPrecio, setConPrecio] = useState(true);
     const [conFoto, setConFoto] = useState(true);
+    /** Cuánto se le pide de abono. Solo en modo `abono`. */
+    const [abono, setAbono] = useState<number | null>(null);
     const [enviando, setEnviando] = useState(false);
     const [avisados, setAvisados] = useState(0);
     const [ultimo, setUltimo] = useState<string | null>(null);
@@ -144,6 +161,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
             const { demandas: filas, hayMas: mas } = await cargarPorAvisar({
                 soloTelefono,
                 soloDemandaId,
+                modo,
             });
             setDemandas(filas);
             setHayMas(mas);
@@ -189,7 +207,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
             // a comprobar en el servidor al mandar.
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [soloTelefono, soloDemandaId]);
+    }, [soloTelefono, soloDemandaId, modo]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -206,12 +224,24 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
         return cuenta;
     }, [demandas]);
 
+    /** El texto sugerido del modo que corresponda. */
+    const sugerir = useCallback(
+        (d: DemandaPorAvisar, incluirPrecio: boolean, abono: number | null) =>
+            esAbono
+                ? textoDeAbono(d, { incluirPrecio, abono: abono ?? undefined })
+                : textoDeAviso(d, { incluirPrecio }),
+        [esAbono],
+    );
+
     const abrirVistaPrevia = (d: DemandaPorAvisar) => {
+        const precio = d.product?.price != null ? precioParaCliente(d.product.price) : null;
+        const abono = esAbono && precio != null ? abonoSugerido(precio) : null;
         setAbierto(d);
         setEditado(false);
         setConPrecio(true);
         setConFoto(!!d.product?.image_url);
-        setTexto(textoDeAviso(d, { incluirPrecio: true }));
+        setAbono(abono);
+        setTexto(sugerir(d, true, abono));
         setError(null);
     };
 
@@ -220,8 +250,8 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     // "incluir precio" es perder trabajo sin avisar.
     useEffect(() => {
         if (!abierto || editado) return;
-        setTexto(textoDeAviso(abierto, { incluirPrecio: conPrecio }));
-    }, [abierto, conPrecio, editado]);
+        setTexto(sugerir(abierto, conPrecio, abono));
+    }, [abierto, conPrecio, editado, abono, sugerir]);
 
     const quitarDeLaLista = (id: number) => {
         setDemandas((prev) => prev.filter((d) => d.id !== id));
@@ -232,7 +262,9 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
         setEnviando(true);
         setError(null);
         try {
-            const resultado = await avisarLlegada({ demanda: abierto, texto, conFoto, userId });
+            const resultado = esAbono
+                ? await solicitarAbono({ demanda: abierto, texto, conFoto, userId })
+                : await avisarLlegada({ demanda: abierto, texto, conFoto, userId });
             if (!resultado.ok) {
                 setError(resultado.detalle);
                 if (resultado.motivo === 'tope-por-hora') {
@@ -299,15 +331,25 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                 <div className={modal.header}>
                     <div className="min-w-0">
                         <h2 className={cn(modal.title, 'flex items-center gap-2')}>
-                            <Bell size={17} className="text-success shrink-0" aria-hidden="true" />
-                            {abierto ? 'Revisá el aviso antes de mandarlo' : 'Avisar que llegó el repuesto'}
+                            <Bell
+                                size={17}
+                                className={cn('shrink-0', esAbono ? 'text-warning' : 'text-success')}
+                                aria-hidden="true"
+                            />
+                            {abierto
+                                ? 'Revisá el mensaje antes de mandarlo'
+                                : esAbono
+                                  ? 'Pedir abono para traerlo'
+                                  : 'Avisar que llegó el repuesto'}
                         </h2>
                         <p className={modal.subtitle}>
                             {abierto
                                 ? 'Sale por el chat del cliente y queda registrado en el hilo.'
-                                : soloTelefono
-                                  ? 'Repuestos de este cliente que ya se pueden entregar.'
-                                  : 'Clientes que dejaron un pedido anotado y cuyo repuesto ya está.'}
+                                : esAbono
+                                  ? 'El repuesto no está en la bodega pero la importadora lo tiene. El pedido sigue esperando: pedir el abono no lo archiva.'
+                                  : soloTelefono
+                                    ? 'Repuestos de este cliente que ya se pueden entregar.'
+                                    : 'Clientes que dejaron un pedido anotado y cuyo repuesto ya está.'}
                         </p>
                     </div>
                     <button onClick={onClose} className={modal.close} aria-label="Cerrar">
@@ -399,13 +441,60 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                 aparece en toda solicitud activa. Es justo el
                                 momento en que hace falta decirlo: la persona
                                 ya eligió a quién avisarle. */}
-                            {stock && stock.local === 0 && (
+                            {/* Lo que hay que advertir es distinto en cada
+                                modo: para avisar que llegó, el problema es que
+                                NO esté en la bodega; para pedir un abono, el
+                                problema es el contrario -- que ya esté acá y
+                                se le esté cobrando un adelanto al pedo. */}
+                            {stock && !esAbono && stock.local === 0 && (
                                 <p className="flex items-start gap-1.5 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
                                     <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
                                     {stock.hay
                                         ? 'Este repuesto NO está en la bodega: solo figura en la importadora. Avisar que llegó es prometer una fecha que no controlás, y el cliente viene al mostrador y no está.'
                                         : 'Este repuesto ya NO tiene stock en ningún lado. Si se vendió mientras tanto, avisar que llegó te deja en falta con el cliente.'}
                                 </p>
+                            )}
+                            {stock && esAbono && stock.local > 0 && (
+                                <p className="flex items-start gap-1.5 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
+                                    <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
+                                    Este repuesto SÍ está en la bodega. No hay nada que encargar ni por qué pedirle un
+                                    abono: avisale que ya llegó y que lo venga a buscar.
+                                </p>
+                            )}
+                            {stock && esAbono && stock.local === 0 && !stock.hay && (
+                                <p className="flex items-start gap-1.5 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
+                                    <AlertTriangle size={14} className="mt-px shrink-0" aria-hidden="true" />
+                                    La importadora ya no lo tiene. Pedirle un abono ahora es cobrarle por algo que no
+                                    sabés cuándo vas a poder conseguir.
+                                </p>
+                            )}
+
+                            {/* Cuánto se le pide. Va aparte del texto para que
+                                se pueda mover sin reescribir el mensaje, y
+                                porque es el dato que después hay que cobrar. */}
+                            {esAbono && (
+                                <label className="flex items-center gap-2 text-xs text-fg-muted">
+                                    Abono a pedir
+                                    <span className="text-fg-subtle">$</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        value={abono ?? ''}
+                                        onChange={(e) => {
+                                            const v = e.target.value.trim();
+                                            setAbono(v === '' ? null : Math.max(0, Number(v)));
+                                        }}
+                                        disabled={editado}
+                                        className={cn(input.base, input.size.sm, 'w-28')}
+                                    />
+                                    {precio != null && (
+                                        <span className="text-2xs text-fg-subtle">
+                                            sugerido {formatearPrecio(abonoSugerido(precio))} · precio{' '}
+                                            {formatearPrecio(precio)}
+                                        </span>
+                                    )}
+                                </label>
                             )}
 
                             {/* Este número nunca escribió: se le puede escribir
@@ -443,13 +532,20 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                             <MessageCircle size={13} aria-hidden="true" />
                                             Escribirle por fuera
                                         </button>
-                                        <button
-                                            onClick={archivarSinMensaje}
-                                            disabled={enviando}
-                                            className={cn(button.base, button.variant.ghost, button.size.xs)}
-                                        >
-                                            Marcar avisado sin mandar
-                                        </button>
+                                        {/* Solo para "ya llegó": archivar un
+                                            pedido al que se le pidió un abono
+                                            lo sacaría de la lista de espera, y
+                                            el cliente sigue esperando el
+                                            repuesto. */}
+                                        {!esAbono && (
+                                            <button
+                                                onClick={archivarSinMensaje}
+                                                disabled={enviando}
+                                                className={cn(button.base, button.variant.ghost, button.size.xs)}
+                                            >
+                                                Marcar avisado sin mandar
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -512,16 +608,18 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                         <>
                             {cargando ? (
                                 <p className="flex items-center gap-2 py-10 text-center text-sm text-fg-muted">
-                                    <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Buscando pedidos
-                                    con stock…
+                                    <Loader2 size={15} className="animate-spin" aria-hidden="true" />{' '}
+                                    {esAbono ? 'Buscando pedidos que se puedan encargar…' : 'Buscando pedidos con stock…'}
                                 </p>
                             ) : demandas.length === 0 ? (
                                 <p className="py-10 text-center text-sm text-fg-muted">
                                     {avisados > 0
-                                        ? 'No queda nada por avisar.'
-                                        : soloTelefono
-                                          ? 'Este cliente no tiene ningún pedido cuyo repuesto ya haya llegado.'
-                                          : 'Ningún cliente está esperando un repuesto que ya haya llegado.'}
+                                        ? 'No queda nada pendiente.'
+                                        : esAbono
+                                          ? 'Ningún cliente está esperando un repuesto que la importadora tenga y la bodega no.'
+                                          : soloTelefono
+                                            ? 'Este cliente no tiene ningún pedido cuyo repuesto ya haya llegado.'
+                                            : 'Ningún cliente está esperando un repuesto que ya haya llegado.'}
                                 </p>
                             ) : (
                                 <div className="divide-y divide-subtle">
@@ -581,9 +679,13 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                                 )}
                                                 <button
                                                     onClick={() => abrirVistaPrevia(d)}
-                                                    className={cn(button.base, button.variant.success, button.size.sm)}
+                                                    className={cn(
+                                                        button.base,
+                                                        esAbono ? button.variant.primary : button.variant.success,
+                                                        button.size.sm,
+                                                    )}
                                                 >
-                                                    Avisar
+                                                    {esAbono ? 'Pedir abono' : 'Avisar'}
                                                 </button>
                                             </div>
                                         );
@@ -632,7 +734,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                 ) : (
                                     <Send size={15} aria-hidden="true" />
                                 )}
-                                Mandar el aviso
+                                {esAbono ? 'Mandar el pedido de abono' : 'Mandar el aviso'}
                             </button>
                         </>
                     ) : (

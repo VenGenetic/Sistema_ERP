@@ -53,6 +53,8 @@ export interface DemandaPorAvisar {
     notes: string | null;
     created_at: string;
     stock_detected_at: string | null;
+    /** Cuándo se le pidió abono para traerlo. `null` = nunca. */
+    deposit_requested_at: string | null;
     product: ProductoDeAviso | null;
     /**
      * El chat por el que sale el aviso. `null` significa que ese número
@@ -84,7 +86,7 @@ const CAMPOS_PRODUCTO =
  * descarte PEDIDOS y no solo el producto embebido. Sin él, la consulta
  * devolvería todos los pedidos con el producto en `null`.
  */
-const CAMPOS_DEMANDA = `id, status, phone_number, customer_name, notes, created_at, stock_detected_at, product:products!inner(${CAMPOS_PRODUCTO})`;
+const CAMPOS_DEMANDA = `id, status, phone_number, customer_name, notes, created_at, stock_detected_at, deposit_requested_at, product:products!inner(${CAMPOS_PRODUCTO})`;
 
 /**
  * QUÉ ES "por avisar", en un solo lugar.
@@ -108,6 +110,41 @@ const CAMPOS_DEMANDA = `id, status, phone_number, customer_name, notes, created_
  * para notificar" y al tocarla no salía ni un cliente.
  */
 const FILTRO_EN_BODEGA = 'local_stock.gt.0';
+
+/**
+ * Y el otro caso: el repuesto NO está acá, pero la importadora lo tiene.
+ *
+ * A esa persona no se le puede decir "ya llegó" -- no llegó -- pero sí se
+ * le puede ofrecer traerlo, que es la otra mitad del negocio. Se le pide
+ * un abono para pedirlo, porque traer una pieza que después nadie retira
+ * es plata inmovilizada en el mostrador.
+ *
+ * `local_stock` se compara contra null Y contra 0: un producto que nunca
+ * pasó por la bodega tiene la columna en null, y `not.gt.0` lo dejaría
+ * afuera (en SQL, `NOT (NULL > 0)` no es verdadero).
+ */
+const FILTRO_SOLO_IMPORTADORA =
+    'and(importer_stock.gt.0,importer_unavailable_override.not.is.true,or(local_stock.is.null,local_stock.eq.0))';
+
+/**
+ * Los dos avisos que salen de una lista de espera.
+ *
+ *  * `llego` -- está en la bodega. Se le avisa y el pedido se archiva.
+ *  * `abono` -- está en la importadora. Se le ofrece traerlo y se le pide
+ *    un abono. El pedido NO se archiva: el cliente sigue esperando, y el
+ *    día que el repuesto entre de verdad hay que poder avisarle.
+ */
+export type ModoAviso = 'llego' | 'abono';
+
+/**
+ * Cada cuánto se le puede volver a pedir el abono a quien no contestó.
+ *
+ * Sin esto, quien ya recibió el pedido reaparecería en la lista al día
+ * siguiente y le llegaría lo mismo otra vez. Una semana es el
+ * seguimiento razonable: insistir antes es hostigar, no insistir nunca es
+ * perder la venta.
+ */
+export const DIAS_PARA_REINSISTIR = 7;
 
 const ESTADOS_AVISABLES: EstadoAvisable[] = ['stock_available', 'pending_stock'];
 
@@ -268,10 +305,16 @@ export interface AlcanceAviso {
      * esté se dice en la vista previa, con el aviso en rojo.
      */
     soloDemandaId?: number;
+    /**
+     * Cuál de los dos avisos. Cambia a quién se lista: `llego` trae lo que
+     * está en la bodega; `abono`, lo que solo está en la importadora.
+     * Por defecto `llego`.
+     */
+    modo?: ModoAviso;
 }
 
 export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<ListaPorAvisar> {
-    const { soloTelefono, soloDemandaId } = alcance;
+    const { soloTelefono, soloDemandaId, modo = 'llego' } = alcance;
 
     let consulta = supabase
         .from('product_demands')
@@ -288,7 +331,16 @@ export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<Lista
     if (soloDemandaId) {
         consulta = consulta.eq('id', soloDemandaId);
     } else {
-        consulta = consulta.or(FILTRO_EN_BODEGA, { referencedTable: 'product' });
+        consulta = consulta.or(modo === 'abono' ? FILTRO_SOLO_IMPORTADORA : FILTRO_EN_BODEGA, {
+            referencedTable: 'product',
+        });
+        if (modo === 'abono') {
+            // Fuera los que ya recibieron el pedido de abono hace poco: sin
+            // esto le llegaría lo mismo todos los días. Vuelven a aparecer
+            // pasada la semana, para insistirles una vez más.
+            const desde = new Date(Date.now() - DIAS_PARA_REINSISTIR * 86400000).toISOString();
+            consulta = consulta.or(`deposit_requested_at.is.null,deposit_requested_at.lt.${desde}`);
+        }
     }
 
     if (soloTelefono) {
@@ -300,7 +352,18 @@ export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<Lista
     }
 
     const { data, error } = await consulta;
-    if (error) throw error;
+    if (error) {
+        // 42703 = falta la columna. Solo puede pasar con el pedido de
+        // abono, que la estrena. Sin este mensaje el error que se ve es
+        // "column does not exist", que no le dice a nadie qué correr.
+        if (error.code === '42703') {
+            throw new Error(
+                'Falta aplicar la migración del pedido de abono ' +
+                    '(supabase/migrations/20260827200000_product_demands_abono.sql).',
+            );
+        }
+        throw error;
+    }
 
     const crudas = ((data ?? []) as unknown as DemandaPorAvisar[]).map((d) => ({
         ...d,
@@ -329,13 +392,28 @@ export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<Lista
  * cambia uno solo de los dos, el botón va a prometer clientes que la lista
  * no muestra.
  */
-export async function contarPorAvisar(): Promise<number> {
-    const { count, error } = await supabase
+export async function contarPorAvisar(modo: ModoAviso = 'llego'): Promise<number> {
+    let consulta = supabase
         .from('product_demands')
         .select('id, product:products!inner(id)', { count: 'exact', head: true })
         .in('status', ESTADOS_AVISABLES)
-        .or(FILTRO_EN_BODEGA, { referencedTable: 'product' });
-    if (error) throw error;
+        .or(modo === 'abono' ? FILTRO_SOLO_IMPORTADORA : FILTRO_EN_BODEGA, {
+            referencedTable: 'product',
+        });
+
+    if (modo === 'abono') {
+        const desde = new Date(Date.now() - DIAS_PARA_REINSISTIR * 86400000).toISOString();
+        consulta = consulta.or(`deposit_requested_at.is.null,deposit_requested_at.lt.${desde}`);
+    }
+
+    const { count, error } = await consulta;
+    // El contador corre al abrir la bandeja: si falta la migración del
+    // abono, eso no puede romper la pantalla entera. Se devuelve 0 y el
+    // modal explica qué falta cuando alguien toca el botón.
+    if (error) {
+        if (error.code === '42703') return 0;
+        throw error;
+    }
     return count ?? 0;
 }
 
@@ -397,6 +475,62 @@ export function textoDeAviso(demanda: DemandaPorAvisar, opciones: OpcionesTexto)
  * aparte: el cliente ve la pieza y el precio juntos, que es lo que le
  * permite contestar "sí, mándamelo" sin más vueltas.
  */
+/**
+ * Qué parte del precio se pide de abono por defecto.
+ *
+ * La mitad es un criterio, no una regla del negocio: cubre buena parte de
+ * lo inmovilizado si el cliente después no viene, sin pedirle todo por
+ * adelantado a alguien que todavía no vio la pieza. Se puede cambiar
+ * antes de mandar, y lo que se manda es lo que quedó en pantalla.
+ */
+export const PARTE_DE_ABONO = 0.5;
+
+/** El abono sugerido: la mitad del precio, redondeada al dólar. */
+export function abonoSugerido(precio: number): number {
+    return Math.ceil(precio * PARTE_DE_ABONO);
+}
+
+/**
+ * El mensaje para traerlo de la importadora.
+ *
+ * Dice explícitamente que NO está acá y que hay que pedirlo. Prometer que
+ * "ya llegó" algo que todavía viene en camino es lo que después obliga a
+ * salir a dar explicaciones en el mostrador.
+ *
+ * No promete fecha: la del proveedor no la controlamos, y una fecha
+ * inventada es peor que no dar ninguna. Quien atiende puede agregarla si
+ * la sabe -- el texto se edita antes de mandar.
+ */
+export function textoDeAbono(
+    demanda: DemandaPorAvisar,
+    opciones: { incluirPrecio: boolean; precio?: number; abono?: number },
+): string {
+    const nombre = nombreParaSaludar(demanda.customer_name);
+    const saludo = nombre ? `¡Hola ${nombre}!` : '¡Hola!';
+    const lineas = [
+        `${saludo} Te tenemos novedades del repuesto que estabas buscando:`,
+        '',
+        demanda.product?.name ?? 'el repuesto que nos pediste',
+    ];
+
+    const precio =
+        opciones.precio ??
+        (demanda.product?.price != null ? precioParaCliente(demanda.product.price) : null);
+    if (opciones.incluirPrecio && precio != null) lineas.push(`Precio: ${formatearPrecio(precio)}`);
+
+    lineas.push('', 'No lo tenemos en tienda, pero lo podemos pedir para vos.');
+
+    const abono = opciones.abono ?? (precio != null ? abonoSugerido(precio) : null);
+    if (abono != null) {
+        lineas.push(`Para encargarlo necesitamos un abono de ${formatearPrecio(abono)}.`);
+    } else {
+        lineas.push('Para encargarlo necesitamos un abono.');
+    }
+
+    lineas.push('', '¿Lo pedimos?');
+    return lineas.join('\n');
+}
+
 export function mensajesDeAviso(
     demanda: DemandaPorAvisar,
     conversationId: number,
@@ -642,6 +776,97 @@ export async function avisarLlegada(params: {
             throw new Error(
                 `No se pudo encolar el aviso y TAMPOCO devolver el pedido a la lista. ` +
                     `Marcalo a mano como "esperando stock" en Solicitudes (pedido #${demanda.id}).`,
+            );
+        }
+        throw err;
+    }
+
+    return { ok: true };
+}
+
+/**
+ * Le pide al cliente un abono para traer el repuesto de la importadora.
+ *
+ * Se parece a `avisarLlegada` pero difiere en lo esencial: NO archiva el
+ * pedido. El cliente sigue esperando el repuesto, y el día que entre de
+ * verdad a la bodega hay que poder avisarle. Archivarlo acá lo sacaría de
+ * la lista de espera y ese aviso no llegaría nunca -- justo el agujero
+ * que esta pantalla vino a tapar.
+ *
+ * Lo que se anota es `deposit_requested_at`, que solo sirve para no
+ * repetirle el pedido todos los días.
+ *
+ * El orden es el mismo y por el mismo motivo: primero se RESERVA con un
+ * UPDATE condicional, después se encola. Si dos vendedores tocan a la vez,
+ * el segundo recibe cero filas y se entera, en vez de mandar el mensaje
+ * repetido.
+ */
+export async function solicitarAbono(params: {
+    demanda: DemandaPorAvisar;
+    texto: string;
+    conFoto: boolean;
+    userId: string | null;
+}): Promise<ResultadoAviso> {
+    const { demanda, texto, conFoto, userId } = params;
+    if (!texto.trim()) throw new Error('No hay nada que mandar: el mensaje quedó vacío.');
+
+    const recientes = await contarAvisosRecientes();
+    if (recientes >= AVISOS_POR_HORA) {
+        return {
+            ok: false,
+            motivo: 'tope-por-hora',
+            detalle:
+                `Ya se mandaron ${recientes} avisos en la última hora, que es el tope. ` +
+                'Seguí más tarde: mandarle a mucha gente que nunca escribió, toda junta, ' +
+                'es lo que hace que WhatsApp bloquee el número del negocio.',
+        };
+    }
+
+    const ahora = new Date().toISOString();
+    const desde = new Date(Date.now() - DIAS_PARA_REINSISTIR * 86400000).toISOString();
+
+    // La reserva: solo si no se le pidió nunca, o si ya pasó la semana.
+    // Es la misma condición con la que se arma la lista, así que lo que se
+    // ve en pantalla y lo que la base acepta no se pueden separar.
+    const { data: reservada, error: errorReserva } = await supabase
+        .from('product_demands')
+        .update({ deposit_requested_at: ahora, deposit_requested_by: userId, updated_at: ahora })
+        .eq('id', demanda.id)
+        .in('status', ['stock_available', 'pending_stock'])
+        .or(`deposit_requested_at.is.null,deposit_requested_at.lt.${desde}`)
+        .select('id');
+    if (errorReserva) throw errorReserva;
+
+    if (!reservada || reservada.length === 0) {
+        return {
+            ok: false,
+            motivo: 'ya-avisado',
+            detalle:
+                'A este cliente ya se le pidió el abono hace poco (o el pedido dejó de estar activo). No se mandó nada.',
+        };
+    }
+
+    try {
+        const conversationId = await asegurarConversacion(demanda);
+        const mensajes = mensajesDeAviso(demanda, conversationId, texto, conFoto);
+        if (mensajes.length === 0) throw new Error('No hay nada que mandar: el mensaje quedó vacío.');
+        await encolarMensajes(mensajes, userId);
+    } catch (err) {
+        // No salió: se borra la marca para que vuelva a la lista. Acá la
+        // vuelta atrás es más simple que en `avisarLlegada` -- se limpia
+        // una fecha, no se restaura un estado.
+        const { error: errorVuelta } = await supabase
+            .from('product_demands')
+            .update({
+                deposit_requested_at: demanda.deposit_requested_at,
+                deposit_requested_by: null,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', demanda.id);
+        if (errorVuelta) {
+            throw new Error(
+                'No se pudo encolar el pedido de abono y TAMPOCO deshacer la marca. ' +
+                    `Ese cliente no va a volver a aparecer en la lista por una semana (pedido #${demanda.id}).`,
             );
         }
         throw err;

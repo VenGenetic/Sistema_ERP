@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
-    ArrowLeft, Bell, Bot, BotOff, CheckCheck, Clock, Headset, Images, Inbox,
+    ArrowLeft, Bell, Bot, BotOff, CheckCheck, Clock, HandCoins, Headset, Images, Inbox,
     MailQuestion, RefreshCw, RotateCw, Search, User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
@@ -17,7 +17,7 @@ import {
 } from '../components/whatsapp/agente';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import AvisarLlegadaModal from '../components/whatsapp/AvisarLlegadaModal';
-import { contarPorAvisar } from '../components/whatsapp/avisarLlegada';
+import { contarPorAvisar, type ModoAviso } from '../components/whatsapp/avisarLlegada';
 import { fusionarMensajes, useRepasoDelHilo } from '../components/whatsapp/hiloEnVivo';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
 import ChatThread, {
@@ -277,12 +277,24 @@ const WhatsAppInbox: React.FC = () => {
     const [avisarAbierto, setAvisarAbierto] = useState(false);
     const [avisarTelefono, setAvisarTelefono] = useState<string | undefined>(undefined);
     const [porAvisar, setPorAvisar] = useState(0);
+    /**
+     * El otro caso: el repuesto no está en la bodega pero la importadora
+     * lo tiene. A esa gente no se le avisa que llegó -- no llegó -- se le
+     * ofrece traerlo pidiéndole un abono.
+     */
+    const [modoAviso, setModoAviso] = useState<ModoAviso>('llego');
+    const [porPedirAbono, setPorPedirAbono] = useState(0);
 
     // Solo el número, sin traer las filas: el botón vive en una pantalla
     // que queda abierta todo el día.
     const contarAvisos = useCallback(async () => {
         try {
-            setPorAvisar(await contarPorAvisar());
+            const [enBodega, enImportadora] = await Promise.all([
+                contarPorAvisar('llego'),
+                contarPorAvisar('abono'),
+            ]);
+            setPorAvisar(enBodega);
+            setPorPedirAbono(enImportadora);
         } catch (err) {
             // Que no se pueda contar no puede romper la bandeja: el botón
             // se muestra sin número y el modal dirá qué pasó.
@@ -1225,9 +1237,10 @@ const WhatsAppInbox: React.FC = () => {
                 <button
                     onClick={() => {
                         setAvisarTelefono(undefined);
+                        setModoAviso('llego');
                         setAvisarAbierto(true);
                     }}
-                    title="Clientes que dejaron un pedido anotado y cuyo repuesto ya está"
+                    title="Clientes que dejaron un pedido anotado y cuyo repuesto ya está en la bodega"
                     className={cn(
                         button.base,
                         porAvisar > 0 ? button.variant.success : button.variant.secondary,
@@ -1239,6 +1252,33 @@ const WhatsAppInbox: React.FC = () => {
                     {porAvisar > 0 && (
                         <span className="ml-0.5 rounded-full bg-black/15 px-1.5 text-2xs font-semibold tnum">
                             {porAvisar}
+                        </span>
+                    )}
+                </button>
+
+                {/* El otro caso, y por eso es otro botón y no una pestaña
+                    adentro del primero: no es la misma cola trabajada de otra
+                    forma, es otra conversación. Al de arriba se le dice "vení
+                    a buscarlo"; a este, "lo podemos pedir, dejanos un abono".
+                    Confundirlos es prometer una entrega que no existe. */}
+                <button
+                    onClick={() => {
+                        setAvisarTelefono(undefined);
+                        setModoAviso('abono');
+                        setAvisarAbierto(true);
+                    }}
+                    title="Clientes cuyo repuesto no está en la bodega pero la importadora sí lo tiene: se les puede pedir un abono para encargarlo"
+                    className={cn(
+                        button.base,
+                        porPedirAbono > 0 ? button.variant.primary : button.variant.secondary,
+                        button.size.md,
+                    )}
+                >
+                    <HandCoins size={15} aria-hidden="true" />
+                    Piden abono
+                    {porPedirAbono > 0 && (
+                        <span className="ml-0.5 rounded-full bg-black/15 px-1.5 text-2xs font-semibold tnum">
+                            {porPedirAbono}
                         </span>
                     )}
                 </button>
@@ -1830,6 +1870,7 @@ const WhatsAppInbox: React.FC = () => {
                 onClose={() => setAvisarAbierto(false)}
                 userId={userId}
                 soloTelefono={avisarTelefono}
+                modo={modoAviso}
                 onAvisado={() => {
                     // El aviso ya está en la cola: se refresca el número del
                     // botón y la ficha, que muestra el pedido como avisado.
