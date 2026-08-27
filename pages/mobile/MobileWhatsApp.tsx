@@ -1,16 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ArrowLeft,
+    Bot,
+    BotOff,
     ClipboardList,
+    ContactRound,
     FileText,
     ImageIcon,
     Images,
     Loader2,
     MailQuestion,
+    Headset,
     MessageCircle,
+    MoreVertical,
     Package,
     Plus,
     RefreshCw,
+    RotateCw,
     Search,
     Send,
     X,
@@ -22,6 +28,10 @@ import VoiceRecorder from '../../components/whatsapp/VoiceRecorder';
 import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
 import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
 import MediaGallery from '../../components/whatsapp/MediaGallery';
+import CustomerPanel from '../../components/whatsapp/CustomerPanel';
+import { BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
+import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/agente';
+import { useChatProformaStore } from '../../store/useChatProformaStore';
 import ChatThread, {
     horaLista,
     PildoraChat,
@@ -82,6 +92,10 @@ interface Conversacion {
     /** De qué habla el chat, sin abrirlo (migración 0032). */
     last_message_preview: string | null;
     last_message_direction: string | null;
+    /** El agente contesta solo en las conversaciones que lo tengan activado. */
+    bot_enabled: boolean;
+    /** `escalated` = el agente se rindió y pidió que conteste una persona. */
+    status: string;
 }
 
 /**
@@ -174,6 +188,50 @@ const MobileWhatsApp: React.FC = () => {
     const [visor, setVisor] = useState<{ media: MediaItem[]; index: number } | null>(null);
     /** La galería de fotos recibidas (buscar un comprobante). */
     const [galeria, setGaleria] = useState(false);
+    /** La ficha del cliente, en una hoja que sube desde abajo. */
+    const [ficha, setFicha] = useState(false);
+    /** El menú "⋮" de la cabecera del chat. */
+    const [menuChat, setMenuChat] = useState(false);
+    /**
+     * Ver solo lo que el agente escaló.
+     *
+     * En el escritorio eso es una pestaña entera con su triage; acá alcanza
+     * con poder ENCONTRARLOS: si el agente se rinde con un cliente mientras
+     * el vendedor está en el mostrador, desde el teléfono no había forma de
+     * enterarse.
+     */
+    const [soloEscalados, setSoloEscalados] = useState(false);
+    const [cuantosEscalados, setCuantosEscalados] = useState(0);
+    const [cambiandoBot, setCambiandoBot] = useState(false);
+
+    /**
+     * Estado del proceso del agente y el interruptor maestro. El MISMO
+     * módulo que usa la bandeja: la regla de cuándo avisar que un mensaje no
+     * va a salir no puede estar escrita dos veces.
+     */
+    const { estado: estadoAgente, globalEncendido, alternarGlobal } = useAgente(userId);
+    const aviso = useMemo(() => avisoDeEnvio(estadoAgente, haceCuanto), [estadoAgente]);
+
+    /** Cuántos repuestos tiene a medio armar la proforma de este chat. */
+    const itemsEnProforma = useChatProformaStore(
+        (st) => (abierta ? st.porConversacion[abierta.id]?.items.length ?? 0 : 0),
+    );
+    const agregarAProforma = useChatProformaStore((st) => st.agregar);
+
+    /**
+     * Lo que se mandó y todavía no salió. Mismo hook y mismas burbujas que
+     * la bandeja: desde el teléfono se enviaba a ciegas -- se tocaba enviar y
+     * no pasaba nada visible hasta que el agente despachaba.
+     */
+    const {
+        enCola,
+        recargar: recargarCola,
+        cancelar: cancelarDeLaCola,
+        reintentar: reintentarDeLaCola,
+    } = useColaDeSalida(abierta?.id ?? null, {
+        onError: setError,
+        onYaHabiaSalido: () => abierta && cargarMensajes(abierta.id),
+    });
 
     const hiloRef = useRef<HTMLDivElement | null>(null);
     const fileRef = useRef<HTMLInputElement | null>(null);
@@ -193,6 +251,7 @@ const MobileWhatsApp: React.FC = () => {
                 .select(campos)
                 .order('last_message_at', { ascending: false, nullsFirst: false })
                 .limit(POR_PAGINA);
+            if (soloEscalados) q = q.eq('status', 'escalated');
             const texto = busqueda.trim();
             if (texto) {
                 const digitos = texto.replace(/\D/g, '');
@@ -215,7 +274,17 @@ const MobileWhatsApp: React.FC = () => {
         }
         setError(null);
         setConversaciones((data ?? []) as unknown as Conversacion[]);
-    }, [busqueda]);
+    }, [busqueda, soloEscalados]);
+
+    // Cuántos hay escalados. Es un `count` sin filas: no trae datos, solo el
+    // número, así que se puede repasar sin gastar cuota.
+    useEffect(() => {
+        supabase
+            .from('agent_conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'escalated')
+            .then(({ count }) => setCuantosEscalados(count ?? 0));
+    }, [conversaciones]);
 
     // Las respuestas rapidas se cargan una vez: son pocas y no cambian
     // mientras se atiende.
@@ -388,6 +457,9 @@ const MobileWhatsApp: React.FC = () => {
 
         await encolarMensajes(conCita, userId);
         setCitando(null);
+        // Aparece de inmediato al final del hilo como "en cola"; el realtime
+        // de agent_outbox lo va actualizando hasta que sale.
+        await recargarCola();
         // El mensaje aparece en el hilo cuando el agente lo despacha (llega
         // por realtime). No se pinta antes: mostrarlo como enviado sin que
         // haya salido es justo lo que el acuse de recibo vino a evitar.
@@ -498,6 +570,29 @@ const MobileWhatsApp: React.FC = () => {
         abrirChat(data as unknown as Conversacion);
     };
 
+    /**
+     * Enciende o apaga el agente en ESTA conversación.
+     *
+     * Importante que el fallo se vea: si esto falla en silencio, uno cree
+     * que apagó el agente para un cliente y el agente le sigue contestando.
+     */
+    const alternarBotDelChat = async () => {
+        if (!abierta || cambiandoBot) return;
+        setCambiandoBot(true);
+        const nuevo = !abierta.bot_enabled;
+        const { error: err } = await supabase
+            .from('agent_conversations')
+            .update({ bot_enabled: nuevo })
+            .eq('id', abierta.id);
+        setCambiandoBot(false);
+        if (err) {
+            setError(`No se pudo cambiar el agente de esta conversación: ${err.message}`);
+            return;
+        }
+        setAbierta((prev) => (prev ? { ...prev, bot_enabled: nuevo } : prev));
+        setConversaciones((prev) => prev.map((c) => (c.id === abierta.id ? { ...c, bot_enabled: nuevo } : c)));
+    };
+
     const sinLeer = useMemo(
         () => conversaciones.reduce((n, c) => n + (c.unread_count > 0 ? 1 : 0), 0),
         [conversaciones],
@@ -571,28 +666,119 @@ const MobileWhatsApp: React.FC = () => {
                         </p>
                     </div>
 
-                    {/* Dejar el chat pendiente en la lista. Abrirlo para ver de qué
-                        se trataba lo apagaba de los pendientes y quedaba enterrado. */}
+                    {/* El agente de ESTE chat. Es botón y a la vez semáforo: si
+                        está encendido, el agente puede contestar encima del
+                        vendedor y hay que poder apagarlo desde el mostrador. */}
                     <button
-                        onClick={() => marcarComoNoLeido(abierta)}
-                        aria-label="Marcar el chat como no leído"
-                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10'}
+                        onClick={alternarBotDelChat}
+                        disabled={cambiandoBot}
+                        aria-label={abierta.bot_enabled ? 'Desactivar el agente en este chat' : 'Activar el agente en este chat'}
+                        className={cn(
+                            'flex h-11 w-11 shrink-0 items-center justify-center rounded-full active:bg-wa-inset/10',
+                            abierta.bot_enabled ? 'text-wa-accent' : 'text-wa-meta',
+                        )}
                     >
-                        <MailQuestion size={20} aria-hidden="true" />
+                        {abierta.bot_enabled ? <Bot size={20} aria-hidden="true" /> : <BotOff size={20} aria-hidden="true" />}
                     </button>
 
-                    <button
-                        onClick={() => cargarMensajes(abierta.id)}
-                        aria-label="Actualizar el chat"
-                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10'}
-                    >
-                        {cargandoChat ? (
-                            <Loader2 size={19} className="animate-spin" aria-hidden="true" />
-                        ) : (
-                            <RefreshCw size={19} aria-hidden="true" />
+                    {/* El resto, en un menú: cinco iconos en la cabecera de un
+                        teléfono no entran, y los tres de acá se usan una vez
+                        cada tanto. */}
+                    <div className="relative shrink-0">
+                        <button
+                            onClick={() => setMenuChat((v) => !v)}
+                            aria-label="Más opciones del chat"
+                            aria-expanded={menuChat}
+                            className="flex h-11 w-11 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10"
+                        >
+                            <MoreVertical size={20} aria-hidden="true" />
+                        </button>
+
+                        {menuChat && (
+                            <>
+                                {/* Capa para cerrarlo tocando fuera. */}
+                                <button
+                                    aria-hidden="true"
+                                    tabIndex={-1}
+                                    onClick={() => setMenuChat(false)}
+                                    className="fixed inset-0 z-30 cursor-default"
+                                />
+                                <div
+                                    role="menu"
+                                    className="absolute right-0 top-full z-40 mt-1 w-60 overflow-hidden rounded-xl border border-wa-divider bg-wa-panel py-1 shadow-2xl"
+                                >
+                                    <button
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setMenuChat(false);
+                                            setFicha(true);
+                                        }}
+                                        className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover"
+                                    >
+                                        <ContactRound size={19} className="text-wa-meta" aria-hidden="true" />
+                                        Ficha del cliente
+                                    </button>
+                                    <button
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setMenuChat(false);
+                                            marcarComoNoLeido(abierta);
+                                        }}
+                                        className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover"
+                                    >
+                                        <MailQuestion size={19} className="text-wa-meta" aria-hidden="true" />
+                                        Marcar sin leer
+                                    </button>
+                                    <button
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setMenuChat(false);
+                                            cargarMensajes(abierta.id);
+                                        }}
+                                        className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover"
+                                    >
+                                        {cargandoChat ? (
+                                            <Loader2 size={19} className="animate-spin text-wa-meta" aria-hidden="true" />
+                                        ) : (
+                                            <RefreshCw size={19} className="text-wa-meta" aria-hidden="true" />
+                                        )}
+                                        Actualizar el chat
+                                    </button>
+                                </div>
+                            </>
                         )}
-                    </button>
+                    </div>
                 </div>
+
+                {/* Lo que se encole ahora NO va a salir. Se avisa arriba de todo
+                    y no en la caja de escribir: hay que verlo ANTES de escribir. */}
+                {aviso && (
+                    <div className="flex shrink-0 items-start gap-2 border-b border-wa-divider bg-wa-notice px-3 py-2">
+                        <RotateCw size={15} className="mt-0.5 shrink-0 text-wa-notice-text" aria-hidden="true" />
+                        <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-wa-notice-text">{aviso.titulo}</p>
+                            <p className="text-[12px] text-wa-notice-text/90">{aviso.detalle}</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* El agente sigue habilitado acá: puede contestar encima del
+                    vendedor. No se apaga solo -- eso dejaría al bot mudo sin que
+                    nadie lo decidiera -- pero se avisa y se apaga de un toque. */}
+                {abierta.bot_enabled && globalEncendido && (
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-wa-divider bg-warning-soft px-3 py-2">
+                        <p className="text-[12px] text-warning-soft-fg">
+                            El agente también contesta en este chat.
+                        </p>
+                        <button
+                            onClick={alternarBotDelChat}
+                            disabled={cambiandoBot}
+                            className="shrink-0 rounded-lg bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-fg"
+                        >
+                            Apagarlo acá
+                        </button>
+                    </div>
+                )}
 
                 {/* ----------------------------- Hilo ----------------------------- */}
                 <div ref={hiloRef} className="wa-wallpaper wa-scroll flex min-h-0 flex-1 flex-col overflow-y-auto [overflow-anchor:none] py-2">
@@ -622,6 +808,15 @@ const MobileWhatsApp: React.FC = () => {
                         onReaccionar={reaccionar}
                         onBorrar={borrar}
                     />
+
+                    {/* Lo que se mandó y todavía no salió. Las mismas burbujas
+                        que en la bandeja: ver components/whatsapp/ColaDeSalida. */}
+                    <BurbujasEnCola
+                        items={enCola}
+                        onCancelar={cancelarDeLaCola}
+                        onReintentar={reintentarDeLaCola}
+                        tactil
+                    />
                     </div>
                 </div>
 
@@ -647,7 +842,7 @@ const MobileWhatsApp: React.FC = () => {
                             {opcionMenu(<Package size={20} aria-hidden="true" />, 'Repuesto del catálogo', 0, () =>
                                 setCatalogoAbierto(true),
                             )}
-                            {opcionMenu(<FileText size={20} aria-hidden="true" />, 'Proforma', 0, () =>
+                            {opcionMenu(<FileText size={20} aria-hidden="true" />, 'Proforma', itemsEnProforma, () =>
                                 setProformaAbierta(true),
                             )}
                             {opcionMenu(<ClipboardList size={20} aria-hidden="true" />, 'Anotar un pedido', 0, () =>
@@ -799,6 +994,51 @@ const MobileWhatsApp: React.FC = () => {
                     initialIndex={visor?.index ?? 0}
                     onClose={() => setVisor(null)}
                 />
+
+                {/* La ficha del cliente, en una hoja que sube desde abajo.
+                    Lo que dice -- si tiene descuento, qué repuestos dejó
+                    pedidos, cuáles ya llegaron -- hay que tenerlo MIENTRAS se
+                    cotiza. En el escritorio va en una columna al costado; acá
+                    no hay costado, así que va en una hoja. */}
+                {ficha && (
+                    <div
+                        className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60"
+                        onClick={() => setFicha(false)}
+                        role="presentation"
+                    >
+                        <div
+                            /* Centrada y con el ancho de la columna: en un teléfono
+                               ocupa todo, pero el modo móvil también se abre en un
+                               monitor y ahí una hoja de 1500px de ancho no es una
+                               hoja, es otra pantalla. */
+                            className="mx-auto max-h-[82dvh] w-full max-w-[520px] overflow-y-auto rounded-t-2xl bg-bg p-3"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Sin título propio: la ficha ya trae el suyo. Va el
+                                asa de arrastre y el botón de cerrar, nada más. */}
+                            <div className="mb-1 flex items-center justify-end">
+                                <span className="absolute left-1/2 -translate-x-1/2 h-1 w-10 rounded-full bg-fg-subtle/40" aria-hidden="true" />
+                                <button
+                                    onClick={() => setFicha(false)}
+                                    aria-label="Cerrar la ficha del cliente"
+                                    className="flex h-11 w-11 items-center justify-center rounded-full text-fg-muted"
+                                >
+                                    <X size={20} aria-hidden="true" />
+                                </button>
+                            </div>
+                            <CustomerPanel
+                                conversationId={abierta.id}
+                                phoneNumber={abierta.phone_number}
+                                customerName={abierta.customer_name}
+                                onCotizar={(producto) => {
+                                    agregarAProforma(abierta.id, producto);
+                                    setFicha(false);
+                                    setProformaAbierta(true);
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -870,6 +1110,65 @@ const MobileWhatsApp: React.FC = () => {
                 </div>
             </div>
 
+            {(cuantosEscalados > 0 || soloEscalados) && (
+                <div className="shrink-0 bg-wa-header px-4 pb-2">
+                    <button
+                        onClick={() => setSoloEscalados((v) => !v)}
+                        aria-pressed={soloEscalados}
+                        className={cn(
+                            'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3 text-[13px] font-medium',
+                            soloEscalados ? 'bg-wa-accent text-wa-accent-fg' : 'bg-wa-inset/10 text-wa-text',
+                        )}
+                    >
+                        <Headset size={15} aria-hidden="true" />
+                        {soloEscalados ? 'Viendo los escalados' : `El agente escaló ${cuantosEscalados}`}
+                    </button>
+                </div>
+            )}
+
+            {/* El interruptor MAESTRO: apagado acá el agente no le contesta a
+                nadie, aunque una conversación lo tenga activado. Estaba solo en
+                el escritorio, así que desde el mostrador no había forma de
+                frenarlo. */}
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-wa-divider bg-wa-panel px-4 py-2">
+                <span className="text-[13px] text-wa-meta">
+                    Agente automático{' '}
+                    <span className={cn('font-semibold', globalEncendido ? 'text-wa-accent' : 'text-wa-text')}>
+                        {globalEncendido === null ? '…' : globalEncendido ? 'encendido' : 'apagado'}
+                    </span>
+                </span>
+                <button
+                    onClick={async () => {
+                        const err = await alternarGlobal();
+                        if (err) setError(err);
+                    }}
+                    disabled={globalEncendido === null}
+                    role="switch"
+                    aria-checked={!!globalEncendido}
+                    aria-label="Agente automático"
+                    className="relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50"
+                    style={{ background: globalEncendido ? 'rgb(var(--wa-accent))' : 'rgb(var(--wa-inset) / .2)' }}
+                >
+                    <span
+                        aria-hidden="true"
+                        className={cn(
+                            'absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all',
+                            globalEncendido ? 'left-6' : 'left-1',
+                        )}
+                    />
+                </button>
+            </div>
+
+            {aviso && (
+                <div className="flex shrink-0 items-start gap-2 border-b border-wa-divider bg-wa-notice px-4 py-2">
+                    <RotateCw size={15} className="mt-0.5 shrink-0 text-wa-notice-text" aria-hidden="true" />
+                    <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-wa-notice-text">{aviso.titulo}</p>
+                        <p className="text-[12px] text-wa-notice-text/90">{aviso.detalle}</p>
+                    </div>
+                </div>
+            )}
+
             {error && <p className="px-4 py-2 text-xs text-wa-danger">{error}</p>}
 
             {/* Hueco para que el último chat no quede bajo el botón central. */}
@@ -938,8 +1237,15 @@ const MobileWhatsApp: React.FC = () => {
                                         formatearTelefono(c)
                                     )}
                                 </span>
+                                {c.status === 'escalated' && (
+                                    <Headset
+                                        size={15}
+                                        className="shrink-0 text-warning"
+                                        aria-label="El agente escaló esta conversación"
+                                    />
+                                )}
                                 {c.unread_count > 0 && (
-                                    <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
+                                    <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent-strong px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
                                         {c.unread_count}
                                     </span>
                                 )}

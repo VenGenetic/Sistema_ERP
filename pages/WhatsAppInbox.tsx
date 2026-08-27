@@ -3,12 +3,18 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
-    ArrowLeft, Ban, Bot, BotOff, CheckCheck, Clock, Clock3, FileText, Headset, Images, Inbox,
-    MailQuestion, Mic, RefreshCw, RotateCw, Search, User, X,
+    ArrowLeft, Bot, BotOff, CheckCheck, Clock, Headset, Images, Inbox,
+    MailQuestion, RefreshCw, RotateCw, Search, User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
 import MediaGallery from '../components/whatsapp/MediaGallery';
+import { BurbujasEnCola, useColaDeSalida } from '../components/whatsapp/ColaDeSalida';
+import {
+    avisoDeEnvio as avisoDelAgente,
+    haceCuanto as timeAgo,
+    type EstadoAgente,
+} from '../components/whatsapp/agente';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
 import ChatThread, {
@@ -21,17 +27,13 @@ import ChatThread, {
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     borrarMensaje,
-    CAMPOS_COLA,
     CAMPOS_CONV_BASE,
     CAMPOS_CONV_PREVIEW,
-    cancelarMensaje,
     encolarMensajes,
     faltaColumna,
     marcarLeidoEnWhatsApp,
     marcarNoLeido,
     reaccionarMensaje,
-    reintentarMensaje,
-    type MensajeEnCola,
     type NuevoMensaje,
 } from '../utils/whatsappOutbox';
 
@@ -126,33 +128,6 @@ const REASON_TONE: Record<EscalationReason, keyof typeof badge.tone> = {
     angry_or_urgent: 'danger',
     other: 'neutral',
 };
-
-function timeAgo(iso: string): string {
-    const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-    if (minutes < 1) return 'recién';
-    if (minutes < 60) return `hace ${minutes} min`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 24) return `hace ${hours} h`;
-    return `hace ${Math.round(hours / 24)} d`;
-}
-
-/**
- * Estado que reporta el proceso del agente (migración 0027). Es lo que
- * permite avisar que un mensaje encolado NO va a salir -- antes de que
- * alguien escriba tres veces al vacío.
- */
-interface EstadoAgente {
-    agent_last_seen_at: string | null;
-    agent_connection: 'connected' | 'connecting' | 'disconnected' | null;
-    agent_outbound_mode: 'blocked' | 'erp_only' | 'full' | null;
-}
-
-/**
- * Cuánto puede tardar el latido antes de dar el proceso por caído. El
- * agente late cada 30s, así que 2 minutos tolera un par de fallos seguidos
- * sin dar una falsa alarma.
- */
-const LATIDO_MAXIMO_MS = 2 * 60 * 1000;
 
 /** Fila de agent_conversations -- la pestaña "Todas" no depende de escalamientos. */
 interface Conversation {
@@ -323,7 +298,6 @@ const WhatsAppInbox: React.FC = () => {
      * despacha, la pantalla se ve como si no hubiera pasado nada y la gente
      * lo manda de nuevo.
      */
-    const [enCola, setEnCola] = useState<MensajeEnCola[]>([]);
     /** Foto abierta a pantalla completa. */
     const [visor, setVisor] = useState<{ media: MediaItem[]; index: number } | null>(null);
     /** Estado del proceso del agente (migración 0027). null = no se sabe. */
@@ -399,33 +373,6 @@ const WhatsAppInbox: React.FC = () => {
      * razón que `searchRef`: los eventos de realtime los llaman sin
      * argumentos y tienen que trabajar sobre el chat que está a la vista).
      */
-    const selectedConversationIdRef = useRef<number | null>(null);
-
-    /**
-     * Lo que está esperando salir en esta conversación.
-     *
-     * Solo `pending` y `failed`: lo que ya salió aparece en el hilo real
-     * (`agent_messages`), y mostrarlo dos veces haría dudar de si se mandó
-     * una vez o dos.
-     */
-    const cargarCola = useCallback(async () => {
-        const conversationId = selectedConversationIdRef.current;
-        if (!conversationId) {
-            setEnCola([]);
-            return;
-        }
-        const { data, error } = await supabase
-            .from('agent_outbox')
-            .select(CAMPOS_COLA)
-            .eq('conversation_id', conversationId)
-            .in('status', ['pending', 'failed'])
-            .order('created_at', { ascending: true });
-        if (error) {
-            console.error('No se pudo leer la cola de salida:', error.message);
-            return;
-        }
-        setEnCola((data ?? []) as unknown as MensajeEnCola[]);
-    }, []);
 
     const fetchConversations = useCallback(async () => {
         setConversationsLoading(true);
@@ -689,32 +636,10 @@ const WhatsAppInbox: React.FC = () => {
      * quedó trabado recién cuando el cliente reclama es el peor final
      * posible para esta pantalla.
      */
-    const avisoDeEnvio = useMemo(() => {
-        if (!estadoAgente) return null;
-
-        const ultimo = estadoAgente.agent_last_seen_at ? new Date(estadoAgente.agent_last_seen_at).getTime() : 0;
-        if (!ultimo || Date.now() - ultimo > LATIDO_MAXIMO_MS) {
-            return {
-                titulo: 'El agente está caído',
-                detalle: ultimo
-                    ? `No da señales desde ${timeAgo(estadoAgente.agent_last_seen_at!)}. Lo que escribas queda en cola y sale cuando vuelva.`
-                    : 'Nunca reportó estar activo. Lo que escribas queda en cola y sale cuando arranque.',
-            };
-        }
-        if (estadoAgente.agent_connection !== 'connected') {
-            return {
-                titulo: 'El agente no está conectado a WhatsApp',
-                detalle: 'Está intentando reconectar. Los mensajes quedan en cola y salen cuando la sesión vuelva.',
-            };
-        }
-        if (estadoAgente.agent_outbound_mode === 'blocked') {
-            return {
-                titulo: 'La salida a clientes está bloqueada en el servidor',
-                detalle: 'Con OUTBOUND_MODE=blocked no sale nada, ni siquiera lo que escribas vos. Hay que cambiarlo en el .env del agente.',
-            };
-        }
-        return null;
-    }, [estadoAgente]);
+    // La regla de qué avisar vive en components/whatsapp/agente.ts: es la
+    // misma para la bandeja y para el modo móvil, y escrita dos veces
+    // significaba que un día una avisa y la otra no.
+    const avisoDeEnvio = useMemo(() => avisoDelAgente(estadoAgente, timeAgo), [estadoAgente]);
 
     const selectedEscalation = escalations.find((e) => e.id === selectedId) ?? null;
 
@@ -752,7 +677,19 @@ const WhatsAppInbox: React.FC = () => {
         };
     }, [tab, conversations, selectedConversationId, selectedEscalation]);
 
-    selectedConversationIdRef.current = selected?.conversationId ?? null;
+    // La cola de salida vive en components/whatsapp/ColaDeSalida.tsx: el modo
+    // móvil usa el MISMO hook y las mismas burbujas. Va acá y no más arriba
+    // porque en las pestañas de escalamientos el id de la conversación no es
+    // `selectedConversationId`: sale del escalamiento.
+    const {
+        enCola,
+        recargar: cargarCola,
+        cancelar: handleCancelar,
+        reintentar: handleReintentar,
+    } = useColaDeSalida(selected?.conversationId ?? null, {
+        onError: setErrorAccion,
+        onYaHabiaSalido: () => setRecargarMensajes((n) => n + 1),
+    });
 
     useEffect(() => {
         if (!selected) {
@@ -845,61 +782,6 @@ const WhatsAppInbox: React.FC = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selected?.conversationId]);
-
-    /**
-     * Cola de salida del chat abierto, en vivo.
-     *
-     * Es lo que hace visible el tramo entre "le di a enviar" y "el cliente
-     * lo recibió": mientras el agente no lo despache, el mensaje se ve al
-     * final del hilo marcado como en cola, y se puede cancelar. Sin esto,
-     * ese hueco de unos segundos parece que el envío no funcionó.
-     */
-    useEffect(() => {
-        const conversationId = selected?.conversationId;
-        if (!conversationId) {
-            setEnCola([]);
-            return;
-        }
-        cargarCola();
-
-        const channel = supabase
-            .channel(`agent_outbox_conversation_${conversationId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'agent_outbox',
-                    filter: `conversation_id=eq.${conversationId}`,
-                },
-                () => cargarCola(),
-            )
-            .subscribe();
-
-        return () => {
-            channel.unsubscribe();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selected?.conversationId, cargarCola]);
-
-    const hayPendientes = enCola.some((q) => q.status === 'pending');
-
-    /**
-     * Mientras haya algo esperando salir, se relee la cola cada pocos
-     * segundos.
-     *
-     * Es a propósito además del realtime: `agent_outbox` tiene que estar
-     * agregada a la publicación `supabase_realtime` para que lleguen
-     * eventos (migración 0028), y si esa migración no se aplicó el mensaje
-     * se quedaría marcado como "En cola" para siempre aunque el cliente ya
-     * lo tenga. Solo corre mientras hay pendientes, así que en un chat
-     * quieto no consulta nada.
-     */
-    useEffect(() => {
-        if (!hayPendientes) return;
-        const t = setInterval(() => cargarCola(), 4000);
-        return () => clearInterval(t);
-    }, [hayPendientes, cargarCola]);
 
     const handleClaim = async (escalation: Escalation) => {
         if (!userId) return;
@@ -1053,32 +935,6 @@ const WhatsAppInbox: React.FC = () => {
     );
 
     /** Cancela un mensaje que todavía no salió. */
-    const handleCancelar = async (item: MensajeEnCola) => {
-        try {
-            const cancelado = await cancelarMensaje(item.id);
-            if (!cancelado) {
-                // Se despachó entre el clic y el update: decirle a la persona
-                // que se canceló sería mentirle sobre algo que el cliente ya
-                // tiene en el teléfono.
-                setErrorAccion('Ese mensaje ya había salido, no se pudo cancelar.');
-                setRecargarMensajes((n) => n + 1);
-            }
-            await cargarCola();
-        } catch (err: any) {
-            setErrorAccion(`No se pudo cancelar: ${err?.message ?? err}`);
-        }
-    };
-
-    /** Vuelve a intentar un mensaje que falló. */
-    const handleReintentar = async (item: MensajeEnCola) => {
-        try {
-            await reintentarMensaje(item.id);
-            await cargarCola();
-        } catch (err: any) {
-            setErrorAccion(`No se pudo reintentar: ${err?.message ?? err}`);
-        }
-    };
-
     /**
      * Deja el chat como pendiente y CIERRA el detalle.
      *
@@ -1683,76 +1539,13 @@ const WhatsAppInbox: React.FC = () => {
                                     />
                                 )}
 
-                                {/* Lo que todavía no salió. Va al final del hilo, con la misma
-                                    burbuja verde que un mensaje enviado pero atenuada y con el
-                                    relojito: se ve dónde va a quedar sin fingir que el cliente
-                                    ya lo recibió. */}
-                                {enCola.map((q) => (
-                                    <div key={`cola-${q.id}`} className="group mt-0.5 flex justify-end px-2 md:px-4">
-                                        <div
-                                            className={cn(
-                                                'relative max-w-[85%] min-w-0 rounded-lg px-2 py-[6px] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] md:max-w-[65%]',
-                                                q.status === 'failed'
-                                                    ? 'bg-danger-soft text-danger-soft-fg'
-                                                    : 'bg-wa-out text-wa-text opacity-80',
-                                            )}
-                                        >
-                                            {q.media_url && q.kind === 'image' && (
-                                                <img
-                                                    src={q.media_url}
-                                                    alt={q.body ?? 'Foto por enviar'}
-                                                    className="mb-1 max-h-56 w-auto rounded-[6px] object-cover"
-                                                />
-                                            )}
-                                            {q.media_url && q.kind === 'audio' && (
-                                                <p className="mb-1 flex items-center gap-1.5 text-[13px]">
-                                                    <Mic size={14} aria-hidden="true" />
-                                                    Nota de voz
-                                                </p>
-                                            )}
-                                            {q.media_url && q.kind !== 'image' && q.kind !== 'audio' && (
-                                                <p className="mb-1 flex items-center gap-1.5 text-[13px]">
-                                                    <FileText size={14} aria-hidden="true" />
-                                                    {q.media_filename ?? 'archivo'}
-                                                </p>
-                                            )}
-
-                                            <p className="whitespace-pre-wrap break-words text-[14.2px] leading-[19px]">
-                                                {q.body}
-                                            </p>
-
-                                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-wa-meta-out">
-                                                {q.status === 'failed' ? (
-                                                    <>
-                                                        <span className="font-semibold">No se pudo enviar</span>
-                                                        <button
-                                                            onClick={() => handleReintentar(q)}
-                                                            className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
-                                                        >
-                                                            <RotateCw size={11} aria-hidden="true" /> Reintentar
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span className="inline-flex items-center gap-1">
-                                                            <Clock3 size={13} aria-hidden="true" /> En cola
-                                                        </span>
-                                                        <button
-                                                            onClick={() => handleCancelar(q)}
-                                                            className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
-                                                        >
-                                                            <Ban size={11} aria-hidden="true" /> Cancelar
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-
-                                            {/* El motivo exacto del fallo: sin esto, "no se pudo
-                                                enviar" no le dice a nadie qué hacer al respecto. */}
-                                            {q.error && <p className="mt-1 text-[11px] opacity-80">{q.error}</p>}
-                                        </div>
-                                    </div>
-                                ))}
+                                {/* Lo que todavía no salió. Las mismas burbujas que en el
+                                    modo móvil: ver components/whatsapp/ColaDeSalida.tsx. */}
+                                <BurbujasEnCola
+                                    items={enCola}
+                                    onCancelar={handleCancelar}
+                                    onReintentar={handleReintentar}
+                                />
                                 </div>
                             </div>
 
