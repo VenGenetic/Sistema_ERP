@@ -2,13 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, page, card, badge, button, input } from '../components/ui/styles';
-import { Ban, CheckCheck, Clock, FileText, Headset, Inbox, MailQuestion, Mic, RefreshCw, RotateCw, Search, User, X } from 'lucide-react';
+import {
+    ArrowLeft, Ban, Bot, BotOff, CheckCheck, Clock, Clock3, FileText, Headset, Inbox,
+    MailQuestion, Mic, RefreshCw, RotateCw, Search, User, X,
+} from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
-import MessageMedia from '../components/whatsapp/MessageMedia';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
-import ChatThread, { ENTREGA, textoDe, type MensajeHilo } from '../components/whatsapp/ChatThread';
+import ChatThread, { PildoraChat, textoDe, type MensajeHilo } from '../components/whatsapp/ChatThread';
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     borrarMensaje,
@@ -118,6 +120,27 @@ const REASON_TONE: Record<EscalationReason, keyof typeof badge.tone> = {
     other: 'neutral',
 };
 
+/**
+ * La hora que WhatsApp pone al costado de cada chat en la lista: la hora
+ * si es de hoy, "ayer", el día de la semana dentro de la semana, y la
+ * fecha corta más atrás. Es más útil que "hace 14 h" para decidir a quién
+ * contestar: dice CUÁNDO escribió, no cuánto pasó.
+ */
+export function horaLista(iso: string): string {
+    const f = new Date(iso);
+    const hoy = new Date();
+    const ayer = new Date();
+    ayer.setDate(hoy.getDate() - 1);
+    const mismoDia = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+    if (mismoDia(f, hoy)) return f.toLocaleTimeString('es-EC', { hour: 'numeric', minute: '2-digit' });
+    if (mismoDia(f, ayer)) return 'ayer';
+    if (Date.now() - f.getTime() < 7 * 24 * 60 * 60 * 1000) {
+        return f.toLocaleDateString('es-EC', { weekday: 'long' });
+    }
+    return f.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
 function timeAgo(iso: string): string {
     const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
     if (minutes < 1) return 'recién';
@@ -199,7 +222,11 @@ const COLORES_AVATAR = [
     'bg-surface-3 text-fg-muted',
 ];
 
-const Avatar: React.FC<{ nombre: string | null; telefono: string }> = ({ nombre, telefono }) => {
+const Avatar: React.FC<{ nombre: string | null; telefono: string; tam?: 'sm' | 'md' }> = ({
+    nombre,
+    telefono,
+    tam = 'md',
+}) => {
     const inicial = (nombre?.trim()?.[0] ?? telefono.slice(-2, -1) ?? '?').toUpperCase();
     let suma = 0;
     for (const ch of telefono) suma += ch.charCodeAt(0);
@@ -207,7 +234,9 @@ const Avatar: React.FC<{ nombre: string | null; telefono: string }> = ({ nombre,
         <span
             aria-hidden="true"
             className={cn(
-                'shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold select-none',
+                'shrink-0 rounded-full flex items-center justify-center font-bold select-none',
+                // 48px es el tamaño del avatar de WhatsApp en la lista.
+                tam === 'md' ? 'h-12 w-12 text-lg' : 'h-10 w-10 text-base',
                 COLORES_AVATAR[suma % COLORES_AVATAR.length],
             )}
         >
@@ -274,7 +303,15 @@ const WhatsAppInbox: React.FC = () => {
     const [escalations, setEscalations] = useState<Escalation[]>([]);
     const [profileNames, setProfileNames] = useState<Map<string, string>>(new Map());
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<Tab>('pending');
+    /**
+     * Se abre en "Todas", no en "Pendientes".
+     *
+     * Pendientes son solo los chats que el agente ESCALÓ -- casi siempre uno o
+     * ninguno -- así que la bandeja arrancaba con la lista prácticamente vacía
+     * y había que hacer un clic antes de poder trabajar. Lo que se busca al
+     * entrar es la conversación de un cliente, y esa está en "Todas".
+     */
+    const [tab, setTab] = useState<Tab>('all');
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [messagesLoading, setMessagesLoading] = useState(false);
@@ -582,7 +619,20 @@ const WhatsAppInbox: React.FC = () => {
      */
     useEffect(() => {
         const cont = hiloRef.current;
-        if (cont) cont.scrollTop = cont.scrollHeight;
+        if (!cont) return;
+        const abajo = () => {
+            cont.scrollTop = cont.scrollHeight;
+        };
+        abajo();
+        // Y otra vez cuando las fotos terminan de cargar: hasta que la imagen
+        // no tiene alto, el hilo mide menos de lo que va a medir y el "abajo
+        // del todo" queda a media conversación.
+        const t1 = setTimeout(abajo, 120);
+        const t2 = setTimeout(abajo, 600);
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
     }, [messages]);
 
     /**
@@ -1212,24 +1262,39 @@ const WhatsAppInbox: React.FC = () => {
                 </div>
             </div>
 
-            {/* Tres columnas en pantalla ancha: lista de chats, la conversación,
-                y la ficha del cliente. La ficha va al costado y no en un modal
-                a propósito -- lo que dice (si tiene descuento, qué repuestos
-                dejó pedidos, cuáles ya llegaron) hay que tenerlo a la vista
-                MIENTRAS se cotiza, no detrás de un clic. En pantallas angostas
-                se apila debajo del chat. */}
-            <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] xl:grid-cols-[340px_1fr_300px] gap-4 items-start">
-                {/* Lista */}
-                <div className={cn(card.base, 'divide-y divide-subtle overflow-hidden')}>
-                    {/* Cada pestaña espera SU propia carga: la de "Todas" usaba
-                        el loading de escalamientos y por eso mostraba "no hay
+            {/* WhatsApp Web en una sola lámina: la lista, la conversación y la
+                ficha del cliente pegadas, con altura fija y cada columna con su
+                propio desplazamiento.
+
+                Antes eran tres tarjetas sueltas que crecían hacia abajo, así que
+                para ver el último mensaje había que bajar la PÁGINA entera y la
+                caja de escribir quedaba fuera de pantalla. Con altura fija el
+                hilo termina siempre justo encima de donde se escribe, que es la
+                única disposición en la que se puede contestar rápido.
+
+                La ficha del cliente va al costado y no en un modal a propósito:
+                lo que dice (si tiene descuento, qué repuestos dejó pedidos,
+                cuáles ya llegaron) hay que tenerlo a la vista MIENTRAS se
+                cotiza, no detrás de un clic. */}
+            <div className="flex h-[72vh] min-h-[520px] overflow-hidden rounded-xl border border-subtle bg-wa-panel shadow-sm">
+                {/* ============================ LISTA ============================ */}
+                {/* En pantalla angosta se ve una columna por vez: al abrir un chat
+                    la lista se aparta, igual que en el teléfono. */}
+                <div
+                    className={cn(
+                        'w-full shrink-0 flex-col overflow-y-auto wa-scroll border-r border-wa-divider bg-wa-panel lg:flex lg:w-[360px]',
+                        selected ? 'hidden' : 'flex',
+                    )}
+                >
+                    {/* Cada pestaña espera SU propia carga: la de "Todas" usaba el
+                        loading de escalamientos y por eso mostraba "no hay
                         conversaciones" mientras la consulta seguía en vuelo. */}
                     {(tab === 'all' ? conversationsLoading : loading) ? (
-                        <div className="p-8 text-center text-sm text-fg-muted">Cargando…</div>
+                        <div className="p-8 text-center text-sm text-wa-meta">Cargando…</div>
                     ) : tab === 'all' ? (
                         filteredConversations.length === 0 ? (
-                            <div className="p-10 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
-                                <Inbox size={22} className="text-fg-subtle" aria-hidden="true" />
+                            <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
+                                <Inbox size={22} aria-hidden="true" />
                                 {search.trim()
                                     ? `Ningún cliente coincide con "${search.trim()}".`
                                     : 'Todavía no hay conversaciones de WhatsApp.'}
@@ -1240,84 +1305,95 @@ const WhatsAppInbox: React.FC = () => {
                                     key={c.id}
                                     onClick={() => setSelectedConversationId(c.id)}
                                     className={cn(
-                                        'w-full text-left px-4 py-3 transition-colors',
-                                        selectedConversationId === c.id ? 'bg-primary-soft/60' : 'hover:bg-surface-hover',
+                                        'w-full text-left flex items-center gap-3 pl-3 transition-colors',
+                                        selectedConversationId === c.id ? 'bg-wa-active' : 'hover:bg-wa-hover',
                                     )}
                                 >
-                                    {/* El NOMBRE manda, no el teléfono: es lo que se busca
-                                        al recorrer la lista. El número baja de línea, y
-                                        solo ocupa el lugar principal cuando no hay nombre. */}
-                                    <div className="flex items-start gap-2.5">
-                                        <Avatar nombre={c.customer_name} telefono={c.phone_number} />
+                                    <Avatar nombre={c.customer_name} telefono={c.phone_number} />
 
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-baseline justify-between gap-2">
+                                    {/* La línea divisoria arranca DESPUÉS del avatar,
+                                        como en WhatsApp: así la columna de avatares se
+                                        lee como una sola tira y la lista respira. */}
+                                    <div className="min-w-0 flex-1 border-b border-wa-divider py-3 pr-3">
+                                        <div className="flex items-baseline justify-between gap-2">
+                                            {/* El NOMBRE manda, no el teléfono: es lo que se
+                                                busca al recorrer la lista. */}
+                                            <span
+                                                className={cn(
+                                                    'truncate text-[16px] leading-[21px] text-wa-text',
+                                                    c.unread_count > 0 ? 'font-semibold' : 'font-normal',
+                                                )}
+                                            >
+                                                {c.customer_name || formatPhone(c)}
+                                            </span>
+                                            {c.last_message_at && (
                                                 <span
                                                     className={cn(
-                                                        'text-sm truncate',
-                                                        c.unread_count > 0 ? 'font-bold text-fg' : 'font-medium text-fg',
+                                                        'shrink-0 text-[12px] leading-[16px]',
+                                                        c.unread_count > 0 ? 'font-semibold text-wa-accent' : 'text-wa-meta',
                                                     )}
                                                 >
-                                                    {c.customer_name || formatPhone(c)}
+                                                    {horaLista(c.last_message_at)}
                                                 </span>
-                                                {c.last_message_at && (
-                                                    <span className="text-2xs text-fg-subtle shrink-0">
-                                                        {timeAgo(c.last_message_at)}
-                                                    </span>
-                                                )}
-                                            </div>
+                                            )}
+                                        </div>
 
-                                            {/* De qué habla el chat, sin abrirlo: antes había
-                                                que entrar uno por uno para poder triar. */}
+                                        {/* De qué habla el chat, sin abrirlo: antes había que
+                                            entrar uno por uno para poder triar. */}
+                                        <div className="mt-0.5 flex items-center gap-1.5">
                                             <p
                                                 className={cn(
-                                                    'text-2xs truncate mt-0.5',
-                                                    c.unread_count > 0 ? 'text-fg font-medium' : 'text-fg-muted',
+                                                    'min-w-0 flex-1 truncate text-[13.5px] leading-[19px]',
+                                                    c.unread_count > 0 ? 'text-wa-text' : 'text-wa-meta',
                                                 )}
                                             >
                                                 {c.last_message_preview ? (
                                                     <>
                                                         {c.last_message_direction === 'outbound' && (
-                                                            <span className="text-fg-subtle">Vos: </span>
+                                                            <span className="text-wa-meta">Vos: </span>
                                                         )}
                                                         {c.last_message_preview}
                                                     </>
                                                 ) : (
-                                                    <span className="text-fg-subtle">{formatPhone(c)}</span>
+                                                    formatPhone(c)
                                                 )}
                                             </p>
 
-                                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                                {c.unread_count > 0 && (
-                                                    <span className={cn(badge.base, badge.size.sm, badge.tone.danger)}>
-                                                        {c.unread_count} sin leer
-                                                    </span>
-                                                )}
-                                                {/* "Agente apagado" es el estado por defecto de
-                                                    casi todos: repetirlo en cada fila es ruido
-                                                    que tapa lo que sí distingue una de otra.
-                                                    Solo se marca lo excepcional. */}
-                                                {c.bot_enabled && (
-                                                    <span className={cn(badge.base, badge.size.sm, badge.tone.success)}>
-                                                        Agente activado
-                                                    </span>
-                                                )}
-                                            </div>
+                                            {/* "Agente apagado" es el estado por defecto de casi
+                                                todos: repetirlo en cada fila es ruido que tapa lo
+                                                que sí distingue una de otra. Solo se marca lo
+                                                excepcional, y como icono para no robarle ancho a
+                                                la vista previa. */}
+                                            {c.bot_enabled && (
+                                                <Bot
+                                                    size={15}
+                                                    className="shrink-0 text-wa-accent"
+                                                    aria-label="El agente responde en este chat"
+                                                />
+                                            )}
+
+                                            {c.unread_count > 0 && (
+                                                <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
+                                                    {c.unread_count}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </button>
                             ))
                         )
                     ) : null}
+
                     {tab === 'all' && !conversationsLoading && hayMas && (
-                        <p className="px-4 py-3 text-2xs text-fg-subtle text-center">
+                        <p className="px-4 py-3 text-center text-[12px] text-wa-meta">
                             Mostrando las {conversations.length} más recientes de {totalConversaciones}.
                             {' '}Usá el buscador para encontrar una conversación puntual.
                         </p>
                     )}
+
                     {tab !== 'all' && (loading ? null : filtered.length === 0 ? (
-                        <div className="p-10 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
-                            <Inbox size={22} className="text-fg-subtle" aria-hidden="true" />
+                        <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
+                            <Inbox size={22} aria-hidden="true" />
                             {search.trim()
                                 ? `Ningún cliente coincide con "${search.trim()}".`
                                 : tab === 'pending'
@@ -1330,172 +1406,157 @@ const WhatsAppInbox: React.FC = () => {
                                 key={e.id}
                                 onClick={() => setSelectedId(e.id)}
                                 className={cn(
-                                    'w-full text-left px-4 py-3 transition-colors',
-                                    selectedId === e.id ? 'bg-primary-soft/60' : 'hover:bg-surface-hover',
+                                    'w-full text-left flex items-center gap-3 pl-3 transition-colors',
+                                    selectedId === e.id ? 'bg-wa-active' : 'hover:bg-wa-hover',
                                 )}
                             >
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-fg text-sm truncate">
-                                        {e.agent_conversations?.customer_name || e.agent_conversations?.phone_number || 'Cliente'}
-                                    </span>
-                                    <span className="text-2xs text-fg-subtle shrink-0 flex items-center gap-1">
-                                        <Clock size={11} aria-hidden="true" />
-                                        {timeAgo(e.created_at)}
-                                    </span>
+                                <Avatar
+                                    nombre={e.agent_conversations?.customer_name ?? null}
+                                    telefono={e.agent_conversations?.phone_number ?? '?'}
+                                />
+                                <div className="min-w-0 flex-1 border-b border-wa-divider py-3 pr-3">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                        <span className="truncate text-[16px] font-semibold leading-[21px] text-wa-text">
+                                            {e.agent_conversations?.customer_name || e.agent_conversations?.phone_number || 'Cliente'}
+                                        </span>
+                                        <span className="shrink-0 text-[12px] text-wa-meta flex items-center gap-1">
+                                            <Clock size={11} aria-hidden="true" />
+                                            {timeAgo(e.created_at)}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-1.5">
+                                        <span className={cn(badge.base, badge.size.sm, badge.tone[REASON_TONE[e.reason]])}>
+                                            {REASON_LABEL[e.reason]}
+                                        </span>
+                                        {e.status === 'claimed' && (
+                                            <span className="flex items-center gap-1 text-[11px] text-wa-meta">
+                                                <User size={11} aria-hidden="true" />
+                                                {e.claimed_by === userId ? 'Vos' : profileNames.get(e.claimed_by ?? '') ?? 'del equipo'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {e.message_snapshot && (
+                                        <p className="mt-1 line-clamp-2 text-[13px] leading-[18px] text-wa-meta">
+                                            {e.message_snapshot}
+                                        </p>
+                                    )}
                                 </div>
-                                <div className="mt-1.5">
-                                    <span className={cn(badge.base, badge.size.sm, badge.tone[REASON_TONE[e.reason]])}>
-                                        {REASON_LABEL[e.reason]}
-                                    </span>
-                                </div>
-                                {e.message_snapshot && (
-                                    <p className="mt-1.5 text-xs text-fg-muted line-clamp-2">{e.message_snapshot}</p>
-                                )}
-                                {e.status === 'claimed' && (
-                                    <p className="mt-1 text-2xs text-fg-subtle flex items-center gap-1">
-                                        <User size={11} aria-hidden="true" />
-                                        {e.claimed_by === userId ? 'Vos la estás atendiendo' : `Atendiendo: ${profileNames.get(e.claimed_by ?? '') ?? 'alguien del equipo'}`}
-                                    </p>
-                                )}
                             </button>
                         ))
                     ))}
                 </div>
 
-                {/* Detalle */}
-                <div className={cn(card.base, 'flex flex-col')}>
+                {/* ========================= CONVERSACIÓN ========================= */}
+                <div
+                    className={cn(
+                        'min-w-0 flex-1 flex-col bg-wa-bg lg:flex',
+                        selected ? 'flex' : 'hidden',
+                    )}
+                >
                     {!selected ? (
-                        <div className="p-14 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
-                            <Headset size={22} className="text-fg-subtle" aria-hidden="true" />
-                            Elegí una conversación de la lista para ver el detalle.
+                        <div className="m-auto flex max-w-sm flex-col items-center gap-3 p-10 text-center">
+                            <Headset size={40} className="text-wa-meta" aria-hidden="true" />
+                            <p className="text-lg font-light text-wa-text">Bandeja de WhatsApp</p>
+                            <p className="text-[13.5px] text-wa-meta">
+                                Elegí una conversación de la lista para leer el hilo completo y contestarle
+                                al cliente con texto, fotos, repuestos del catálogo o una proforma.
+                            </p>
                         </div>
                     ) : (
                         <>
-                            <div className={card.header}>
-                                <div>
-                                    <h2 className="text-base font-semibold text-fg">
-                                        {formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })}
+                            {/* ---------------------- Cabecera ---------------------- */}
+                            <div className="flex shrink-0 items-center gap-3 border-b border-wa-divider bg-wa-header px-3 py-2">
+                                {/* En angosto la lista se apartó: hace falta cómo volver. */}
+                                <button
+                                    onClick={() => {
+                                        setSelectedId(null);
+                                        setSelectedConversationId(null);
+                                    }}
+                                    aria-label="Volver a la lista de chats"
+                                    className="flex h-9 w-9 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10 lg:hidden"
+                                >
+                                    <ArrowLeft size={20} aria-hidden="true" />
+                                </button>
+
+                                <Avatar
+                                    nombre={selected.customerName}
+                                    telefono={selected.phoneNumber}
+                                    tam="sm"
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                    <h2 className="truncate text-[16px] font-medium leading-[21px] text-wa-text">
+                                        {selected.customerName ||
+                                            formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })}
                                     </h2>
-                                    {selected.customerName && (
-                                        <p className="text-xs text-fg-muted">{selected.customerName}</p>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span
-                                        className={cn(
-                                            badge.base,
-                                            badge.size.md,
-                                            selected.botEnabled ? badge.tone.success : badge.tone.neutral,
-                                        )}
-                                    >
-                                        {selected.botEnabled ? 'Agente activado' : 'Agente apagado'}
-                                    </span>
-                                    {selected.escalation && (
-                                        <span className={cn(badge.base, badge.size.md, badge.tone[REASON_TONE[selected.escalation.reason]])}>
-                                            {REASON_LABEL[selected.escalation.reason]}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div ref={hiloRef} className="p-5 max-h-[52vh] overflow-y-auto space-y-3">
-                                {messages.length >= MENSAJES_VISIBLES && (
-                                    <p className="text-2xs text-fg-subtle text-center pb-1">
-                                        Mostrando los últimos {MENSAJES_VISIBLES} mensajes de esta conversación.
+                                    {/* La línea de abajo es la de "en línea" de WhatsApp. Acá
+                                        dice lo que de verdad importa saber sin abrir nada: el
+                                        número, y si el agente está contestando en este chat. */}
+                                    <p className="truncate text-[12.5px] leading-[17px] text-wa-meta">
+                                        {selected.customerName &&
+                                            formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })}
+                                        {selected.customerName && ' · '}
+                                        {selected.botEnabled
+                                            ? globalBotEnabled === false
+                                                ? 'agente activado acá, pero apagado en general'
+                                                : 'el agente responde en este chat'
+                                            : 'contesta el vendedor'}
                                     </p>
-                                )}
-                                {messagesLoading ? (
-                                    <p className="text-sm text-fg-muted">Cargando conversación…</p>
-                                ) : messages.length === 0 ? (
-                                    <p className="text-sm text-fg-muted">Sin mensajes registrados todavía.</p>
-                                ) : (
-                                    <ChatThread
-                                        mensajes={messages}
-                                        onAbrirFoto={abrirVisor}
-                                        onResponder={setCitando}
-                                        onReaccionar={reaccionar}
-                                        onBorrar={borrar}
-                                    />
+                                </div>
+
+                                {selected.escalation && (
+                                    <span className={cn(badge.base, badge.size.md, badge.tone[REASON_TONE[selected.escalation.reason]])}>
+                                        {REASON_LABEL[selected.escalation.reason]}
+                                    </span>
                                 )}
 
-                                {/* Lo que todavía no salió. Va al final del hilo, con el
-                                    mismo aspecto que un mensaje enviado pero atenuado: se
-                                    ve dónde va a quedar sin fingir que el cliente ya lo
-                                    recibió. */}
-                                {enCola.map((q) => (
-                                    <div key={`cola-${q.id}`} className="flex justify-end">
-                                        <div
-                                            className={cn(
-                                                'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words border border-dashed',
-                                                q.status === 'failed'
-                                                    ? 'border-danger/50 bg-danger-soft text-danger-soft-fg'
-                                                    : 'border-strong bg-surface-2 text-fg-muted',
-                                            )}
-                                        >
-                                            {q.media_url && q.kind === 'image' && (
-                                                <img
-                                                    src={q.media_url}
-                                                    alt={q.body ?? 'Foto por enviar'}
-                                                    className="mb-1.5 max-h-48 w-auto rounded-xl object-cover opacity-80"
-                                                />
-                                            )}
-                                            {q.media_url && q.kind === 'audio' && (
-                                                <p className="mb-1 flex items-center gap-1.5 text-xs">
-                                                    <Mic size={13} aria-hidden="true" />
-                                                    Nota de voz
-                                                </p>
-                                            )}
-                                            {q.media_url && q.kind !== 'image' && q.kind !== 'audio' && (
-                                                <p className="mb-1 flex items-center gap-1.5 text-xs">
-                                                    <FileText size={13} aria-hidden="true" />
-                                                    {q.media_filename ?? 'archivo'}
-                                                </p>
-                                            )}
-                                            {q.body}
+                                {/* Las acciones del chat van acá arriba, como los iconos de
+                                    WhatsApp: antes vivían en una barra al pie que empujaba la
+                                    caja de escribir hacia abajo. */}
+                                <button
+                                    onClick={() => handleToggleBot(selected)}
+                                    disabled={actionLoading}
+                                    aria-label={selected.botEnabled ? 'Desactivar el agente en este chat' : 'Activar el agente en este chat'}
+                                    title={
+                                        selected.botEnabled
+                                            ? 'El agente está contestando en este chat. Apagalo para responder vos.'
+                                            : 'Activar el agente en este chat'
+                                    }
+                                    className={cn(
+                                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10',
+                                        selected.botEnabled ? 'text-wa-accent' : 'text-wa-meta',
+                                    )}
+                                >
+                                    {selected.botEnabled ? <Bot size={19} aria-hidden="true" /> : <BotOff size={19} aria-hidden="true" />}
+                                </button>
 
-                                            <div className="text-2xs mt-1 flex items-center gap-2 flex-wrap">
-                                                {q.status === 'failed' ? (
-                                                    <>
-                                                        <span className={cn(badge.base, badge.size.sm, badge.tone.danger)}>
-                                                            No se pudo enviar
-                                                        </span>
-                                                        <button
-                                                            onClick={() => handleReintentar(q)}
-                                                            className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
-                                                        >
-                                                            <RotateCw size={11} aria-hidden="true" /> Reintentar
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span className={cn(badge.base, badge.size.sm, badge.tone.warning)}>
-                                                            En cola
-                                                        </span>
-                                                        <button
-                                                            onClick={() => handleCancelar(q)}
-                                                            className="inline-flex items-center gap-1 text-fg-subtle underline underline-offset-2 hover:no-underline"
-                                                        >
-                                                            <Ban size={11} aria-hidden="true" /> Cancelar
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
+                                <button
+                                    onClick={() => marcarComoNoLeido(selected.conversationId)}
+                                    disabled={actionLoading}
+                                    aria-label="Marcar el chat como no leído"
+                                    title="Lo deja como pendiente en la lista (no cambia nada en el teléfono del cliente)"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10"
+                                >
+                                    <MailQuestion size={19} aria-hidden="true" />
+                                </button>
 
-                                            {/* El motivo exacto del fallo: sin esto, "no se pudo
-                                                enviar" no le dice a nadie qué hacer al respecto. */}
-                                            {q.error && <p className="text-2xs mt-1 opacity-80">{q.error}</p>}
-                                        </div>
-                                    </div>
-                                ))}
+                                <button
+                                    onClick={() => setRecargarMensajes((n) => n + 1)}
+                                    disabled={messagesLoading}
+                                    aria-label="Actualizar el chat"
+                                    title="Vuelve a leer la conversación y el estado de entrega de cada mensaje"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10"
+                                >
+                                    <RefreshCw size={18} className={cn(messagesLoading && 'animate-spin')} aria-hidden="true" />
+                                </button>
                             </div>
 
-                            {/* Si el agente sigue habilitado en este chat, puede
-                                contestar encima de la persona que está atendiendo.
-                                No se apaga solo -- eso dejaría al bot mudo para
-                                siempre sin que nadie lo haya decidido -- pero se
-                                avisa y se apaga de un clic. */}
+                            {/* Si el agente sigue habilitado en este chat, puede contestar
+                                encima de la persona que está atendiendo. No se apaga solo
+                                -- eso dejaría al bot mudo para siempre sin que nadie lo
+                                haya decidido -- pero se avisa y se apaga de un clic. */}
                             {selected.botEnabled && globalBotEnabled && (
-                                <div className="mx-5 mt-3 px-3 py-2 rounded-lg bg-warning-soft border border-warning/30 flex items-center justify-between gap-3 flex-wrap">
+                                <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-wa-divider bg-warning-soft px-4 py-2">
                                     <p className="text-xs text-warning-soft-fg">
                                         El agente también contesta en este chat: pueden cruzarse las respuestas.
                                     </p>
@@ -1509,112 +1570,181 @@ const WhatsAppInbox: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Responder desde acá y no desde el teléfono: lo que se
-                                escribe en el teléfono llega cifrado al agente y no
-                                queda registrado en la conversación. */}
-                            {citando && (
-                                <div className="px-5 pt-3">
-                                    <CitaEnComposer
-                                        texto={textoDe(citando)}
-                                        onQuitar={() => setCitando(null)}
+                            {/* ------------------------ Hilo ------------------------ */}
+                            <div ref={hiloRef} className="wa-wallpaper wa-scroll flex-1 overflow-y-auto py-3">
+                                <PildoraChat tono="aviso">
+                                    Lo que mandes desde acá sale por WhatsApp y queda guardado en esta
+                                    conversación. Lo que escribas desde el teléfono, no.
+                                </PildoraChat>
+
+                                {messages.length >= MENSAJES_VISIBLES && (
+                                    <PildoraChat>
+                                        Mostrando los últimos {MENSAJES_VISIBLES} mensajes de esta conversación.
+                                    </PildoraChat>
+                                )}
+
+                                {messagesLoading ? (
+                                    <PildoraChat>Cargando conversación…</PildoraChat>
+                                ) : messages.length === 0 ? (
+                                    <PildoraChat>Sin mensajes registrados todavía.</PildoraChat>
+                                ) : (
+                                    <ChatThread
+                                        mensajes={messages}
+                                        onAbrirFoto={abrirVisor}
+                                        onResponder={setCitando}
+                                        onReaccionar={reaccionar}
+                                        onBorrar={borrar}
                                     />
+                                )}
+
+                                {/* Lo que todavía no salió. Va al final del hilo, con la misma
+                                    burbuja verde que un mensaje enviado pero atenuada y con el
+                                    relojito: se ve dónde va a quedar sin fingir que el cliente
+                                    ya lo recibió. */}
+                                {enCola.map((q) => (
+                                    <div key={`cola-${q.id}`} className="group mt-0.5 flex justify-end px-2 md:px-4">
+                                        <div
+                                            className={cn(
+                                                'relative max-w-[85%] min-w-0 rounded-lg px-2 py-[6px] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] md:max-w-[65%]',
+                                                q.status === 'failed'
+                                                    ? 'bg-danger-soft text-danger-soft-fg'
+                                                    : 'bg-wa-out text-wa-text opacity-80',
+                                            )}
+                                        >
+                                            {q.media_url && q.kind === 'image' && (
+                                                <img
+                                                    src={q.media_url}
+                                                    alt={q.body ?? 'Foto por enviar'}
+                                                    className="mb-1 max-h-56 w-auto rounded-[6px] object-cover"
+                                                />
+                                            )}
+                                            {q.media_url && q.kind === 'audio' && (
+                                                <p className="mb-1 flex items-center gap-1.5 text-[13px]">
+                                                    <Mic size={14} aria-hidden="true" />
+                                                    Nota de voz
+                                                </p>
+                                            )}
+                                            {q.media_url && q.kind !== 'image' && q.kind !== 'audio' && (
+                                                <p className="mb-1 flex items-center gap-1.5 text-[13px]">
+                                                    <FileText size={14} aria-hidden="true" />
+                                                    {q.media_filename ?? 'archivo'}
+                                                </p>
+                                            )}
+
+                                            <p className="whitespace-pre-wrap break-words text-[14.2px] leading-[19px]">
+                                                {q.body}
+                                            </p>
+
+                                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-wa-meta-out">
+                                                {q.status === 'failed' ? (
+                                                    <>
+                                                        <span className="font-semibold">No se pudo enviar</span>
+                                                        <button
+                                                            onClick={() => handleReintentar(q)}
+                                                            className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
+                                                        >
+                                                            <RotateCw size={11} aria-hidden="true" /> Reintentar
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Clock3 size={13} aria-hidden="true" /> En cola
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleCancelar(q)}
+                                                            className="inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline"
+                                                        >
+                                                            <Ban size={11} aria-hidden="true" /> Cancelar
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* El motivo exacto del fallo: sin esto, "no se pudo
+                                                enviar" no le dice a nadie qué hacer al respecto. */}
+                                            {q.error && <p className="mt-1 text-[11px] opacity-80">{q.error}</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* ------------------- Caja de escribir ------------------ */}
+                            {/* Responder desde acá y no desde el teléfono: lo que se escribe
+                                en el teléfono llega cifrado al agente y no queda registrado
+                                en la conversación. */}
+                            <div className="shrink-0 bg-wa-header">
+                                {citando && (
+                                    <div className="px-3 pt-2">
+                                        <CitaEnComposer texto={textoDe(citando)} onQuitar={() => setCitando(null)} />
+                                    </div>
+                                )}
+                                <ChatComposer
+                                    key={selected.conversationId}
+                                    conversationId={selected.conversationId}
+                                    clienteLabel={
+                                        selected.customerName ||
+                                        formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })
+                                    }
+                                    clienteNombre={selected.customerName}
+                                    phoneNumber={selected.phoneNumber}
+                                    userId={userId}
+                                    onEnviar={enviarMensajes}
+                                    onPedidoRegistrado={() => setRecargarFicha((n) => n + 1)}
+                                />
+                            </div>
+
+                            {/* Triage del escalamiento. Solo aparece cuando hay uno: el
+                                resto del tiempo esa barra era una franja vacía entre el
+                                hilo y la caja de escribir. */}
+                            {selected.escalation && (
+                                <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-wa-divider bg-wa-header px-4 py-2.5">
+                                    {selected.escalation.status === 'open' && (
+                                        <button
+                                            onClick={() => handleClaim(selected.escalation!)}
+                                            disabled={actionLoading}
+                                            className={cn(button.base, button.variant.primary, button.size.sm)}
+                                        >
+                                            <User size={14} aria-hidden="true" /> Reclamar
+                                        </button>
+                                    )}
+                                    {selected.escalation.status === 'claimed' && (
+                                        <>
+                                            <label className="mr-auto flex items-center gap-1.5 text-xs text-wa-meta">
+                                                <input
+                                                    type="checkbox"
+                                                    className={input.checkbox}
+                                                    checked={closeInsteadOfReopen}
+                                                    onChange={(e) => setCloseInsteadOfReopen(e.target.checked)}
+                                                />
+                                                No devolver al bot (dejar la conversación cerrada)
+                                            </label>
+                                            <button
+                                                onClick={() => handleResolve(selected.escalation!)}
+                                                disabled={actionLoading}
+                                                className={cn(button.base, button.variant.success, button.size.sm)}
+                                            >
+                                                <CheckCheck size={14} aria-hidden="true" /> Marcar resuelta
+                                            </button>
+                                        </>
+                                    )}
+                                    {selected.escalation.status === 'resolved' && (
+                                        <p className="text-xs text-wa-meta">
+                                            Resuelta {selected.escalation.resolved_at ? timeAgo(selected.escalation.resolved_at) : ''}
+                                            {selected.conversationStatus === 'closed' && ' -- conversación cerrada, el bot no retoma sola'}
+                                        </p>
+                                    )}
                                 </div>
                             )}
-                            <ChatComposer
-                                key={selected.conversationId}
-                                conversationId={selected.conversationId}
-                                clienteLabel={
-                                    selected.customerName ||
-                                    formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })
-                                }
-                                clienteNombre={selected.customerName}
-                                phoneNumber={selected.phoneNumber}
-                                userId={userId}
-                                onEnviar={enviarMensajes}
-                                onPedidoRegistrado={() => setRecargarFicha((n) => n + 1)}
-                            />
-
-                            <div className={cn(card.footer, 'flex items-center gap-3 flex-wrap')}>
-                                {/* Dejar el chat pendiente. Abrirlo para ver de qué se
-                                    trataba lo apagaba de la lista y quedaba enterrado
-                                    entre miles; esto lo devuelve a los que esperan. */}
-                                <button
-                                    onClick={() => marcarComoNoLeido(selected.conversationId)}
-                                    disabled={actionLoading}
-                                    className={cn(button.base, button.variant.secondary, button.size.md)}
-                                    title="Lo deja como pendiente en la lista (no cambia nada en el teléfono del cliente)"
-                                >
-                                    <MailQuestion size={15} aria-hidden="true" /> Marcar sin leer
-                                </button>
-                                <button
-                                    onClick={() => setRecargarMensajes((n) => n + 1)}
-                                    disabled={messagesLoading}
-                                    className={cn(button.base, button.variant.secondary, button.size.md)}
-                                    title="Vuelve a leer la conversación y el estado de entrega de cada mensaje"
-                                >
-                                    <RefreshCw size={15} aria-hidden="true" /> Actualizar chat
-                                </button>
-                                <button
-                                    onClick={() => handleToggleBot(selected)}
-                                    disabled={actionLoading}
-                                    className={cn(
-                                        button.base,
-                                        selected.botEnabled ? button.variant.secondary : button.variant.success,
-                                        button.size.md,
-                                    )}
-                                    title="El agente solo responde en las conversaciones que habilites acá"
-                                >
-                                    {selected.botEnabled ? 'Desactivar agente' : 'Activar agente'}
-                                </button>
-                                {selected.botEnabled && globalBotEnabled === false && (
-                                    <p className="text-2xs text-fg-muted">
-                                        Ojo: el agente está apagado en general, así que igual no va a responder.
-                                    </p>
-                                )}
-                                {selected.escalation?.status === 'open' && (
-                                    <button
-                                        onClick={() => handleClaim(selected.escalation!)}
-                                        disabled={actionLoading}
-                                        className={cn(button.base, button.variant.primary, button.size.md)}
-                                    >
-                                        <User size={15} aria-hidden="true" /> Reclamar
-                                    </button>
-                                )}
-                                {selected.escalation?.status === 'claimed' && (
-                                    <>
-                                        <label className="flex items-center gap-1.5 text-xs text-fg-muted mr-auto">
-                                            <input
-                                                type="checkbox"
-                                                className={input.checkbox}
-                                                checked={closeInsteadOfReopen}
-                                                onChange={(e) => setCloseInsteadOfReopen(e.target.checked)}
-                                            />
-                                            No devolver al bot (dejar la conversación cerrada)
-                                        </label>
-                                        <button
-                                            onClick={() => handleResolve(selected.escalation!)}
-                                            disabled={actionLoading}
-                                            className={cn(button.base, button.variant.success, button.size.md)}
-                                        >
-                                            <CheckCheck size={15} aria-hidden="true" /> Marcar resuelta
-                                        </button>
-                                    </>
-                                )}
-                                {selected.escalation?.status === 'resolved' && (
-                                    <p className="text-xs text-fg-muted">
-                                        Resuelta {selected.escalation.resolved_at ? timeAgo(selected.escalation.resolved_at) : ''}
-                                        {selected.conversationStatus === 'closed' && ' -- conversación cerrada, el bot no retoma sola'}
-                                    </p>
-                                )}
-                            </div>
                         </>
                     )}
                 </div>
 
-                {/* Ficha del cliente. Solo con un chat abierto: sin eso no hay
-                    de quién mostrar nada. */}
+                {/* ============================ FICHA ============================ */}
+                {/* Como el panel de "datos del contacto" de WhatsApp: tercera
+                    columna dentro de la misma lámina, no una tarjeta suelta. */}
                 {selected && (
-                    <div className="xl:sticky xl:top-4">
+                    <div className="hidden w-[320px] shrink-0 overflow-y-auto wa-scroll border-l border-wa-divider bg-surface p-3 xl:block">
                         <CustomerPanel
                             key={`${selected.conversationId}-${recargarFicha}`}
                             conversationId={selected.conversationId}

@@ -49,9 +49,24 @@ interface Props {
      * cambiarle dos clases.
      */
     claseBoton?: string;
+    /**
+     * Barra de WhatsApp: el botón es un círculo con el micrófono y nada más.
+     * Sin esto el botón dice "Nota de voz" al lado del icono, que en una
+     * barra de escribir de 48px de alto no entra ni se parece a WhatsApp.
+     */
+    soloIcono?: boolean;
+    /**
+     * Avisa si hay una grabación en curso o una grabada sin mandar.
+     *
+     * Lo necesita la barra de escribir: mientras el grabador esté ocupado no
+     * puede desmontarlo para poner el botón de enviar en su lugar, porque la
+     * grabación se perdería sin decir nada -- basta con tocar la caja de
+     * texto después de grabar.
+     */
+    onOcupado?: (ocupado: boolean) => void;
 }
 
-export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton }) => {
+export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton, soloIcono, onOcupado }) => {
     const [grabando, setGrabando] = useState(false);
     const [segundos, setSegundos] = useState(0);
     const [grabacion, setGrabacion] = useState<{ blob: Blob; url: string; mime: string } | null>(null);
@@ -77,6 +92,11 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton 
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
     );
+
+    const ocupado = grabando || !!grabacion;
+    useEffect(() => {
+        onOcupado?.(ocupado);
+    }, [ocupado, onOcupado]);
 
     const empezar = async () => {
         setError(null);
@@ -158,11 +178,11 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton 
                     className={claseBoton ?? cn(button.base, button.variant.primary, button.size.sm)}
                 >
                     {enviando ? (
-                        <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                        <Loader2 size={soloIcono ? 20 : 14} className="animate-spin" aria-hidden="true" />
                     ) : (
-                        <Send size={14} aria-hidden="true" />
+                        <Send size={soloIcono ? 20 : 14} aria-hidden="true" />
                     )}
-                    Enviar nota
+                    {!soloIcono && 'Enviar nota'}
                 </button>
                 <button
                     onClick={descartar}
@@ -188,9 +208,20 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton 
                 }
                 title={grabando ? 'Detener la grabación' : 'Grabar una nota de voz'}
             >
-                {grabando ? <Square size={14} aria-hidden="true" /> : <Mic size={14} aria-hidden="true" />}
-                {grabando ? `Grabando ${tiempo(segundos)}` : 'Nota de voz'}
+                {grabando ? (
+                    <Square size={soloIcono ? 18 : 14} fill="currentColor" aria-hidden="true" />
+                ) : (
+                    <Mic size={soloIcono ? 21 : 14} aria-hidden="true" />
+                )}
+                {!soloIcono && (grabando ? `Grabando ${tiempo(segundos)}` : 'Nota de voz')}
             </button>
+            {/* El cronómetro tiene que verse igual sin la etiqueta: una nota de
+                voz de tres minutos se corta sola y hay que saber cuánto va. */}
+            {soloIcono && grabando && (
+                <span className="tnum shrink-0 text-[13px] font-semibold text-danger" aria-live="polite">
+                    {tiempo(segundos)}
+                </span>
+            )}
             {error && <p className="text-2xs text-danger w-full">{error}</p>}
         </>
     );

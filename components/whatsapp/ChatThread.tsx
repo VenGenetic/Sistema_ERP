@@ -1,23 +1,37 @@
 import React, { memo } from 'react';
-import { badge, cn } from '../ui/styles';
+import { AlertCircle, Check, CheckCheck, Clock3 } from 'lucide-react';
+import { cn } from '../ui/styles';
 import MessageMedia from './MessageMedia';
 import MessageActions from './MessageActions';
 
 /**
- * El hilo de la conversación.
+ * El hilo de la conversación, con el aspecto de WhatsApp.
  *
- * Vive aparte de la página por dos razones, y la segunda es la que
- * importa: cada burbuja es un componente MEMOIZADO. Antes el hilo entero
- * se redibujaba con cada mensaje que llegaba por realtime, con cada tecla
- * del buscador y con cada recarga de la cola -- con cien mensajes, y con
- * fotos y reproductores de audio dentro, eso se siente lento justo cuando
- * el chat está activo. Ahora solo se redibuja la burbuja que cambió.
+ * Es una imitación deliberada, no un capricho: el vendedor pasa el día
+ * dentro del WhatsApp del teléfono y salta a esta pantalla cada dos
+ * minutos. Si acá la burbuja propia no es la verde de la derecha, si el
+ * doble check azul no significa «lo leyó» y si la fecha no es la píldora
+ * gris del medio, tiene que traducir todo en la cabeza en el peor momento
+ * -- mientras un cliente espera un precio. Así que se copia el modelo
+ * completo: papel tapiz, colita de la burbuja, checks de entrega,
+ * agrupado por día y por autor, hora dentro de la burbuja, y la reacción
+ * colgando del borde.
  *
- * Los mensajes se agrupan por DÍA y por autor, como en WhatsApp: un
- * separador de fecha cada vez que cambia el día, y los mensajes seguidos
- * de la misma persona se pegan sin repetir la hora. Un hilo de cien
- * mensajes sin eso es un muro de burbujas donde no se distingue una
- * conversación de ayer de una de hace un mes.
+ * Los colores salen de los tokens `--wa-*` de index.html, que son los
+ * valores exactos de WhatsApp Web en claro y en oscuro. No tocan la
+ * paleta del resto del ERP.
+ *
+ * Vive aparte de las páginas por dos razones, y la segunda es la que
+ * importa:
+ *
+ *   1. La bandeja de escritorio y el modo móvil usan ESTE componente. Una
+ *      corrección acá llega a las dos; antes el móvil tenía su propia
+ *      copia de las burbujas y se desincronizaba sola.
+ *   2. Cada burbuja está MEMOIZADA. El hilo entero se redibujaba con cada
+ *      mensaje que llegaba por realtime, con cada tecla del buscador y con
+ *      cada recarga de la cola -- con cien mensajes, y con fotos y
+ *      reproductores de audio dentro, eso se siente lento justo cuando el
+ *      chat está activo. Ahora solo se redibuja la burbuja que cambió.
  */
 
 export type ContentType =
@@ -32,7 +46,8 @@ export interface MensajeHilo {
     content_type: ContentType;
     body: string | null;
     created_at: string;
-    delivery_status: DeliveryStatus | null;
+    /** Opcional: el modo móvil no siempre lo trae. Sin él no se dibujan checks. */
+    delivery_status?: DeliveryStatus | null;
     action_taken: string | null;
     media_url: string | null;
     whatsapp_message_id: string | null;
@@ -40,32 +55,90 @@ export interface MensajeHilo {
     reaction: string | null;
 }
 
-/** Lo que WhatsApp confirmó de cada mensaje que se mandó. */
-export const ENTREGA: Record<DeliveryStatus, { texto: string; tono: keyof typeof badge.tone }> = {
-    pending: { texto: 'Sin confirmar', tono: 'warning' },
-    sent: { texto: 'Enviado', tono: 'info' },
-    delivered: { texto: 'Entregado', tono: 'success' },
-    read: { texto: 'Leído', tono: 'success' },
-    failed: { texto: 'No se entregó', tono: 'danger' },
+/**
+ * Qué significa cada check. El texto va en `title` y en `aria-label`: el
+ * color por sí solo no puede ser la única señal (el doble check gris y el
+ * azul son la misma forma), y con lector de pantalla no hay forma.
+ */
+export const ENTREGA: Record<DeliveryStatus, string> = {
+    pending: 'Sin confirmar todavía',
+    sent: 'Enviado',
+    delivered: 'Entregado en el teléfono del cliente',
+    read: 'Leído por el cliente',
+    failed: 'No se pudo entregar',
 };
 
+/** Los checks de WhatsApp: reloj, check, doble check, doble check azul. */
+export const Checks: React.FC<{ estado: DeliveryStatus; size?: number }> = ({ estado, size = 15 }) => {
+    const comun = { size, 'aria-hidden': true } as const;
+    const icono =
+        estado === 'pending' ? <Clock3 {...comun} /> :
+        estado === 'failed' ? <AlertCircle {...comun} /> :
+        estado === 'sent' ? <Check {...comun} /> :
+        <CheckCheck {...comun} />;
+
+    return (
+        <span
+            title={ENTREGA[estado]}
+            aria-label={ENTREGA[estado]}
+            role="img"
+            className={cn(
+                'inline-flex shrink-0',
+                estado === 'read' && 'text-wa-tick',
+                estado === 'failed' && 'text-danger',
+            )}
+        >
+            {icono}
+        </span>
+    );
+};
+
+/**
+ * La píldora gris del centro del hilo: separadores de fecha, avisos del
+ * sistema y las notas de la pantalla («mostrando los últimos 100»).
+ */
+export const PildoraChat: React.FC<{ children: React.ReactNode; tono?: 'normal' | 'aviso' }> = ({
+    children,
+    tono = 'normal',
+}) => (
+    <div className="flex justify-center px-3 py-1.5">
+        <span
+            className={cn(
+                'max-w-[85%] rounded-lg px-3 py-1.5 text-center text-[12.5px] leading-[17px] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]',
+                tono === 'aviso'
+                    ? 'bg-wa-notice text-wa-notice-text'
+                    : 'bg-wa-pill text-wa-pill-text',
+            )}
+        >
+            {children}
+        </span>
+    </div>
+);
+
 const SIN_TEXTO: Partial<Record<ContentType, string>> = {
-    image: '(foto)',
-    audio: '(nota de voz)',
-    video: '(video)',
-    document: '(archivo)',
-    sticker: '(sticker)',
-    location: '(ubicación)',
-    contact: '(contacto)',
+    image: 'Foto',
+    audio: 'Nota de voz',
+    video: 'Video',
+    document: 'Archivo',
+    sticker: 'Sticker',
+    location: 'Ubicación',
+    contact: 'Contacto',
 };
 
 /** Tipos que DEBERÍAN traer archivo. Si no lo traen, se aclara. */
 const CON_ARCHIVO = new Set<ContentType>(['image', 'audio', 'video', 'document', 'sticker']);
 
+/**
+ * Medios que ocupan la burbuja entera: si no traen pie de foto, la hora se
+ * dibuja ENCIMA de la imagen sobre un degradado, como en WhatsApp, en vez
+ * de agregar una línea de texto vacía debajo.
+ */
+const MEDIA_VISUAL = new Set<ContentType>(['image', 'video', 'sticker']);
+
 export const textoDe = (m: Pick<MensajeHilo, 'body' | 'content_type'>): string =>
     m.body || SIN_TEXTO[m.content_type] || '(sin texto)';
 
-/** "Hoy" / "Ayer" / "12 de marzo" -- lo que se lee de un vistazo. */
+/** "HOY" / "AYER" / "12 DE MARZO" -- lo que se lee de un vistazo. */
 function etiquetaDeDia(iso: string): string {
     const fecha = new Date(iso);
     const hoy = new Date();
@@ -78,19 +151,24 @@ function etiquetaDeDia(iso: string): string {
     return fecha.toLocaleDateString('es-EC', {
         day: 'numeric',
         month: 'long',
-        // El año solo cuando no es el actual: repetirlo en cada separador
-        // de una conversación de esta semana es ruido.
+        // El año solo cuando no es el actual: repetirlo en cada separador de
+        // una conversación de esta semana es ruido.
         ...(fecha.getFullYear() !== hoy.getFullYear() ? { year: 'numeric' } : {}),
     });
 }
 
 const hora = (iso: string) =>
-    new Date(iso).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+    new Date(iso).toLocaleTimeString('es-EC', { hour: 'numeric', minute: '2-digit' });
 
 interface BurbujaProps {
     m: MensajeHilo;
-    /** Sigue al anterior del mismo autor: se pega y no repite la hora. */
-    pegadoAlAnterior: boolean;
+    /**
+     * Primera del grupo: lleva la colita y la esquina cuadrada. Las que
+     * siguen del mismo autor se pegan sin pico, como en WhatsApp.
+     */
+    primeraDelGrupo: boolean;
+    /** En el teléfono: texto y zonas táctiles más grandes. */
+    tactil: boolean;
     onAbrirFoto: (m: MensajeHilo) => void;
     onResponder: (m: MensajeHilo) => void;
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
@@ -98,23 +176,67 @@ interface BurbujaProps {
 }
 
 const Burbuja = memo<BurbujaProps>(
-    ({ m, pegadoAlAnterior, onAbrirFoto, onResponder, onReaccionar, onBorrar }) => {
+    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar }) => {
         const entrante = m.direction === 'inbound';
+        const borrado = !!m.deleted_at;
+
+        // Foto, video o sticker sin pie: la hora va encima del medio.
+        const soloMedia = !!m.media_url && !m.body && MEDIA_VISUAL.has(m.content_type) && !borrado;
+        // El sticker no lleva burbuja: en WhatsApp flota sobre el papel tapiz.
+        const sticker = m.content_type === 'sticker' && !!m.media_url && !borrado;
+
+        const meta = (
+            <>
+                <span className="tnum">{hora(m.created_at)}</span>
+                {!entrante && m.delivery_status && <Checks estado={m.delivery_status} size={15} />}
+            </>
+        );
+
+        const claseMeta = cn(
+            'flex items-center gap-[3px] text-[11px] leading-none',
+            entrante ? 'text-wa-meta' : 'text-wa-meta-out',
+        );
+
         return (
-            <div className={cn('flex group', entrante ? 'justify-start' : 'justify-end', pegadoAlAnterior ? 'mt-0.5' : 'mt-3')}>
+            <div
+                className={cn(
+                    'group flex px-2 md:px-4',
+                    entrante ? 'justify-start' : 'justify-end',
+                    primeraDelGrupo ? 'mt-2.5' : 'mt-0.5',
+                    // Sitio para la reacción, que cuelga por fuera del borde.
+                    m.reaction && 'mb-3.5',
+                )}
+            >
                 <div
                     className={cn(
-                        'max-w-[80%] px-3.5 py-2 text-sm whitespace-pre-wrap break-words rounded-2xl',
-                        entrante ? 'bg-surface-2 text-fg' : 'bg-primary-soft text-primary-soft-fg',
-                        // La esquina del lado del autor se achica cuando el
-                        // mensaje sigue al anterior: es lo que hace que un
-                        // grupo se lea como un bloque y no como piezas sueltas.
-                        pegadoAlAnterior && (entrante ? 'rounded-tl-md' : 'rounded-tr-md'),
-                        m.deleted_at && 'line-through opacity-50',
+                        'relative max-w-[85%] md:max-w-[65%] min-w-0',
+                        sticker
+                            ? ''
+                            : cn(
+                                  'rounded-lg shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]',
+                                  entrante ? 'bg-wa-in' : 'bg-wa-out',
+                                  'text-wa-text',
+                                  // La colita solo en la primera del grupo, y del
+                                  // lado del autor.
+                                  primeraDelGrupo &&
+                                      (entrante ? 'wa-tail-in rounded-tl-none' : 'wa-tail-out rounded-tr-none'),
+                                  soloMedia ? 'p-[3px]' : 'px-2 py-[6px]',
+                              ),
                     )}
                 >
-                    {m.media_url && (
-                        <div className="mb-1.5">
+                    {/* Quién contestó. WhatsApp pone el nombre del participante
+                        arriba de la burbuja en los grupos; acá sirve para lo
+                        mismo: distinguir la respuesta de una persona de la del
+                        agente. Solo se marca lo que consta -- si no dice
+                        «vendedor», no se afirma nada. */}
+                    {!entrante && primeraDelGrupo && m.action_taken === 'human_reply' && !sticker && (
+                        <p className="mb-0.5 text-[12.5px] font-semibold leading-[16px] text-wa-meta-out">
+                            Vendedor
+                        </p>
+                    )}
+
+                    {m.media_url && !borrado && (
+                        <div className={cn(soloMedia ? 'overflow-hidden rounded-[6px]' : 'mb-1')}>
                             <MessageMedia
                                 url={m.media_url}
                                 contentType={m.content_type}
@@ -123,43 +245,95 @@ const Burbuja = memo<BurbujaProps>(
                             />
                         </div>
                     )}
-                    {(m.body || !m.media_url) && textoDe(m)}
-                    {!m.media_url && CON_ARCHIVO.has(m.content_type) && (
-                        <span className="ml-1 text-2xs text-fg-subtle">· archivo no guardado</span>
+
+                    {/* Texto + hora. La hora va DENTRO del párrafo, abajo a la
+                        derecha, y el separador invisible de al lado le reserva
+                        el hueco en la última línea: así el texto la esquiva en
+                        vez de quedar tapado, que es exactamente lo que hace
+                        WhatsApp. */}
+                    {!soloMedia && (
+                        <div
+                            className={cn(
+                                'relative whitespace-pre-wrap break-words',
+                                tactil ? 'text-[15px] leading-[20px]' : 'text-[14.2px] leading-[19px]',
+                            )}
+                        >
+                            <span className={cn(borrado && 'italic text-wa-meta')}>
+                                {borrado ? 'Se borró este mensaje' : textoDe(m)}
+                            </span>
+
+                            {!m.media_url && CON_ARCHIVO.has(m.content_type) && !borrado && (
+                                <span className="ml-1 text-[11px] text-wa-meta">· archivo no guardado</span>
+                            )}
+
+                            {/* El hueco de la hora, reservado con la hora MISMA
+                                puesta invisible: así mide exactamente lo que va a
+                                ocupar, venga la hora como "20:04" o como
+                                "8:04 p. m." y lleve checks o no. Con un ancho fijo
+                                a ojo, el texto le quedaba por debajo. */}
+                            <span aria-hidden="true" className={cn(claseMeta, 'invisible ml-2 inline-flex select-none align-bottom')}>
+                                {meta}
+                            </span>
+                            <span className={cn(claseMeta, 'absolute bottom-0 right-0')}>{meta}</span>
+                        </div>
                     )}
 
+                    {/* Medio sin pie: la hora encima, sobre un degradado, para
+                        que se lea igual sobre una foto clara o una oscura. */}
+                    {soloMedia && !sticker && (
+                        <span className="pointer-events-none absolute bottom-[3px] right-[3px] left-[3px] flex justify-end rounded-b-[6px] bg-gradient-to-t from-black/45 to-transparent px-2 pb-1 pt-6">
+                            <span className="flex items-center gap-[3px] text-[11px] leading-none text-white/90">
+                                {meta}
+                            </span>
+                        </span>
+                    )}
+
+                    {/* El sticker no tiene fondo donde apoyar la hora: va debajo. */}
+                    {sticker && (
+                        <span className={cn(claseMeta, 'mt-0.5 flex justify-end pr-1')}>{meta}</span>
+                    )}
+
+                    {/* Reacción: cuelga del borde inferior de la burbuja, del
+                        lado del autor, como en WhatsApp. */}
                     {m.reaction && (
-                        <span className="ml-1 inline-block rounded-full border border-subtle bg-surface px-1.5 text-sm leading-none">
+                        <span
+                            className={cn(
+                                'absolute -bottom-3 z-10 flex items-center rounded-full border border-wa-divider bg-wa-panel px-1.5 py-[3px] text-[12px] leading-none shadow-[0_1px_2px_rgba(11,20,26,0.2)]',
+                                entrante ? 'left-2' : 'right-2',
+                            )}
+                        >
                             {m.reaction}
                         </span>
                     )}
 
-                    <div className="text-2xs text-fg-subtle mt-1 flex items-center gap-1.5 flex-wrap">
-                        <span>{hora(m.created_at)}</span>
-                        {m.action_taken === 'human_reply' && <span>· vendedor</span>}
-
-                        {/* El menú aparece al pasar el mouse: tenerlo siempre
-                            visible en cien mensajes es ruido constante. Igual
-                            queda accesible por teclado (focus-within). */}
-                        {m.whatsapp_message_id && !m.deleted_at && (
-                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                                <MessageActions
-                                    onResponder={() => onResponder(m)}
-                                    onReaccionar={(emoji) => onReaccionar(m, emoji)}
-                                    onBorrar={m.direction === 'outbound' ? () => onBorrar(m) : undefined}
-                                    alineacion={entrante ? 'izquierda' : 'derecha'}
-                                />
-                            </span>
-                        )}
-
-                        {/* El acuse aplica a todo lo que salió por el agente. Lo
-                            escrito desde el teléfono del vendedor no lo tiene. */}
-                        {!entrante && m.delivery_status && (
-                            <span className={cn(badge.base, badge.size.sm, badge.tone[ENTREGA[m.delivery_status].tono])}>
-                                {ENTREGA[m.delivery_status].texto}
-                            </span>
-                        )}
-                    </div>
+                    {/* Citar, reaccionar, borrar. Aparece al pasar el mouse: un
+                        disparador fijo en cien mensajes es ruido constante.
+                        Sigue siendo alcanzable por teclado (focus-within) y en
+                        el teléfono queda tenue pero visible, porque ahí no hay
+                        hover que lo revele. */}
+                    {m.whatsapp_message_id && !borrado && (
+                        <div
+                            className={cn(
+                                'absolute top-0 z-20 transition-opacity',
+                                entrante ? 'right-0' : 'right-0',
+                                tactil
+                                    ? 'opacity-50'
+                                    : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                            )}
+                        >
+                            <MessageActions
+                                onResponder={() => onResponder(m)}
+                                onReaccionar={(emoji) => onReaccionar(m, emoji)}
+                                onBorrar={m.direction === 'outbound' ? () => onBorrar(m) : undefined}
+                                alineacion="derecha"
+                                abrirHacia="abajo"
+                                claseBoton={cn(
+                                    'flex items-center justify-center rounded-full text-wa-meta',
+                                    tactil ? 'h-9 w-9' : 'h-6 w-6 hover:bg-black/5 dark:hover:bg-white/10',
+                                )}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -167,43 +341,64 @@ const Burbuja = memo<BurbujaProps>(
 );
 Burbuja.displayName = 'Burbuja';
 
-const SeparadorDia: React.FC<{ etiqueta: string }> = ({ etiqueta }) => (
-    <div className="flex items-center gap-3 my-4" role="separator" aria-label={etiqueta}>
-        <span className="flex-1 h-px bg-subtle" />
-        <span className="text-2xs font-semibold uppercase tracking-wider text-fg-subtle">{etiqueta}</span>
-        <span className="flex-1 h-px bg-subtle" />
-    </div>
-);
-
 interface Props {
     mensajes: MensajeHilo[];
     onAbrirFoto: (m: MensajeHilo) => void;
     onResponder: (m: MensajeHilo) => void;
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
+    /** En el teléfono: texto y zonas táctiles más grandes. */
+    tactil?: boolean;
 }
 
-export const ChatThread: React.FC<Props> = ({ mensajes, onAbrirFoto, onResponder, onReaccionar, onBorrar }) => (
+export const ChatThread: React.FC<Props> = ({
+    mensajes,
+    onAbrirFoto,
+    onResponder,
+    onReaccionar,
+    onBorrar,
+    tactil = false,
+}) => (
     <>
         {mensajes.map((m, i) => {
             const anterior = i > 0 ? mensajes[i - 1] : null;
             const diaNuevo =
                 !anterior || new Date(anterior.created_at).toDateString() !== new Date(m.created_at).toDateString();
-            // Se pega al anterior solo si es el mismo autor, el mismo día y
-            // dentro de unos minutos: dos mensajes del mismo cliente con dos
-            // horas de diferencia son dos momentos distintos.
-            const pegado =
-                !diaNuevo &&
-                !!anterior &&
-                anterior.direction === m.direction &&
-                new Date(m.created_at).getTime() - new Date(anterior.created_at).getTime() < 5 * 60 * 1000;
+
+            if (m.content_type === 'system') {
+                return (
+                    <React.Fragment key={m.id}>
+                        {diaNuevo && (
+                            <PildoraChat>
+                                <span className="uppercase">{etiquetaDeDia(m.created_at)}</span>
+                            </PildoraChat>
+                        )}
+                        <PildoraChat>{m.body || 'Aviso del sistema'}</PildoraChat>
+                    </React.Fragment>
+                );
+            }
+
+            // Abre grupo si cambia el día, si cambia el autor, o si pasaron
+            // más de unos minutos: dos mensajes del mismo cliente con dos
+            // horas de diferencia son dos momentos distintos, no un bloque.
+            const primeraDelGrupo =
+                diaNuevo ||
+                !anterior ||
+                anterior.direction !== m.direction ||
+                anterior.content_type === 'system' ||
+                new Date(m.created_at).getTime() - new Date(anterior.created_at).getTime() >= 5 * 60 * 1000;
 
             return (
                 <React.Fragment key={m.id}>
-                    {diaNuevo && <SeparadorDia etiqueta={etiquetaDeDia(m.created_at)} />}
+                    {diaNuevo && (
+                        <PildoraChat>
+                            <span className="uppercase">{etiquetaDeDia(m.created_at)}</span>
+                        </PildoraChat>
+                    )}
                     <Burbuja
                         m={m}
-                        pegadoAlAnterior={pegado}
+                        primeraDelGrupo={primeraDelGrupo}
+                        tactil={tactil}
                         onAbrirFoto={onAbrirFoto}
                         onResponder={onResponder}
                         onReaccionar={onReaccionar}

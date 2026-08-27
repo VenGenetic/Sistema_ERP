@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, FileText, Image as ImageIcon, Loader2, Package, Paperclip, Plus, Send, X, Zap } from 'lucide-react';
+import {
+    ClipboardList, FileText, Image as ImageIcon, Loader2, Package, Paperclip, Plus, Send, X, Zap,
+} from 'lucide-react';
 import { supabase } from '../../supabaseClient';
-import { badge, button, cn, input } from '../ui/styles';
+import { cn } from '../ui/styles';
 import CatalogSendModal from './CatalogSendModal';
 import ProformaBuilder from './ProformaBuilder';
 import RegistrarPedidoModal from './RegistrarPedidoModal';
@@ -60,6 +62,34 @@ interface AdjuntoLocal {
     error: string | null;
 }
 
+/**
+ * Una opción del menú "+" de la barra de escribir.
+ *
+ * Vive fuera del componente a propósito: definida adentro, React la trata
+ * como un componente distinto en cada tecla que se escribe y desmonta el
+ * menú entero mientras está abierto.
+ */
+const Herramienta: React.FC<{
+    icono: React.ReactNode;
+    texto: string;
+    cuenta?: number;
+    onClick: () => void;
+}> = ({ icono, texto, cuenta, onClick }) => (
+    <button
+        onClick={onClick}
+        role="menuitem"
+        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[14px] text-wa-text hover:bg-wa-hover"
+    >
+        <span className="text-wa-meta">{icono}</span>
+        <span className="flex-1">{texto}</span>
+        {!!cuenta && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-wa-accent px-1.5 text-[11px] font-bold text-wa-accent-fg">
+                {cuenta}
+            </span>
+        )}
+    </button>
+);
+
 export const ChatComposer: React.FC<Props> = ({
     conversationId,
     clienteLabel,
@@ -88,6 +118,16 @@ export const ChatComposer: React.FC<Props> = ({
     );
     const [rapidas, setRapidas] = useState<RespuestaRapida[]>([]);
     const [menuRapidas, setMenuRapidas] = useState(false);
+    /**
+     * El "+" de WhatsApp. Adjuntar, catálogo, proforma, pedido y respuestas
+     * rápidas viven adentro en vez de en una fila de cinco botones sobre la
+     * caja de escribir: esa fila ocupaba dos renglones, empujaba el hilo
+     * hacia arriba y no se parece en nada a WhatsApp. Las funciones son
+     * exactamente las mismas, a un toque de distancia.
+     */
+    const [menuHerramientas, setMenuHerramientas] = useState(false);
+    /** Hay una nota de voz grabándose o grabada sin mandar. */
+    const [grabadorOcupado, setGrabadorOcupado] = useState(false);
     const [guardandoRapida, setGuardandoRapida] = useState(false);
 
     const fileRef = useRef<HTMLInputElement>(null);
@@ -101,6 +141,7 @@ export const ChatComposer: React.FC<Props> = ({
         setAdjuntos([]);
         setError(null);
         setMenuRapidas(false);
+        setMenuHerramientas(false);
     }, [conversationId]);
 
     const cargarRapidas = useCallback(async () => {
@@ -121,15 +162,24 @@ export const ChatComposer: React.FC<Props> = ({
         cargarRapidas();
     }, [cargarRapidas]);
 
-    // Cerrar el menú de respuestas rápidas al tocar fuera.
+    // Cerrar los menús al tocar fuera o al apretar Escape.
     useEffect(() => {
-        if (!menuRapidas) return;
-        const fuera = (e: MouseEvent) => {
-            if (!contenedorRef.current?.contains(e.target as Node)) setMenuRapidas(false);
+        if (!menuRapidas && !menuHerramientas) return;
+        const cerrar = () => {
+            setMenuRapidas(false);
+            setMenuHerramientas(false);
         };
+        const fuera = (e: MouseEvent) => {
+            if (!contenedorRef.current?.contains(e.target as Node)) cerrar();
+        };
+        const escape = (e: KeyboardEvent) => e.key === 'Escape' && cerrar();
         document.addEventListener('mousedown', fuera);
-        return () => document.removeEventListener('mousedown', fuera);
-    }, [menuRapidas]);
+        document.addEventListener('keydown', escape);
+        return () => {
+            document.removeEventListener('mousedown', fuera);
+            document.removeEventListener('keydown', escape);
+        };
+    }, [menuRapidas, menuHerramientas]);
 
     /* ---------------------------------------------------------------- */
     /*  Adjuntos                                                         */
@@ -301,10 +351,18 @@ export const ChatComposer: React.FC<Props> = ({
 
     /* ---------------------------------------------------------------- */
 
+
+    /* Con texto escrito el botón de la derecha manda; sin nada escrito es
+       el micrófono, igual que en WhatsApp. */
+    const hayQueMandar = borrador.trim().length > 0 || adjuntos.length > 0;
+    /* Mientras se graba manda el grabador: el botón verde volvería a aparecer
+       encima de los controles de la nota de voz. */
+    const mostrarEnviar = hayQueMandar && !grabadorOcupado;
+
     return (
         <div
             ref={contenedorRef}
-            className="relative px-5 pt-3 border-t border-subtle"
+            className="relative bg-wa-header px-2 py-2 md:px-3"
             onDragOver={(e) => {
                 e.preventDefault();
                 setArrastrando(true);
@@ -317,24 +375,26 @@ export const ChatComposer: React.FC<Props> = ({
             onDrop={alSoltar}
         >
             {arrastrando && (
-                <div className="absolute inset-2 z-10 rounded-xl border-2 border-dashed border-primary bg-primary-soft/70 flex items-center justify-center pointer-events-none">
-                    <p className="text-sm font-semibold text-primary-soft-fg">Soltá la foto para adjuntarla</p>
+                <div className="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-wa-accent bg-wa-panel/80">
+                    <p className="text-sm font-semibold text-wa-text">Soltá la foto para adjuntarla</p>
                 </div>
             )}
 
-            {/* Menú de respuestas rápidas */}
+            {/* Menú de respuestas rápidas. Se abre desde el "+" o escribiendo
+                "/" al principio, que es como se usan de verdad: en medio de
+                una conversación, sin soltar el teclado. */}
             {(menuRapidas || filtroRapidas !== null) && rapidasVisibles.length > 0 && (
-                <div className="absolute bottom-full left-5 right-5 mb-2 z-20 max-h-64 overflow-y-auto rounded-xl border border-strong bg-surface shadow-lg divide-y divide-subtle">
+                <div className="absolute bottom-full left-2 right-2 z-20 mb-2 max-h-64 divide-y divide-wa-divider overflow-y-auto rounded-xl border border-wa-divider bg-wa-panel shadow-lg md:left-3 md:right-3">
                     {rapidasVisibles.map((r) => (
-                        <div key={r.id} className="flex items-start gap-2 hover:bg-surface-hover">
-                            <button onClick={() => usarRapida(r)} className="flex-1 text-left px-3 py-2 min-w-0">
-                                <p className="text-xs font-semibold text-fg">{r.label}</p>
-                                <p className="text-2xs text-fg-muted line-clamp-2">{r.body}</p>
+                        <div key={r.id} className="flex items-start gap-2 hover:bg-wa-hover">
+                            <button onClick={() => usarRapida(r)} className="min-w-0 flex-1 px-3 py-2 text-left">
+                                <p className="text-[13px] font-semibold text-wa-text">{r.label}</p>
+                                <p className="line-clamp-2 text-[12px] text-wa-meta">{r.body}</p>
                             </button>
                             <button
                                 onClick={() => borrarRapida(r)}
                                 aria-label={`Quitar la respuesta rápida ${r.label}`}
-                                className="p-2 text-fg-subtle hover:text-danger"
+                                className="p-2 text-wa-meta hover:text-danger"
                             >
                                 <X size={13} aria-hidden="true" />
                             </button>
@@ -343,42 +403,103 @@ export const ChatComposer: React.FC<Props> = ({
                 </div>
             )}
 
+            {/* El menú del "+" */}
+            {menuHerramientas && (
+                <div
+                    role="menu"
+                    className="absolute bottom-full left-2 z-20 mb-2 w-64 overflow-hidden rounded-xl border border-wa-divider bg-wa-panel py-1 shadow-lg md:left-3"
+                >
+                    <Herramienta
+                        icono={<ImageIcon size={19} aria-hidden="true" />}
+                        texto="Foto, video o archivo"
+                        onClick={() => {
+                            setMenuHerramientas(false);
+                            fileRef.current?.click();
+                        }}
+                    />
+                    <Herramienta
+                        icono={<Package size={19} aria-hidden="true" />}
+                        texto="Repuesto del catálogo"
+                        onClick={() => {
+                            setMenuHerramientas(false);
+                            setCatalogoAbierto(true);
+                        }}
+                    />
+                    <Herramienta
+                        icono={<FileText size={19} aria-hidden="true" />}
+                        texto="Proforma"
+                        cuenta={itemsEnProforma}
+                        onClick={() => {
+                            setMenuHerramientas(false);
+                            setProformaAbierta(true);
+                        }}
+                    />
+                    <Herramienta
+                        icono={<ClipboardList size={19} aria-hidden="true" />}
+                        texto="Anotar un pedido"
+                        onClick={() => {
+                            setMenuHerramientas(false);
+                            setPedidoAbierto(true);
+                        }}
+                    />
+                    <Herramienta
+                        icono={<Zap size={19} aria-hidden="true" />}
+                        texto="Respuestas rápidas"
+                        cuenta={rapidas.length}
+                        onClick={() => {
+                            setMenuHerramientas(false);
+                            setMenuRapidas(true);
+                        }}
+                    />
+                    {borrador.trim().length > 0 && (
+                        <Herramienta
+                            icono={<Plus size={19} aria-hidden="true" />}
+                            texto="Guardar esto como respuesta rápida"
+                            onClick={() => {
+                                setMenuHerramientas(false);
+                                guardarComoRapida();
+                            }}
+                        />
+                    )}
+                </div>
+            )}
+
             {/* Adjuntos elegidos */}
             {adjuntos.length > 0 && (
-                <div className="flex gap-2 flex-wrap mb-2">
+                <div className="mb-2 flex flex-wrap gap-2 px-1">
                     {adjuntos.map((a) => (
                         <div
                             key={a.key}
                             className={cn(
-                                'relative rounded-lg border overflow-hidden bg-surface-2',
-                                a.error ? 'border-danger' : 'border-subtle',
+                                'relative overflow-hidden rounded-lg border bg-wa-panel',
+                                a.error ? 'border-danger' : 'border-wa-divider',
                             )}
                         >
                             {a.preview ? (
-                                <img src={a.preview} alt={a.nombre} className="w-16 h-16 object-cover" />
+                                <img src={a.preview} alt={a.nombre} className="h-16 w-16 object-cover" />
                             ) : (
-                                <div className="w-16 h-16 flex flex-col items-center justify-center gap-1 px-1">
-                                    <FileText size={16} className="text-fg-subtle" aria-hidden="true" />
-                                    <span className="text-[9px] text-fg-subtle truncate w-full text-center">{a.nombre}</span>
+                                <div className="flex h-16 w-16 flex-col items-center justify-center gap-1 px-1">
+                                    <FileText size={16} className="text-wa-meta" aria-hidden="true" />
+                                    <span className="w-full truncate text-center text-[9px] text-wa-meta">{a.nombre}</span>
                                 </div>
                             )}
 
                             {!a.subido && !a.error && (
-                                <div className="absolute inset-0 bg-surface/70 flex items-center justify-center">
-                                    <Loader2 size={16} className="animate-spin text-fg-muted" aria-hidden="true" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-wa-panel/70">
+                                    <Loader2 size={16} className="animate-spin text-wa-meta" aria-hidden="true" />
                                 </div>
                             )}
 
                             <button
                                 onClick={() => quitarAdjunto(a.key)}
                                 aria-label={`Quitar ${a.nombre}`}
-                                className="absolute top-0.5 right-0.5 rounded-full bg-slate-900/70 text-white p-0.5 hover:bg-slate-900"
+                                className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white hover:bg-black/80"
                             >
                                 <X size={11} aria-hidden="true" />
                             </button>
 
                             {a.error && (
-                                <p className="absolute inset-x-0 bottom-0 bg-danger text-danger-fg text-[9px] px-1 py-0.5 text-center">
+                                <p className="absolute inset-x-0 bottom-0 bg-danger px-1 py-0.5 text-center text-[9px] text-danger-fg">
                                     error
                                 </p>
                             )}
@@ -388,131 +509,120 @@ export const ChatComposer: React.FC<Props> = ({
             )}
 
             {adjuntos.some((a) => a.error) && (
-                <p className="text-2xs text-danger mb-1.5">
+                <p className="mb-1.5 px-1 text-[11px] text-danger">
                     {adjuntos.find((a) => a.error)?.error} — quitá el archivo y probá de nuevo.
                 </p>
             )}
 
-            {/* Barra de herramientas */}
-            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                <input
-                    ref={fileRef}
-                    type="file"
-                    multiple
-                    accept="image/*,video/*,audio/*,application/pdf"
-                    className="hidden"
-                    onChange={(e) => {
-                        agregarArchivos(Array.from(e.target.files ?? []));
-                        // Se limpia para poder volver a elegir el MISMO archivo.
-                        e.target.value = '';
+            <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept="image/*,video/*,audio/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                    agregarArchivos(Array.from(e.target.files ?? []));
+                    // Se limpia para poder volver a elegir el MISMO archivo.
+                    e.target.value = '';
+                }}
+            />
+
+            {/* La barra: "+", el campo redondeado y el botón de la derecha.
+                Tres piezas, como en WhatsApp. */}
+            <div className="flex flex-wrap items-end gap-1.5">
+                <button
+                    onClick={() => {
+                        setMenuHerramientas((v) => !v);
+                        setMenuRapidas(false);
                     }}
-                />
+                    aria-label="Adjuntar y herramientas"
+                    aria-expanded={menuHerramientas}
+                    title="Foto, catálogo, proforma, pedido y respuestas rápidas"
+                    className={cn(
+                        'flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-transform',
+                        'text-wa-meta hover:bg-black/5 dark:hover:bg-white/10',
+                        menuHerramientas && 'rotate-45',
+                    )}
+                >
+                    <Plus size={24} aria-hidden="true" />
+                </button>
+
+                {/* Un segundo acceso directo al clip: adjuntar una foto es de
+                    lejos lo más frecuente y no merece pasar por el menú. */}
                 <button
                     onClick={() => fileRef.current?.click()}
-                    className={cn(button.base, button.variant.secondary, button.size.sm)}
+                    aria-label="Adjuntar foto o archivo"
                     title={`Adjuntar foto o archivo (hasta ${MAX_ADJUNTO_MB} MB). También podés pegar con Ctrl+V o arrastrar.`}
+                    className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10 sm:flex"
                 >
-                    <Paperclip size={14} aria-hidden="true" /> Adjuntar
+                    <Paperclip size={22} aria-hidden="true" />
                 </button>
-                <button
-                    onClick={() => setCatalogoAbierto(true)}
-                    className={cn(button.base, button.variant.secondary, button.size.sm)}
-                    title="Buscar un repuesto y mandarlo con foto y precio"
-                >
-                    <Package size={14} aria-hidden="true" /> Catálogo
-                </button>
-                <button
-                    onClick={() => setProformaAbierta(true)}
-                    className={cn(
-                        button.base,
-                        itemsEnProforma > 0 ? button.variant.primary : button.variant.secondary,
-                        button.size.sm,
-                    )}
-                    title="Armar una cotización con varios repuestos y mandarla como imagen"
-                >
-                    <FileText size={14} aria-hidden="true" /> Proforma
-                    {itemsEnProforma > 0 && (
-                        <span className={cn(badge.base, badge.size.sm, badge.tone.neutral)}>{itemsEnProforma}</span>
-                    )}
-                </button>
-                <button
-                    onClick={() => setPedidoAbierto(true)}
-                    className={cn(button.base, button.variant.secondary, button.size.sm)}
-                    title="Anotar un repuesto que no hay, para avisarle cuando llegue"
-                >
-                    <ClipboardList size={14} aria-hidden="true" /> Anotar pedido
-                </button>
-                <button
-                    onClick={() => setMenuRapidas((v) => !v)}
-                    className={cn(button.base, button.variant.secondary, button.size.sm)}
-                    title="Respuestas rápidas (o escribí / al principio)"
-                >
-                    <Zap size={14} aria-hidden="true" /> Rápidas
-                    {rapidas.length > 0 && (
-                        <span className={cn(badge.base, badge.size.sm, badge.tone.neutral)}>{rapidas.length}</span>
-                    )}
-                </button>
-                {/* Contestar hablando: el cliente que preguntó por audio suele
-                    preferir que le respondan igual, y explicar la diferencia
-                    entre dos repuestos parecidos toma diez segundos hablando y
-                    tres párrafos escritos. */}
-                <VoiceRecorder onEnviar={enviarNotaDeVoz} disabled={enviando} />
-                {borrador.trim().length > 0 && (
-                    <button
-                        onClick={guardarComoRapida}
-                        disabled={guardandoRapida}
-                        className={cn(button.base, button.variant.ghost, button.size.sm)}
-                        title="Guardar este texto como respuesta rápida"
-                    >
-                        <Plus size={14} aria-hidden="true" /> Guardar como rápida
-                    </button>
-                )}
-            </div>
 
-            <div className="flex items-end gap-2">
                 <textarea
                     ref={textareaRef}
                     value={borrador}
                     onChange={(e) => setBorrador(e.target.value)}
                     onPaste={alPegar}
                     onKeyDown={(e) => {
-                        if (e.key === 'Escape') setMenuRapidas(false);
+                        if (e.key === 'Escape') {
+                            setMenuRapidas(false);
+                            setMenuHerramientas(false);
+                        }
                         // Enter envía, Shift+Enter hace salto de línea.
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             enviar();
                         }
                     }}
-                    rows={2}
-                    placeholder={
-                        adjuntos.length > 0
-                            ? 'Pie de foto (opcional)…'
-                            : 'Escribí tu respuesta… (Enter envía, Shift+Enter salta de línea, / para respuestas rápidas)'
-                    }
+                    rows={1}
+                    placeholder={adjuntos.length > 0 ? 'Pie de foto (opcional)…' : 'Escribí un mensaje'}
                     aria-label="Mensaje para el cliente"
-                    className={cn(input.base, 'py-2 px-3 text-sm resize-none')}
-                />
-                <button
-                    onClick={enviar}
-                    disabled={!puedeEnviar}
-                    className={cn(button.base, button.variant.primary, button.size.md, 'shrink-0')}
-                    title={subiendo ? 'Esperando a que termine de subir el archivo' : 'Enviar'}
-                >
-                    {enviando || subiendo ? (
-                        <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-                    ) : (
-                        <Send size={15} aria-hidden="true" />
+                    // Los atajos van en el title y no en el placeholder: el texto
+                    // largo se partía en dos renglones y descuadraba la barra.
+                    title="Enter envía · Shift+Enter salta de línea · / abre las respuestas rápidas"
+                    className={cn(
+                        'wa-scroll min-h-[44px] max-h-40 flex-1 resize-none rounded-lg bg-wa-input px-4 py-3',
+                        'text-[14.5px] leading-[19px] text-wa-text placeholder:text-wa-meta',
+                        'border-none outline-none focus:ring-0',
                     )}
-                    {enviando ? 'Enviando…' : subiendo ? 'Subiendo…' : 'Enviar'}
-                </button>
+                />
+
+                {mostrarEnviar && (
+                    <button
+                        onClick={enviar}
+                        disabled={!puedeEnviar}
+                        aria-label="Enviar"
+                        title={subiendo ? 'Esperando a que termine de subir el archivo' : 'Enviar'}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-wa-accent-strong text-wa-accent-fg hover:brightness-110 disabled:opacity-50"
+                    >
+                        {enviando || subiendo ? (
+                            <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                        ) : (
+                            <Send size={20} aria-hidden="true" />
+                        )}
+                    </button>
+                )}
+
+                {/* Contestar hablando: el cliente que preguntó por audio suele
+                    preferir que le respondan igual, y explicar la diferencia entre
+                    dos repuestos parecidos toma diez segundos hablando y tres
+                    párrafos escritos.
+
+                    Se ESCONDE en vez de desmontarse cuando aparece el botón de
+                    enviar: desmontarlo tira a la basura una nota ya grabada sin
+                    avisar, y para eso basta con tocar la caja de texto. */}
+                <div className={cn('shrink-0', mostrarEnviar && 'hidden')}>
+                    <VoiceRecorder
+                        onEnviar={enviarNotaDeVoz}
+                        disabled={enviando}
+                        soloIcono
+                        onOcupado={setGrabadorOcupado}
+                        claseBoton="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40"
+                    />
+                </div>
             </div>
 
-            {error && <p className="text-xs text-danger mt-1.5">{error}</p>}
-            <p className="text-2xs text-fg-subtle mt-1.5 flex items-center gap-1.5">
-                <ImageIcon size={11} aria-hidden="true" />
-                Sale por WhatsApp en unos segundos y queda guardado en esta conversación.
-            </p>
-
+            {error && <p className="mt-1.5 px-1 text-xs text-danger">{error}</p>}
             <CatalogSendModal
                 isOpen={catalogoAbierto}
                 onClose={() => setCatalogoAbierto(false)}

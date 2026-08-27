@@ -97,11 +97,11 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-2 rounded-lg border border-subtle bg-surface px-2.5 py-1.5 text-xs text-fg hover:bg-surface-hover"
+                className="flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] text-wa-text hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
             >
-                <Mic size={14} aria-hidden="true" />
+                <Mic size={16} className="text-wa-meta" aria-hidden="true" />
                 Descargar la nota de voz
-                <span className="text-2xs text-fg-subtle">(este navegador no la reproduce)</span>
+                <span className="text-[11px] text-wa-meta">(este navegador no la reproduce)</span>
             </a>
         );
     }
@@ -109,7 +109,7 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
     const progreso = Number.isFinite(duracion) && duracion > 0 ? (posicion / duracion) * 100 : 0;
 
     return (
-        <div className="flex items-center gap-2 min-w-[190px]">
+        <div className="flex items-center gap-2.5 min-w-[210px] py-0.5">
             <audio ref={audioRef} src={url} preload="metadata" />
             {/* 44px: el mismo reproductor se usa en el modo móvil, donde una
                 zona táctil más chica falla el toque y dispara la acción de al
@@ -118,9 +118,14 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
             <button
                 onClick={alternar}
                 aria-label={sonando ? 'Pausar la nota de voz' : 'Escuchar la nota de voz'}
-                className="shrink-0 h-11 w-11 rounded-full bg-primary text-primary-fg flex items-center justify-center hover:bg-primary-hover"
+                className="shrink-0 h-11 w-11 -my-1 rounded-full flex items-center justify-center text-wa-meta hover:text-wa-text"
             >
-                {sonando ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+                {/* Relleno: WhatsApp usa el triangulito lleno, no el contorno. */}
+                {sonando ? (
+                    <Pause size={22} fill="currentColor" aria-hidden="true" />
+                ) : (
+                    <Play size={22} fill="currentColor" aria-hidden="true" />
+                )}
             </button>
             <div className="flex-1 min-w-0">
                 <input
@@ -139,12 +144,12 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
                     // `py-2` con `bg-clip-content`: la barra se ve fina pero la
                     // zona que agarra el dedo mide 20px. Una barra de 4px es
                     // imposible de arrastrar en un teléfono.
-                    className="w-full h-1 py-2 box-content bg-clip-content accent-primary cursor-pointer"
+                    className="w-full h-[3px] py-2 box-content bg-clip-content rounded-full cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-wa-accent"
                     style={{
-                        background: `linear-gradient(to right, rgb(var(--primary)) ${progreso}%, rgb(var(--surface-3)) ${progreso}%)`,
+                        background: `linear-gradient(to right, rgb(var(--wa-accent)) ${progreso}%, rgb(var(--wa-meta) / .4) ${progreso}%)`,
                     }}
                 />
-                <div className="flex items-center justify-between text-2xs text-fg-subtle mt-0.5">
+                <div className="flex items-center justify-between text-[11px] text-wa-meta mt-0.5">
                     <span className="tnum">{tiempo(posicion)}</span>
                     <span className="tnum">{tiempo(duracion)}</span>
                 </div>
@@ -157,7 +162,7 @@ const Foto: React.FC<{ url: string; alt: string; onAbrir?: () => void }> = ({ ur
     const [falló, setFalló] = useState(false);
     if (falló) {
         return (
-            <div className="flex items-center gap-2 rounded-lg bg-surface-3 px-2.5 py-2 text-xs text-fg-subtle">
+            <div className="flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] text-wa-meta dark:bg-white/5">
                 <ImageOff size={14} aria-hidden="true" />
                 No se pudo cargar la foto
             </div>
@@ -166,10 +171,17 @@ const Foto: React.FC<{ url: string; alt: string; onAbrir?: () => void }> = ({ ur
     return (
         <button
             onClick={onAbrir}
-            className="block rounded-xl overflow-hidden focus-visible:ring-2 focus-visible:ring-primary"
+            className="block w-full overflow-hidden rounded-[6px] focus-visible:ring-2 focus-visible:ring-wa-accent"
             title="Ver en grande"
         >
-            <img src={url} alt={alt} loading="lazy" onError={() => setFalló(true)} className="max-h-64 w-auto object-cover" />
+            <img
+                src={url}
+                alt={alt}
+                loading="lazy"
+                decoding="async"
+                onError={() => setFalló(true)}
+                className="max-h-80 w-auto max-w-full object-cover"
+            />
         </button>
     );
 };
@@ -180,7 +192,7 @@ const Foto: React.FC<{ url: string; alt: string; onAbrir?: () => void }> = ({ ur
  * una burbuja angosta.
  */
 const Video: React.FC<{ url: string }> = ({ url }) => (
-    <video src={url} controls preload="metadata" className="max-h-64 w-auto rounded-xl bg-black" />
+    <video src={url} controls preload="metadata" className="max-h-80 w-auto max-w-full rounded-[6px] bg-black" />
 );
 
 const Documento: React.FC<{ url: string; filename: string | null }> = ({ url, filename }) => (
@@ -188,11 +200,11 @@ const Documento: React.FC<{ url: string; filename: string | null }> = ({ url, fi
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center gap-2 rounded-lg border border-subtle bg-surface px-2.5 py-2 text-xs text-fg hover:bg-surface-hover max-w-[240px]"
+        className="flex max-w-[260px] items-center gap-2.5 rounded-lg bg-black/5 px-2.5 py-2.5 text-[13px] text-wa-text hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
     >
-        <FileText size={16} className="shrink-0 text-fg-muted" aria-hidden="true" />
-        <span className="truncate flex-1">{filename?.trim() || 'Abrir el archivo'}</span>
-        <Download size={13} className="shrink-0 text-fg-subtle" aria-hidden="true" />
+        <FileText size={22} className="shrink-0 text-wa-meta" aria-hidden="true" />
+        <span className="flex-1 truncate underline underline-offset-2">{filename?.trim() || 'Abrir el archivo'}</span>
+        <Download size={15} className="shrink-0 text-wa-meta" aria-hidden="true" />
     </a>
 );
 
@@ -203,7 +215,7 @@ export const MessageMedia: React.FC<Props> = ({ url, contentType, body, filename
         case 'sticker':
             // Un sticker es una imagen, pero chica y sin marco: mostrarlo del
             // tamaño de una foto lo hace ver como un error.
-            return <img src={url} alt="Sticker" loading="lazy" className="h-24 w-24 object-contain" />;
+            return <img src={url} alt="Sticker" loading="lazy" decoding="async" className="h-32 w-32 object-contain" />;
         case 'audio':
             return <NotaDeVoz url={url} />;
         case 'video':

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MoreVertical, Reply, Trash2 } from 'lucide-react';
+import { ChevronDown, Reply, Trash2, X } from 'lucide-react';
 import { cn } from '../ui/styles';
 
 /**
@@ -29,6 +29,13 @@ interface Props {
     claseBoton?: string;
     /** De qué lado abrir el menú, para que no se salga de la burbuja. */
     alineacion?: 'izquierda' | 'derecha';
+    /**
+     * Hacia dónde se despliega. El disparador del hilo vive en la ESQUINA
+     * DE ARRIBA de la burbuja (como en WhatsApp), así que ahí el menú tiene
+     * que caer hacia abajo: hacia arriba se le salía del hilo al primer
+     * mensaje de la conversación.
+     */
+    abrirHacia?: 'arriba' | 'abajo';
 }
 
 export const MessageActions: React.FC<Props> = ({
@@ -37,6 +44,7 @@ export const MessageActions: React.FC<Props> = ({
     onBorrar,
     claseBoton,
     alineacion = 'derecha',
+    abrirHacia = 'arriba',
 }) => {
     const [abierto, setAbierto] = useState(false);
     const contenedorRef = useRef<HTMLDivElement>(null);
@@ -68,13 +76,16 @@ export const MessageActions: React.FC<Props> = ({
                 aria-expanded={abierto}
                 className={claseBoton ?? 'p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-hover'}
             >
-                <MoreVertical size={14} aria-hidden="true" />
+                {/* El galoncito hacia abajo: el mismo gesto que WhatsApp Web
+                    para abrir las acciones de un mensaje. */}
+                <ChevronDown size={16} aria-hidden="true" />
             </button>
 
             {abierto && (
                 <div
                     className={cn(
-                        'absolute z-30 bottom-full mb-1 w-44 rounded-xl border border-strong bg-surface shadow-lg overflow-hidden',
+                        'absolute z-30 w-44 rounded-xl border border-strong bg-surface shadow-lg overflow-hidden',
+                        abrirHacia === 'abajo' ? 'top-full mt-1' : 'bottom-full mb-1',
                         alineacion === 'derecha' ? 'right-0' : 'left-0',
                     )}
                     role="menu"
@@ -125,24 +136,25 @@ export const MessageActions: React.FC<Props> = ({
 export const CitaEnComposer: React.FC<{
     texto: string;
     onQuitar: () => void;
+    /** Sin uso: se conserva para no romper llamadas viejas. */
     oscuro?: boolean;
-}> = ({ texto, onQuitar, oscuro }) => (
-    <div
-        className={cn(
-            'flex items-start gap-2 rounded-lg px-2.5 py-1.5 border-l-2',
-            oscuro ? 'bg-slate-800 border-amber-500' : 'bg-surface-2 border-primary',
-        )}
-    >
-        <Reply size={13} className={cn('shrink-0 mt-0.5', oscuro ? 'text-amber-400' : 'text-primary')} aria-hidden="true" />
-        <p className={cn('flex-1 min-w-0 text-xs line-clamp-2', oscuro ? 'text-slate-300' : 'text-fg-muted')}>
-            {texto}
-        </p>
+}> = ({ texto, onQuitar }) => (
+    <div className="flex items-stretch gap-2 overflow-hidden rounded-lg bg-black/5 dark:bg-white/5">
+        {/* La barra verde de la izquierda es la señal de WhatsApp para
+            "esto es una cita". Sin ella la tarjeta se lee como un aviso. */}
+        <span className="w-1 shrink-0 rounded-l bg-wa-accent" aria-hidden="true" />
+        <div className="min-w-0 flex-1 py-1.5">
+            <p className="flex items-center gap-1 text-[12.5px] font-semibold text-wa-accent">
+                <Reply size={12} aria-hidden="true" /> Respondiendo a
+            </p>
+            <p className="line-clamp-2 text-[12.5px] text-wa-meta">{texto}</p>
+        </div>
         <button
             onClick={onQuitar}
             aria-label="No citar este mensaje"
-            className={cn('shrink-0 text-xs px-1', oscuro ? 'text-slate-500' : 'text-fg-subtle')}
+            className="shrink-0 px-2.5 text-wa-meta hover:text-wa-text"
         >
-            ✕
+            <X size={16} aria-hidden="true" />
         </button>
     </div>
 );

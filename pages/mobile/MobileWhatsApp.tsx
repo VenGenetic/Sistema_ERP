@@ -5,9 +5,10 @@ import {
     FileText,
     ImageIcon,
     Loader2,
+    MailQuestion,
     MessageCircle,
     Package,
-    Paperclip,
+    Plus,
     RefreshCw,
     Search,
     Send,
@@ -16,9 +17,11 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
-import MessageMedia from '../../components/whatsapp/MessageMedia';
 import VoiceRecorder from '../../components/whatsapp/VoiceRecorder';
-import MessageActions, { CitaEnComposer } from '../../components/whatsapp/MessageActions';
+import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
+import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
+import ChatThread, { PildoraChat, textoDe, type MensajeHilo } from '../../components/whatsapp/ChatThread';
+import { cn } from '../../components/ui/styles';
 import CatalogSendModal from '../../components/whatsapp/CatalogSendModal';
 import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
 import RegistrarPedidoModal from '../../components/whatsapp/RegistrarPedidoModal';
@@ -73,27 +76,20 @@ interface Conversacion {
     last_message_direction: string | null;
 }
 
-interface Mensaje {
-    id: number;
-    direction: 'inbound' | 'outbound';
-    content_type: string;
-    body: string | null;
-    media_url: string | null;
-    created_at: string;
-    action_taken: string | null;
-    /** Identifica el mensaje en WhatsApp: hace falta para citar, reaccionar o borrar. */
-    whatsapp_message_id: string | null;
-    /** Borrado para todos (migración 0031). Se conserva, tachado. */
-    deleted_at: string | null;
-    reaction: string | null;
-}
+/**
+ * El mensaje es EL MISMO tipo que usa la bandeja de escritorio, no una copia:
+ * las burbujas las dibuja `ChatThread`, que es el mismo componente. Si acá se
+ * declarara un tipo propio, la primera columna que se agregue al hilo quedaría
+ * puesta en una pantalla y faltando en la otra.
+ */
+type Mensaje = MensajeHilo;
 
 /** Cuántas conversaciones se traen. Bajo a propósito: es un teléfono. */
 const POR_PAGINA = 40;
 const MENSAJES_VISIBLES = 40;
 
 const CAMPOS_MSG =
-    'id, direction, content_type, body, media_url, created_at, action_taken, whatsapp_message_id, deleted_at, reaction';
+    'id, direction, content_type, body, media_url, created_at, delivery_status, action_taken, whatsapp_message_id, deleted_at, reaction';
 
 /** Los números se guardan como solo dígitos (migración 0021). */
 function formatearTelefono(c: Pick<Conversacion, 'phone_number' | 'lid'>): string {
@@ -115,14 +111,39 @@ function hace(iso: string): string {
     return `${Math.round(h / 24)}d`;
 }
 
-const SIN_TEXTO: Record<string, string> = {
-    image: 'Foto',
-    audio: 'Nota de voz',
-    video: 'Video',
-    document: 'Archivo',
-    sticker: 'Sticker',
-    location: 'Ubicación',
-    contact: 'Contacto',
+/**
+ * Inicial del cliente sobre un color estable, como en la bandeja: el color
+ * sale del propio teléfono, así que el mismo cliente tiene siempre la misma
+ * mancha y se lo reconoce antes de leer el nombre.
+ */
+const COLORES_AVATAR = [
+    'bg-emerald-500/25 text-emerald-200',
+    'bg-sky-500/25 text-sky-200',
+    'bg-amber-500/25 text-amber-200',
+    'bg-rose-500/25 text-rose-200',
+    'bg-violet-500/25 text-violet-200',
+];
+
+const Avatar: React.FC<{ nombre: string | null; telefono: string; tam?: 'sm' | 'md' }> = ({
+    nombre,
+    telefono,
+    tam = 'md',
+}) => {
+    const inicial = (nombre?.trim()?.[0] ?? telefono.slice(-2, -1) ?? '?').toUpperCase();
+    let suma = 0;
+    for (const ch of telefono) suma += ch.charCodeAt(0);
+    return (
+        <span
+            aria-hidden="true"
+            className={cn(
+                'shrink-0 rounded-full flex items-center justify-center font-bold select-none',
+                tam === 'md' ? 'h-12 w-12 text-lg' : 'h-10 w-10 text-base',
+                COLORES_AVATAR[suma % COLORES_AVATAR.length],
+            )}
+        >
+            {inicial}
+        </span>
+    );
 };
 
 const MobileWhatsApp: React.FC = () => {
@@ -146,6 +167,12 @@ const MobileWhatsApp: React.FC = () => {
     /** Textos que el equipo repite todo el dia (tabla agent_quick_replies). */
     const [rapidas, setRapidas] = useState<Array<{ id: number; label: string; body: string }>>([]);
     const [menuRapidas, setMenuRapidas] = useState(false);
+    /** El "+" de WhatsApp: archivo, catálogo, proforma, pedido y rápidas. */
+    const [menuHerramientas, setMenuHerramientas] = useState(false);
+    /** Hay una nota de voz grabándose o grabada sin mandar. */
+    const [grabadorOcupado, setGrabadorOcupado] = useState(false);
+    /** Foto abierta a pantalla completa, con las demás del hilo al costado. */
+    const [visor, setVisor] = useState<{ media: MediaItem[]; index: number } | null>(null);
 
     const hiloRef = useRef<HTMLDivElement | null>(null);
     const fileRef = useRef<HTMLInputElement | null>(null);
@@ -230,10 +257,30 @@ const MobileWhatsApp: React.FC = () => {
         setBorrador('');
         setError(null);
         await cargarMensajes(c.id);
-        // Abrirlo cuenta como leído, igual que en el escritorio.
+        // Abrirlo cuenta como leído, igual que en el escritorio: se apaga el
+        // contador de acá y además se le mandan los tildes azules al cliente,
+        // que es lo que él ve en su teléfono. Que falle el tilde no puede
+        // romper la apertura del chat, así que no se espera.
         if (c.unread_count > 0) {
             await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', c.id);
             setConversaciones((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread_count: 0 } : x)));
+        }
+        marcarLeidoEnWhatsApp(c.id, userId).catch(() => {});
+    };
+
+    /**
+     * Deja el chat como pendiente en la lista y vuelve atrás.
+     *
+     * Lo segundo no es un capricho: si el chat quedara abierto, abrirlo lo
+     * marca leído otra vez y el botón parecería no hacer nada.
+     */
+    const marcarComoNoLeido = async (c: Conversacion) => {
+        try {
+            await marcarNoLeido(c.id);
+            setConversaciones((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread_count: 1 } : x)));
+            setAbierta(null);
+        } catch (err: any) {
+            setError(err?.message ?? 'No se pudo marcar sin leer.');
         }
     };
 
@@ -263,7 +310,20 @@ const MobileWhatsApp: React.FC = () => {
     // El hilo arranca abajo del todo, donde está lo último que se dijo.
     useEffect(() => {
         const c = hiloRef.current;
-        if (c) c.scrollTop = c.scrollHeight;
+        if (!c) return;
+        const abajo = () => {
+            c.scrollTop = c.scrollHeight;
+        };
+        abajo();
+        // Y otra vez cuando las fotos terminan de cargar: hasta que la imagen
+        // no tiene alto, el hilo mide menos de lo que va a medir y el "abajo
+        // del todo" queda a media conversación.
+        const t1 = setTimeout(abajo, 120);
+        const t2 = setTimeout(abajo, 600);
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
     }, [mensajes]);
 
     // El botón «atrás» del teléfono vuelve a la lista en vez de salirse.
@@ -375,267 +435,351 @@ const MobileWhatsApp: React.FC = () => {
 
     /* ------------------------------------------------------------------ */
 
+    /**
+     * Abre la foto a pantalla completa con TODAS las del hilo cargadas, para
+     * poder pasar de una a otra: el cliente casi nunca manda una sola foto de
+     * la pieza, manda tres desde ángulos distintos.
+     */
+    const abrirVisor = (m: Mensaje) => {
+        const fotos = mensajes.filter((x) => !!x.media_url && x.content_type === 'image');
+        setVisor({
+            media: fotos.map((x) => ({ type: 'image', url: x.media_url!, title: x.body ?? undefined })),
+            index: Math.max(0, fotos.findIndex((x) => x.id === m.id)),
+        });
+    };
+
+    /* Con algo escrito manda el botón verde; sin nada, el micrófono. Mientras
+       se graba manda el grabador: el botón verde taparía sus controles. */
+    const mostrarEnviar = borrador.trim().length > 0 && !grabadorOcupado;
+
+    /** Una opción del menú "+". */
+    const opcionMenu = (icono: React.ReactNode, texto: string, cuenta: number, accion: () => void) => (
+        <button
+            onClick={() => {
+                setMenuHerramientas(false);
+                accion();
+            }}
+            role="menuitem"
+            className="flex min-h-[52px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover"
+        >
+            <span className="text-wa-meta">{icono}</span>
+            <span className="flex-1">{texto}</span>
+            {cuenta > 0 && (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-wa-accent px-1.5 text-[11px] font-bold text-wa-accent-fg">
+                    {cuenta}
+                </span>
+            )}
+        </button>
+    );
+
+    /* ------------------------------------------------------------------ */
+
     if (abierta) {
         return (
-            <div className="flex flex-col h-full bg-slate-950">
-                {/* Cabecera del chat */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-900 border-b border-slate-800 shrink-0">
+            /* `wa-dark` fija la paleta oscura de WhatsApp pase lo que pase con el
+                tema del ERP: el resto del modo móvil es oscuro y fijo, y un chat
+                claro adentro se veía como un recorte de otra aplicación. */
+            <div className="wa-dark flex h-full flex-col bg-wa-bg">
+                {/* --------------------------- Cabecera --------------------------- */}
+                <div className="flex shrink-0 items-center gap-1.5 bg-wa-header px-1.5 py-1.5">
                     <button
                         onClick={() => setAbierta(null)}
                         aria-label="Volver a los chats"
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-300 active:bg-slate-800"
+                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10'}
                     >
-                        <ArrowLeft size={20} aria-hidden="true" />
+                        <ArrowLeft size={22} aria-hidden="true" />
                     </button>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[15px] font-bold text-white truncate">
+
+                    <Avatar nombre={abierta.customer_name} telefono={abierta.phone_number} tam="sm" />
+
+                    <div className="min-w-0 flex-1 pl-1">
+                        <p className="truncate text-[16px] font-medium leading-[21px] text-wa-text">
                             {abierta.customer_name || formatearTelefono(abierta)}
                         </p>
-                        {abierta.customer_name && (
-                            <p className="text-xs text-slate-500 truncate">{formatearTelefono(abierta)}</p>
-                        )}
+                        <p className="truncate text-[12.5px] leading-[16px] text-wa-meta">
+                            {abierta.customer_name ? formatearTelefono(abierta) : "contestá desde acá"}
+                        </p>
                     </div>
+
+                    {/* Dejar el chat pendiente en la lista. Abrirlo para ver de qué
+                        se trataba lo apagaba de los pendientes y quedaba enterrado. */}
+                    <button
+                        onClick={() => marcarComoNoLeido(abierta)}
+                        aria-label="Marcar el chat como no leído"
+                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10'}
+                    >
+                        <MailQuestion size={20} aria-hidden="true" />
+                    </button>
+
                     <button
                         onClick={() => cargarMensajes(abierta.id)}
                         aria-label="Actualizar el chat"
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-400 active:bg-slate-800"
+                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10'}
                     >
                         {cargandoChat ? (
-                            <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                            <Loader2 size={19} className="animate-spin" aria-hidden="true" />
                         ) : (
-                            <RefreshCw size={18} aria-hidden="true" />
+                            <RefreshCw size={19} aria-hidden="true" />
                         )}
                     </button>
                 </div>
 
-                {/* Hilo */}
-                <div ref={hiloRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
-                    {cargandoChat && mensajes.length === 0 && (
-                        <p className="text-center text-sm text-slate-500 py-8">Cargando…</p>
-                    )}
+                {/* ----------------------------- Hilo ----------------------------- */}
+                <div ref={hiloRef} className="wa-wallpaper wa-scroll flex-1 overflow-y-auto py-2">
+                    <PildoraChat tono="aviso">
+                        Lo que mandes desde acá sale por WhatsApp y queda guardado en esta
+                        conversación. Lo que escribas desde el teléfono, no.
+                    </PildoraChat>
+
+                    {cargandoChat && mensajes.length === 0 && <PildoraChat>Cargando…</PildoraChat>}
                     {!cargandoChat && mensajes.length === 0 && (
-                        <p className="text-center text-sm text-slate-500 py-8">Sin mensajes todavía.</p>
+                        <PildoraChat>Sin mensajes todavía.</PildoraChat>
                     )}
-                    {mensajes.map((m) => (
-                        <div key={m.id} className={`flex ${m.direction === 'inbound' ? 'justify-start' : 'justify-end'}`}>
-                            <div
-                                className={`max-w-[85%] rounded-2xl px-3 py-2 text-[15px] whitespace-pre-wrap break-words ${
-                                    // Borrado para todos: se conserva, pero se ve que
-                                    // ya no está del lado del cliente.
-                                    m.deleted_at ? 'line-through opacity-50 ' : ''
-                                }${
-                                    m.direction === 'inbound'
-                                        ? 'bg-slate-800 text-slate-100'
-                                        : 'bg-amber-500/15 text-amber-50 border border-amber-500/25'
-                                }`}
-                            >
-                                {m.media_url && (
-                                    <div className="mb-1.5">
-                                        <MessageMedia url={m.media_url} contentType={m.content_type} body={m.body} />
-                                    </div>
-                                )}
-                                {(m.body || !m.media_url) && (m.body || SIN_TEXTO[m.content_type] || '(sin texto)')}
-                                {/* La reacción, pegada al pie de la burbuja como en WhatsApp. */}
-                                {m.reaction && (
-                                    <span className="ml-1 inline-block rounded-full border border-slate-700 bg-slate-900 px-1.5 text-base leading-none">
-                                        {m.reaction}
-                                    </span>
-                                )}
-                                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                                    <span>
-                                        {new Date(m.created_at).toLocaleTimeString('es-EC', {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                        })}
-                                        {m.action_taken === 'human_reply' && ' · vendedor'}
-                                    </span>
-                                    {/* Citar, reaccionar y borrar -- el mismo componente que
-                                        el escritorio, con el disparador a 44px para el dedo. */}
-                                    {m.whatsapp_message_id && !m.deleted_at && (
-                                        <span className="ml-auto">
-                                            <MessageActions
-                                                onResponder={() => setCitando(m)}
-                                                onReaccionar={(emoji) => reaccionar(m, emoji)}
-                                                onBorrar={m.direction === 'outbound' ? () => borrar(m) : undefined}
-                                                alineacion={m.direction === 'inbound' ? 'izquierda' : 'derecha'}
-                                                claseBoton="min-w-[44px] min-h-[44px] -my-2 flex items-center justify-center rounded-xl text-slate-500 active:bg-slate-800"
-                                            />
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+
+                    {/* El MISMO hilo que la bandeja de escritorio, con las zonas
+                        táctiles agrandadas. Antes acá vivía una copia de las
+                        burbujas y se desincronizaba sola. */}
+                    <ChatThread
+                        mensajes={mensajes}
+                        tactil
+                        onAbrirFoto={abrirVisor}
+                        onResponder={setCitando}
+                        onReaccionar={reaccionar}
+                        onBorrar={borrar}
+                    />
                 </div>
 
-                {/* Caja de escribir */}
-                {/* El boton central de la barra inferior sobresale por encima
-                    de ella (84px de barra, 104px de pico), y `pb-nav-safe` del
-                    layout solo reserva los 84: sin este hueco extra el boton
-                    flotante queda justo encima de la caja de escribir. */}
+                {/* ------------------------ Caja de escribir ----------------------- */}
+                {/* El botón central de la barra inferior sobresale por encima de
+                    ella (84px de barra, 104px de pico), y `pb-nav-safe` del layout
+                    solo reserva los 84: sin este hueco extra el botón flotante
+                    queda justo encima de la caja de escribir. */}
                 <div
-                    className="shrink-0 border-t border-slate-800 bg-slate-900 px-3 py-2 space-y-2"
+                    className="relative shrink-0 bg-wa-header px-1.5 py-1.5"
                     style={{ paddingBottom: 'calc(var(--mobile-nav-peak) - var(--mobile-nav-h) + 12px)' }}
                 >
-                    {menuRapidas && (
-                        <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-800 divide-y divide-slate-700">
+                    {/* Menú del "+" */}
+                    {menuHerramientas && (
+                        <div
+                            role="menu"
+                            className="absolute bottom-full left-2 right-2 z-20 mb-2 overflow-hidden rounded-2xl border border-wa-divider bg-wa-panel py-1 shadow-2xl"
+                        >
+                            {opcionMenu(<ImageIcon size={20} aria-hidden="true" />, 'Foto, video o archivo', 0, () =>
+                                fileRef.current?.click(),
+                            )}
+                            {opcionMenu(<Package size={20} aria-hidden="true" />, 'Repuesto del catálogo', 0, () =>
+                                setCatalogoAbierto(true),
+                            )}
+                            {opcionMenu(<FileText size={20} aria-hidden="true" />, 'Proforma', 0, () =>
+                                setProformaAbierta(true),
+                            )}
+                            {opcionMenu(<ClipboardList size={20} aria-hidden="true" />, 'Anotar un pedido', 0, () =>
+                                setPedidoAbierto(true),
+                            )}
+                            {rapidas.length > 0 &&
+                                opcionMenu(<Zap size={20} aria-hidden="true" />, 'Respuestas rápidas', rapidas.length, () =>
+                                    setMenuRapidas(true),
+                                )}
+                        </div>
+                    )}
+
+                    {/* Respuestas rápidas */}
+                    {menuRapidas && rapidas.length > 0 && (
+                        <div className="absolute bottom-full left-2 right-2 z-20 mb-2 max-h-64 divide-y divide-wa-divider overflow-y-auto rounded-2xl border border-wa-divider bg-wa-panel shadow-2xl">
                             {rapidas.map((r) => (
                                 <button
                                     key={r.id}
                                     onClick={() => {
-                                        // Se agrega a lo ya escrito en vez de pisarlo:
-                                        // muchas veces la respuesta rápida completa
-                                        // algo que ya se estaba escribiendo.
+                                        // Se agrega a lo ya escrito en vez de pisarlo: muchas
+                                        // veces la respuesta rápida completa algo que ya se
+                                        // estaba escribiendo.
                                         setBorrador((prev) => (prev.trim() ? `${prev.trim()}\n${r.body}` : r.body));
                                         setMenuRapidas(false);
                                     }}
-                                    className="w-full text-left px-3 py-3 min-h-[44px] active:bg-slate-700"
+                                    className="min-h-[52px] w-full px-4 py-2.5 text-left active:bg-wa-hover"
                                 >
-                                    <p className="text-sm font-semibold text-slate-200">{r.label}</p>
-                                    <p className="text-xs text-slate-400 line-clamp-2">{r.body}</p>
+                                    <p className="text-[14px] font-semibold text-wa-text">{r.label}</p>
+                                    <p className="line-clamp-2 text-[12.5px] text-wa-meta">{r.body}</p>
                                 </button>
                             ))}
                         </div>
                     )}
+
                     {citando && (
-                        <CitaEnComposer texto={citando.body || 'Mensaje'} onQuitar={() => setCitando(null)} oscuro />
+                        <div className="mb-1.5">
+                            <CitaEnComposer texto={textoDe(citando)} onQuitar={() => setCitando(null)} />
+                        </div>
                     )}
-                    {error && <p className="text-xs text-rose-300">{error}</p>}
 
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <input
-                            ref={fileRef}
-                            type="file"
-                            multiple
-                            accept="image/*,video/*,audio/*,application/pdf"
-                            className="hidden"
-                            onChange={(e) => {
-                                enviarArchivos(Array.from(e.target.files ?? []));
-                                e.target.value = '';
+                    {error && <p className="mb-1.5 px-2 text-xs text-danger">{error}</p>}
+
+                    <input
+                        ref={fileRef}
+                        type="file"
+                        multiple
+                        accept="image/*,video/*,audio/*,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                            enviarArchivos(Array.from(e.target.files ?? []));
+                            e.target.value = '';
+                        }}
+                    />
+
+                    <div className="flex flex-wrap items-end gap-1.5">
+                        {/* Adjuntar, catálogo, proforma, pedido y rápidas viven acá
+                            adentro. Antes eran seis botones en dos renglones sobre la
+                            caja de escribir: comían media pantalla de hilo en un
+                            teléfono y no se parecían a WhatsApp. */}
+                        <button
+                            onClick={() => {
+                                setMenuHerramientas((v) => !v);
+                                setMenuRapidas(false);
                             }}
-                        />
-                        <button
-                            onClick={() => fileRef.current?.click()}
-                            disabled={enviando}
-                            className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5"
+                            aria-label="Adjuntar y herramientas"
+                            aria-expanded={menuHerramientas}
+                            className={cn(
+                                'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta transition-transform active:bg-white/10',
+                                menuHerramientas && 'rotate-45',
+                            )}
                         >
-                            <Paperclip size={15} aria-hidden="true" /> Archivo
+                            <Plus size={26} aria-hidden="true" />
                         </button>
-                        {/* 44px mínimo: los botones del escritorio son de 32 y
-                            en una pantalla táctil por debajo de 44 se falla el
-                            toque (design-system/modo-movil-industrial/MASTER.md). */}
-                        <button
-                            onClick={() => setCatalogoAbierto(true)}
-                            className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5"
-                        >
-                            <Package size={15} aria-hidden="true" /> Catálogo
-                        </button>
-                        <button
-                            onClick={() => setProformaAbierta(true)}
-                            className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5"
-                        >
-                            <FileText size={15} aria-hidden="true" /> Proforma
-                        </button>
-                        <button
-                            onClick={() => setPedidoAbierto(true)}
-                            className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5"
-                        >
-                            <ClipboardList size={15} aria-hidden="true" /> Pedido
-                        </button>
-                        {rapidas.length > 0 && (
-                            <button onClick={() => setMenuRapidas((v) => !v)} className="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5">
-                                <Zap size={15} aria-hidden="true" /> Rápidas
-                            </button>
-                        )}
-                        <VoiceRecorder
-                            onEnviar={enviarNotaDeVoz}
-                            disabled={enviando}
-                            claseBoton="min-h-[44px] px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm active:bg-slate-700 flex items-center gap-1.5 disabled:opacity-40"
-                        />
-                    </div>
 
-                    <div className="flex items-end gap-2">
                         <textarea
                             value={borrador}
                             onChange={(e) => setBorrador(e.target.value)}
                             rows={1}
-                            placeholder="Escribí tu respuesta…"
+                            placeholder="Escribí un mensaje…"
                             aria-label="Mensaje para el cliente"
-                            /* 16px mínimo: por debajo, iOS hace zoom al enfocar
-                               y descoloca la pantalla entera (ver MASTER.md). */
-                            className="flex-1 min-h-[48px] max-h-32 px-3 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-base focus:border-amber-500 outline-none resize-none"
+                            /* 16px mínimo: por debajo, iOS hace zoom al enfocar y
+                               descoloca la pantalla entera (ver MASTER.md). */
+                            className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl border-none bg-wa-input px-4 py-3 text-base leading-[20px] text-wa-text outline-none placeholder:text-wa-meta focus:ring-0"
                         />
-                        <button
-                            onClick={enviarTexto}
-                            disabled={enviando || !borrador.trim()}
-                            aria-label="Enviar"
-                            className="min-w-[48px] min-h-[48px] rounded-xl bg-amber-500 text-slate-950 font-bold flex items-center justify-center active:bg-amber-600 disabled:opacity-40"
-                        >
-                            {enviando ? (
-                                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
-                            ) : (
-                                <Send size={18} aria-hidden="true" />
-                            )}
-                        </button>
+
+                        {mostrarEnviar && (
+                            <button
+                                onClick={enviarTexto}
+                                disabled={enviando}
+                                aria-label="Enviar"
+                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-wa-accent text-wa-accent-fg active:brightness-90 disabled:opacity-40"
+                            >
+                                {enviando ? (
+                                    <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                                ) : (
+                                    <Send size={20} aria-hidden="true" />
+                                )}
+                            </button>
+                        )}
+
+                        {/* Se ESCONDE en vez de desmontarse cuando aparece el botón de
+                            enviar: desmontarlo tira a la basura una nota ya grabada sin
+                            avisar, y para eso basta con tocar la caja de texto. */}
+                        <div className={cn('shrink-0', mostrarEnviar && 'hidden')}>
+                            <VoiceRecorder
+                                onEnviar={enviarNotaDeVoz}
+                                disabled={enviando}
+                                soloIcono
+                                onOcupado={setGrabadorOcupado}
+                                claseBoton="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10 disabled:opacity-40"
+                            />
+                        </div>
                     </div>
-                    <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                        <ImageIcon size={11} aria-hidden="true" />
-                        Sale por WhatsApp en unos segundos.
-                    </p>
                 </div>
+
+                {/* Los tres modales del vendedor. Antes estaban importados pero sin
+                    dibujar: los botones de catálogo, proforma y pedido prendían un
+                    estado que no abría nada. */}
+                <CatalogSendModal
+                    isOpen={catalogoAbierto}
+                    onClose={() => setCatalogoAbierto(false)}
+                    conversationId={abierta.id}
+                    clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
+                    onEnviar={enviar}
+                />
+
+                <ProformaBuilder
+                    isOpen={proformaAbierta}
+                    onClose={() => setProformaAbierta(false)}
+                    conversationId={abierta.id}
+                    clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
+                    clienteNombre={abierta.customer_name}
+                    onEnviar={enviar}
+                />
+
+                <RegistrarPedidoModal
+                    isOpen={pedidoAbierto}
+                    onClose={() => setPedidoAbierto(false)}
+                    phoneNumber={abierta.phone_number}
+                    customerName={abierta.customer_name}
+                    userId={userId}
+                    onRegistrado={() => {}}
+                />
+
+                <MediaLightbox
+                    isOpen={!!visor}
+                    media={visor?.media ?? []}
+                    initialIndex={visor?.index ?? 0}
+                    onClose={() => setVisor(null)}
+                />
             </div>
         );
     }
 
+    /* ---------------------------- Lista de chats ---------------------------- */
+
     return (
-        <div className="flex flex-col h-full bg-slate-950">
-            <div className="px-4 pt-3 pb-2 shrink-0">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                    <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                        <MessageCircle size={18} className="text-amber-400" aria-hidden="true" />
+        <div className="wa-dark flex h-full flex-col bg-wa-panel">
+            <div className="shrink-0 bg-wa-header px-4 pb-2 pt-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                    <h1 className="flex items-center gap-2 text-xl font-bold text-wa-text">
+                        <MessageCircle size={20} className="text-wa-accent" aria-hidden="true" />
                         WhatsApp
                     </h1>
                     {sinLeer > 0 && (
-                        <span className="text-xs font-bold text-slate-950 bg-amber-500 rounded-full px-2 py-0.5">
+                        <span className="rounded-full bg-wa-accent px-2 py-0.5 text-xs font-bold text-wa-accent-fg">
                             {sinLeer} sin leer
                         </span>
                     )}
                 </div>
 
                 <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                    <Search
+                        size={16}
+                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-wa-meta"
+                        aria-hidden="true"
+                    />
                     <input
                         type="search"
                         value={busqueda}
                         onChange={(e) => setBusqueda(e.target.value)}
                         placeholder="Buscar por nombre o teléfono…"
                         aria-label="Buscar chat"
-                        className="w-full min-h-[48px] pl-10 pr-10 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 text-base focus:border-amber-500 outline-none"
+                        className="min-h-[44px] w-full rounded-full border-none bg-wa-input pl-11 pr-12 text-base text-wa-text outline-none placeholder:text-wa-meta focus:ring-0"
                     />
                     {busqueda && (
                         <button
                             onClick={() => setBusqueda('')}
                             aria-label="Limpiar la búsqueda"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500"
+                            className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-wa-meta"
                         >
-                            <X size={16} aria-hidden="true" />
+                            <X size={18} aria-hidden="true" />
                         </button>
                     )}
                 </div>
             </div>
 
-            {error && <p className="px-4 pb-2 text-xs text-rose-300">{error}</p>}
+            {error && <p className="px-4 py-2 text-xs text-danger">{error}</p>}
 
-            {/* Hueco para que el ultimo chat no quede bajo el boton central. */}
+            {/* Hueco para que el último chat no quede bajo el botón central. */}
             <div
-                className="flex-1 overflow-y-auto px-4 space-y-2"
+                className="wa-scroll flex-1 overflow-y-auto"
                 style={{ paddingBottom: 'calc(var(--mobile-nav-peak) - var(--mobile-nav-h) + 16px)' }}
             >
                 {cargando && conversaciones.length === 0 && (
-                    <p className="text-center text-sm text-slate-500 py-10">Cargando chats…</p>
+                    <p className="py-10 text-center text-sm text-wa-meta">Cargando chats…</p>
                 )}
                 {!cargando && conversaciones.length === 0 && (
-                    <p className="text-center text-sm text-slate-500 py-10">
+                    <p className="py-10 text-center text-sm text-wa-meta">
                         {busqueda.trim() ? 'Ningún chat coincide.' : 'Todavía no hay conversaciones.'}
                     </p>
                 )}
@@ -644,46 +788,60 @@ const MobileWhatsApp: React.FC = () => {
                     <button
                         key={c.id}
                         onClick={() => abrirChat(c)}
-                        className="w-full text-left bg-slate-900 rounded-2xl border border-slate-800 px-3.5 py-3 active:bg-slate-800 min-h-[64px]"
+                        className="flex w-full items-center gap-3 pl-3 text-left active:bg-wa-hover"
                     >
-                        <div className="flex items-center justify-between gap-2">
-                            <span
-                                className={`text-[15px] truncate ${
-                                    c.unread_count > 0 ? 'font-bold text-white' : 'font-semibold text-slate-200'
-                                }`}
-                            >
-                                {c.customer_name || formatearTelefono(c)}
-                            </span>
-                            <span className="text-xs text-slate-500 shrink-0">
-                                {c.last_message_at ? hace(c.last_message_at) : ''}
-                            </span>
-                        </div>
-                        {/* De qué habla el chat, sin abrirlo. En un teléfono
-                            importa más que en el escritorio: no hay lugar para
-                            tener la lista y el chat al mismo tiempo, así que
-                            cada apertura equivocada cuesta dos toques. */}
-                        <div className="flex items-center gap-2 mt-1">
-                            <span
-                                className={`text-xs truncate flex-1 min-w-0 ${
-                                    c.unread_count > 0 ? 'text-slate-200 font-medium' : 'text-slate-400'
-                                }`}
-                            >
-                                {c.last_message_preview ? (
-                                    <>
-                                        {c.last_message_direction === 'outbound' && (
-                                            <span className="text-slate-500">Vos: </span>
-                                        )}
-                                        {c.last_message_preview}
-                                    </>
-                                ) : (
-                                    <span className="text-slate-500">{formatearTelefono(c)}</span>
-                                )}
-                            </span>
-                            {c.unread_count > 0 && (
-                                <span className="shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full">
-                                    {c.unread_count}
+                        <Avatar nombre={c.customer_name} telefono={c.phone_number} />
+
+                        {/* La línea divisoria arranca DESPUÉS del avatar, como en
+                            WhatsApp: la columna de avatares se lee como una tira. */}
+                        <div className="min-w-0 flex-1 border-b border-wa-divider py-3 pr-3">
+                            <div className="flex items-baseline justify-between gap-2">
+                                <span
+                                    className={cn(
+                                        'truncate text-[16px] leading-[21px] text-wa-text',
+                                        c.unread_count > 0 ? 'font-semibold' : 'font-normal',
+                                    )}
+                                >
+                                    {c.customer_name || formatearTelefono(c)}
                                 </span>
-                            )}
+                                <span
+                                    className={cn(
+                                        'shrink-0 text-[12px] leading-[16px]',
+                                        c.unread_count > 0 ? 'font-semibold text-wa-accent' : 'text-wa-meta',
+                                    )}
+                                >
+                                    {c.last_message_at ? hace(c.last_message_at) : ''}
+                                </span>
+                            </div>
+
+                            {/* De qué habla el chat, sin abrirlo. En un teléfono importa
+                                más que en el escritorio: no hay lugar para tener la lista
+                                y el chat a la vez, así que cada apertura equivocada cuesta
+                                dos toques. */}
+                            <div className="mt-0.5 flex items-center gap-1.5">
+                                <span
+                                    className={cn(
+                                        'min-w-0 flex-1 truncate text-[13.5px] leading-[19px]',
+                                        c.unread_count > 0 ? 'text-wa-text' : 'text-wa-meta',
+                                    )}
+                                >
+                                    {c.last_message_preview ? (
+                                        <>
+                                            {c.last_message_direction === 'outbound' && (
+                                                <span className="text-wa-meta">Vos: </span>
+                                            )}
+                                            {c.last_message_preview}
+                                        </>
+                                    ) : (
+                                        formatearTelefono(c)
+                                    )}
+                                </span>
+                                {c.unread_count > 0 && (
+                                    <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
+                                        {c.unread_count}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </button>
                 ))}
