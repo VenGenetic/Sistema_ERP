@@ -403,8 +403,15 @@ const WhatsAppInbox: React.FC = () => {
      * argumentos y tienen que trabajar sobre el chat que está a la vista).
      */
 
-    const fetchConversations = useCallback(async () => {
-        setConversationsLoading(true);
+    /**
+     * `silencioso` = repaso de fondo, sin tocar el indicador de carga.
+     *
+     * Sin eso, cada repaso automático dibujaría el esqueleto de carga sobre
+     * una lista que ya está bien: la pantalla parpadearía sola cada minuto
+     * mientras alguien está leyendo un chat.
+     */
+    const fetchConversations = useCallback(async (silencioso = false) => {
+        if (!silencioso) setConversationsLoading(true);
 
         const consulta = (campos: string) => {
             let q = supabase
@@ -427,7 +434,7 @@ const WhatsAppInbox: React.FC = () => {
         let { data, error, count } = await consulta(CAMPOS_CONV_PREVIEW);
         if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE));
 
-        setConversationsLoading(false);
+        if (!silencioso) setConversationsLoading(false);
         if (error) {
             console.error('Error cargando conversaciones:', error.message);
             setErrorCarga(`No se pudieron cargar las conversaciones: ${error.message}`);
@@ -472,8 +479,8 @@ const WhatsAppInbox: React.FC = () => {
         setGlobalBotEnabled(Boolean(data?.bot_auto_reply_enabled));
     }, []);
 
-    const fetchEscalations = useCallback(async () => {
-        setLoading(true);
+    const fetchEscalations = useCallback(async (silencioso = false) => {
+        if (!silencioso) setLoading(true);
         const { data, error } = await supabase
             .from('agent_escalations')
             .select(
@@ -528,6 +535,9 @@ const WhatsAppInbox: React.FC = () => {
         let conversationsTimer: ReturnType<typeof setTimeout> | undefined;
         const AGRUPAR_MS = 3000;
 
+        /** Si ya estuvo conectada una vez, el próximo SUBSCRIBED es una reconexión. */
+        let huboConexion = false;
+
         const channel = supabase
             .channel('agent_escalations_inbox')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_escalations' }, () => {
@@ -564,7 +574,28 @@ const WhatsAppInbox: React.FC = () => {
                 clearTimeout(conversationsTimer);
                 conversationsTimer = setTimeout(() => fetchConversations(), AGRUPAR_MS);
             })
-            .subscribe();
+            /**
+             * Ponerse al día al RECONECTAR.
+             *
+             * Una suscripción se cae sola: se corta el wifi, se duerme la
+             * laptop, cambia la red del local. El cliente de Supabase vuelve
+             * a conectarse solo, pero los eventos de ese rato NO se
+             * reenvían nunca -- se perdieron. Sin esto, la bandeja se
+             * reconecta y sigue mostrando la lista congelada en el momento
+             * del corte, sin que nada indique que está vieja.
+             *
+             * La primera conexión no cuenta: ahí la lista se acaba de
+             * cargar y volver a pedirla sería duplicar la consulta de
+             * arranque.
+             */
+            .subscribe((estado) => {
+                if (estado !== 'SUBSCRIBED') return;
+                if (huboConexion) {
+                    fetchConversations(true);
+                    fetchEscalations(true);
+                }
+                huboConexion = true;
+            });
 
         return () => {
             clearTimeout(escalationsTimer);
@@ -760,6 +791,29 @@ const WhatsAppInbox: React.FC = () => {
     }, []);
 
     useRepasoDelHilo(!!selected, repasarHilo);
+
+    /**
+     * Y la red de abajo de la LISTA, que no tenía ninguna.
+     *
+     * El hilo abierto ya se repasa (arriba) y la cola de salida también,
+     * pero la lista de chats dependía enteramente del realtime: si la
+     * suscripción se caía, la lista quedaba congelada para siempre -- sin
+     * contadores de no leídos nuevos, sin la vista previa del último
+     * mensaje y sin reordenarse por actividad -- y nada en la pantalla
+     * decía que lo que se estaba viendo era viejo.
+     *
+     * Un minuto y no ocho segundos como el hilo: la lista son 200 filas
+     * contra las 100 del hilo, y la conversación abierta es la que se está
+     * mirando. Solo con la pestaña A LA VISTA, y se pone al día de una al
+     * volver a ella -- que es cuando importa, después de un rato en otra
+     * cosa. En un ERP que queda abierto todo el día, repasar contra una
+     * pestaña que nadie mira es factura de Supabase al pepe.
+     */
+    const repasarLista = useCallback(() => {
+        fetchConversations(true);
+    }, [fetchConversations]);
+
+    useRepasoDelHilo(true, repasarLista, 60000);
 
     useEffect(() => {
         if (!selected) {

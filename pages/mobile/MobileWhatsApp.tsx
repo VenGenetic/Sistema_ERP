@@ -246,8 +246,9 @@ const MobileWhatsApp: React.FC = () => {
     /*  Lista                                                              */
     /* ------------------------------------------------------------------ */
 
-    const cargarLista = useCallback(async () => {
-        setCargando(true);
+    /** `silencioso` = repaso de fondo: no dibuja el estado de carga sobre una lista que ya está bien. */
+    const cargarLista = useCallback(async (silencioso = false) => {
+        if (!silencioso) setCargando(true);
 
         const consulta = (campos: string) => {
             let q = supabase
@@ -271,7 +272,7 @@ const MobileWhatsApp: React.FC = () => {
         let { data, error: err } = await consulta(CAMPOS_CONV_PREVIEW);
         if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_BASE));
 
-        setCargando(false);
+        if (!silencioso) setCargando(false);
         if (err) {
             setError(`No se pudieron cargar los chats: ${err.message}`);
             return;
@@ -334,6 +335,81 @@ const MobileWhatsApp: React.FC = () => {
         const t = setTimeout(() => cargarLista(), 350);
         return () => clearTimeout(t);
     }, [cargarLista]);
+
+    /**
+     * La lista, en vivo.
+     *
+     * No tenía NADA: ni realtime ni repaso. Se cargaba al entrar y al
+     * cambiar la búsqueda, y de ahí en adelante se quedaba quieta -- un
+     * mensaje nuevo del cliente no movía el chat de lugar, no encendía el
+     * contador de no leídos y no cambiaba la vista previa hasta salir y
+     * volver a entrar. En un teléfono de mostrador eso es no enterarse.
+     *
+     * Un UPDATE trae la fila nueva entera, así que se parchea en memoria en
+     * vez de volver a pedir la lista: `last_message_at` cambia en CADA
+     * mensaje, y en un teléfono con datos móviles releer 40 conversaciones
+     * cada vez es gasto puro. Un INSERT sí necesita relectura, porque la
+     * conversación nueva puede entrar en cualquier posición del orden.
+     */
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let huboConexion = false;
+
+        const canal = supabase
+            .channel('mobile_conversaciones')
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'agent_conversations' },
+                (payload) => {
+                    const fila = payload.new as Conversacion;
+                    setConversaciones((prev) => {
+                        if (!prev.some((c) => c.id === fila.id)) return prev;
+                        return prev
+                            .map((c) => (c.id === fila.id ? { ...c, ...fila } : c))
+                            .sort(
+                                (a, b) =>
+                                    new Date(b.last_message_at ?? 0).getTime() -
+                                    new Date(a.last_message_at ?? 0).getTime(),
+                            );
+                    });
+                },
+            )
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'agent_conversations' },
+                () => {
+                    // Agrupado: una importación de historial dispara un
+                    // evento por conversación y serían miles de recargas.
+                    clearTimeout(timer);
+                    timer = setTimeout(() => cargarLista(true), 3000);
+                },
+            )
+            // Al reconectar hay que ponerse al día: los eventos del rato que
+            // estuvo caída no se reenvían nunca. En un teléfono pasa todo el
+            // tiempo -- se apaga la pantalla, se pierde la señal.
+            .subscribe((estado) => {
+                if (estado !== 'SUBSCRIBED') return;
+                if (huboConexion) cargarLista(true);
+                huboConexion = true;
+            });
+
+        return () => {
+            clearTimeout(timer);
+            canal.unsubscribe();
+        };
+    }, [cargarLista]);
+
+    /**
+     * Y la red de abajo, por si el realtime no llega: solo con la pantalla
+     * A LA VISTA, y poniéndose al día de una al volver a ella. En un
+     * teléfono la pestaña pasa casi todo el tiempo en segundo plano, así
+     * que esto casi no corre.
+     */
+    const repasarLista = useCallback(() => {
+        cargarLista(true);
+    }, [cargarLista]);
+
+    useRepasoDelHilo(true, repasarLista, 60000);
 
     /* ------------------------------------------------------------------ */
     /*  Chat                                                               */
