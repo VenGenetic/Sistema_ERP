@@ -34,14 +34,19 @@ import {
  * cliente y no se puede volver atrás, así que nadie tiene que poder
  * mandarlo sin haber leído antes qué dice y a quién le va.
  *
- * Se abre en dos alcances:
+ * Se abre en tres alcances, y es el mismo modal en los tres a propósito:
+ * el texto, el precio, los avisos de stock y el archivado del pedido son
+ * una sola implementación y no tres que se van separando con el tiempo.
  *
- *  * Desde el chat abierto (`soloTelefono`), para avisarle a la persona
- *    con la que se está hablando.
  *  * Desde el botón "Por avisar" de la bandeja, con TODOS los que están
  *    esperando. Este es el que hace que el sistema sirva: cuando entra un
  *    pedido a la importadora se destraban treinta clientes de una, y
  *    buscarlos chat por chat no lo hace nadie.
+ *  * Desde el chat abierto (`soloTelefono`), para avisarle a la persona
+ *    con la que se está hablando.
+ *  * Desde el botón "Notificar" de Solicitudes (`soloDemandaId`), sobre
+ *    una solicitud puntual. Ahí se salta la lista y se abre derecho la
+ *    vista previa: la persona ya eligió cuál.
  */
 
 interface Props {
@@ -50,6 +55,12 @@ interface Props {
     userId: string | null;
     /** Limita la lista a un cliente. Sin esto, salen todos. */
     soloTelefono?: string;
+    /**
+     * Abre directo la vista previa de UNA solicitud, sin pasar por la
+     * lista: la persona ya eligio cual desde la pantalla de Solicitudes,
+     * volver a pedirsela seria hacerla elegir dos veces.
+     */
+    soloDemandaId?: number;
     /** Para que la pantalla de atrás refresque sus contadores. */
     onAvisado?: () => void;
     /** Saltar al chat del cliente. Si no se pasa, no se ofrece. */
@@ -101,6 +112,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     onClose,
     userId,
     soloTelefono,
+    soloDemandaId,
     onAvisado,
     onAbrirChat,
 }) => {
@@ -126,9 +138,20 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
         setCargando(true);
         setError(null);
         try {
-            const { demandas: filas, hayMas: mas } = await cargarPorAvisar(soloTelefono);
+            const { demandas: filas, hayMas: mas } = await cargarPorAvisar({
+                soloTelefono,
+                soloDemandaId,
+            });
             setDemandas(filas);
             setHayMas(mas);
+            // Sin lista que mostrar: la solicitud ya venia elegida.
+            if (soloDemandaId && filas.length === 1) abrirVistaPrevia(filas[0]);
+            // Si no vino ninguna, el pedido dejo de ser avisable entre que
+            // se dibujo la pantalla y se toco el boton: alguien lo cancelo,
+            // lo archivo o ya lo aviso.
+            if (soloDemandaId && filas.length === 0) {
+                setError('Ese pedido ya no se puede avisar: lo archivaron, lo cancelaron o ya se aviso.');
+            }
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo cargar la lista.');
         } finally {
@@ -153,7 +176,8 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
             .eq('id', 1)
             .maybeSingle();
         setEstadoAgente((data as EstadoAgente) ?? null);
-    }, [soloTelefono]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [soloTelefono, soloDemandaId]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -529,13 +553,25 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                 <div className={modal.footer}>
                     {abierto ? (
                         <>
-                            <button
-                                onClick={() => setAbierto(null)}
-                                className={cn(button.base, button.variant.secondary, button.size.md, 'mr-auto')}
-                            >
-                                <ArrowLeft size={15} aria-hidden="true" />
-                                Volver a la lista
-                            </button>
+                            {/* Abierto en una solicitud puntual no hay lista
+                                detras a la que volver: el boton mandaria a una
+                                pantalla vacia. */}
+                            {soloDemandaId ? (
+                                <button
+                                    onClick={onClose}
+                                    className={cn(button.base, button.variant.secondary, button.size.md, 'mr-auto')}
+                                >
+                                    Cancelar
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setAbierto(null)}
+                                    className={cn(button.base, button.variant.secondary, button.size.md, 'mr-auto')}
+                                >
+                                    <ArrowLeft size={15} aria-hidden="true" />
+                                    Volver a la lista
+                                </button>
+                            )}
                             <button
                                 onClick={enviar}
                                 disabled={enviando || !abierto.conversationId || !texto.trim()}

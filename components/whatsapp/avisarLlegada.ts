@@ -247,12 +247,29 @@ export interface ListaPorAvisar {
  * `soloTelefono` limita la lista a un cliente: es lo que usa el botón
  * "Avisar" de la ficha, dentro del chat.
  */
-export async function cargarPorAvisar(soloTelefono?: string): Promise<ListaPorAvisar> {
+export interface AlcanceAviso {
+    /** Solo los pedidos de un cliente. */
+    soloTelefono?: string;
+    /**
+     * Un pedido puntual, elegido a mano.
+     *
+     * Este alcance NO filtra por stock, a diferencia de los otros dos. Es
+     * a propósito: viene del boton "Notificar" de Solicitudes, que se
+     * muestra en toda solicitud activa -- también en las que no tienen
+     * stock. Filtrando, tocar ese botón abriría un modal vacío justo
+     * cuando la persona acaba de señalar cuál queria. Que el repuesto no
+     * esté se dice en la vista previa, con el aviso en rojo.
+     */
+    soloDemandaId?: number;
+}
+
+export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<ListaPorAvisar> {
+    const { soloTelefono, soloDemandaId } = alcance;
+
     let consulta = supabase
         .from('product_demands')
         .select(CAMPOS_DEMANDA)
         .in('status', ESTADOS_AVISABLES)
-        .or(FILTRO_CON_STOCK, { referencedTable: 'product' })
         // Primero lo que se detectó llegando hace poco -- es el orden en
         // que se trabaja la cola -- y después, entre los que nunca se
         // marcaron, el que lleva más tiempo esperando: a ese es al que
@@ -260,6 +277,12 @@ export async function cargarPorAvisar(soloTelefono?: string): Promise<ListaPorAv
         .order('stock_detected_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: true })
         .limit(TOPE);
+
+    if (soloDemandaId) {
+        consulta = consulta.eq('id', soloDemandaId);
+    } else {
+        consulta = consulta.or(FILTRO_CON_STOCK, { referencedTable: 'product' });
+    }
 
     if (soloTelefono) {
         const c = cola(soloTelefono);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-import { buildWhatsAppDemandURL, buildWhatsAppDiscontinuedURL, openWhatsApp } from '../utils/whatsapp';
+import { buildWhatsAppDiscontinuedURL, openWhatsApp } from '../utils/whatsapp';
+import AvisarLlegadaModal from '../components/whatsapp/AvisarLlegadaModal';
 import { MediaLightbox } from '../components/MediaLightbox';
 import { getThumbnailUrl } from '../utils/image';
 import { EditDemandModal } from '../components/EditDemandModal';
@@ -108,6 +109,8 @@ const ProductDemands: React.FC = () => {
     const { session } = useAuth();
     const user = session?.user;
     const [demands, setDemands] = useState<ProductDemand[]>([]);
+    /** La solicitud que se está por avisar, o `null` si no hay ninguna. */
+    const [avisarDemandaId, setAvisarDemandaId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [dialog, setDialog] = useState<DialogRequest | null>(null);
     
@@ -346,25 +349,31 @@ const ProductDemands: React.FC = () => {
         }
     };
 
-    const handleNotify = async (demand: ProductDemand, e?: React.MouseEvent) => {
+    /*
+        Notificar que llegó el repuesto.
+
+        Va por la BANDEJA de WhatsApp -- se encola en agent_outbox y lo
+        despacha el proceso del agente -- y no por un link de wa.me como
+        antes. La diferencia no es de comodidad:
+
+        * El wa.me abría WhatsApp Web o la aplicación y el mensaje se
+          terminaba escribiendo desde el teléfono. Lo que se escribe ahí le
+          llega CIFRADO al agente y nunca queda registrado, así que ese
+          aviso no existía en ningún lado: quien después atendía la
+          respuesta del cliente no tenía forma de saber qué se le había
+          dicho, ni cuándo.
+        * Y el archivado dependía de que alguien contestara con sinceridad
+          "sí, se envió" en un diálogo. Si se enviaba y no se confirmaba, la
+          solicitud quedaba viva y el cliente recibía el aviso dos veces; si
+          se confirmaba sin haber enviado, quedaba archivada sin que nadie
+          le hubiera avisado nunca.
+
+        Ahora el archivado lo hace el mismo acto de mandar (ver
+        avisarLlegada), así que no puede quedar uno sin el otro.
+    */
+    const handleNotify = (demand: ProductDemand, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (!demand.product) return;
-        
-        const url = buildWhatsAppDemandURL({
-            customerPhone: demand.phone_number,
-            customerName: demand.customer_name || undefined,
-            productSku: demand.product.sku,
-            productName: demand.product.name
-        });
-
-        openWhatsApp(url);
-
-        setDialog({
-            title: '¿Se envió el mensaje?',
-            body: `Confirma que ${demand.customer_name || demand.phone_number} recibió el aviso para archivar la solicitud.`,
-            confirmLabel: 'Sí, se envió',
-            onConfirm: () => markNotified(demand.id),
-        });
+        setAvisarDemandaId(demand.id);
     };
 
     const handleNotifyDiscontinued = async (demand: ProductDemand, e?: React.MouseEvent) => {
@@ -1583,6 +1592,24 @@ const ProductDemands: React.FC = () => {
                     isOpen={true}
                     onClose={() => setSharingDemand(null)}
                     demand={sharingDemand}
+                />
+            )}
+
+            {/* El aviso de "ya llegó tu repuesto", por la bandeja. Es el
+                MISMO modal que usan la bandeja y el modo móvil: el texto, el
+                precio, los avisos de stock y el archivado del pedido son una
+                sola implementación, no tres que se van separando. */}
+            {avisarDemandaId !== null && (
+                <AvisarLlegadaModal
+                    isOpen={true}
+                    onClose={() => setAvisarDemandaId(null)}
+                    userId={user?.id ?? null}
+                    soloDemandaId={avisarDemandaId}
+                    onAvisado={() => {
+                        // El pedido quedó archivado como notificado: la lista
+                        // y los contadores de arriba tienen que reflejarlo.
+                        fetchDemands();
+                    }}
                 />
             )}
 
