@@ -1,0 +1,1214 @@
+{
+  "takenAt": "2026-08-27T18:49:24.990Z",
+  "restoredIds": [
+    425,
+    467,
+    24,
+    65,
+    622,
+    47,
+    38,
+    59,
+    70,
+    243,
+    139,
+    101,
+    81,
+    615,
+    262,
+    124,
+    647,
+    592,
+    135,
+    96,
+    17,
+    86,
+    89,
+    84,
+    203,
+    198,
+    8,
+    12,
+    190,
+    202,
+    571,
+    159,
+    204,
+    169,
+    229,
+    232,
+    247,
+    524,
+    525,
+    223,
+    157,
+    253,
+    227,
+    242,
+    218,
+    271,
+    212,
+    277,
+    217,
+    342,
+    321,
+    320,
+    250,
+    518,
+    167,
+    287,
+    638,
+    286,
+    618,
+    297,
+    312,
+    125,
+    61,
+    281,
+    304,
+    366,
+    279,
+    293,
+    316,
+    317,
+    383,
+    385,
+    164,
+    399,
+    350,
+    574,
+    349,
+    607,
+    608,
+    663,
+    379,
+    675,
+    676,
+    411,
+    426,
+    430,
+    688,
+    414,
+    431,
+    405,
+    609,
+    519,
+    432,
+    404,
+    468,
+    470,
+    156,
+    599,
+    148,
+    478,
+    481,
+    509,
+    610,
+    629,
+    484,
+    466,
+    485,
+    479,
+    476,
+    482,
+    480,
+    503,
+    513,
+    677,
+    137,
+    118,
+    112,
+    554,
+    400,
+    549,
+    390,
+    553,
+    542,
+    540,
+    678,
+    631,
+    516,
+    679,
+    706,
+    241,
+    684,
+    325,
+    111,
+    328
+  ],
+  "skippedIds": [],
+  "rows": [
+    {
+      "id": 425,
+      "product_id": 9671,
+      "phone_number": "+593985157659",
+      "customer_name": "Marco Espinoza",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:24:20.659+00:00"
+    },
+    {
+      "id": 467,
+      "product_id": 8059,
+      "phone_number": "+593994577577",
+      "customer_name": "Gp1 250 Estribos",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:28:58.533+00:00"
+    },
+    {
+      "id": 24,
+      "product_id": 6735,
+      "phone_number": "+593 96 905 0788",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-23T22:58:28.354+00:00"
+    },
+    {
+      "id": 65,
+      "product_id": 12265,
+      "phone_number": "+593 99 065 2133",
+      "customer_name": "Elinson B. ",
+      "status": "notified",
+      "notified_at": "2026-07-25T20:16:58.738+00:00"
+    },
+    {
+      "id": 622,
+      "product_id": 11464,
+      "phone_number": "+593961550113",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T19:46:28.478+00:00"
+    },
+    {
+      "id": 47,
+      "product_id": 8444,
+      "phone_number": "+593 98 641 3267",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T22:02:51.768+00:00"
+    },
+    {
+      "id": 38,
+      "product_id": 8009,
+      "phone_number": "+593 96 369 0514",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-02T18:16:24.617+00:00"
+    },
+    {
+      "id": 59,
+      "product_id": 9029,
+      "phone_number": "593 97 888 5990",
+      "customer_name": "alexis",
+      "status": "notified",
+      "notified_at": "2026-07-02T18:22:37.404+00:00"
+    },
+    {
+      "id": 70,
+      "product_id": 9610,
+      "phone_number": "+593 98 197 2055",
+      "customer_name": "Ale🥰Jose🥰",
+      "status": "notified",
+      "notified_at": "2026-07-07T18:21:38.081+00:00"
+    },
+    {
+      "id": 243,
+      "product_id": 8726,
+      "phone_number": "+593989177171",
+      "customer_name": "Christian C",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:08:23.771+00:00"
+    },
+    {
+      "id": 139,
+      "product_id": 7612,
+      "phone_number": "+593998446661",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T20:37:34.126+00:00"
+    },
+    {
+      "id": 101,
+      "product_id": 8869,
+      "phone_number": "+593 99 594 3715",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T20:40:07.248+00:00"
+    },
+    {
+      "id": 81,
+      "product_id": 7855,
+      "phone_number": "+593 93 927 9365",
+      "customer_name": "~Omar Gonzabay",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:40:40.79+00:00"
+    },
+    {
+      "id": 615,
+      "product_id": 6781,
+      "phone_number": "+593981734670",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:28.034+00:00"
+    },
+    {
+      "id": 262,
+      "product_id": 8097,
+      "phone_number": "+593983195128",
+      "customer_name": "May",
+      "status": "notified",
+      "notified_at": "2026-08-16T02:28:56.048+00:00"
+    },
+    {
+      "id": 124,
+      "product_id": 7276,
+      "phone_number": "+593 99 317 2893",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:30:37.876+00:00"
+    },
+    {
+      "id": 647,
+      "product_id": 6970,
+      "phone_number": "+593962889203",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:04:54.655+00:00"
+    },
+    {
+      "id": 592,
+      "product_id": 9150,
+      "phone_number": "+593962903370",
+      "customer_name": "Roberto Ramos Delta",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:18:03.081+00:00"
+    },
+    {
+      "id": 135,
+      "product_id": 8948,
+      "phone_number": "+593 95 975 7914",
+      "customer_name": "~roberincas11",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:18:16.77+00:00"
+    },
+    {
+      "id": 96,
+      "product_id": 9830,
+      "phone_number": "+593 95 920 7474",
+      "customer_name": "~victor martinez",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:18:38.654+00:00"
+    },
+    {
+      "id": 17,
+      "product_id": 6864,
+      "phone_number": "+593 99 076 6390",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-02T18:15:13.306+00:00"
+    },
+    {
+      "id": 86,
+      "product_id": 8183,
+      "phone_number": "+593 96 129 7726",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-02T18:25:01.738+00:00"
+    },
+    {
+      "id": 89,
+      "product_id": 12637,
+      "phone_number": "+593 99 039 2948",
+      "customer_name": "~DavidMtz",
+      "status": "notified",
+      "notified_at": "2026-07-02T18:26:51.057+00:00"
+    },
+    {
+      "id": 84,
+      "product_id": 8713,
+      "phone_number": "+593 99 028 0642",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-25T20:17:48.73+00:00"
+    },
+    {
+      "id": 203,
+      "product_id": 7722,
+      "phone_number": "+593989134867",
+      "customer_name": "dianita torres",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:09:26.532+00:00"
+    },
+    {
+      "id": 198,
+      "product_id": 8370,
+      "phone_number": "+593 96 788 3320",
+      "customer_name": "~Andy Del Salto!",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:11:02.306+00:00"
+    },
+    {
+      "id": 8,
+      "product_id": 8134,
+      "phone_number": "+593 99 076 6390",
+      "customer_name": "~S.C",
+      "status": "notified",
+      "notified_at": "2026-07-02T18:12:26.219+00:00"
+    },
+    {
+      "id": 12,
+      "product_id": 9788,
+      "phone_number": "+593 99 780 4645",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-02T18:13:24.779+00:00"
+    },
+    {
+      "id": 190,
+      "product_id": 9269,
+      "phone_number": "+593 99 100 5688",
+      "customer_name": "francisco",
+      "status": "notified",
+      "notified_at": "2026-08-16T02:29:49.133+00:00"
+    },
+    {
+      "id": 202,
+      "product_id": 6878,
+      "phone_number": "+593 99 598 9879",
+      "customer_name": "gabriel gp1",
+      "status": "notified",
+      "notified_at": "2026-07-15T15:37:52.387+00:00"
+    },
+    {
+      "id": 571,
+      "product_id": 9375,
+      "phone_number": "+593979724417",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:18:50.29+00:00"
+    },
+    {
+      "id": 159,
+      "product_id": 9242,
+      "phone_number": "+593 96 789 9868",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:19:16.54+00:00"
+    },
+    {
+      "id": 204,
+      "product_id": 8713,
+      "phone_number": "+593963672890",
+      "customer_name": "Eduardo Moran",
+      "status": "notified",
+      "notified_at": "2026-07-25T20:20:12.208+00:00"
+    },
+    {
+      "id": 169,
+      "product_id": 9610,
+      "phone_number": "+593 96 274 8082",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-07T18:21:45.93+00:00"
+    },
+    {
+      "id": 229,
+      "product_id": 7612,
+      "phone_number": "+593980282495",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T20:08:54.739+00:00"
+    },
+    {
+      "id": 232,
+      "product_id": 12035,
+      "phone_number": "+593980282495",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T21:55:08.706+00:00"
+    },
+    {
+      "id": 247,
+      "product_id": 10282,
+      "phone_number": "+593984467070",
+      "customer_name": "Dario",
+      "status": "notified",
+      "notified_at": "2026-07-07T21:41:34.627+00:00"
+    },
+    {
+      "id": 524,
+      "product_id": 9435,
+      "phone_number": "+593962378588",
+      "customer_name": "Yorles Ossa",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:19:56.563+00:00"
+    },
+    {
+      "id": 525,
+      "product_id": 9128,
+      "phone_number": "+593962378588",
+      "customer_name": "Yorles Ossa",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:20:05.126+00:00"
+    },
+    {
+      "id": 223,
+      "product_id": 9976,
+      "phone_number": "+593981900275",
+      "customer_name": "Kataleya",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:20:16.315+00:00"
+    },
+    {
+      "id": 157,
+      "product_id": 11482,
+      "phone_number": "593 99 184 3510",
+      "customer_name": "osma",
+      "status": "notified",
+      "notified_at": "2026-07-08T22:01:13.543+00:00"
+    },
+    {
+      "id": 253,
+      "product_id": 10297,
+      "phone_number": "+593992577300",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-08T22:04:43.717+00:00"
+    },
+    {
+      "id": 227,
+      "product_id": 8966,
+      "phone_number": "+593986413267",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:20:26.505+00:00"
+    },
+    {
+      "id": 242,
+      "product_id": 9811,
+      "phone_number": "+593985422006",
+      "customer_name": "Ozuna",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:20:48.228+00:00"
+    },
+    {
+      "id": 218,
+      "product_id": 6878,
+      "phone_number": "+593995515565",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-15T15:38:37.275+00:00"
+    },
+    {
+      "id": 271,
+      "product_id": 9641,
+      "phone_number": "+593962304240",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-18T20:58:04.186+00:00"
+    },
+    {
+      "id": 212,
+      "product_id": 7172,
+      "phone_number": "+593963895557",
+      "customer_name": "Alejandro",
+      "status": "notified",
+      "notified_at": "2026-07-23T22:58:12.199+00:00"
+    },
+    {
+      "id": 277,
+      "product_id": 9138,
+      "phone_number": "+593963797972",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:21:09.465+00:00"
+    },
+    {
+      "id": 217,
+      "product_id": 7188,
+      "phone_number": "+593968068681",
+      "customer_name": "Toba",
+      "status": "notified",
+      "notified_at": "2026-07-25T17:04:11.282+00:00"
+    },
+    {
+      "id": 342,
+      "product_id": 7827,
+      "phone_number": "+593988697941",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T20:06:31.407+00:00"
+    },
+    {
+      "id": 321,
+      "product_id": 9150,
+      "phone_number": "+593989091726",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:22:05.62+00:00"
+    },
+    {
+      "id": 320,
+      "product_id": 9300,
+      "phone_number": "+593994067277",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:25:52.937+00:00"
+    },
+    {
+      "id": 250,
+      "product_id": 7127,
+      "phone_number": "+593987704088",
+      "customer_name": "José Luis",
+      "status": "notified",
+      "notified_at": "2026-07-17T16:04:04.102+00:00"
+    },
+    {
+      "id": 518,
+      "product_id": 7609,
+      "phone_number": "+593985336022",
+      "customer_name": "...😇Switch Panther Delta...",
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:15.074+00:00"
+    },
+    {
+      "id": 167,
+      "product_id": 7127,
+      "phone_number": "+593 99 096 8783",
+      "customer_name": "Alan",
+      "status": "notified",
+      "notified_at": "2026-07-17T16:04:27.084+00:00"
+    },
+    {
+      "id": 287,
+      "product_id": 6781,
+      "phone_number": "+593984693552",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:27:31.617+00:00"
+    },
+    {
+      "id": 638,
+      "product_id": 9409,
+      "phone_number": "+593959974238",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:21:18.851+00:00"
+    },
+    {
+      "id": 286,
+      "product_id": 9455,
+      "phone_number": "+593987544419",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:21:29.94+00:00"
+    },
+    {
+      "id": 618,
+      "product_id": 6898,
+      "phone_number": "+593998785630",
+      "customer_name": "Bolivar Bayas Wing Evo",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:21:42.877+00:00"
+    },
+    {
+      "id": 297,
+      "product_id": 8199,
+      "phone_number": "+593982899354",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:21:53.849+00:00"
+    },
+    {
+      "id": 312,
+      "product_id": 12425,
+      "phone_number": "+593963818469",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-15T17:44:14.666+00:00"
+    },
+    {
+      "id": 125,
+      "product_id": 7127,
+      "phone_number": "+593 98 742 0176",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-17T16:05:41.357+00:00"
+    },
+    {
+      "id": 61,
+      "product_id": 7127,
+      "phone_number": "+593 95 966 8182",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-17T16:06:50.002+00:00"
+    },
+    {
+      "id": 281,
+      "product_id": 7026,
+      "phone_number": "+593967619649",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-17T18:33:00.364+00:00"
+    },
+    {
+      "id": 304,
+      "product_id": 8713,
+      "phone_number": "+593999535207",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-25T20:27:36.675+00:00"
+    },
+    {
+      "id": 366,
+      "product_id": 7561,
+      "phone_number": "+593983877211",
+      "customer_name": "COLORIN",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:01:56.551+00:00"
+    },
+    {
+      "id": 279,
+      "product_id": 10300,
+      "phone_number": "+593960233428",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-15T15:44:20.642+00:00"
+    },
+    {
+      "id": 293,
+      "product_id": 12425,
+      "phone_number": "+593997337418",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-15T17:43:08.874+00:00"
+    },
+    {
+      "id": 316,
+      "product_id": 11838,
+      "phone_number": "+593961778743",
+      "customer_name": "Luis",
+      "status": "notified",
+      "notified_at": "2026-07-15T17:45:03.041+00:00"
+    },
+    {
+      "id": 317,
+      "product_id": 12291,
+      "phone_number": "+593968049532",
+      "customer_name": "Kevin",
+      "status": "notified",
+      "notified_at": "2026-07-15T17:45:19.456+00:00"
+    },
+    {
+      "id": 383,
+      "product_id": 12637,
+      "phone_number": "+593981617868",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:01.906+00:00"
+    },
+    {
+      "id": 385,
+      "product_id": 9300,
+      "phone_number": "+593992398269",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:04.297+00:00"
+    },
+    {
+      "id": 164,
+      "product_id": 7127,
+      "phone_number": "+593 96 411 1426",
+      "customer_name": "Cristian",
+      "status": "notified",
+      "notified_at": "2026-07-17T16:04:50.195+00:00"
+    },
+    {
+      "id": 399,
+      "product_id": 7722,
+      "phone_number": "+593961502649",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T20:00:01.621+00:00"
+    },
+    {
+      "id": 350,
+      "product_id": 11134,
+      "phone_number": "+593987650828",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-18T20:24:19.6+00:00"
+    },
+    {
+      "id": 574,
+      "product_id": 6987,
+      "phone_number": "+593994764580",
+      "customer_name": "Artic Placas Del Tanque",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:22:35.055+00:00"
+    },
+    {
+      "id": 349,
+      "product_id": 6987,
+      "phone_number": "+593999340422",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:22:48.232+00:00"
+    },
+    {
+      "id": 607,
+      "product_id": 9222,
+      "phone_number": "+593967588645",
+      "customer_name": "Compras ADV R 250 BL",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:22:57.887+00:00"
+    },
+    {
+      "id": 608,
+      "product_id": 8072,
+      "phone_number": "+593967588645",
+      "customer_name": "Compras ADV R 250 BL",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:23:16.081+00:00"
+    },
+    {
+      "id": 663,
+      "product_id": 11254,
+      "phone_number": "+593981316833",
+      "customer_name": "😡",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:23:25.181+00:00"
+    },
+    {
+      "id": 379,
+      "product_id": 7705,
+      "phone_number": "+593997020349",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:23:31.99+00:00"
+    },
+    {
+      "id": 675,
+      "product_id": 7961,
+      "phone_number": "+593990647094",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:23:48.601+00:00"
+    },
+    {
+      "id": 676,
+      "product_id": 10003,
+      "phone_number": "+593990647094",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-27T18:42:20.077+00:00"
+    },
+    {
+      "id": 411,
+      "product_id": 9016,
+      "phone_number": "+593967324676",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:24:11.505+00:00"
+    },
+    {
+      "id": 426,
+      "product_id": 7760,
+      "phone_number": "+593988271599",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:24:50.84+00:00"
+    },
+    {
+      "id": 430,
+      "product_id": 6990,
+      "phone_number": "+593989690877",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:25:04.025+00:00"
+    },
+    {
+      "id": 688,
+      "product_id": 6878,
+      "phone_number": "+593991082490",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:25:35.653+00:00"
+    },
+    {
+      "id": 414,
+      "product_id": 7276,
+      "phone_number": "+593987846651",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:09.674+00:00"
+    },
+    {
+      "id": 431,
+      "product_id": 12637,
+      "phone_number": "+593996623245",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:12.218+00:00"
+    },
+    {
+      "id": 405,
+      "product_id": 6735,
+      "phone_number": "+593983265240",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-23T22:57:41.37+00:00"
+    },
+    {
+      "id": 609,
+      "product_id": 9300,
+      "phone_number": "+593961086223",
+      "customer_name": "JOAE",
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:23.466+00:00"
+    },
+    {
+      "id": 519,
+      "product_id": 7726,
+      "phone_number": "+593979134739",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T16:02:51.057+00:00"
+    },
+    {
+      "id": 432,
+      "product_id": 9278,
+      "phone_number": "+593996623245",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T21:48:31.459+00:00"
+    },
+    {
+      "id": 404,
+      "product_id": 8975,
+      "phone_number": "+593939879635",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:23:59.171+00:00"
+    },
+    {
+      "id": 468,
+      "product_id": 8160,
+      "phone_number": "+593939930059",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:25:48.151+00:00"
+    },
+    {
+      "id": 470,
+      "product_id": 8934,
+      "phone_number": "+593984514390",
+      "customer_name": "Lenin C. Everest",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:26:06.061+00:00"
+    },
+    {
+      "id": 156,
+      "product_id": 9754,
+      "phone_number": "+593 99 035 7734",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T20:20:06.642+00:00"
+    },
+    {
+      "id": 599,
+      "product_id": 11453,
+      "phone_number": "+593994809427",
+      "customer_name": "Elian Isaac 🦴💪🏽⚜️ s1 adv 180",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:26:40.23+00:00"
+    },
+    {
+      "id": 148,
+      "product_id": 6777,
+      "phone_number": "+593 98 898 6669",
+      "customer_name": "Byrcap",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:20:50.426+00:00"
+    },
+    {
+      "id": 478,
+      "product_id": 6960,
+      "phone_number": "+593987867969",
+      "customer_name": "🪖Roch⚔️ barras invertidas Scorpion 250",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:27:11.683+00:00"
+    },
+    {
+      "id": 481,
+      "product_id": 9584,
+      "phone_number": "+593959774152",
+      "customer_name": "Luis Mario Eagle",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:27:41.285+00:00"
+    },
+    {
+      "id": 509,
+      "product_id": 9069,
+      "phone_number": "+593994584730",
+      "customer_name": "🤙one Piece Eagle Boyq",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:28:09.311+00:00"
+    },
+    {
+      "id": 610,
+      "product_id": 12637,
+      "phone_number": "+593963997346",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:25.595+00:00"
+    },
+    {
+      "id": 629,
+      "product_id": 10030,
+      "phone_number": "+593939536037",
+      "customer_name": "Diego Rodríguez",
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:29.714+00:00"
+    },
+    {
+      "id": 484,
+      "product_id": 6885,
+      "phone_number": "+593998755579",
+      "customer_name": "Cristopher Serrano  guardafango s1",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:27:52.073+00:00"
+    },
+    {
+      "id": 466,
+      "product_id": 10250,
+      "phone_number": "+593980368291",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T16:03:08.158+00:00"
+    },
+    {
+      "id": 485,
+      "product_id": 6663,
+      "phone_number": "+593979160556",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T19:57:16.333+00:00"
+    },
+    {
+      "id": 479,
+      "product_id": 12926,
+      "phone_number": "+593959774152",
+      "customer_name": "Luis Mario Eagle",
+      "status": "notified",
+      "notified_at": "2026-07-28T19:57:50.509+00:00"
+    },
+    {
+      "id": 476,
+      "product_id": 6777,
+      "phone_number": "+593988986669",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T19:59:03.036+00:00"
+    },
+    {
+      "id": 482,
+      "product_id": 7234,
+      "phone_number": "+593969147638",
+      "customer_name": "Gabriel 🤓",
+      "status": "notified",
+      "notified_at": "2026-08-22T21:08:16.192+00:00"
+    },
+    {
+      "id": 480,
+      "product_id": 12265,
+      "phone_number": "+593990652133",
+      "customer_name": "Elinson B. (Fer). Wolf 300",
+      "status": "notified",
+      "notified_at": "2026-08-22T21:08:53.808+00:00"
+    },
+    {
+      "id": 503,
+      "product_id": 8160,
+      "phone_number": "+593963226465",
+      "customer_name": "Ricky",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:28:01.089+00:00"
+    },
+    {
+      "id": 513,
+      "product_id": 9042,
+      "phone_number": "+593994201972",
+      "customer_name": "Andy S1",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:28:19.732+00:00"
+    },
+    {
+      "id": 677,
+      "product_id": 12328,
+      "phone_number": "+593990647094",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:28:50.114+00:00"
+    },
+    {
+      "id": 137,
+      "product_id": 9444,
+      "phone_number": "+593998446661",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-07-28T20:38:14.198+00:00"
+    },
+    {
+      "id": 118,
+      "product_id": 6766,
+      "phone_number": "+593 96 376 3974",
+      "customer_name": "edisson bermeo",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:38:43.454+00:00"
+    },
+    {
+      "id": 112,
+      "product_id": 7168,
+      "phone_number": "+593 99 710 4473",
+      "customer_name": "~Walter Ospina",
+      "status": "notified",
+      "notified_at": "2026-07-28T20:39:43.086+00:00"
+    },
+    {
+      "id": 554,
+      "product_id": 8144,
+      "phone_number": "+593983525406",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:29:11.743+00:00"
+    },
+    {
+      "id": 400,
+      "product_id": 7977,
+      "phone_number": "+593979350731",
+      "customer_name": "JOSÉ",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:29:10.501+00:00"
+    },
+    {
+      "id": 549,
+      "product_id": 8092,
+      "phone_number": "+593959874143",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:29:33.122+00:00"
+    },
+    {
+      "id": 390,
+      "product_id": 8864,
+      "phone_number": "+593959270022",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:06.577+00:00"
+    },
+    {
+      "id": 553,
+      "product_id": 7609,
+      "phone_number": "+593983525406",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-16T02:26:18.562+00:00"
+    },
+    {
+      "id": 542,
+      "product_id": 8229,
+      "phone_number": "+593980254504",
+      "customer_name": ".. Placa Lat post gtr roadster",
+      "status": "notified",
+      "notified_at": "2026-08-22T15:58:53.1+00:00"
+    },
+    {
+      "id": 540,
+      "product_id": 9743,
+      "phone_number": "+593985483813",
+      "customer_name": "Joel😎🏍️ xpower",
+      "status": "notified",
+      "notified_at": "2026-08-22T15:59:03.81+00:00"
+    },
+    {
+      "id": 678,
+      "product_id": 8439,
+      "phone_number": "+593961032032",
+      "customer_name": "Natanael Flores",
+      "status": "notified",
+      "notified_at": "2026-08-22T19:08:45.994+00:00"
+    },
+    {
+      "id": 631,
+      "product_id": 7209,
+      "phone_number": "+593963217118",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:29:21.936+00:00"
+    },
+    {
+      "id": 516,
+      "product_id": 7488,
+      "phone_number": "+593983779079",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T15:59:35.028+00:00"
+    },
+    {
+      "id": 679,
+      "product_id": 12056,
+      "phone_number": "+593979560077",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:29:33.455+00:00"
+    },
+    {
+      "id": 706,
+      "product_id": 10003,
+      "phone_number": "+593997667402",
+      "customer_name": "Fernando Torres",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:05:29.178+00:00"
+    },
+    {
+      "id": 241,
+      "product_id": 9572,
+      "phone_number": "+593979197312",
+      "customer_name": "Betancourt",
+      "status": "notified",
+      "notified_at": "2026-08-23T18:20:37.643+00:00"
+    },
+    {
+      "id": 684,
+      "product_id": 8917,
+      "phone_number": "+593978729280",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:19:05.002+00:00"
+    },
+    {
+      "id": 325,
+      "product_id": 9301,
+      "phone_number": "+593963617945",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-23T18:22:23.867+00:00"
+    },
+    {
+      "id": 111,
+      "product_id": 7574,
+      "phone_number": "+593 93 901 0945",
+      "customer_name": "Erick Cárdenas",
+      "status": "notified",
+      "notified_at": "2026-08-22T15:12:04.688+00:00"
+    },
+    {
+      "id": 328,
+      "product_id": 7355,
+      "phone_number": "+593961848850",
+      "customer_name": null,
+      "status": "notified",
+      "notified_at": "2026-08-22T16:02:38.842+00:00"
+    }
+  ]
+}
