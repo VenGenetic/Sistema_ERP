@@ -20,7 +20,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import VoiceRecorder from '../../components/whatsapp/VoiceRecorder';
 import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
 import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
-import ChatThread, { PildoraChat, textoDe, type MensajeHilo } from '../../components/whatsapp/ChatThread';
+import ChatThread, { horaLista, PildoraChat, textoDe, type MensajeHilo } from '../../components/whatsapp/ChatThread';
 import { cn } from '../../components/ui/styles';
 import CatalogSendModal from '../../components/whatsapp/CatalogSendModal';
 import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
@@ -102,15 +102,6 @@ function formatearTelefono(c: Pick<Conversacion, 'phone_number' | 'lid'>): strin
     return `+${d}`;
 }
 
-function hace(iso: string): string {
-    const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-    if (min < 1) return 'ahora';
-    if (min < 60) return `${min}m`;
-    const h = Math.round(min / 60);
-    if (h < 24) return `${h}h`;
-    return `${Math.round(h / 24)}d`;
-}
-
 /**
  * Inicial del cliente sobre un color estable, como en la bandeja: el color
  * sale del propio teléfono, así que el mismo cliente tiene siempre la misma
@@ -176,6 +167,8 @@ const MobileWhatsApp: React.FC = () => {
 
     const hiloRef = useRef<HTMLDivElement | null>(null);
     const fileRef = useRef<HTMLInputElement | null>(null);
+    const composerRef = useRef<HTMLDivElement | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
     /* ------------------------------------------------------------------ */
     /*  Lista                                                              */
@@ -224,6 +217,34 @@ const MobileWhatsApp: React.FC = () => {
             .order('sort_order', { ascending: true })
             .then(({ data }) => setRapidas(data ?? []));
     }, []);
+
+    // Cerrar los menús al tocar fuera o con Escape. Sin esto quedaban
+    // abiertos tapando el hilo hasta volver a tocar el "+".
+    useEffect(() => {
+        if (!menuHerramientas && !menuRapidas) return;
+        const cerrar = () => {
+            setMenuHerramientas(false);
+            setMenuRapidas(false);
+        };
+        const fuera = (e: Event) => {
+            if (!composerRef.current?.contains(e.target as Node)) cerrar();
+        };
+        const escape = (e: KeyboardEvent) => e.key === 'Escape' && cerrar();
+        document.addEventListener('pointerdown', fuera);
+        document.addEventListener('keydown', escape);
+        return () => {
+            document.removeEventListener('pointerdown', fuera);
+            document.removeEventListener('keydown', escape);
+        };
+    }, [menuHerramientas, menuRapidas]);
+
+    // La caja crece con lo que se escribe y frena a los 128px.
+    useEffect(() => {
+        const t = textareaRef.current;
+        if (!t) return;
+        t.style.height = 'auto';
+        t.style.height = `${Math.min(t.scrollHeight, 128)}px`;
+    }, [borrador]);
 
     // La búsqueda va contra la base: se espera a que termine de tipear.
     useEffect(() => {
@@ -340,7 +361,17 @@ const MobileWhatsApp: React.FC = () => {
     /* ------------------------------------------------------------------ */
 
     const enviar = async (mensajes: NuevoMensaje[]) => {
-        await encolarMensajes(mensajes, userId);
+        // Si hay un mensaje citado, la cita viaja con el primero: es el que
+        // WhatsApp muestra con la tarjetita arriba. Antes acá se dibujaba la
+        // tarjeta de "respondiendo a" pero la cita NO se mandaba, así que el
+        // cliente recibía una respuesta suelta sin saber a cuál de sus cinco
+        // mensajes contestaba.
+        const conCita = citando?.whatsapp_message_id
+            ? mensajes.map((m, i) => (i === 0 ? { ...m, replyToWaId: citando.whatsapp_message_id } : m))
+            : mensajes;
+
+        await encolarMensajes(conCita, userId);
+        setCitando(null);
         // El mensaje aparece en el hilo cuando el agente lo despacha (llega
         // por realtime). No se pinta antes: mostrarlo como enviado sin que
         // haya salido es justo lo que el acuse de recibo vino a evitar.
@@ -485,7 +516,7 @@ const MobileWhatsApp: React.FC = () => {
                     <button
                         onClick={() => setAbierta(null)}
                         aria-label="Volver a los chats"
-                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10'}
+                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10'}
                     >
                         <ArrowLeft size={22} aria-hidden="true" />
                     </button>
@@ -506,7 +537,7 @@ const MobileWhatsApp: React.FC = () => {
                     <button
                         onClick={() => marcarComoNoLeido(abierta)}
                         aria-label="Marcar el chat como no leído"
-                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10'}
+                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10'}
                     >
                         <MailQuestion size={20} aria-hidden="true" />
                     </button>
@@ -514,7 +545,7 @@ const MobileWhatsApp: React.FC = () => {
                     <button
                         onClick={() => cargarMensajes(abierta.id)}
                         aria-label="Actualizar el chat"
-                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10'}
+                        className={'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10'}
                     >
                         {cargandoChat ? (
                             <Loader2 size={19} className="animate-spin" aria-hidden="true" />
@@ -555,6 +586,7 @@ const MobileWhatsApp: React.FC = () => {
                     solo reserva los 84: sin este hueco extra el botón flotante
                     queda justo encima de la caja de escribir. */}
                 <div
+                    ref={composerRef}
                     className="relative shrink-0 bg-wa-header px-1.5 py-1.5"
                     style={{ paddingBottom: 'calc(var(--mobile-nav-peak) - var(--mobile-nav-h) + 12px)' }}
                 >
@@ -611,7 +643,7 @@ const MobileWhatsApp: React.FC = () => {
                         </div>
                     )}
 
-                    {error && <p className="mb-1.5 px-2 text-xs text-danger">{error}</p>}
+                    {error && <p className="mb-1.5 px-2 text-xs text-wa-danger">{error}</p>}
 
                     <input
                         ref={fileRef}
@@ -638,7 +670,7 @@ const MobileWhatsApp: React.FC = () => {
                             aria-label="Adjuntar y herramientas"
                             aria-expanded={menuHerramientas}
                             className={cn(
-                                'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta transition-transform active:bg-white/10',
+                                'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta transition-transform active:bg-wa-inset/10',
                                 menuHerramientas && 'rotate-45',
                             )}
                         >
@@ -646,6 +678,7 @@ const MobileWhatsApp: React.FC = () => {
                         </button>
 
                         <textarea
+                            ref={textareaRef}
                             value={borrador}
                             onChange={(e) => setBorrador(e.target.value)}
                             rows={1}
@@ -680,7 +713,7 @@ const MobileWhatsApp: React.FC = () => {
                                 disabled={enviando}
                                 soloIcono
                                 onOcupado={setGrabadorOcupado}
-                                claseBoton="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-white/10 disabled:opacity-40"
+                                claseBoton="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10 disabled:opacity-40"
                             />
                         </div>
                     </div>
@@ -768,7 +801,7 @@ const MobileWhatsApp: React.FC = () => {
                 </div>
             </div>
 
-            {error && <p className="px-4 py-2 text-xs text-danger">{error}</p>}
+            {error && <p className="px-4 py-2 text-xs text-wa-danger">{error}</p>}
 
             {/* Hueco para que el último chat no quede bajo el botón central. */}
             <div
@@ -810,7 +843,7 @@ const MobileWhatsApp: React.FC = () => {
                                         c.unread_count > 0 ? 'font-semibold text-wa-accent' : 'text-wa-meta',
                                     )}
                                 >
-                                    {c.last_message_at ? hace(c.last_message_at) : ''}
+                                    {c.last_message_at ? horaLista(c.last_message_at) : ''}
                                 </span>
                             </div>
 

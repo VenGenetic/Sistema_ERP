@@ -192,7 +192,7 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton,
                 >
                     <Trash2 size={14} aria-hidden="true" />
                 </button>
-                {error && <p className="text-2xs text-danger w-full">{error}</p>}
+                {error && <p className="w-full text-2xs text-wa-danger">{error}</p>}
             </div>
         );
     }
@@ -218,11 +218,11 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton,
             {/* El cronómetro tiene que verse igual sin la etiqueta: una nota de
                 voz de tres minutos se corta sola y hay que saber cuánto va. */}
             {soloIcono && grabando && (
-                <span className="tnum shrink-0 text-[13px] font-semibold text-danger" aria-live="polite">
+                <span className="tnum shrink-0 text-[13px] font-semibold text-wa-danger" aria-live="polite">
                     {tiempo(segundos)}
                 </span>
             )}
-            {error && <p className="text-2xs text-danger w-full">{error}</p>}
+            {error && <p className="w-full text-2xs text-wa-danger">{error}</p>}
         </>
     );
 };

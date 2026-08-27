@@ -206,6 +206,11 @@
       --wa-accent-fg: 255 255 255;
       --wa-tick: 83 189 235;
       /* #53bdeb el doble check azul de "visto"  */
+      --wa-danger: 197 48 48;
+      /* rojo del chat: el --danger del ERP se invierte con el tema y sobre
+         una burbuja de WhatsApp quedaba en 2.5:1                          */
+      --wa-inset: 17 27 33;
+      /* tinte de los recuadros DENTRO de la burbuja; se usa con opacidad   */
     }
 
     .dark {
@@ -291,6 +296,8 @@
       --wa-accent-strong: 0 168 132;
       --wa-accent-fg: 17 27 33;
       --wa-tick: 83 189 235;
+      --wa-danger: 255 138 128;
+      --wa-inset: 255 255 255;
     }
 
     /* =========================================================================
@@ -366,7 +373,9 @@
       background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'260'%20height%3D'270'%20viewBox%3D'0%200%20260%20270'%3E%3Cg%20fill%3D'none'%20stroke%3D'%23111b21'%20stroke-width%3D'1.5'%20stroke-linecap%3D'round'%20stroke-linejoin%3D'round'%20opacity%3D'.055'%3E%3Cg%20transform%3D'translate(34%2C32)'%3E%3Ccircle%20r%3D'11'%2F%3E%3Ccircle%20r%3D'4'%2F%3E%3Cpath%20d%3D'M0-15v3M0%2012v3M-15%200h3M12%200h3M-10.6-10.6l2.1%202.1M8.5%208.5l2.1%202.1M10.6-10.6l-2.1%202.1M-8.5%208.5l-2.1%202.1'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(112%2C28)%20rotate(-30)'%3E%3Cpath%20d%3D'M-16-4.5a5%205%200%200%200%200%209h6v-9z'%2F%3E%3Cpath%20d%3D'M-10-2.5h24a2.5%202.5%200%200%201%200%205h-24z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(186%2C34)'%3E%3Crect%20x%3D'-3'%20y%3D'-15'%20width%3D'6'%20height%3D'9'%20rx%3D'2'%2F%3E%3Cpath%20d%3D'M-5-6h10l-1.5%206h-7z'%2F%3E%3Crect%20x%3D'-3.5'%20y%3D'0'%20width%3D'7'%20height%3D'7'%20rx%3D'1'%2F%3E%3Cpath%20d%3D'M0%207v6'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(56%2C96)'%3E%3Ccircle%20cx%3D'-9'%20r%3D'4.5'%2F%3E%3Ccircle%20cx%3D'9'%20r%3D'4.5'%2F%3E%3Cpath%20d%3D'M-9-4.5h18M-9%204.5h18'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(140%2C92)'%3E%3Cpath%20d%3D'M0-12l10.4%206v12L0%2012l-10.4-6v-12z'%2F%3E%3Ccircle%20r%3D'5'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(212%2C100)'%3E%3Ccircle%20r%3D'13'%2F%3E%3Ccircle%20r%3D'4.5'%2F%3E%3Ccircle%20cy%3D'-8.5'%20r%3D'1.3'%2F%3E%3Ccircle%20cx%3D'7.4'%20cy%3D'4.2'%20r%3D'1.3'%2F%3E%3Ccircle%20cx%3D'-7.4'%20cy%3D'4.2'%20r%3D'1.3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(30%2C166)'%3E%3Crect%20x%3D'-7'%20y%3D'-14'%20width%3D'14'%20height%3D'11'%20rx%3D'2'%2F%3E%3Cpath%20d%3D'M-7-10.5h14M-7-7h14'%2F%3E%3Cpath%20d%3D'M0-3v6l-5%207h10z'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(100%2C170)'%3E%3Cpath%20d%3D'M-12%206a12%2012%200%201%201%2024%200'%2F%3E%3Cpath%20d%3D'M0%206l7.5-7.5'%2F%3E%3Ccircle%20r%3D'2'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(176%2C174)'%3E%3Ccircle%20r%3D'13'%2F%3E%3Ccircle%20r%3D'6'%2F%3E%3Cpath%20d%3D'M0-13v-3M0%2013v3M-13%200h-3M13%200h3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(60%2C232)'%3E%3Cellipse%20cy%3D'-6'%20rx%3D'7.5'%20ry%3D'5.5'%2F%3E%3Cpath%20d%3D'M0-0.5v6l-5%205'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(134%2C236)'%3E%3Crect%20x%3D'-7'%20y%3D'-11'%20width%3D'14'%20height%3D'21'%20rx%3D'3'%2F%3E%3Cpath%20d%3D'M-7-5h14'%2F%3E%3Ccircle%20cy%3D'2.5'%20r%3D'3'%2F%3E%3C%2Fg%3E%3Cg%20transform%3D'translate(206%2C238)'%3E%3Cpath%20d%3D'M-15%200h30M-15%200v6M15%200v6'%2F%3E%3Cpath%20d%3D'M-6%200c0-4%2012-4%2012%200'%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E");
       background-repeat: repeat;
       background-size: 260px 270px;
-      background-attachment: local;
+      /* Por defecto (scroll): el dibujo queda quieto y los mensajes pasan por
+         encima, como en WhatsApp. Con `local` el tapiz se arrastraba con el
+         hilo y al desplazar rápido mareaba. */
     }
 
     /* El chat del MODO MÓVIL va siempre en la paleta oscura de WhatsApp,
@@ -394,6 +403,8 @@
       --wa-accent-strong: 0 168 132;
       --wa-accent-fg: 17 27 33;
       --wa-tick: 83 189 235;
+      --wa-danger: 255 138 128;
+      --wa-inset: 255 255 255;
     }
 
     .dark .wa-wallpaper,
@@ -526,6 +537,8 @@
               'accent-strong': 'rgb(var(--wa-accent-strong) / <alpha-value>)',
               'accent-fg': 'rgb(var(--wa-accent-fg) / <alpha-value>)',
               tick: 'rgb(var(--wa-tick) / <alpha-value>)',
+              danger: 'rgb(var(--wa-danger) / <alpha-value>)',
+              inset: 'rgb(var(--wa-inset) / <alpha-value>)',
             },
 
             /* ---- legacy aliases, re-pointed at the same variables ----

@@ -352,6 +352,16 @@ export const ChatComposer: React.FC<Props> = ({
     /* ---------------------------------------------------------------- */
 
 
+    /* La caja crece con lo que se escribe y frena a los 160px, como en
+       WhatsApp. Sin esto, con `rows={1}`, un mensaje de tres renglones se
+       escribía dentro de una ranura de 44px que había que ir desplazando. */
+    useEffect(() => {
+        const t = textareaRef.current;
+        if (!t) return;
+        t.style.height = 'auto';
+        t.style.height = `${Math.min(t.scrollHeight, 160)}px`;
+    }, [borrador]);
+
     /* Con texto escrito el botón de la derecha manda; sin nada escrito es
        el micrófono, igual que en WhatsApp. */
     const hayQueMandar = borrador.trim().length > 0 || adjuntos.length > 0;
@@ -394,7 +404,7 @@ export const ChatComposer: React.FC<Props> = ({
                             <button
                                 onClick={() => borrarRapida(r)}
                                 aria-label={`Quitar la respuesta rápida ${r.label}`}
-                                className="p-2 text-wa-meta hover:text-danger"
+                                className="p-2 text-wa-meta hover:text-wa-danger"
                             >
                                 <X size={13} aria-hidden="true" />
                             </button>
@@ -509,7 +519,7 @@ export const ChatComposer: React.FC<Props> = ({
             )}
 
             {adjuntos.some((a) => a.error) && (
-                <p className="mb-1.5 px-1 text-[11px] text-danger">
+                <p className="mb-1.5 px-1 text-[11px] text-wa-danger">
                     {adjuntos.find((a) => a.error)?.error} — quitá el archivo y probá de nuevo.
                 </p>
             )}
@@ -540,7 +550,7 @@ export const ChatComposer: React.FC<Props> = ({
                     title="Foto, catálogo, proforma, pedido y respuestas rápidas"
                     className={cn(
                         'flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-transform',
-                        'text-wa-meta hover:bg-black/5 dark:hover:bg-white/10',
+                        'text-wa-meta hover:bg-wa-inset/10',
                         menuHerramientas && 'rotate-45',
                     )}
                 >
@@ -553,7 +563,7 @@ export const ChatComposer: React.FC<Props> = ({
                     onClick={() => fileRef.current?.click()}
                     aria-label="Adjuntar foto o archivo"
                     title={`Adjuntar foto o archivo (hasta ${MAX_ADJUNTO_MB} MB). También podés pegar con Ctrl+V o arrastrar.`}
-                    className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10 sm:flex"
+                    className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10 sm:flex"
                 >
                     <Paperclip size={22} aria-hidden="true" />
                 </button>
@@ -617,12 +627,12 @@ export const ChatComposer: React.FC<Props> = ({
                         disabled={enviando}
                         soloIcono
                         onOcupado={setGrabadorOcupado}
-                        claseBoton="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40"
+                        claseBoton="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10 disabled:opacity-40"
                     />
                 </div>
             </div>
 
-            {error && <p className="mt-1.5 px-1 text-xs text-danger">{error}</p>}
+            {error && <p className="mt-1.5 px-1 text-xs text-wa-danger">{error}</p>}
             <CatalogSendModal
                 isOpen={catalogoAbierto}
                 onClose={() => setCatalogoAbierto(false)}

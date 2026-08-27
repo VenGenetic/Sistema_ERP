@@ -97,7 +97,7 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] text-wa-text hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+                className="flex items-center gap-2 rounded-lg bg-wa-inset/[0.07] px-2.5 py-2 text-[13px] text-wa-text hover:bg-wa-inset/[0.12]"
             >
                 <Mic size={16} className="text-wa-meta" aria-hidden="true" />
                 Descargar la nota de voz
@@ -144,7 +144,7 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
                     // `py-2` con `bg-clip-content`: la barra se ve fina pero la
                     // zona que agarra el dedo mide 20px. Una barra de 4px es
                     // imposible de arrastrar en un teléfono.
-                    className="w-full h-[3px] py-2 box-content bg-clip-content rounded-full cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-wa-accent"
+                    className="w-full h-[3px] py-2 box-content bg-clip-content rounded-full cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-wa-accent [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-wa-accent"
                     style={{
                         background: `linear-gradient(to right, rgb(var(--wa-accent)) ${progreso}%, rgb(var(--wa-meta) / .4) ${progreso}%)`,
                     }}
@@ -162,7 +162,7 @@ const Foto: React.FC<{ url: string; alt: string; onAbrir?: () => void }> = ({ ur
     const [falló, setFalló] = useState(false);
     if (falló) {
         return (
-            <div className="flex items-center gap-2 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] text-wa-meta dark:bg-white/5">
+            <div className="flex items-center gap-2 rounded-lg bg-wa-inset/[0.07] px-2.5 py-2 text-[13px] text-wa-meta">
                 <ImageOff size={14} aria-hidden="true" />
                 No se pudo cargar la foto
             </div>
@@ -200,7 +200,7 @@ const Documento: React.FC<{ url: string; filename: string | null }> = ({ url, fi
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="flex max-w-[260px] items-center gap-2.5 rounded-lg bg-black/5 px-2.5 py-2.5 text-[13px] text-wa-text hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10"
+        className="flex max-w-[260px] items-center gap-2.5 rounded-lg bg-wa-inset/[0.07] px-2.5 py-2.5 text-[13px] text-wa-text hover:bg-wa-inset/[0.12]"
     >
         <FileText size={22} className="shrink-0 text-wa-meta" aria-hidden="true" />
         <span className="flex-1 truncate underline underline-offset-2">{filename?.trim() || 'Abrir el archivo'}</span>

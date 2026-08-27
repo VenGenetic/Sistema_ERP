@@ -10,7 +10,7 @@ import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
-import ChatThread, { PildoraChat, textoDe, type MensajeHilo } from '../components/whatsapp/ChatThread';
+import ChatThread, { horaLista, PildoraChat, textoDe, type MensajeHilo } from '../components/whatsapp/ChatThread';
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     borrarMensaje,
@@ -119,27 +119,6 @@ const REASON_TONE: Record<EscalationReason, keyof typeof badge.tone> = {
     angry_or_urgent: 'danger',
     other: 'neutral',
 };
-
-/**
- * La hora que WhatsApp pone al costado de cada chat en la lista: la hora
- * si es de hoy, "ayer", el día de la semana dentro de la semana, y la
- * fecha corta más atrás. Es más útil que "hace 14 h" para decidir a quién
- * contestar: dice CUÁNDO escribió, no cuánto pasó.
- */
-export function horaLista(iso: string): string {
-    const f = new Date(iso);
-    const hoy = new Date();
-    const ayer = new Date();
-    ayer.setDate(hoy.getDate() - 1);
-    const mismoDia = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-
-    if (mismoDia(f, hoy)) return f.toLocaleTimeString('es-EC', { hour: 'numeric', minute: '2-digit' });
-    if (mismoDia(f, ayer)) return 'ayer';
-    if (Date.now() - f.getTime() < 7 * 24 * 60 * 60 * 1000) {
-        return f.toLocaleDateString('es-EC', { weekday: 'long' });
-    }
-    return f.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: '2-digit' });
-}
 
 function timeAgo(iso: string): string {
     const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -1473,7 +1452,7 @@ const WhatsAppInbox: React.FC = () => {
                                         setSelectedConversationId(null);
                                     }}
                                     aria-label="Volver a la lista de chats"
-                                    className="flex h-9 w-9 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10 lg:hidden"
+                                    className="flex h-9 w-9 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10 lg:hidden"
                                 >
                                     <ArrowLeft size={20} aria-hidden="true" />
                                 </button>
@@ -1523,7 +1502,7 @@ const WhatsAppInbox: React.FC = () => {
                                             : 'Activar el agente en este chat'
                                     }
                                     className={cn(
-                                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10',
+                                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-wa-inset/10',
                                         selected.botEnabled ? 'text-wa-accent' : 'text-wa-meta',
                                     )}
                                 >
@@ -1535,7 +1514,7 @@ const WhatsAppInbox: React.FC = () => {
                                     disabled={actionLoading}
                                     aria-label="Marcar el chat como no leído"
                                     title="Lo deja como pendiente en la lista (no cambia nada en el teléfono del cliente)"
-                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10"
                                 >
                                     <MailQuestion size={19} aria-hidden="true" />
                                 </button>
@@ -1545,7 +1524,7 @@ const WhatsAppInbox: React.FC = () => {
                                     disabled={messagesLoading}
                                     aria-label="Actualizar el chat"
                                     title="Vuelve a leer la conversación y el estado de entrega de cada mensaje"
-                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-black/5 dark:hover:bg-white/10"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10"
                                 >
                                     <RefreshCw size={18} className={cn(messagesLoading && 'animate-spin')} aria-hidden="true" />
                                 </button>

@@ -30,10 +30,11 @@ interface Props {
     /** De qué lado abrir el menú, para que no se salga de la burbuja. */
     alineacion?: 'izquierda' | 'derecha';
     /**
-     * Hacia dónde se despliega. El disparador del hilo vive en la ESQUINA
-     * DE ARRIBA de la burbuja (como en WhatsApp), así que ahí el menú tiene
-     * que caer hacia abajo: hacia arriba se le salía del hilo al primer
-     * mensaje de la conversación.
+     * Hacia dónde se despliega POR PREFERENCIA. Si de ese lado no entra y
+     * del otro sí, se abre igual del lado que entra: el disparador del hilo
+     * vive en la esquina de arriba de la burbuja, y con una dirección fija
+     * el menú del último mensaje -- el que más se usa -- quedaba cortado
+     * contra la caja de escribir.
      */
     abrirHacia?: 'arriba' | 'abajo';
 }
@@ -47,7 +48,33 @@ export const MessageActions: React.FC<Props> = ({
     abrirHacia = 'arriba',
 }) => {
     const [abierto, setAbierto] = useState(false);
+    const [haciaAbajo, setHaciaAbajo] = useState(abrirHacia === 'abajo');
     const contenedorRef = useRef<HTMLDivElement>(null);
+
+    /**
+     * Al abrirlo, mira cuánto sitio queda de cada lado DENTRO del hilo (el
+     * contenedor con scroll, no la ventana: el hilo termina bastante antes,
+     * donde empieza la caja de escribir) y se abre del lado que entra.
+     */
+    useEffect(() => {
+        if (!abierto) return;
+        const disparador = contenedorRef.current;
+        if (!disparador) return;
+
+        const ALTO_MENU = 200;
+        const limite = disparador.closest('.wa-scroll')?.getBoundingClientRect();
+        const arribaDe = limite?.top ?? 0;
+        const abajoDe = limite?.bottom ?? window.innerHeight;
+        const r = disparador.getBoundingClientRect();
+
+        const cabeAbajo = abajoDe - r.bottom >= ALTO_MENU;
+        const cabeArriba = r.top - arribaDe >= ALTO_MENU;
+
+        let abajo = abrirHacia === 'abajo';
+        if (abajo && !cabeAbajo && cabeArriba) abajo = false;
+        if (!abajo && !cabeArriba && cabeAbajo) abajo = true;
+        setHaciaAbajo(abajo);
+    }, [abierto, abrirHacia]);
 
     useEffect(() => {
         if (!abierto) return;
@@ -74,7 +101,7 @@ export const MessageActions: React.FC<Props> = ({
                 onClick={() => setAbierto((v) => !v)}
                 aria-label="Acciones del mensaje"
                 aria-expanded={abierto}
-                className={claseBoton ?? 'p-1 rounded text-fg-subtle hover:text-fg hover:bg-surface-hover'}
+                className={claseBoton ?? 'rounded p-1 text-wa-meta hover:bg-wa-inset/10 hover:text-wa-text'}
             >
                 {/* El galoncito hacia abajo: el mismo gesto que WhatsApp Web
                     para abrir las acciones de un mensaje. */}
@@ -84,21 +111,22 @@ export const MessageActions: React.FC<Props> = ({
             {abierto && (
                 <div
                     className={cn(
-                        'absolute z-30 w-44 rounded-xl border border-strong bg-surface shadow-lg overflow-hidden',
-                        abrirHacia === 'abajo' ? 'top-full mt-1' : 'bottom-full mb-1',
+                        // w-56: los seis emoji miden 192px y en w-44 el ultimo quedaba cortado.
+                        'absolute z-30 w-56 overflow-hidden rounded-xl border border-wa-divider bg-wa-panel shadow-lg',
+                        haciaAbajo ? 'top-full mt-1' : 'bottom-full mb-1',
                         alineacion === 'derecha' ? 'right-0' : 'left-0',
                     )}
                     role="menu"
                 >
                     {/* Los emoji van arriba y en fila: es la acción más
                         frecuente y la que menos merece un menú. */}
-                    <div className="flex items-center justify-between px-2 py-1.5 border-b border-subtle">
+                    <div className="flex items-center justify-between border-b border-wa-divider px-2 py-1.5">
                         {EMOJIS.map((e) => (
                             <button
                                 key={e}
                                 onClick={cerrarY(() => onReaccionar(e))}
                                 aria-label={`Reaccionar con ${e}`}
-                                className="min-w-[32px] h-8 rounded-lg text-base hover:bg-surface-hover active:bg-surface-3"
+                                className="h-8 min-w-[32px] rounded-lg text-base hover:bg-wa-hover active:bg-wa-hover"
                             >
                                 {e}
                             </button>
@@ -108,7 +136,7 @@ export const MessageActions: React.FC<Props> = ({
                     <button
                         onClick={cerrarY(onResponder)}
                         role="menuitem"
-                        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-fg hover:bg-surface-hover active:bg-surface-3"
+                        className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
                     >
                         <Reply size={14} aria-hidden="true" /> Responder citando
                     </button>
@@ -117,7 +145,7 @@ export const MessageActions: React.FC<Props> = ({
                         <button
                             onClick={cerrarY(onBorrar)}
                             role="menuitem"
-                            className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-danger hover:bg-danger-soft active:bg-danger-soft"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-danger hover:bg-wa-hover"
                         >
                             <Trash2 size={14} aria-hidden="true" /> Borrar para todos
                         </button>
@@ -139,7 +167,7 @@ export const CitaEnComposer: React.FC<{
     /** Sin uso: se conserva para no romper llamadas viejas. */
     oscuro?: boolean;
 }> = ({ texto, onQuitar }) => (
-    <div className="flex items-stretch gap-2 overflow-hidden rounded-lg bg-black/5 dark:bg-white/5">
+    <div className="flex items-stretch gap-2 overflow-hidden rounded-lg bg-wa-inset/[0.07]">
         {/* La barra verde de la izquierda es la señal de WhatsApp para
             "esto es una cita". Sin ella la tarjeta se lee como un aviso. */}
         <span className="w-1 shrink-0 rounded-l bg-wa-accent" aria-hidden="true" />

@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo, useRef } from 'react';
 import { AlertCircle, Check, CheckCheck, Clock3 } from 'lucide-react';
 import { cn } from '../ui/styles';
 import MessageMedia from './MessageMedia';
@@ -85,7 +85,7 @@ export const Checks: React.FC<{ estado: DeliveryStatus; size?: number }> = ({ es
             className={cn(
                 'inline-flex shrink-0',
                 estado === 'read' && 'text-wa-tick',
-                estado === 'failed' && 'text-danger',
+                estado === 'failed' && 'text-wa-danger',
             )}
         >
             {icono}
@@ -129,9 +129,12 @@ const SIN_TEXTO: Partial<Record<ContentType, string>> = {
 const CON_ARCHIVO = new Set<ContentType>(['image', 'audio', 'video', 'document', 'sticker']);
 
 /**
- * Medios que ocupan la burbuja entera: si no traen pie de foto, la hora se
- * dibuja ENCIMA de la imagen sobre un degradado, como en WhatsApp, en vez
- * de agregar una línea de texto vacía debajo.
+ * Medios que ocupan la burbuja entera. Sin pie de foto no se escribe
+ * "(foto)" debajo: la hora se apoya sobre el medio, como en WhatsApp.
+ *
+ * El video está incluido pero recibe la hora DEBAJO, no encima: el
+ * reproductor es el nativo y el degradado le tapaba la barra de controles
+ * justo donde está el botón de reproducir.
  */
 const MEDIA_VISUAL = new Set<ContentType>(['image', 'video', 'sticker']);
 
@@ -160,6 +163,30 @@ function etiquetaDeDia(iso: string): string {
 const hora = (iso: string) =>
     new Date(iso).toLocaleTimeString('es-EC', { hour: 'numeric', minute: '2-digit' });
 
+/**
+ * La hora que WhatsApp pone al costado de cada chat en la lista: la hora si
+ * es de hoy, "ayer", el día de la semana dentro de la semana, y la fecha
+ * corta más atrás.
+ *
+ * Es más útil que "hace 14 h" para decidir a quién contestar: dice CUÁNDO
+ * escribió, no cuánto pasó. Vive acá y no en cada pantalla para que la
+ * bandeja y el modo móvil no muestren dos formatos distintos del mismo dato.
+ */
+export function horaLista(iso: string): string {
+    const f = new Date(iso);
+    const hoy = new Date();
+    const ayer = new Date();
+    ayer.setDate(hoy.getDate() - 1);
+    const mismoDia = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+    if (mismoDia(f, hoy)) return f.toLocaleTimeString('es-EC', { hour: 'numeric', minute: '2-digit' });
+    if (mismoDia(f, ayer)) return 'ayer';
+    if (Date.now() - f.getTime() < 7 * 24 * 60 * 60 * 1000) {
+        return f.toLocaleDateString('es-EC', { weekday: 'long' });
+    }
+    return f.toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
 interface BurbujaProps {
     m: MensajeHilo;
     /**
@@ -180,10 +207,16 @@ const Burbuja = memo<BurbujaProps>(
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
 
-        // Foto, video o sticker sin pie: la hora va encima del medio.
+        // Foto, video o sticker sin pie: no hace falta línea de texto.
         const soloMedia = !!m.media_url && !m.body && MEDIA_VISUAL.has(m.content_type) && !borrado;
-        // El sticker no lleva burbuja: en WhatsApp flota sobre el papel tapiz.
-        const sticker = m.content_type === 'sticker' && !!m.media_url && !borrado;
+        // El sticker no lleva burbuja: en WhatsApp flota sobre el papel
+        // tapiz. Con pie de foto (que WhatsApp ni permite) vuelve a la burbuja
+        // normal: sin fondo, ese texto quedaba suelto sobre el tapiz.
+        const sticker = m.content_type === 'sticker' && !!m.media_url && !m.body && !borrado;
+        // La hora encima solo sobre una foto. Sobre el video taparía los
+        // controles, y el sticker no tiene fondo donde apoyarla.
+        const horaEncima = soloMedia && m.content_type === 'image';
+        const horaDebajo = soloMedia && !horaEncima;
 
         const meta = (
             <>
@@ -278,9 +311,9 @@ const Burbuja = memo<BurbujaProps>(
                         </div>
                     )}
 
-                    {/* Medio sin pie: la hora encima, sobre un degradado, para
-                        que se lea igual sobre una foto clara o una oscura. */}
-                    {soloMedia && !sticker && (
+                    {/* Foto sin pie: la hora encima, sobre un degradado, para que
+                        se lea igual sobre una foto clara o una oscura. */}
+                    {horaEncima && (
                         <span className="pointer-events-none absolute bottom-[3px] right-[3px] left-[3px] flex justify-end rounded-b-[6px] bg-gradient-to-t from-black/45 to-transparent px-2 pb-1 pt-6">
                             <span className="flex items-center gap-[3px] text-[11px] leading-none text-white/90">
                                 {meta}
@@ -288,8 +321,10 @@ const Burbuja = memo<BurbujaProps>(
                         </span>
                     )}
 
-                    {/* El sticker no tiene fondo donde apoyar la hora: va debajo. */}
-                    {sticker && (
+                    {/* Video y sticker: la hora en su propia línea, a la derecha.
+                        Iba dentro del bloque de texto, así que un sticker CON pie de
+                        foto la dibujaba dos veces. */}
+                    {horaDebajo && (
                         <span className={cn(claseMeta, 'mt-0.5 flex justify-end pr-1')}>{meta}</span>
                     )}
 
@@ -314,10 +349,13 @@ const Burbuja = memo<BurbujaProps>(
                     {m.whatsapp_message_id && !borrado && (
                         <div
                             className={cn(
-                                'absolute top-0 z-20 transition-opacity',
-                                entrante ? 'right-0' : 'right-0',
+                                // Lleva el color de la burbuja detrás: si no, el
+                                // galoncito queda apoyado sobre las primeras
+                                // letras del mensaje y no se lee ninguno de los dos.
+                                'absolute right-0 top-0 z-20 rounded-tr-lg transition-opacity',
+                                sticker ? '' : entrante ? 'bg-wa-in' : 'bg-wa-out',
                                 tactil
-                                    ? 'opacity-50'
+                                    ? 'opacity-60'
                                     : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
                             )}
                         >
@@ -329,7 +367,7 @@ const Burbuja = memo<BurbujaProps>(
                                 abrirHacia="abajo"
                                 claseBoton={cn(
                                     'flex items-center justify-center rounded-full text-wa-meta',
-                                    tactil ? 'h-9 w-9' : 'h-6 w-6 hover:bg-black/5 dark:hover:bg-white/10',
+                                    tactil ? 'h-9 w-9' : 'h-6 w-6 hover:bg-wa-inset/10',
                                 )}
                             />
                         </div>
@@ -358,7 +396,31 @@ export const ChatThread: React.FC<Props> = ({
     onReaccionar,
     onBorrar,
     tactil = false,
-}) => (
+}) => {
+    /**
+     * Las cuatro acciones, envueltas en funciones que NO cambian de
+     * identidad entre renders.
+     *
+     * Sin esto el `memo` de la burbuja no servía para nada: las páginas
+     * declaran `abrirVisor`, `reaccionar` y `borrar` en el cuerpo del
+     * componente, así que llegaban distintas en cada render y las cien
+     * burbujas se redibujaban igual. La referencia guarda siempre la
+     * versión más nueva, así que tampoco se cierra sobre datos viejos.
+     */
+    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar });
+    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar };
+
+    const acciones = useMemo(
+        () => ({
+            abrirFoto: (m: MensajeHilo) => ultimas.current.onAbrirFoto(m),
+            responder: (m: MensajeHilo) => ultimas.current.onResponder(m),
+            reaccionar: (m: MensajeHilo, emoji: string) => ultimas.current.onReaccionar(m, emoji),
+            borrar: (m: MensajeHilo) => ultimas.current.onBorrar(m),
+        }),
+        [],
+    );
+
+    return (
     <>
         {mensajes.map((m, i) => {
             const anterior = i > 0 ? mensajes[i - 1] : null;
@@ -399,15 +461,16 @@ export const ChatThread: React.FC<Props> = ({
                         m={m}
                         primeraDelGrupo={primeraDelGrupo}
                         tactil={tactil}
-                        onAbrirFoto={onAbrirFoto}
-                        onResponder={onResponder}
-                        onReaccionar={onReaccionar}
-                        onBorrar={onBorrar}
+                        onAbrirFoto={acciones.abrirFoto}
+                        onResponder={acciones.responder}
+                        onReaccionar={acciones.reaccionar}
+                        onBorrar={acciones.borrar}
                     />
                 </React.Fragment>
             );
         })}
     </>
-);
+    );
+};
 
 export default ChatThread;
