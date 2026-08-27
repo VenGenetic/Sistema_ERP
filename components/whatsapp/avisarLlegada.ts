@@ -432,6 +432,72 @@ export function mensajesDeAviso(
  * uniones por un discriminante booleano -- leer `resultado.detalle` dentro
  * de un `if (!resultado.ok)` no compila.
  */
+/**
+ * La conversación por la que va a salir el aviso, abriéndola si no existe.
+ *
+ * La mayoría de los pedidos se cargan a mano desde Solicitudes, con el
+ * teléfono de un cliente de mostrador: esa persona puede no haberle
+ * escrito nunca al WhatsApp del negocio, y entonces no hay conversación
+ * ni, por lo tanto, `conversation_id` con el que encolar. Medido sobre
+ * los datos reales: 124 de 134 pedidos listos para avisar. O sea, casi
+ * todos.
+ *
+ * Abrir la conversación acá es lo que destraba esos avisos. WhatsApp no
+ * impone ninguna ventana de tiempo para escribir primero -- eso es de la
+ * API Business de Meta, no de esta vía -- así que se le puede escribir
+ * igual que desde el teléfono.
+ *
+ * Lo que NO se comprueba acá es que el número tenga WhatsApp: el
+ * navegador no tiene la sesión. Eso lo hace el agente al despachar
+ * (`confirmarNumeroEnWhatsApp`), y si el número no existe marca la fila
+ * como fallida con el motivo en vez de dar por enviado algo que nunca
+ * salió.
+ */
+async function asegurarConversacion(demanda: DemandaPorAvisar): Promise<number> {
+    if (demanda.conversationId) return demanda.conversationId;
+
+    const numero = normalizePhoneEC(demanda.phone_number);
+    // Un teléfono ecuatoriano normalizado son 12 dígitos (593 + 9). Se
+    // exige un mínimo para no abrir un chat contra un número recortado, y
+    // un máximo porque más de 13 dígitos ya no es un teléfono sino un LID.
+    if (numero.length < 10 || numero.length > 13) {
+        throw new Error(
+            `El teléfono de este pedido no parece válido ("${demanda.phone_number}"). ` +
+                'Corregilo en Solicitudes antes de avisar.',
+        );
+    }
+
+    const { data, error } = await supabase
+        .from('agent_conversations')
+        .insert({
+            phone_number: numero,
+            customer_name: demanda.customer_name?.trim() || null,
+            // La abre una persona para escribir, no el bot. `bot_enabled`
+            // ya viene en false por defecto (migración 0017); el estado se
+            // pone acorde para que la bandeja no lo muestre como un chat
+            // que el agente está atendiendo solo.
+            status: 'human_active',
+        })
+        .select('id')
+        .maybeSingle();
+
+    if (!error && data?.id) return data.id;
+
+    // 23505 = ya existía (`phone_number` es UNIQUE). Pasa si dos personas
+    // avisan a la vez, o si el cliente escribió entre que se cargó la
+    // lista y se tocó el botón. No es un fallo: hay que usar la que está.
+    if (error && error.code !== '23505') throw error;
+
+    const { data: existente, error: errorBusqueda } = await supabase
+        .from('agent_conversations')
+        .select('id')
+        .eq('phone_number', numero)
+        .maybeSingle();
+    if (errorBusqueda) throw errorBusqueda;
+    if (!existente?.id) throw new Error('No se pudo abrir la conversación para este número.');
+    return existente.id;
+}
+
 export interface ResultadoAviso {
     ok: boolean;
     /** Por qué no se hizo. Solo viene cuando `ok` es false. */
@@ -458,17 +524,22 @@ export interface ResultadoAviso {
  * mandado nada, y por eso el fallo al encolar DEVUELVE el pedido a su
  * estado anterior. Ese es el único caso reversible de los dos: un mensaje
  * enviado no se puede volver atrás, una fila sí.
+ *
+ * Por lo mismo, la conversación se abre DESPUÉS de la reserva y no antes:
+ * si se abriera primero y el pedido resultara ya avisado por otro, habría
+ * quedado un chat vacío en la bandeja por nada.
+ *
+ * Recibe el texto y no los mensajes ya armados porque el `conversation_id`
+ * recién se conoce acá dentro, cuando la conversación existe.
  */
 export async function avisarLlegada(params: {
     demanda: DemandaPorAvisar;
-    mensajes: NuevoMensaje[];
+    texto: string;
+    conFoto: boolean;
     userId: string | null;
 }): Promise<ResultadoAviso> {
-    const { demanda, mensajes, userId } = params;
-    if (mensajes.length === 0) throw new Error('No hay nada que mandar: el mensaje quedó vacío.');
-    if (!demanda.conversationId) {
-        throw new Error('Este número no tiene una conversación abierta en la bandeja.');
-    }
+    const { demanda, texto, conFoto, userId } = params;
+    if (!texto.trim()) throw new Error('No hay nada que mandar: el mensaje quedó vacío.');
 
     const ahora = new Date().toISOString();
     const { data: reservada, error: errorReserva } = await supabase
@@ -491,6 +562,11 @@ export async function avisarLlegada(params: {
     }
 
     try {
+        // Abre el chat si este número nunca escribió. El agente confirma
+        // que el número exista en WhatsApp antes de mandar nada.
+        const conversationId = await asegurarConversacion(demanda);
+        const mensajes = mensajesDeAviso(demanda, conversationId, texto, conFoto);
+        if (mensajes.length === 0) throw new Error('No hay nada que mandar: el mensaje quedó vacío.');
         await encolarMensajes(mensajes, userId);
     } catch (err) {
         // El aviso no salió, así que el pedido no puede quedar archivado:

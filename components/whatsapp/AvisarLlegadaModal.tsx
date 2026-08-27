@@ -21,7 +21,7 @@ import {
     avisarLlegada,
     cargarPorAvisar,
     marcarAvisadoSinMensaje,
-    mensajesDeAviso,
+
     textoDeAviso,
     type DemandaPorAvisar,
 } from './avisarLlegada';
@@ -217,12 +217,10 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
 
     const enviar = async () => {
         if (!abierto || enviando) return;
-        if (!abierto.conversationId) return;
         setEnviando(true);
         setError(null);
         try {
-            const mensajes = mensajesDeAviso(abierto, abierto.conversationId, texto, conFoto);
-            const resultado = await avisarLlegada({ demanda: abierto, mensajes, userId });
+            const resultado = await avisarLlegada({ demanda: abierto, texto, conFoto, userId });
             if (!resultado.ok) {
                 // No es un error del sistema: es que alguien se le adelantó.
                 // Se saca de la lista igual, porque ya no hay nada que hacer.
@@ -362,16 +360,23 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                 </p>
                             )}
 
-                            {!abierto.conversationId ? (
+                            {/* Este número nunca escribió: se le puede escribir
+                                igual. Ya no bloquea el envío -- eran 124 de 134
+                                pedidos -- pero conviene decir qué va a pasar,
+                                porque es la primera vez que el negocio le
+                                escribe a esa persona. */}
+                            {!abierto.conversationId && (
                                 <div className="rounded-lg border border-dashed border-strong px-3 py-3">
                                     <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
                                         <PhoneOff size={13} className="shrink-0" aria-hidden="true" />
                                         Este número nunca escribió al WhatsApp del negocio
                                     </p>
                                     <p className="mt-1 text-2xs text-fg-muted">
-                                        No hay conversación por la que mandarlo, así que el aviso no puede salir desde
-                                        acá. Se le puede escribir por fuera y dejar constancia: cuando conteste, el chat
-                                        queda creado y a partir de ahí sí entra en la bandeja.
+                                        Se le puede escribir igual: WhatsApp no exige que hayan escrito primero. Al
+                                        mandar se abre el chat en la bandeja y el aviso queda registrado ahí como
+                                        cualquier otro. Antes de enviarlo, el agente comprueba que el número tenga
+                                        WhatsApp; si no lo tiene, el mensaje queda marcado como fallido y no se pierde
+                                        el pedido.
                                     </p>
                                     <div className="mt-2.5 flex flex-wrap gap-2">
                                         <button
@@ -385,76 +390,73 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                                     }),
                                                 )
                                             }
-                                            className={cn(button.base, button.variant.secondary, button.size.sm)}
+                                            className={cn(button.base, button.variant.ghost, button.size.xs)}
                                         >
-                                            <MessageCircle size={14} aria-hidden="true" />
-                                            Abrir WhatsApp por fuera
+                                            <MessageCircle size={13} aria-hidden="true" />
+                                            Escribirle por fuera
                                         </button>
                                         <button
                                             onClick={archivarSinMensaje}
                                             disabled={enviando}
-                                            className={cn(button.base, button.variant.ghost, button.size.sm)}
+                                            className={cn(button.base, button.variant.ghost, button.size.xs)}
                                         >
-                                            Marcar como avisado
+                                            Marcar avisado sin mandar
                                         </button>
                                     </div>
                                 </div>
-                            ) : (
-                                <>
-                                    <label className="block">
-                                        <span className="text-xs font-semibold text-fg-muted">
-                                            Lo que le va a llegar
-                                        </span>
-                                        <textarea
-                                            value={texto}
-                                            onChange={(e) => {
-                                                setTexto(e.target.value);
-                                                setEditado(true);
-                                            }}
-                                            rows={7}
-                                            className={cn(input.textarea, 'mt-1')}
-                                        />
-                                    </label>
+                            )}
+                            <label className="block">
+                                <span className="text-xs font-semibold text-fg-muted">
+                                    Lo que le va a llegar
+                                </span>
+                                <textarea
+                                    value={texto}
+                                    onChange={(e) => {
+                                        setTexto(e.target.value);
+                                        setEditado(true);
+                                    }}
+                                    rows={7}
+                                    className={cn(input.textarea, 'mt-1')}
+                                />
+                            </label>
 
-                                    <div className="flex flex-wrap items-center gap-4">
-                                        <label className="flex items-center gap-2 text-xs text-fg-muted">
-                                            <input
-                                                type="checkbox"
-                                                checked={conPrecio}
-                                                onChange={(e) => setConPrecio(e.target.checked)}
-                                                disabled={editado}
-                                            />
-                                            Incluir el precio
-                                        </label>
-                                        <label className="flex items-center gap-2 text-xs text-fg-muted">
-                                            <input
-                                                type="checkbox"
-                                                checked={conFoto}
-                                                onChange={(e) => setConFoto(e.target.checked)}
-                                                disabled={!producto?.image_url}
-                                            />
-                                            Mandar la foto {!producto?.image_url && '(no tiene)'}
-                                        </label>
-                                        {editado && (
-                                            <button
-                                                onClick={() => {
-                                                    setEditado(false);
-                                                    setTexto(textoDeAviso(abierto, { incluirPrecio: conPrecio }));
-                                                }}
-                                                className={cn(button.base, button.variant.link, button.size.xs)}
-                                            >
-                                                Volver al texto sugerido
-                                            </button>
-                                        )}
-                                    </div>
+                            <div className="flex flex-wrap items-center gap-4">
+                                <label className="flex items-center gap-2 text-xs text-fg-muted">
+                                    <input
+                                        type="checkbox"
+                                        checked={conPrecio}
+                                        onChange={(e) => setConPrecio(e.target.checked)}
+                                        disabled={editado}
+                                    />
+                                    Incluir el precio
+                                </label>
+                                <label className="flex items-center gap-2 text-xs text-fg-muted">
+                                    <input
+                                        type="checkbox"
+                                        checked={conFoto}
+                                        onChange={(e) => setConFoto(e.target.checked)}
+                                        disabled={!producto?.image_url}
+                                    />
+                                    Mandar la foto {!producto?.image_url && '(no tiene)'}
+                                </label>
+                                {editado && (
+                                    <button
+                                        onClick={() => {
+                                            setEditado(false);
+                                            setTexto(textoDeAviso(abierto, { incluirPrecio: conPrecio }));
+                                        }}
+                                        className={cn(button.base, button.variant.link, button.size.xs)}
+                                    >
+                                        Volver al texto sugerido
+                                    </button>
+                                )}
+                            </div>
 
-                                    {(porTelefono.get(abierto.phone_number) ?? 0) > 1 && (
-                                        <p className="text-2xs text-fg-muted">
-                                            Este cliente tiene {porTelefono.get(abierto.phone_number)} repuestos por
-                                            avisar. Cada uno se manda por separado, con su foto.
-                                        </p>
-                                    )}
-                                </>
+                            {(porTelefono.get(abierto.phone_number) ?? 0) > 1 && (
+                                <p className="text-2xs text-fg-muted">
+                                    Este cliente tiene {porTelefono.get(abierto.phone_number)} repuestos por
+                                    avisar. Cada uno se manda por separado, con su foto.
+                                </p>
                             )}
                         </div>
                     ) : (
@@ -574,7 +576,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                             )}
                             <button
                                 onClick={enviar}
-                                disabled={enviando || !abierto.conversationId || !texto.trim()}
+                                disabled={enviando || !texto.trim()}
                                 className={cn(button.base, button.variant.success, button.size.md)}
                             >
                                 {enviando ? (
