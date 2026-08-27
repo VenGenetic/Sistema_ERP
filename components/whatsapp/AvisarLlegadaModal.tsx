@@ -6,6 +6,7 @@ import {
     Check,
     ImageOff,
     Loader2,
+    HandCoins,
     MessageCircle,
     PhoneOff,
     Send,
@@ -20,6 +21,8 @@ import { buildWhatsAppDemandURL, openWhatsApp } from '../../utils/whatsapp';
 import {
     abonoSugerido,
     AVISOS_POR_HORA,
+    DIAS_PARA_REINSISTIR,
+    registrarAbonoPagado,
     avisarLlegada,
     cargarPorAvisar,
     contarAvisosRecientes,
@@ -110,6 +113,11 @@ const Miniatura: React.FC<{ url: string | null | undefined; alt: string; grande?
         />
     );
 };
+
+/** true si ya pasó la semana y se le puede volver a pedir el abono. */
+function puedeReinsistir(pedidoEl: string): boolean {
+    return Date.now() - new Date(pedidoEl).getTime() > DIAS_PARA_REINSISTIR * 86400000;
+}
 
 /** "hoy" / "hace 3 días" / "hace 2 meses". */
 function esperandoDesde(iso: string): string {
@@ -289,6 +297,49 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
             onAvisado?.();
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo mandar el aviso.');
+        } finally {
+            setEnviando(false);
+        }
+    };
+
+    /**
+     * El cliente pagó: se registra y el grupo de compras se entera solo.
+     *
+     * El monto se pregunta porque lo que se cobró no siempre es lo que se
+     * pidió -- se negocia -- y lo que después hay que cerrar es lo que
+     * puso de verdad. Se propone el sugerido para no tener que escribirlo
+     * en el caso normal.
+     */
+    const marcarAbonado = async (d: DemandaPorAvisar) => {
+        if (enviando) return;
+        const precio = d.product?.price != null ? precioParaCliente(d.product.price) : null;
+        const sugerido = precio != null ? abonoSugerido(precio) : 0;
+        const escrito = window.prompt(
+            `¿Cuánto abonó ${d.customer_name?.trim() || d.phone_number} por "${d.product?.name ?? 'el repuesto'}"?`,
+            String(sugerido || ''),
+        );
+        // Cancelar el diálogo no es cobrar cero: no se hace nada.
+        if (escrito === null) return;
+        const monto = Number(escrito.replace(',', '.'));
+        if (!Number.isFinite(monto) || monto <= 0) {
+            setError('El monto del abono tiene que ser un número mayor que cero.');
+            return;
+        }
+
+        setEnviando(true);
+        setError(null);
+        try {
+            const resultado = await registrarAbonoPagado({ demanda: d, monto, userId });
+            // `detalle` viene también cuando salió bien: dice si el grupo se
+            // enteró o si hay que avisarle a mano.
+            if (resultado.detalle) setError(resultado.detalle);
+            if (resultado.ok) {
+                // Ya está encargado: sale de la lista de abonos pendientes.
+                quitarDeLaLista(d.id);
+                onAvisado?.();
+            }
+        } catch (err: any) {
+            setError(err?.message ?? 'No se pudo registrar el abono.');
         } finally {
             setEnviando(false);
         }
@@ -677,16 +728,50 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                                         <MessageCircle size={14} aria-hidden="true" />
                                                     </button>
                                                 )}
-                                                <button
-                                                    onClick={() => abrirVistaPrevia(d)}
-                                                    className={cn(
-                                                        button.base,
-                                                        esAbono ? button.variant.primary : button.variant.success,
-                                                        button.size.sm,
-                                                    )}
-                                                >
-                                                    {esAbono ? 'Pedir abono' : 'Avisar'}
-                                                </button>
+                                                {/* En modo abono cada fila
+                                                    ofrece lo que corresponde a
+                                                    su estado: pedirle el abono
+                                                    a quien no se le pidió, y
+                                                    registrar el pago de quien
+                                                    ya lo recibió. Al segundo no
+                                                    se le vuelve a pedir antes
+                                                    de la semana: insistir al
+                                                    día siguiente es hostigar. */}
+                                                {esAbono && d.deposit_requested_at && (
+                                                    <button
+                                                        onClick={() => marcarAbonado(d)}
+                                                        disabled={enviando}
+                                                        title={`Se le pidió ${esperandoDesde(d.deposit_requested_at)}`}
+                                                        className={cn(
+                                                            button.base,
+                                                            button.variant.success,
+                                                            button.size.sm,
+                                                        )}
+                                                    >
+                                                        <HandCoins size={14} aria-hidden="true" />
+                                                        Abonó
+                                                    </button>
+                                                )}
+                                                {(!esAbono ||
+                                                    !d.deposit_requested_at ||
+                                                    puedeReinsistir(d.deposit_requested_at)) && (
+                                                    <button
+                                                        onClick={() => abrirVistaPrevia(d)}
+                                                        className={cn(
+                                                            button.base,
+                                                            esAbono
+                                                                ? button.variant.secondary
+                                                                : button.variant.success,
+                                                            button.size.sm,
+                                                        )}
+                                                    >
+                                                        {esAbono
+                                                            ? d.deposit_requested_at
+                                                                ? 'Volver a pedir'
+                                                                : 'Pedir abono'
+                                                            : 'Avisar'}
+                                                    </button>
+                                                )}
                                             </div>
                                         );
                                     })}

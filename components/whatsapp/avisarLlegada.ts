@@ -55,6 +55,8 @@ export interface DemandaPorAvisar {
     stock_detected_at: string | null;
     /** Cuándo se le pidió abono para traerlo. `null` = nunca. */
     deposit_requested_at: string | null;
+    /** Cuándo lo pagó. `null` = todavía no. */
+    deposit_paid_at: string | null;
     product: ProductoDeAviso | null;
     /**
      * El chat por el que sale el aviso. `null` significa que ese número
@@ -86,7 +88,7 @@ const CAMPOS_PRODUCTO =
  * descarte PEDIDOS y no solo el producto embebido. Sin él, la consulta
  * devolvería todos los pedidos con el producto en `null`.
  */
-const CAMPOS_DEMANDA = `id, status, phone_number, customer_name, notes, created_at, stock_detected_at, deposit_requested_at, product:products!inner(${CAMPOS_PRODUCTO})`;
+const CAMPOS_DEMANDA = `id, status, phone_number, customer_name, notes, created_at, stock_detected_at, deposit_requested_at, deposit_paid_at, product:products!inner(${CAMPOS_PRODUCTO})`;
 
 /**
  * QUÉ ES "por avisar", en un solo lugar.
@@ -335,11 +337,15 @@ export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<Lista
             referencedTable: 'product',
         });
         if (modo === 'abono') {
-            // Fuera los que ya recibieron el pedido de abono hace poco: sin
-            // esto le llegaría lo mismo todos los días. Vuelven a aparecer
-            // pasada la semana, para insistirles una vez más.
-            const desde = new Date(Date.now() - DIAS_PARA_REINSISTIR * 86400000).toISOString();
-            consulta = consulta.or(`deposit_requested_at.is.null,deposit_requested_at.lt.${desde}`);
+            // Fuera los que YA abonaron: ese repuesto ya está encargado y
+            // no hay nada más que pedirle a esa persona.
+            //
+            // Los que ya recibieron el pedido y todavía no pagaron SÍ se
+            // quedan, aunque haya sido ayer: son los que hay que seguir. La
+            // fila decide qué ofrecer -- "Pedir abono" a quien no se le
+            // pidió, "Abonó" a quien está esperando pago -- y el pedido no
+            // se le repite antes de la semana.
+            consulta = consulta.is('deposit_paid_at', null);
         }
     }
 
@@ -401,10 +407,7 @@ export async function contarPorAvisar(modo: ModoAviso = 'llego'): Promise<number
             referencedTable: 'product',
         });
 
-    if (modo === 'abono') {
-        const desde = new Date(Date.now() - DIAS_PARA_REINSISTIR * 86400000).toISOString();
-        consulta = consulta.or(`deposit_requested_at.is.null,deposit_requested_at.lt.${desde}`);
-    }
+    if (modo === 'abono') consulta = consulta.is('deposit_paid_at', null);
 
     const { count, error } = await consulta;
     // El contador corre al abrir la bandeja: si falta la migración del
@@ -873,6 +876,137 @@ export async function solicitarAbono(params: {
     }
 
     return { ok: true };
+}
+
+/**
+ * A qué conversación va el requerimiento de compra.
+ *
+ * El grupo se guarda por su JID en `agent_settings` (migración 0034 del
+ * agente) y el agente lo descubre solo con `runGroupsJob`. Devuelve
+ * `null` cuando todavía no hay grupo elegido o el agente no lo
+ * sincronizó: eso NO es un error, es que el aviso al grupo no va a salir.
+ */
+async function conversacionDelGrupo(): Promise<{ id: number; nombre: string | null } | null> {
+    const { data: ajustes, error } = await supabase
+        .from('agent_settings')
+        .select('requirements_group_jid, requirements_group_name')
+        .eq('id', 1)
+        .maybeSingle();
+    if (error || !ajustes?.requirements_group_jid) return null;
+
+    const { data: conv } = await supabase
+        .from('agent_conversations')
+        .select('id')
+        .eq('chat_jid', ajustes.requirements_group_jid)
+        .maybeSingle();
+    if (!conv?.id) return null;
+    return { id: conv.id, nombre: ajustes.requirements_group_name ?? null };
+}
+
+/**
+ * El requerimiento que se manda al grupo de compras.
+ *
+ * Va al equipo, no al cliente, así que acá SÍ corresponde la jerga
+ * interna: el SKU es lo que se usa para pedirle al proveedor, y el número
+ * de solicitud es por dónde se sigue el caso en el ERP.
+ */
+function textoDeRequerimiento(demanda: DemandaPorAvisar, monto: number): string {
+    const p = demanda.product;
+    const precio = p?.price != null ? precioParaCliente(p.price) : null;
+    const lineas = [
+        '*PEDIDO PARA ENCARGAR*',
+        '',
+        p?.name ?? 'Repuesto sin vincular',
+    ];
+    if (p?.sku) lineas.push(`Código: ${p.sku}`);
+    lineas.push(
+        `Cliente: ${demanda.customer_name?.trim() || 'sin nombre'} (${demanda.phone_number})`,
+        `Abonó: ${formatearPrecio(monto)}${precio != null ? ` de ${formatearPrecio(precio)}` : ''}`,
+        '',
+        `Solicitud #${demanda.id}`,
+    );
+    return lineas.join('\n');
+}
+
+/**
+ * Registra que el cliente ABONÓ y avisa al grupo de compras.
+ *
+ * El aviso al grupo es lo que convierte esto en un flujo cerrado: alguien
+ * paga en el mostrador o manda el comprobante, y quien compra se entera en
+ * el momento, sin que nadie tenga que acordarse de contarlo.
+ *
+ * Una diferencia importante con el resto de este módulo: si el aviso al
+ * grupo falla, el pago NO se deshace. En todos los otros casos la vuelta
+ * atrás es correcta porque lo único que se perdía era una fila; acá lo que
+ * está registrado es que un cliente entregó plata, y eso pasó de verdad.
+ * Borrarlo porque no salió un mensaje sería falsear la caja. Se devuelve
+ * `ok` con el problema anotado, para que quien atiende avise a mano.
+ */
+export async function registrarAbonoPagado(params: {
+    demanda: DemandaPorAvisar;
+    monto: number;
+    userId: string | null;
+}): Promise<ResultadoAviso> {
+    const { demanda, monto, userId } = params;
+    if (!(monto > 0)) throw new Error('El monto del abono tiene que ser mayor que cero.');
+
+    const ahora = new Date().toISOString();
+    const { data: reservada, error } = await supabase
+        .from('product_demands')
+        .update({
+            deposit_paid_at: ahora,
+            deposit_paid_amount: monto,
+            deposit_paid_by: userId,
+            updated_at: ahora,
+        })
+        .eq('id', demanda.id)
+        // Solo si no estaba ya cobrado: si dos personas lo marcan a la vez,
+        // el segundo se entera en vez de mandar el requerimiento repetido y
+        // que el repuesto se encargue dos veces.
+        .is('deposit_paid_at', null)
+        .select('id');
+    if (error) {
+        if (error.code === '42703') {
+            throw new Error(
+                'Falta aplicar la migración del abono pagado ' +
+                    '(supabase/migrations/20260827210000_abono_pagado.sql).',
+            );
+        }
+        throw error;
+    }
+    if (!reservada || reservada.length === 0) {
+        return {
+            ok: false,
+            motivo: 'ya-avisado',
+            detalle: 'Ese abono ya estaba registrado por otra persona. No se mandó el pedido de nuevo.',
+        };
+    }
+
+    // El aviso al grupo, que es el punto de todo esto.
+    try {
+        const grupo = await conversacionDelGrupo();
+        if (!grupo) {
+            return {
+                ok: true,
+                detalle:
+                    'Abono registrado, pero NO se avisó a ningún grupo: todavía no hay un grupo de ' +
+                    'requerimientos configurado (o el agente no lo sincronizó). Avisá a compras a mano.',
+            };
+        }
+        await encolarMensajes(
+            [{ conversationId: grupo.id, body: textoDeRequerimiento(demanda, monto), kind: 'text' }],
+            userId,
+        );
+        return { ok: true, detalle: `Abono registrado y pedido enviado a "${grupo.nombre ?? 'el grupo'}".` };
+    } catch (err) {
+        const detalle = err instanceof Error ? err.message : String(err);
+        return {
+            ok: true,
+            detalle:
+                `Abono registrado, pero NO se pudo avisar al grupo (${detalle}). ` +
+                'Avisá a compras a mano para que el repuesto se encargue.',
+        };
+    }
 }
 
 /**
