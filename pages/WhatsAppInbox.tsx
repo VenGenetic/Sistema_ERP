@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
     ArrowLeft, Bell, Bot, BotOff, CheckCheck, Clock, HandCoins, Headset, Images, Inbox,
-    MailQuestion, RefreshCw, RotateCw, Search, User, X,
+    MailQuestion, MessageSquarePlus, RefreshCw, RotateCw, Search, User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
@@ -16,6 +16,8 @@ import {
     type EstadoAgente,
 } from '../components/whatsapp/agente';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
+import MenuTelefono from '../components/whatsapp/MenuTelefono';
+import NuevoChatModal from '../components/whatsapp/NuevoChatModal';
 import AvisarLlegadaModal from '../components/whatsapp/AvisarLlegadaModal';
 import { contarPorAvisar, type ModoAviso } from '../components/whatsapp/avisarLlegada';
 import { fusionarMensajes, useRepasoDelHilo } from '../components/whatsapp/hiloEnVivo';
@@ -328,6 +330,14 @@ const WhatsAppInbox: React.FC = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [closeInsteadOfReopen, setCloseInsteadOfReopen] = useState(false);
     const [conversations, setConversations] = useState<Conversation[]>([]);
+    /**
+     * El teléfono que se tocó DENTRO de un mensaje y dónde estaba en
+     * pantalla, para colgarle el menú al lado. El menú lo dibuja la página
+     * y no la burbuja porque el hilo tiene scroll propio: colgado adentro
+     * quedaba recortado por el borde de la burbuja.
+     */
+    const [menuTelefono, setMenuTelefono] = useState<{ numero: string; ancla: DOMRect } | null>(null);
+    const [nuevoChat, setNuevoChat] = useState(false);
     const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
     const [globalBotEnabled, setGlobalBotEnabled] = useState<boolean | null>(null);
     const [search, setSearch] = useState('');
@@ -1383,6 +1393,22 @@ const WhatsAppInbox: React.FC = () => {
                             )}
                         </div>
 
+                        {/* Escribirle a alguien que todavía no escribió. Va al lado
+                            del buscador porque es el mismo gesto cuando el
+                            cliente no aparece: uno lo busca, no está, y le
+                            abre el chat sin cambiar de pantalla. */}
+                        <button
+                            onClick={() => setNuevoChat(true)}
+                            aria-label="Empezar un chat nuevo"
+                            title="Escribirle a un número que todavía no está en la lista"
+                            className={cn(
+                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-wa-meta transition-colors hover:bg-wa-inset/10',
+                                focusRing,
+                            )}
+                        >
+                            <MessageSquarePlus size={19} aria-hidden="true" />
+                        </button>
+
                         {/* Buscar por lo que MANDÓ el cliente y no por su nombre:
                             el caso es el comprobante de pago, que se recuerda
                             como foto y no como nombre ni como hora. Va al lado
@@ -1752,6 +1778,7 @@ const WhatsAppInbox: React.FC = () => {
                                         onResponder={setCitando}
                                         onReaccionar={reaccionar}
                                         onBorrar={borrar}
+                                        onTelefono={(numero, ancla) => setMenuTelefono({ numero, ancla })}
                                     />
                                 )}
 
@@ -1883,6 +1910,23 @@ const WhatsAppInbox: React.FC = () => {
                 // -- seleccionar su id dejaría la pantalla en blanco.
                 onAbrirChat={abrirConversacionPorId}
             />
+
+            <NuevoChatModal
+                isOpen={nuevoChat}
+                onClose={() => setNuevoChat(false)}
+                onAbrir={abrirConversacionPorId}
+            />
+
+            {/* El menú del teléfono tocado dentro de un mensaje. */}
+            {menuTelefono && (
+                <MenuTelefono
+                    numero={menuTelefono.numero}
+                    ancla={menuTelefono.ancla}
+                    conversacionActual={selected?.conversationId ?? null}
+                    onAbrir={abrirConversacionPorId}
+                    onCerrar={() => setMenuTelefono(null)}
+                />
+            )}
         </div>
     );
 };

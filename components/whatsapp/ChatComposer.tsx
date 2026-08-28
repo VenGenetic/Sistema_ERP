@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ClipboardList, FileText, Image as ImageIcon, Loader2, Package, Paperclip, Plus, Send, X, Zap,
+    ClipboardList, FileText, Image as ImageIcon, Loader2, Package, Paperclip, Plus, Send,
+    SlidersHorizontal, X, Zap,
 } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { cn } from '../ui/styles';
@@ -8,6 +9,7 @@ import CatalogSendModal from './CatalogSendModal';
 import ProformaBuilder from './ProformaBuilder';
 import RegistrarPedidoModal from './RegistrarPedidoModal';
 import VoiceRecorder from './VoiceRecorder';
+import RespuestasRapidasModal from './RespuestasRapidasModal';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
 import {
     borrarAdjunto,
@@ -128,7 +130,14 @@ export const ChatComposer: React.FC<Props> = ({
     const [menuHerramientas, setMenuHerramientas] = useState(false);
     /** Hay una nota de voz grabándose o grabada sin mandar. */
     const [grabadorOcupado, setGrabadorOcupado] = useState(false);
-    const [guardandoRapida, setGuardandoRapida] = useState(false);
+    /**
+     * El administrador de respuestas rápidas y, si se llegó desde «guardar
+     * esto», el texto con el que arranca. Se pasa por estado y no por
+     * `window.prompt` porque guardar una plantilla sin ver el texto que se
+     * guarda es como se llenó la lista de plantillas cortadas a la mitad.
+     */
+    const [gestorRapidas, setGestorRapidas] = useState(false);
+    const [borradorParaGuardar, setBorradorParaGuardar] = useState('');
 
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -321,32 +330,20 @@ export const ChatComposer: React.FC<Props> = ({
         textareaRef.current?.focus();
     };
 
-    const guardarComoRapida = async () => {
+    /** Guardar lo escrito como plantilla: abre el gestor ya cargado. */
+    const guardarComoRapida = () => {
         const texto = borrador.trim();
-        if (!texto || guardandoRapida) return;
-        const label = window.prompt('¿Con qué nombre la guardamos?', texto.slice(0, 30));
-        if (!label?.trim()) return;
-        setGuardandoRapida(true);
-        const { error: err } = await supabase
-            .from('agent_quick_replies')
-            .insert({ label: label.trim(), body: texto, created_by: userId, sort_order: 100 });
-        setGuardandoRapida(false);
-        if (err) {
-            setError(`No se pudo guardar la respuesta rápida: ${err.message}`);
-            return;
-        }
-        cargarRapidas();
+        if (!texto) return;
+        setBorradorParaGuardar(texto);
+        setMenuRapidas(false);
+        setGestorRapidas(true);
     };
 
-    const borrarRapida = async (r: RespuestaRapida) => {
-        // Baja lógica, no borrado: puede estar en uso por otra persona del
-        // equipo justo ahora, y recuperarla desde la base es trivial.
-        const { error: err } = await supabase.from('agent_quick_replies').update({ is_active: false }).eq('id', r.id);
-        if (err) {
-            setError(`No se pudo quitar la respuesta rápida: ${err.message}`);
-            return;
-        }
-        setRapidas((prev) => prev.filter((x) => x.id !== r.id));
+    /** Agregar, corregir o quitar: todo eso vive en el gestor. */
+    const administrarRapidas = () => {
+        setBorradorParaGuardar('');
+        setMenuRapidas(false);
+        setGestorRapidas(true);
     };
 
     /* ---------------------------------------------------------------- */
@@ -392,24 +389,50 @@ export const ChatComposer: React.FC<Props> = ({
 
             {/* Menú de respuestas rápidas. Se abre desde el "+" o escribiendo
                 "/" al principio, que es como se usan de verdad: en medio de
-                una conversación, sin soltar el teclado. */}
-            {(menuRapidas || filtroRapidas !== null) && rapidasVisibles.length > 0 && (
-                <div className="absolute bottom-full left-2 right-2 z-20 mb-2 max-h-64 divide-y divide-wa-divider overflow-y-auto rounded-xl border border-wa-divider bg-wa-panel shadow-lg md:left-3 md:right-3">
-                    {rapidasVisibles.map((r) => (
-                        <div key={r.id} className="flex items-start gap-2 hover:bg-wa-hover">
-                            <button onClick={() => usarRapida(r)} className="min-w-0 flex-1 px-3 py-2 text-left">
-                                <p className="text-[13px] font-semibold text-wa-text">{r.label}</p>
-                                <p className="line-clamp-2 text-[12px] text-wa-meta">{r.body}</p>
-                            </button>
-                            <button
-                                onClick={() => borrarRapida(r)}
-                                aria-label={`Quitar la respuesta rápida ${r.label}`}
-                                className="p-2 text-wa-meta hover:text-wa-danger"
-                            >
-                                <X size={13} aria-hidden="true" />
-                            </button>
-                        </div>
-                    ))}
+                una conversación, sin soltar el teclado.
+
+                Abierto desde el "+" se muestra SIEMPRE, aunque no haya
+                ninguna guardada: antes, con la lista vacía, ese renglón del
+                menú no hacía absolutamente nada y no había forma de crear la
+                primera. Filtrando con "/" sí se esconde cuando no coincide
+                nada, para no tapar lo que se está escribiendo.
+
+                La equis de borrar que había en cada fila ya no está: borraba
+                sin preguntar una plantilla que usa todo el equipo, y estaba a
+                un dedo de distancia de usarla. Agregar, corregir y quitar
+                viven ahora en el gestor, que pregunta. */}
+            {(menuRapidas || (filtroRapidas !== null && rapidasVisibles.length > 0)) && (
+                <div className="absolute bottom-full left-2 right-2 z-20 mb-2 overflow-hidden rounded-xl border border-wa-divider bg-wa-panel shadow-lg md:left-3 md:right-3">
+                    <div className="max-h-64 divide-y divide-wa-divider overflow-y-auto">
+                        {rapidasVisibles.length === 0 ? (
+                            <p className="px-3 py-4 text-center text-[12.5px] text-wa-meta">
+                                {rapidas.length === 0
+                                    ? 'Todavía no hay respuestas rápidas guardadas.'
+                                    : 'Ninguna coincide con lo que escribiste.'}
+                            </p>
+                        ) : (
+                            rapidasVisibles.map((r) => (
+                                <button
+                                    key={r.id}
+                                    onClick={() => usarRapida(r)}
+                                    className="block w-full px-3 py-2 text-left hover:bg-wa-hover"
+                                >
+                                    <p className="text-[13px] font-semibold text-wa-text">{r.label}</p>
+                                    <p className="line-clamp-2 text-[12px] text-wa-meta">{r.body}</p>
+                                </button>
+                            ))
+                        )}
+                    </div>
+
+                    {menuRapidas && (
+                        <button
+                            onClick={administrarRapidas}
+                            className="flex w-full items-center gap-2 border-t border-wa-divider px-3 py-2.5 text-left text-[12.5px] font-medium text-wa-accent-strong hover:bg-wa-hover"
+                        >
+                            <SlidersHorizontal size={14} aria-hidden="true" />
+                            Agregar, corregir o quitar
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -657,6 +680,20 @@ export const ChatComposer: React.FC<Props> = ({
                 customerName={clienteNombre}
                 userId={userId}
                 onRegistrado={() => onPedidoRegistrado?.()}
+            />
+
+            <RespuestasRapidasModal
+                isOpen={gestorRapidas}
+                onClose={() => {
+                    setGestorRapidas(false);
+                    // El borrador solo sirve para la vez que se abrió desde
+                    // «guardar esto»: si queda, la próxima vez que se abra el
+                    // gestor aparece un formulario cargado sin motivo.
+                    setBorradorParaGuardar('');
+                }}
+                userId={userId}
+                borradorInicial={borradorParaGuardar}
+                onCambio={cargarRapidas}
             />
         </div>
     );

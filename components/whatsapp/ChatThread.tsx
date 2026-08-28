@@ -3,6 +3,7 @@ import { AlertCircle, Check, CheckCheck, Clock3 } from 'lucide-react';
 import { cn } from '../ui/styles';
 import MessageMedia from './MessageMedia';
 import MessageActions from './MessageActions';
+import { partirPorTelefonos } from '../../utils/telefonosEnTexto';
 
 /**
  * El hilo de la conversación, con el aspecto de WhatsApp.
@@ -137,6 +138,60 @@ const MEDIA_AL_BORDE = new Set<ContentType>(['image', 'video', 'sticker']);
 
 export const textoDe = (m: Pick<MensajeHilo, 'body' | 'content_type'>): string =>
     m.body || SIN_TEXTO[m.content_type] || '(sin texto)';
+
+/**
+ * El texto del mensaje con los teléfonos convertidos en algo que se puede
+ * tocar.
+ *
+ * Es la mitad visible de utils/telefonosEnTexto.ts. El caso es de todos
+ * los días: «llámame al 0999123456», «este es el número de mi hermano».
+ * Antes eso había que seleccionarlo a mano, copiarlo y pegarlo en el
+ * buscador; ahora se toca y se salta al chat de esa persona.
+ *
+ * Se subraya en vez de pintarse de otro color: la burbuja propia es verde
+ * y la del cliente es blanca, y un color fijo se pierde en una de las dos.
+ * El subrayado hereda el color del texto y se ve igual en ambas, en claro
+ * y en oscuro.
+ *
+ * Sin `onTelefono` se dibuja texto pelado. Así el componente sirve igual
+ * en una pantalla que todavía no tenga a dónde llevar el toque.
+ */
+const TextoConTelefonos: React.FC<{
+    texto: string;
+    onTelefono?: (numero: string, ancla: DOMRect) => void;
+}> = ({ texto, onTelefono }) => {
+    const trozos = useMemo(() => (onTelefono ? partirPorTelefonos(texto) : null), [texto, onTelefono]);
+    if (!trozos) return <>{texto}</>;
+
+    return (
+        <>
+            {trozos.map((t, i) =>
+                t.tipo === 'telefono' ? (
+                    <button
+                        key={i}
+                        type="button"
+                        onClick={(e) => {
+                            // El hilo entero escucha clics para citar y para
+                            // el menú de la burbuja: sin esto, tocar el
+                            // número además abría esas otras cosas.
+                            e.stopPropagation();
+                            onTelefono(t.numero, e.currentTarget.getBoundingClientRect());
+                        }}
+                        title={`Abrir el chat de ${t.texto}`}
+                        /* `inline` y no el inline-block que trae el botón por
+                           defecto: así el número se parte de línea como
+                           cualquier palabra en vez de saltar entero. */
+                        className="inline cursor-pointer break-all text-left font-medium underline decoration-1 underline-offset-2 hover:opacity-80"
+                    >
+                        {t.texto}
+                    </button>
+                ) : (
+                    <React.Fragment key={i}>{t.texto}</React.Fragment>
+                ),
+            )}
+        </>
+    );
+};
 
 /** "HOY" / "AYER" / "12 DE MARZO" -- lo que se lee de un vistazo. */
 function etiquetaDeDia(iso: string): string {
@@ -291,10 +346,12 @@ interface BurbujaProps {
     onResponder: (m: MensajeHilo) => void;
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
+    /** Tocaron un teléfono escrito dentro del mensaje. */
+    onTelefono?: (numero: string, ancla: DOMRect) => void;
 }
 
 const Burbuja = memo<BurbujaProps>(
-    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar }) => {
+    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onTelefono }) => {
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
 
@@ -388,7 +445,11 @@ const Burbuja = memo<BurbujaProps>(
                             )}
                         >
                             <span className={cn(borrado && 'italic text-wa-meta')}>
-                                {borrado ? 'Se borró este mensaje' : textoDe(m)}
+                                {borrado ? (
+                                    'Se borró este mensaje'
+                                ) : (
+                                    <TextoConTelefonos texto={textoDe(m)} onTelefono={onTelefono} />
+                                )}
                             </span>
 
                             {!m.media_url && CON_ARCHIVO.has(m.content_type) && !borrado && (
@@ -490,6 +551,14 @@ interface Props {
     onResponder: (m: MensajeHilo) => void;
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
+    /**
+     * Tocaron un teléfono escrito DENTRO de un mensaje. `ancla` es dónde
+     * quedó el número en pantalla, para colgarle el menú al lado.
+     *
+     * Sin esto los teléfonos se dibujan como texto común: la pantalla que
+     * no tenga a dónde llevar el toque no muestra un enlace muerto.
+     */
+    onTelefono?: (numero: string, ancla: DOMRect) => void;
     /** En el teléfono: texto y zonas táctiles más grandes. */
     tactil?: boolean;
 }
@@ -500,6 +569,7 @@ export const ChatThread: React.FC<Props> = ({
     onResponder,
     onReaccionar,
     onBorrar,
+    onTelefono,
     tactil = false,
 }) => {
     /**
@@ -512,8 +582,8 @@ export const ChatThread: React.FC<Props> = ({
      * burbujas se redibujaban igual. La referencia guarda siempre la
      * versión más nueva, así que tampoco se cierra sobre datos viejos.
      */
-    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar });
-    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar };
+    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar, onTelefono });
+    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar, onTelefono };
 
     const acciones = useMemo(
         () => ({
@@ -521,9 +591,18 @@ export const ChatThread: React.FC<Props> = ({
             responder: (m: MensajeHilo) => ultimas.current.onResponder(m),
             reaccionar: (m: MensajeHilo, emoji: string) => ultimas.current.onReaccionar(m, emoji),
             borrar: (m: MensajeHilo) => ultimas.current.onBorrar(m),
+            telefono: (numero: string, ancla: DOMRect) => ultimas.current.onTelefono?.(numero, ancla),
         }),
         [],
     );
+
+    /*
+        Se pasa `undefined` cuando la pantalla no trajo `onTelefono`, y no
+        el envoltorio vacío: si no, los números quedarían subrayados como
+        si se pudieran tocar y no harían nada. La identidad igual no cambia
+        entre renders, que es lo que mantiene vivo el `memo` de la burbuja.
+    */
+    const alTocarTelefono = onTelefono ? acciones.telefono : undefined;
 
     return (
     <>
@@ -570,6 +649,7 @@ export const ChatThread: React.FC<Props> = ({
                         onResponder={acciones.responder}
                         onReaccionar={acciones.reaccionar}
                         onBorrar={acciones.borrar}
+                        onTelefono={alTocarTelefono}
                     />
                 </React.Fragment>
             );

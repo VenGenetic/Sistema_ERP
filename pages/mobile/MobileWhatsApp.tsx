@@ -12,6 +12,7 @@ import {
     MailQuestion,
     Headset,
     MessageCircle,
+    MessageSquarePlus,
     MoreVertical,
     Package,
     Plus,
@@ -19,6 +20,7 @@ import {
     RotateCw,
     Search,
     Send,
+    SlidersHorizontal,
     X,
     Zap,
 } from 'lucide-react';
@@ -29,6 +31,9 @@ import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
 import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
 import MediaGallery from '../../components/whatsapp/MediaGallery';
 import CustomerPanel from '../../components/whatsapp/CustomerPanel';
+import MenuTelefono from '../../components/whatsapp/MenuTelefono';
+import NuevoChatModal from '../../components/whatsapp/NuevoChatModal';
+import RespuestasRapidasModal from '../../components/whatsapp/RespuestasRapidasModal';
 import AvisarLlegadaModal from '../../components/whatsapp/AvisarLlegadaModal';
 import { BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
 import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/agente';
@@ -169,6 +174,15 @@ const MobileWhatsApp: React.FC = () => {
     const [cargando, setCargando] = useState(true);
     const [busqueda, setBusqueda] = useState('');
     const [abierta, setAbierta] = useState<Conversacion | null>(null);
+    /**
+     * El teléfono que se tocó DENTRO de un mensaje y dónde estaba en
+     * pantalla, para colgarle el menú al lado. Lo dibuja la pantalla y no
+     * la burbuja porque el hilo tiene scroll propio y ahí adentro el menú
+     * quedaba recortado.
+     */
+    const [menuTelefono, setMenuTelefono] = useState<{ numero: string; ancla: DOMRect } | null>(null);
+    const [nuevoChat, setNuevoChat] = useState(false);
+    const [gestorRapidas, setGestorRapidas] = useState(false);
     const [mensajes, setMensajes] = useState<Mensaje[]>([]);
     const [cargandoChat, setCargandoChat] = useState(false);
     const [borrador, setBorrador] = useState('');
@@ -291,9 +305,10 @@ const MobileWhatsApp: React.FC = () => {
             .then(({ count }) => setCuantosEscalados(count ?? 0));
     }, [conversaciones]);
 
-    // Las respuestas rapidas se cargan una vez: son pocas y no cambian
-    // mientras se atiende.
-    useEffect(() => {
+    // Las respuestas rapidas son pocas y no cambian mientras se atiende,
+    // pero ahora se pueden corregir desde acá: la carga tiene que poder
+    // repetirse cuando el gestor las toca.
+    const cargarRapidas = useCallback(() => {
         supabase
             .from('agent_quick_replies')
             .select('id, label, body')
@@ -301,6 +316,10 @@ const MobileWhatsApp: React.FC = () => {
             .order('sort_order', { ascending: true })
             .then(({ data }) => setRapidas(data ?? []));
     }, []);
+
+    useEffect(() => {
+        cargarRapidas();
+    }, [cargarRapidas]);
 
     // Cerrar los menús al tocar fuera o con Escape. Sin esto quedaban
     // abiertos tapando el hilo hasta volver a tocar el "+".
@@ -667,11 +686,12 @@ const MobileWhatsApp: React.FC = () => {
     };
 
     /**
-     * Abre el chat de una foto de la galería. La lista trae 40 chats, así
-     * que el de una foto vieja puede no estar cargado: si falta, se trae
+     * Abre un chat por su id, venga de donde venga: la galería de fotos, un
+     * teléfono tocado dentro de un mensaje o el chat nuevo. La lista trae
+     * 40 chats, así que uno viejo puede no estar cargado: si falta, se trae
      * ese solo.
      */
-    const irAlChatDeLaFoto = async (id: number) => {
+    const abrirChatPorId = async (id: number) => {
         setGaleria(false);
         const cargado = conversaciones.find((c) => c.id === id);
         if (cargado) {
@@ -926,6 +946,7 @@ const MobileWhatsApp: React.FC = () => {
                         onResponder={setCitando}
                         onReaccionar={reaccionar}
                         onBorrar={borrar}
+                        onTelefono={(numero, ancla) => setMenuTelefono({ numero, ancla })}
                     />
 
                     {/* Lo que se mandó y todavía no salió. Las mismas burbujas
@@ -967,32 +988,55 @@ const MobileWhatsApp: React.FC = () => {
                             {opcionMenu(<ClipboardList size={20} aria-hidden="true" />, 'Anotar un pedido', 0, () =>
                                 setPedidoAbierto(true),
                             )}
-                            {rapidas.length > 0 &&
-                                opcionMenu(<Zap size={20} aria-hidden="true" />, 'Respuestas rápidas', rapidas.length, () =>
-                                    setMenuRapidas(true),
-                                )}
+                            {/* Sin el `rapidas.length > 0` de antes: con la lista
+                                vacía el renglón desaparecía y no había forma de
+                                crear la primera desde el teléfono. */}
+                            {opcionMenu(<Zap size={20} aria-hidden="true" />, 'Respuestas rápidas', rapidas.length, () =>
+                                setMenuRapidas(true),
+                            )}
                         </div>
                     )}
 
                     {/* Respuestas rápidas */}
-                    {menuRapidas && rapidas.length > 0 && (
-                        <div className="absolute bottom-full left-2 right-2 z-20 mb-2 max-h-64 divide-y divide-wa-divider overflow-y-auto rounded-2xl border border-wa-divider bg-wa-panel shadow-2xl">
-                            {rapidas.map((r) => (
-                                <button
-                                    key={r.id}
-                                    onClick={() => {
-                                        // Se agrega a lo ya escrito en vez de pisarlo: muchas
-                                        // veces la respuesta rápida completa algo que ya se
-                                        // estaba escribiendo.
-                                        setBorrador((prev) => (prev.trim() ? `${prev.trim()}\n${r.body}` : r.body));
-                                        setMenuRapidas(false);
-                                    }}
-                                    className="min-h-[52px] w-full px-4 py-2.5 text-left active:bg-wa-hover"
-                                >
-                                    <p className="text-[14px] font-semibold text-wa-text">{r.label}</p>
-                                    <p className="line-clamp-2 text-[12.5px] text-wa-meta">{r.body}</p>
-                                </button>
-                            ))}
+                    {menuRapidas && (
+                        <div className="absolute bottom-full left-2 right-2 z-20 mb-2 overflow-hidden rounded-2xl border border-wa-divider bg-wa-panel shadow-2xl">
+                            <div className="max-h-64 divide-y divide-wa-divider overflow-y-auto">
+                                {rapidas.length === 0 ? (
+                                    <p className="px-4 py-5 text-center text-[13px] text-wa-meta">
+                                        Todavía no hay respuestas rápidas guardadas.
+                                    </p>
+                                ) : (
+                                    rapidas.map((r) => (
+                                    <button
+                                        key={r.id}
+                                        onClick={() => {
+                                            // Se agrega a lo ya escrito en vez de pisarlo: muchas
+                                            // veces la respuesta rápida completa algo que ya se
+                                            // estaba escribiendo.
+                                            setBorrador((prev) => (prev.trim() ? `${prev.trim()}\n${r.body}` : r.body));
+                                            setMenuRapidas(false);
+                                        }}
+                                        className="min-h-[52px] w-full px-4 py-2.5 text-left active:bg-wa-hover"
+                                    >
+                                        <p className="text-[14px] font-semibold text-wa-text">{r.label}</p>
+                                        <p className="line-clamp-2 text-[12.5px] text-wa-meta">{r.body}</p>
+                                    </button>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Sin esto no había forma de crear la primera desde el
+                                teléfono: el menú solo sabía usar las que ya estaban. */}
+                            <button
+                                onClick={() => {
+                                    setMenuRapidas(false);
+                                    setGestorRapidas(true);
+                                }}
+                                className="flex min-h-[52px] w-full items-center gap-2 border-t border-wa-divider px-4 text-left text-[13.5px] font-semibold text-wa-accent-strong active:bg-wa-hover"
+                            >
+                                <SlidersHorizontal size={17} aria-hidden="true" />
+                                Agregar, corregir o quitar
+                            </button>
                         </div>
                     )}
 
@@ -1121,6 +1165,24 @@ const MobileWhatsApp: React.FC = () => {
                     soloTelefono={abierta.phone_number}
                 />
 
+                <RespuestasRapidasModal
+                    isOpen={gestorRapidas}
+                    onClose={() => setGestorRapidas(false)}
+                    userId={userId}
+                    onCambio={cargarRapidas}
+                />
+
+                {/* El menú del teléfono tocado dentro de un mensaje. */}
+                {menuTelefono && (
+                    <MenuTelefono
+                        numero={menuTelefono.numero}
+                        ancla={menuTelefono.ancla}
+                        conversacionActual={abierta.id}
+                        onAbrir={abrirChatPorId}
+                        onCerrar={() => setMenuTelefono(null)}
+                    />
+                )}
+
                 {/* La ficha del cliente, en una hoja que sube desde abajo.
                     Lo que dice -- si tiene descuento, qué repuestos dejó
                     pedidos, cuáles ya llegaron -- hay que tenerlo MIENTRAS se
@@ -1177,7 +1239,7 @@ const MobileWhatsApp: React.FC = () => {
         return (
             <div className="wa-dark flex h-full flex-col bg-wa-panel">
                 <MediaGallery
-                    onIrAlChat={irAlChatDeLaFoto}
+                    onIrAlChat={abrirChatPorId}
                     onCerrar={() => setGaleria(false)}
                     formatearTelefono={formatearTelefono}
                     tactil
@@ -1202,6 +1264,17 @@ const MobileWhatsApp: React.FC = () => {
                                 {sinLeer} sin leer
                             </span>
                         )}
+                        {/* Escribirle a alguien que todavía no escribió: el
+                            número que dio por teléfono o el que está anotado
+                            en un papel. */}
+                        <button
+                            onClick={() => setNuevoChat(true)}
+                            aria-label="Empezar un chat nuevo"
+                            className="flex h-11 w-11 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10"
+                        >
+                            <MessageSquarePlus size={22} aria-hidden="true" />
+                        </button>
+
                         {/* Buscar un comprobante entre las fotos que mandaron
                             los clientes, sin abrir chats de a uno. */}
                         <button
@@ -1384,6 +1457,12 @@ const MobileWhatsApp: React.FC = () => {
                     </button>
                 ))}
             </div>
+
+            <NuevoChatModal
+                isOpen={nuevoChat}
+                onClose={() => setNuevoChat(false)}
+                onAbrir={abrirChatPorId}
+            />
         </div>
     );
 };

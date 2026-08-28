@@ -40,6 +40,16 @@ import {
 
 interface Props {
     isOpen: boolean;
+    /**
+     * `panel`: columna acoplada a la derecha del hilo, para poder ir
+     * leyendo lo que el cliente pidió mientras se arma la cotización --
+     * que es como se trabaja de verdad. `modal`: la ventana centrada de
+     * siempre, para cuando no hay ancho.
+     *
+     * La página decide cuál según el ancho real (ver hooks/useMediaQuery):
+     * es una decisión de QUÉ se monta, no de cómo se ve.
+     */
+    presentacion?: 'modal' | 'panel';
     onClose: () => void;
     conversationId: number;
     clienteLabel: string;
@@ -62,6 +72,7 @@ const Miniatura: React.FC<{ url: string | null; alt: string; className?: string 
 export const ProformaBuilder: React.FC<Props> = ({
     isOpen,
     onClose,
+    presentacion = 'modal',
     conversationId,
     clienteLabel,
     clienteNombre,
@@ -301,14 +312,31 @@ export const ProformaBuilder: React.FC<Props> = ({
 
     if (!isOpen) return null;
 
+    const enPanel = presentacion === 'panel';
+
     return (
-        <div className={modal.overlay} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-            <div className={cn(modal.panel, modal.width.full)} role="dialog" aria-modal="true" aria-label="Armar proforma">
-                <div className={modal.header}>
-                    <div>
-                        <h2 className={modal.title}>Proforma para {clienteLabel}</h2>
-                        <p className={modal.subtitle}>
-                            Agregá los repuestos, ajustá precios y mandala por WhatsApp como imagen.
+        <div
+            className={enPanel ? 'flex h-full min-h-0 flex-col' : modal.overlay}
+            onMouseDown={enPanel ? undefined : (e) => e.target === e.currentTarget && onClose()}
+        >
+            <div
+                className={enPanel ? 'flex h-full min-h-0 flex-1 flex-col bg-surface' : cn(modal.panel, modal.width.full)}
+                role={enPanel ? 'region' : 'dialog'}
+                aria-modal={enPanel ? undefined : true}
+                aria-label="Armar proforma"
+            >
+                <div className={cn(modal.header, enPanel && 'px-4 py-3')}>
+                    <div className="min-w-0">
+                        <h2 className={cn(modal.title, enPanel && 'truncate')}>
+                            {enPanel ? 'Proforma' : `Proforma para ${clienteLabel}`}
+                        </h2>
+                        {/* En el panel el nombre del cliente ya está arriba del
+                            hilo, a dos centímetros: repetirlo gastaría la única
+                            línea que hay para decir algo útil. */}
+                        <p className={cn(modal.subtitle, enPanel && 'truncate text-xs')}>
+                            {enPanel
+                                ? 'Se guarda sola mientras chateás.'
+                                : 'Agregá los repuestos, ajustá precios y mandala por WhatsApp como imagen.'}
                         </p>
                     </div>
                     <button onClick={onClose} className={modal.close} aria-label="Cerrar">
@@ -316,10 +344,17 @@ export const ProformaBuilder: React.FC<Props> = ({
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] flex-1 min-h-0 divide-y lg:divide-y-0 lg:divide-x divide-subtle">
+                <div
+                    className={cn(
+                        'flex-1 min-h-0 divide-subtle',
+                        enPanel
+                            ? 'flex flex-col divide-y'
+                            : 'grid grid-cols-1 lg:grid-cols-[1fr_420px] divide-y lg:divide-y-0 lg:divide-x',
+                    )}
+                >
                     {/* Buscar y agregar */}
-                    <div className="flex flex-col min-h-0">
-                        <div className="px-5 py-3 border-b border-subtle">
+                    <div className={cn('flex flex-col min-h-0', enPanel && 'shrink-0')}>
+                        <div className={cn('border-b border-subtle', enPanel ? 'px-4 py-2.5' : 'px-5 py-3')}>
                             <div className="relative">
                                 <Search size={16} className={input.leadingIcon} aria-hidden="true" />
                                 <input
@@ -340,7 +375,15 @@ export const ProformaBuilder: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        <div className="overflow-y-auto flex-1 min-h-0 divide-y divide-subtle">
+                        <div
+                            className={cn(
+                                'overflow-y-auto min-h-0 divide-y divide-subtle',
+                                // En el panel la lista de resultados es el desplegable
+                                // del buscador, no la mitad de la columna: lo que tiene
+                                // que verse siempre es la proforma que se está armando.
+                                enPanel ? 'max-h-[34vh]' : 'flex-1',
+                            )}
+                        >
                             {termino.trim().length < 2 && proforma.items.length === 0 && (
                                 <div className="py-14 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
                                     <ShoppingCart size={22} className="text-fg-subtle" aria-hidden="true" />
@@ -385,7 +428,7 @@ export const ProformaBuilder: React.FC<Props> = ({
                     </div>
 
                     {/* La proforma */}
-                    <div className="flex flex-col min-h-0 bg-surface-2/40">
+                    <div className={cn('flex flex-col min-h-0 bg-surface-2/40', enPanel && 'flex-1')}>
                         <div className="px-4 py-2.5 border-b border-subtle flex items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-fg">
                                 Proforma ({proforma.items.length} {proforma.items.length === 1 ? 'ítem' : 'ítems'})
@@ -569,10 +612,16 @@ export const ProformaBuilder: React.FC<Props> = ({
                     </div>
                 )}
 
-                <div className={modal.footer}>
-                    {error && <p className="text-xs text-danger mr-auto">{error}</p>}
+                <div
+                    className={
+                        enPanel
+                            ? 'shrink-0 flex flex-col gap-2 border-t border-subtle bg-surface-2 px-4 py-3'
+                            : modal.footer
+                    }
+                >
+                    {error && <p className={cn('text-xs text-danger', !enPanel && 'mr-auto')}>{error}</p>}
                     {!error && hayItems && (
-                        <label className="flex items-center gap-1.5 text-xs text-fg-muted mr-auto">
+                        <label className={cn('flex items-center gap-1.5 text-xs text-fg-muted', !enPanel && 'mr-auto')}>
                             <input
                                 type="checkbox"
                                 className={input.checkbox}
@@ -582,15 +631,21 @@ export const ProformaBuilder: React.FC<Props> = ({
                             Incluir el total en texto
                         </label>
                     )}
-                    <button onClick={onClose} className={cn(button.base, button.variant.secondary, button.size.md)}>
-                        Cerrar
-                    </button>
+                    {/* En el panel cerrar es la X de la cabecera: un "Cerrar"
+                        pegado a "Enviar", en una columna angosta, es el vecino
+                        equivocado del botón que le manda la cotización al
+                        cliente. */}
+                    {!enPanel && (
+                        <button onClick={onClose} className={cn(button.base, button.variant.secondary, button.size.md)}>
+                            Cerrar
+                        </button>
+                    )}
                     {/* El cliente ya aceptó: se pasa al POS a cobrar, sin
                         re-tipear precios ni cantidades. */}
                     <button
                         onClick={pasarAlPos}
                         disabled={!hayItems || convirtiendo || enviando}
-                        className={cn(button.base, button.variant.secondary, button.size.md)}
+                        className={cn(button.base, button.variant.secondary, button.size.md, enPanel && 'order-2 w-full')}
                         title="Cargar estos repuestos en el carrito del POS para cobrar"
                     >
                         {convirtiendo ? (
@@ -603,7 +658,7 @@ export const ProformaBuilder: React.FC<Props> = ({
                     <button
                         onClick={enviar}
                         disabled={!hayItems || enviando}
-                        className={cn(button.base, button.variant.primary, button.size.md)}
+                        className={cn(button.base, button.variant.primary, button.size.md, enPanel && 'order-1 w-full')}
                     >
                         {enviando ? (
                             <Loader2 size={15} className="animate-spin" aria-hidden="true" />

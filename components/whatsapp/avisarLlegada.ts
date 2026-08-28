@@ -1,6 +1,12 @@
 import { supabase } from '../../supabaseClient';
 import { normalizePhoneEC } from '../../utils/phone';
 import {
+    colaTelefono,
+    crearConversacion,
+    pareceLid,
+    telefonoUtilizable,
+} from '../../utils/conversacionesWhatsapp';
+import {
     encolarMensajes,
     formatearPrecio,
     mimeDeUrl,
@@ -150,25 +156,6 @@ export const DIAS_PARA_REINSISTIR = 7;
 
 const ESTADOS_AVISABLES: EstadoAvisable[] = ['stock_available', 'pending_stock'];
 
-/** Los últimos 9 dígitos: el número local, sin el 0 ni el código de país. */
-function cola(numero: string): string {
-    return numero.replace(/\D/g, '').slice(-9);
-}
-
-/**
- * Un LID de WhatsApp es un identificador interno, no un teléfono. Se
- * distingue por el largo, mismo criterio que usa el agente
- * (`agente/src/utils/phone.ts`): los teléfonos con código de país llegan a
- * 13 dígitos como mucho, los LIDs son de 14-15.
- *
- * Importa acá porque la búsqueda por cola compara los últimos 9 dígitos, y
- * sin este filtro un LID podría "coincidir" con el teléfono de otra
- * persona -- y el aviso saldría al chat equivocado.
- */
-function pareceLid(numero: string): boolean {
-    return numero.replace(/\D/g, '').length > 13;
-}
-
 interface FilaConversacion {
     id: number;
     phone_number: string;
@@ -222,12 +209,12 @@ async function resolverConversaciones(telefonos: string[]): Promise<Map<string, 
     }
 
     // --- 2) Por los últimos 9 dígitos ----------------------------------
-    const faltantes = unicos.filter((t) => !salida.has(t) && cola(t).length >= 7);
+    const faltantes = unicos.filter((t) => !salida.has(t) && colaTelefono(t).length >= 7);
     if (faltantes.length === 0) return salida;
 
     const porCola = new Map<string, string[]>();
     for (const tel of faltantes) {
-        const c = cola(tel);
+        const c = colaTelefono(tel);
         const lista = porCola.get(c);
         if (lista) lista.push(tel);
         else porCola.set(c, [tel]);
@@ -254,7 +241,7 @@ async function resolverConversaciones(telefonos: string[]): Promise<Map<string, 
             const cuando = new Date(fila.last_message_at ?? 0).getTime();
             actividad.set(fila.id, cuando);
 
-            const c = cola(fila.phone_number);
+            const c = colaTelefono(fila.phone_number);
             for (const original of porCola.get(c) ?? []) {
                 // Puede haber más de una conversación terminada en los
                 // mismos 9 dígitos (el mismo número guardado de dos
@@ -350,7 +337,7 @@ export async function cargarPorAvisar(alcance: AlcanceAviso = {}): Promise<Lista
     }
 
     if (soloTelefono) {
-        const c = cola(soloTelefono);
+        const c = colaTelefono(soloTelefono);
         // Igual que la ficha del cliente: `product_demands` guarda el
         // teléfono como lo escribió quien creó el pedido, así que se
         // compara por los últimos dígitos y no por igualdad.
@@ -593,46 +580,16 @@ export function mensajesDeAviso(
 async function asegurarConversacion(demanda: DemandaPorAvisar): Promise<number> {
     if (demanda.conversationId) return demanda.conversationId;
 
-    const numero = normalizePhoneEC(demanda.phone_number);
-    // Un teléfono ecuatoriano normalizado son 12 dígitos (593 + 9). Se
-    // exige un mínimo para no abrir un chat contra un número recortado, y
-    // un máximo porque más de 13 dígitos ya no es un teléfono sino un LID.
-    if (numero.length < 10 || numero.length > 13) {
+    // El mensaje de error se arma acá y no en el utilitario porque solo
+    // desde esta pantalla tiene sentido decir dónde se corrige.
+    if (!telefonoUtilizable(demanda.phone_number)) {
         throw new Error(
             `El teléfono de este pedido no parece válido ("${demanda.phone_number}"). ` +
                 'Corregilo en Solicitudes antes de avisar.',
         );
     }
 
-    const { data, error } = await supabase
-        .from('agent_conversations')
-        .insert({
-            phone_number: numero,
-            customer_name: demanda.customer_name?.trim() || null,
-            // La abre una persona para escribir, no el bot. `bot_enabled`
-            // ya viene en false por defecto (migración 0017); el estado se
-            // pone acorde para que la bandeja no lo muestre como un chat
-            // que el agente está atendiendo solo.
-            status: 'human_active',
-        })
-        .select('id')
-        .maybeSingle();
-
-    if (!error && data?.id) return data.id;
-
-    // 23505 = ya existía (`phone_number` es UNIQUE). Pasa si dos personas
-    // avisan a la vez, o si el cliente escribió entre que se cargó la
-    // lista y se tocó el botón. No es un fallo: hay que usar la que está.
-    if (error && error.code !== '23505') throw error;
-
-    const { data: existente, error: errorBusqueda } = await supabase
-        .from('agent_conversations')
-        .select('id')
-        .eq('phone_number', numero)
-        .maybeSingle();
-    if (errorBusqueda) throw errorBusqueda;
-    if (!existente?.id) throw new Error('No se pudo abrir la conversación para este número.');
-    return existente.id;
+    return crearConversacion(demanda.phone_number, demanda.customer_name);
 }
 
 /**
