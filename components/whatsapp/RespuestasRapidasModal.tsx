@@ -227,6 +227,7 @@ export const RespuestasRapidasModal: React.FC<Props> = ({
         <Modal
             isOpen={isOpen}
             onClose={onClose}
+            presentation="side-panel"
             title="Respuestas rápidas"
             subtitle="Los textos que el equipo repite todo el día. Se comparten entre todos."
             width="lg"

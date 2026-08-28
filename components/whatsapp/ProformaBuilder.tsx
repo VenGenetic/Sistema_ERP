@@ -331,11 +331,11 @@ export const ProformaBuilder: React.FC<Props> = ({
 
     return (
         <div
-            className={enPanel ? 'flex h-full min-h-0 flex-col' : modal.overlay}
+            className={enPanel ? 'flex h-full min-h-0 flex-col' : cn(modal.overlay, 'lg:pointer-events-none lg:justify-end lg:bg-transparent lg:p-0 lg:backdrop-blur-none')}
             onMouseDown={enPanel ? undefined : (e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={enPanel ? 'flex h-full min-h-0 flex-1 flex-col bg-surface' : cn(modal.panel, modal.width.full)}
+                className={enPanel ? 'flex h-full min-h-0 flex-1 flex-col bg-surface' : cn(modal.panel, modal.width.full, 'lg:pointer-events-auto lg:h-full lg:max-h-full lg:w-[520px] lg:max-w-[520px] lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-2xl')}
                 role={enPanel ? 'region' : 'dialog'}
                 aria-modal={enPanel ? undefined : true}
                 aria-label="Armar proforma"
@@ -362,9 +362,7 @@ export const ProformaBuilder: React.FC<Props> = ({
                 <div
                     className={cn(
                         'flex-1 min-h-0 divide-subtle',
-                        enPanel
-                            ? 'flex flex-col divide-y'
-                            : 'grid grid-cols-1 lg:grid-cols-[1fr_420px] divide-y lg:divide-y-0 lg:divide-x',
+                        'flex flex-col divide-y',
                     )}
                 >
                     {/* Buscar y agregar */}

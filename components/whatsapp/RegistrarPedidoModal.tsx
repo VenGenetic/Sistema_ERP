@@ -148,8 +148,8 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
     if (!isOpen) return null;
 
     return (
-        <div className={modal.overlay} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-            <div className={cn(modal.panel, modal.width.lg)} role="dialog" aria-modal="true" aria-label="Anotar pedido">
+        <div className={cn(modal.overlay, 'lg:pointer-events-none lg:justify-end lg:bg-transparent lg:p-0 lg:backdrop-blur-none')} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+            <div className={cn(modal.panel, modal.width.lg, 'lg:pointer-events-auto lg:h-full lg:max-h-full lg:w-[480px] lg:max-w-[480px] lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-2xl')} role="dialog" aria-modal="true" aria-label="Anotar pedido">
                 <div className={modal.header}>
                     <div>
                         <h2 className={modal.title}>Anotar un pedido</h2>

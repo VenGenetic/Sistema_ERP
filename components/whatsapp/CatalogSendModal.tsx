@@ -259,8 +259,8 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
     if (!isOpen) return null;
 
     return (
-        <div className={modal.overlay} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-            <div className={cn(modal.panel, modal.width.full)} role="dialog" aria-modal="true" aria-label="Enviar del catálogo">
+        <div className={cn(modal.overlay, 'lg:pointer-events-none lg:justify-end lg:bg-transparent lg:p-0 lg:backdrop-blur-none')} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+            <div className={cn(modal.panel, modal.width.full, 'lg:pointer-events-auto lg:h-full lg:max-h-full lg:w-[520px] lg:max-w-[520px] lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-2xl')} role="dialog" aria-modal="true" aria-label="Enviar del catálogo">
                 <div className={modal.header}>
                     <div>
                         <h2 className={modal.title}>Enviar del catálogo</h2>
@@ -273,7 +273,7 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] flex-1 min-h-0 divide-y lg:divide-y-0 lg:divide-x divide-subtle">
+                <div className="grid grid-cols-1 flex-1 min-h-0 divide-y divide-subtle overflow-y-auto">
                     {/* Buscador + resultados */}
                     <div className="flex flex-col min-h-0">
                         <div className="px-5 py-3 border-b border-subtle">

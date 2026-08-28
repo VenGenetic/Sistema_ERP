@@ -22,6 +22,8 @@ export interface ModalProps {
   /** Desactiva el cierre con Escape. */
   dismissOnEscape?: boolean;
   hideCloseButton?: boolean;
+  /** En escritorio lo acopla a la derecha y deja el contenido de fondo visible y utilizable. */
+  presentation?: 'modal' | 'side-panel';
   className?: string;
   children: React.ReactNode;
 }
@@ -47,6 +49,7 @@ export const Modal: React.FC<ModalProps> = ({
   dismissOnOverlay = true,
   dismissOnEscape = true,
   hideCloseButton = false,
+  presentation = 'modal',
   className,
   children,
 }) => {
@@ -132,7 +135,10 @@ export const Modal: React.FC<ModalProps> = ({
 
   return createPortal(
     <div
-      className={modal.overlay}
+      className={cn(
+        modal.overlay,
+        presentation === 'side-panel' && 'lg:pointer-events-none lg:justify-end lg:bg-transparent lg:p-0 lg:backdrop-blur-none',
+      )}
       onMouseDown={(event) => {
         // mousedown (no click) evita cerrar si el arrastre empezó dentro del panel.
         if (dismissOnOverlay && event.target === event.currentTarget) onClose();
@@ -144,7 +150,12 @@ export const Modal: React.FC<ModalProps> = ({
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        className={cn(modal.panel, modal.width[width], className)}
+        className={cn(
+          modal.panel,
+          modal.width[width],
+          presentation === 'side-panel' && 'lg:pointer-events-auto lg:h-full lg:max-h-full lg:w-[480px] lg:max-w-[480px] lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-2xl',
+          className,
+        )}
       >
         {(title || !hideCloseButton) && (
           <div className={modal.header}>
