@@ -3,9 +3,9 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Archive,
   BarChart3,
+  Building2,
   Boxes,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
@@ -118,8 +118,8 @@ const routeMatches = (pathname: string, to: string) =>
 
 const Badge = ({ value, compact = false }: { value?: number; compact?: boolean }) => {
   if (!value) return null;
-  if (compact) return <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-950" />;
-  return <span className="ml-auto min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-bold leading-4 text-white">{value > 99 ? '99+' : value}</span>;
+  if (compact) return <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-slate-950" />;
+  return <span className="ml-auto min-w-5 rounded-full border border-amber-300/30 bg-amber-400/15 px-1.5 py-0.5 text-center text-[10px] font-bold leading-4 text-amber-200">{value > 99 ? '99+' : value}</span>;
 };
 
 export default function Layout() {
@@ -221,7 +221,7 @@ export default function Layout() {
           to={item.to}
           title={compact ? item.title : undefined}
           aria-current={active ? 'page' : undefined}
-          className={`relative flex min-h-10 items-center rounded-xl text-sm font-medium transition-colors ${compact ? 'mx-2 justify-center px-2' : 'mx-2 gap-3 px-3 pr-9'} ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'}`}
+          className={`relative flex min-h-10 cursor-pointer items-center rounded-lg text-sm font-medium transition-colors duration-150 focus-visible:ring-offset-slate-950 ${compact ? 'mx-2 justify-center px-2' : 'mx-2 gap-3 px-3 pr-9'} ${active ? 'bg-blue-600 text-white shadow-[inset_3px_0_0_#fbbf24,0_5px_18px_rgba(30,64,175,.3)]' : 'text-slate-300 hover:bg-white/8 hover:text-white'}`}
         >
           <Icon className="h-[18px] w-[18px] shrink-0" />
           {!compact && <span className="truncate">{item.label}</span>}
@@ -231,7 +231,7 @@ export default function Layout() {
           <button
             type="button"
             onClick={() => toggleFavorite(item.id)}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 transition-opacity hover:bg-black/10 ${isFavorite ? 'text-amber-400 opacity-100' : 'text-slate-400 opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded p-1 transition-opacity hover:bg-white/10 ${isFavorite ? 'text-amber-400 opacity-100' : 'text-slate-500 opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
             title={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
             aria-label={isFavorite ? `Quitar ${item.label} de favoritos` : `Añadir ${item.label} a favoritos`}
           >
@@ -244,18 +244,18 @@ export default function Layout() {
 
   const SidebarContent = ({ compact = false }: { compact?: boolean }) => (
     <>
-      <div className={`flex h-16 items-center border-b border-slate-200 dark:border-slate-800 ${compact ? 'justify-center px-2' : 'justify-between px-4'}`}>
-        {!compact && <div><div className="font-bold tracking-tight text-slate-950 dark:text-white">ERP</div><div className="text-[10px] uppercase tracking-widest text-slate-400">Operaciones</div></div>}
-        <button type="button" onClick={() => setCollapsed(value => !value)} className="hidden rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 lg:block" title={compact ? 'Expandir menú' : 'Contraer menú'}>
+      <div className={`flex h-16 items-center border-b border-white/10 ${compact ? 'justify-center px-2' : 'justify-between px-4'}`}>
+        {!compact && <div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-lg shadow-blue-950/30"><Building2 className="h-5 w-5" /></span><div className="min-w-0"><div className="truncate text-sm font-bold tracking-wide text-white">XSISTEM ERP</div><div className="truncate text-[9px] font-semibold uppercase tracking-[0.18em] text-blue-300">Gestión empresarial</div></div></div>}
+        <button type="button" onClick={() => setCollapsed(value => !value)} className="hidden cursor-pointer rounded-lg p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white lg:block" title={compact ? 'Expandir menú' : 'Contraer menú'}>
           {compact ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
         </button>
-        {!compact && <button type="button" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"><X className="h-5 w-5" /></button>}
+        {!compact && <button type="button" onClick={() => setMobileOpen(false)} className="cursor-pointer rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white lg:hidden"><X className="h-5 w-5" /></button>}
       </div>
       <nav className="flex-1 space-y-2 overflow-y-auto py-3">
         <NavigationLink item={DASHBOARD} compact={compact} favoriteControl={false} />
         {favoriteItems.length > 0 && (
-          <section className="border-y border-slate-100 py-2 dark:border-slate-800/70">
-            {!compact && <div className="px-5 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">★ Favoritos</div>}
+          <section className="border-y border-white/8 py-2">
+            {!compact && <div className="flex items-center gap-1.5 px-5 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Favoritos</div>}
             <div className="space-y-1">{favoriteItems.map(item => <NavigationLink key={`favorite-${item.id}`} item={item} compact={compact} favoriteControl={false} />)}</div>
           </section>
         )}
@@ -266,58 +266,60 @@ export default function Layout() {
               <button
                 type="button"
                 onClick={() => !compact && setOpenGroups(current => ({ ...current, [group.id]: !current[group.id] }))}
-                className={`flex w-full items-center py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 ${compact ? 'justify-center px-2' : 'justify-between px-5'}`}
+                className={`flex w-full cursor-pointer items-center py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 transition-colors hover:text-slate-200 ${compact ? 'justify-center px-2' : 'justify-between px-5'}`}
                 title={compact ? group.label : undefined}
                 aria-expanded={opened}
               >
-                {compact ? <span className="h-px w-5 bg-slate-300 dark:bg-slate-700" /> : <><span>{group.label}</span>{opened ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</>}
+                {compact ? <span className="h-px w-5 bg-slate-700" /> : <><span>{group.label}</span>{opened ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</>}
               </button>
               {opened && <div className="space-y-1">{group.items.map(item => <NavigationLink key={item.id} item={item} compact={compact} />)}</div>}
             </section>
           );
         })}
       </nav>
-      <div className="border-t border-slate-200 p-2 dark:border-slate-800">
-        <a href="#/pos" target="_blank" rel="noreferrer" title={compact ? 'Abrir POS' : undefined} className={`flex items-center rounded-xl py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 ${compact ? 'justify-center px-2' : 'gap-3 px-3'}`}>
-          <ShoppingCart className="h-[18px] w-[18px]" />{!compact && <span>Abrir POS</span>}
+      <div className="border-t border-white/10 p-2">
+        <a href="#/pos" target="_blank" rel="noreferrer" title={compact ? 'Abrir punto de venta' : undefined} className={`flex cursor-pointer items-center rounded-lg bg-white/5 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 hover:text-white ${compact ? 'justify-center px-2' : 'gap-3 px-3'}`}>
+          <ShoppingCart className="h-[18px] w-[18px] text-amber-400" />{!compact && <span className="flex-1">Punto de venta</span>}{!compact && <span className="h-2 w-2 rounded-full bg-emerald-400" title="Disponible" />}
         </a>
       </div>
     </>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <aside className={`fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-slate-200 bg-white transition-[width] duration-200 dark:border-slate-800 dark:bg-slate-950 lg:flex ${collapsed ? 'w-16' : 'w-64'}`}>
+    <div className="min-h-screen bg-bg text-fg">
+      <a href="#erp-main-content" className="fixed left-4 top-3 z-[200] -translate-y-20 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-fg shadow-lg transition-transform focus:translate-y-0">Saltar al contenido</a>
+      <aside className={`fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-slate-800 bg-slate-950 shadow-[8px_0_30px_rgba(15,23,42,.08)] transition-[width] duration-200 lg:flex ${collapsed ? 'w-16' : 'w-64'}`}>
         <SidebarContent compact={collapsed} />
       </aside>
 
       {mobileOpen && <button type="button" aria-label="Cerrar menú" className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px] lg:hidden" onClick={() => setMobileOpen(false)} />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-white shadow-2xl transition-transform dark:bg-slate-950 lg:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-slate-950 shadow-2xl transition-transform lg:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <SidebarContent />
       </aside>
 
       <div className={`min-h-screen transition-[padding] duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 sm:px-6">
-          <button type="button" onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden" aria-label="Abrir menú"><Menu className="h-5 w-5" /></button>
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-subtle bg-surface/95 px-4 shadow-[0_1px_12px_rgba(15,23,42,.04)] backdrop-blur-xl sm:px-6">
+          <button type="button" onClick={() => setMobileOpen(true)} className="cursor-pointer rounded-lg p-2 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg lg:hidden" aria-label="Abrir menú"><Menu className="h-5 w-5" /></button>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{activeItem?.title || 'Sistema ERP'}</div>
-            <div className="hidden truncate text-xs text-slate-400 sm:block">{userProfile?.full_name || session?.user?.email || 'Panel de trabajo'}</div>
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.14em] text-primary"><span>Xsistem</span><ChevronRight className="h-3 w-3 text-fg-subtle" /><span className="truncate text-fg-muted">{visibleGroups.find(group => group.items.some(item => item.id === activeItem?.id))?.label || 'General'}</span></div>
+            <div className="truncate text-base font-bold tracking-tight text-fg">{activeItem?.title || 'Sistema ERP'}</div>
           </div>
-          <button type="button" onClick={() => setPaletteOpen(true)} className="hidden min-w-52 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 transition hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 sm:flex">
-            <Search className="h-4 w-4" /><span className="flex-1 text-left">Buscar módulo o acción</span><kbd className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] dark:border-slate-700 dark:bg-slate-950">Ctrl K</kbd>
+          <div className="hidden items-center gap-2 border-r border-subtle pr-3 xl:flex"><span className="h-2 w-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/10" /><span className="max-w-40 truncate text-xs font-medium text-fg-muted">{userProfile?.full_name || session?.user?.email || 'Sesión activa'}</span></div>
+          <button type="button" onClick={() => setPaletteOpen(true)} className="hidden min-w-56 cursor-pointer items-center gap-2 rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-sm text-fg-muted transition-colors hover:border-strong hover:bg-surface sm:flex">
+            <Search className="h-4 w-4" /><span className="flex-1 text-left">Buscar en el ERP</span><kbd className="rounded border border-subtle bg-surface px-1.5 py-0.5 text-[10px] text-fg-subtle">Ctrl K</kbd>
           </button>
-          <button type="button" onClick={() => setPaletteOpen(true)} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 sm:hidden" aria-label="Buscar módulos"><Search className="h-5 w-5" /></button>
+          <button type="button" onClick={() => setPaletteOpen(true)} className="cursor-pointer rounded-lg p-2 text-fg-muted hover:bg-surface-hover sm:hidden" aria-label="Buscar módulos"><Search className="h-5 w-5" /></button>
           <ThemeToggle />
           <HeaderAccount />
         </header>
-        <main className="min-w-0"><Outlet /></main>
+        <main id="erp-main-content" className="min-w-0" tabIndex={-1}><Outlet /></main>
       </div>
 
       {paletteOpen && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/55 px-4 pt-[12vh] backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) setPaletteOpen(false); }}>
-          <div role="dialog" aria-modal="true" aria-label="Buscar módulos y comandos" className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-center gap-3 border-b border-slate-200 px-4 dark:border-slate-700">
-              <Command className="h-5 w-5 text-blue-500" />
+          <div role="dialog" aria-modal="true" aria-label="Buscar módulos y comandos" className="w-full max-w-xl overflow-hidden rounded-2xl border border-subtle bg-surface shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-subtle px-4">
+              <Command className="h-5 w-5 text-primary" />
               <input
                 ref={commandInputRef}
                 value={commandQuery}
@@ -328,21 +330,21 @@ export default function Layout() {
                   if (event.key === 'Enter' && commandResults[selectedCommand]) runCommand(commandResults[selectedCommand]);
                 }}
                 placeholder="Escribe: gasto, cliente, WhatsApp…"
-                className="h-14 flex-1 bg-transparent text-base outline-none placeholder:text-slate-400"
+                className="h-14 flex-1 bg-transparent text-base text-fg outline-none placeholder:text-fg-subtle"
               />
-              <kbd className="rounded border border-slate-200 px-2 py-1 text-[10px] text-slate-400 dark:border-slate-700">ESC</kbd>
+              <kbd className="rounded border border-subtle bg-surface-2 px-2 py-1 text-[10px] text-fg-subtle">ESC</kbd>
             </div>
             <div className="max-h-[55vh] overflow-y-auto p-2">
               {commandResults.length ? commandResults.map((item, index) => {
                 const Icon = item.icon;
                 return (
-                  <button key={item.id} type="button" onMouseEnter={() => setSelectedCommand(index)} onClick={() => runCommand(item)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left ${selectedCommand === index ? 'bg-blue-600 text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                    <Icon className="h-5 w-5 shrink-0" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{item.label}</span><span className={`block truncate text-xs ${selectedCommand === index ? 'text-blue-100' : 'text-slate-400'}`}>{item.title}</span></span><ChevronRight className="h-4 w-4 opacity-60" />
+                  <button key={item.id} type="button" onMouseEnter={() => setSelectedCommand(index)} onClick={() => runCommand(item)} className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${selectedCommand === index ? 'bg-primary text-primary-fg' : 'text-fg hover:bg-surface-hover'}`}>
+                    <Icon className="h-5 w-5 shrink-0" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{item.label}</span><span className={`block truncate text-xs ${selectedCommand === index ? 'text-white/70' : 'text-fg-muted'}`}>{item.title}</span></span><ChevronRight className="h-4 w-4 opacity-60" />
                   </button>
                 );
-              }) : <div className="px-4 py-10 text-center text-sm text-slate-400">No se encontraron módulos o acciones.</div>}
+              }) : <div className="px-4 py-10 text-center text-sm text-fg-muted">No se encontraron módulos o acciones.</div>}
             </div>
-            <div className="flex gap-4 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800"><span>↑↓ navegar</span><span>↵ abrir</span><span>Esc cerrar</span></div>
+            <div className="flex gap-4 border-t border-subtle bg-surface-2 px-4 py-2 text-[11px] text-fg-subtle"><span>↑↓ navegar</span><span>↵ abrir</span><span>Esc cerrar</span></div>
           </div>
         </div>
       )}

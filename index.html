@@ -44,15 +44,15 @@
   <!-- viewport-fit=cover: sin esto env(safe-area-inset-*) devuelve 0 en iOS y la
        barra inferior del móvil queda debajo del notch / la barra de gestos. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DropshipERP Suite</title>
+  <title>Xsistem ERP | Gestión empresarial</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
   <link rel="manifest" href="/site.webmanifest">
-  <meta name="msapplication-TileColor" content="#da532c">
+  <meta name="msapplication-TileColor" content="#172554">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -95,7 +95,7 @@
          se lee como una sola lámina. El fondo es claramente gris para que
          las superficies blancas se despeguen por sí solas, sin depender de
          sombras fuertes (que romperían la serenidad). */
-      --bg: 236 239 244;
+      --bg: 243 246 250;
       /* fondo de página — gris definido           */
       --surface: 255 255 255;
       /* tarjetas, tablas, modales — blanco puro   */
@@ -113,7 +113,7 @@
       /* borde de input          3.3:1  croma 13% */
 
       /* Texto — 3 niveles bastan para una interfaz densa */
-      --fg: 27 36 54;
+      --fg: 23 32 51;
       /* títulos, totales       15.7:1 (negro suavizado, no #000) */
       --fg-muted: 98 109 128;
       /* dato secundario         5.0:1 */
@@ -123,12 +123,12 @@
       /* Acentos funcionales — un tono por significado, nunca decorativo.
          Cada color trae su `-fg`: el texto que va ENCIMA del color.
          En claro los acentos son oscuros, así que su `-fg` es blanco. */
-      --primary: 60 107 160;
-      /* azul acero              5.1:1  croma 45% */
-      --primary-hover: 50 90 135;
+      --primary: 30 64 175;
+      /* azul corporativo        8.7:1 sobre blanco */
+      --primary-hover: 30 58 138;
       --primary-fg: 255 255 255;
-      --primary-soft: 237 242 248;
-      --primary-soft-fg: 47 85 128;
+      --primary-soft: 235 240 255;
+      --primary-soft-fg: 30 58 138;
       /* 6.6:1 */
 
       --success: 59 115 85;
@@ -153,7 +153,7 @@
       --danger-soft-fg: 142 57 52;
       /* 7.0:1 */
 
-      --ring: 60 107 160;
+      --ring: 37 99 235;
       /* anillo de foco = primario */
 
       /* Tinte de elevación (las sombras van teñidas, nunca negro puro) */
@@ -217,11 +217,11 @@
       /* Oscuro sereno: superficies con azul apagado en vez de negro puro.
          Los escalones entre --bg / --surface / --surface-2 son cortos a
          propósito, para que la jerarquía se lea sin bordes duros. */
-      --bg: 18 22 31;
-      --surface: 26 31 43;
-      --surface-2: 31 37 50;
-      --surface-3: 38 45 60;
-      --surface-hover: 36 43 57;
+      --bg: 11 18 32;
+      --surface: 17 27 46;
+      --surface-2: 23 35 57;
+      --surface-3: 30 44 68;
+      --surface-hover: 27 41 64;
 
       --border: 46 55 70;
       --border-strong: 104 115 141;
@@ -236,12 +236,12 @@
       /* En oscuro los acentos son CLAROS, así que el texto que va encima
          es tinta oscura, no blanco. Por eso cada `-fg` se invierte aquí:
          blanco sobre un ocre claro daría 2.2:1 (ilegible). */
-      --primary: 124 163 212;
+      --primary: 147 197 253;
       /* azul acero claro    7.0:1  croma 51% */
-      --primary-hover: 153 184 224;
+      --primary-hover: 191 219 254;
       --primary-fg: 16 22 32;
-      --primary-soft: 35 54 79;
-      --primary-soft-fg: 184 208 234;
+      --primary-soft: 23 49 91;
+      --primary-soft-fg: 191 219 254;
 
       --success: 111 175 141;
       /* salvia claro        7.4:1  croma 29% */
@@ -262,7 +262,7 @@
       --danger-soft: 69 33 31;
       --danger-soft-fg: 239 184 179;
 
-      --ring: 124 163 212;
+      --ring: 96 165 250;
       --shadow-color: 0 0 0;
 
       /* WhatsApp oscuro — ver la nota en :root */
@@ -317,7 +317,7 @@
        Al añadir un token nuevo arriba, añádelo también aquí.
        ====================================================================== */
     .on-paper {
-      --bg: 236 239 244;
+      --bg: 243 246 250;
       --surface: 255 255 255;
       --surface-2: 246 248 251;
       --surface-3: 226 231 239;
@@ -326,15 +326,15 @@
       --border: 216 222 231;
       --border-strong: 134 143 161;
 
-      --fg: 27 36 54;
+      --fg: 23 32 51;
       --fg-muted: 98 109 128;
       --fg-subtle: 131 142 159;
 
-      --primary: 60 107 160;
-      --primary-hover: 50 90 135;
+      --primary: 30 64 175;
+      --primary-hover: 30 58 138;
       --primary-fg: 255 255 255;
-      --primary-soft: 237 242 248;
-      --primary-soft-fg: 47 85 128;
+      --primary-soft: 235 240 255;
+      --primary-soft-fg: 30 58 138;
 
       --success: 59 115 85;
       --success-fg: 255 255 255;
@@ -352,7 +352,7 @@
       --danger-soft: 250 238 237;
       --danger-soft-fg: 142 57 52;
 
-      --ring: 60 107 160;
+      --ring: 37 99 235;
       --shadow-color: 27 36 54;
     }
 

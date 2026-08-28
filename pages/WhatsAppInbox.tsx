@@ -230,7 +230,7 @@ const Avatar: React.FC<{ nombre: string | null; telefono: string; tam?: 'sm' | '
     );
 };
 
-type Tab = 'pending' | 'resolved' | 'all';
+type Tab = 'pending' | 'resolved' | 'all' | 'unread';
 
 /** Tope de mensajes que se traen de una conversación (los más recientes). */
 const MENSAJES_VISIBLES = 100;
@@ -493,6 +493,9 @@ const WhatsAppInbox: React.FC = () => {
      */
     const searchRef = useRef(search);
     searchRef.current = search;
+    /** El filtro vigente también debe respetarse en recargas de realtime. */
+    const tabRef = useRef(tab);
+    tabRef.current = tab;
 
     /** Contenedor del hilo, para dejarlo scrolleado en el último mensaje. */
     const hiloRef = useRef<HTMLDivElement | null>(null);
@@ -525,6 +528,7 @@ const WhatsAppInbox: React.FC = () => {
                 .limit(CONVERSACIONES_POR_PAGINA);
             const filtro = filtroBusqueda(searchRef.current);
             if (filtro) q = q.or(filtro);
+            if (tabRef.current === 'unread') q = q.gt('unread_count', 0);
             return q;
         };
 
@@ -667,6 +671,13 @@ const WhatsAppInbox: React.FC = () => {
              */
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agent_conversations' }, (payload) => {
                 const fila = payload.new as Conversation;
+                // En "No leídos" una conversación puede entrar o salir con
+                // este UPDATE; la consulta mantiene el filtro exacto.
+                if (tabRef.current === 'unread') {
+                    clearTimeout(conversationsTimer);
+                    conversationsTimer = setTimeout(() => fetchConversations(true), AGRUPAR_MS);
+                    return;
+                }
                 setConversations((prev) => {
                     if (!prev.some((c) => c.id === fila.id)) return prev;
                     const parcheadas = prev.map((c) => (c.id === fila.id ? { ...c, ...fila } : c));
@@ -719,7 +730,7 @@ const WhatsAppInbox: React.FC = () => {
     useEffect(() => {
         const t = setTimeout(() => fetchConversations(), 350);
         return () => clearTimeout(t);
-    }, [search, fetchConversations]);
+    }, [search, tab, fetchConversations]);
 
     /**
      * Deja el hilo abajo del todo: al abrir un chat con historial se
@@ -781,11 +792,12 @@ const WhatsAppInbox: React.FC = () => {
     );
 
     const filteredConversations = useMemo(() => {
+        if (tab === 'unread') return conversations.filter((c) => c.unread_count > 0);
         if (!etapasDelFiltro) return conversations;
         // Una fila sin `etapa` (migración sin correr) no se esconde: sin el
         // dato, sacarla de la lista sería peor que mostrarla de más.
         return conversations.filter((c) => !c.etapa || etapasDelFiltro.includes(c.etapa));
-    }, [conversations, etapasDelFiltro]);
+    }, [conversations, etapasDelFiltro, tab]);
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
@@ -831,7 +843,7 @@ const WhatsAppInbox: React.FC = () => {
     // así el botón refleja el estado real aunque el escalamiento se haya
     // traído antes del último cambio.
     const selected: SelectedContext | null = useMemo(() => {
-        if (tab === 'all') {
+        if (tab === 'all' || tab === 'unread') {
             const conv = conversations.find((c) => c.id === selectedConversationId);
             if (!conv) return null;
             return {
@@ -1646,6 +1658,7 @@ const WhatsAppInbox: React.FC = () => {
                             {(
                                 [
                                     { id: 'all' as Tab, texto: 'Todas', cuenta: null },
+                                    { id: 'unread' as Tab, texto: 'No leídos', cuenta: metricas.sinLeer },
                                     { id: 'pending' as Tab, texto: 'Pendientes', cuenta: pendingCount },
                                     { id: 'resolved' as Tab, texto: 'Resueltas', cuenta: null },
                                 ]
@@ -1711,15 +1724,17 @@ const WhatsAppInbox: React.FC = () => {
                     {/* Cada pestaña espera SU propia carga: la de "Todas" usaba el
                         loading de escalamientos y por eso mostraba "no hay
                         conversaciones" mientras la consulta seguía en vuelo. */}
-                    {(tab === 'all' ? conversationsLoading : loading) ? (
+                    {(tab === 'all' || tab === 'unread' ? conversationsLoading : loading) ? (
                         <div className="p-8 text-center text-sm text-wa-meta">Cargando…</div>
-                    ) : tab === 'all' ? (
+                    ) : tab === 'all' || tab === 'unread' ? (
                         filteredConversations.length === 0 ? (
                             <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
                                 <Inbox size={22} aria-hidden="true" />
                                 {search.trim()
                                     ? `Ningún cliente coincide con "${search.trim()}".`
-                                    : 'Todavía no hay conversaciones de WhatsApp.'}
+                                    : tab === 'unread'
+                                      ? 'No tienes mensajes sin leer.'
+                                      : 'Todavía no hay conversaciones de WhatsApp.'}
                             </div>
                         ) : (
                             filteredConversations.map((c) => (
@@ -1821,14 +1836,14 @@ const WhatsAppInbox: React.FC = () => {
                         )
                     ) : null}
 
-                    {tab === 'all' && !conversationsLoading && hayMas && (
+                    {(tab === 'all' || tab === 'unread') && !conversationsLoading && hayMas && (
                         <p className="px-4 py-3 text-center text-[12px] text-wa-meta">
                             Mostrando las {conversations.length} más recientes de {totalConversaciones}.
                             {' '}Usá el buscador para encontrar una conversación puntual.
                         </p>
                     )}
 
-                    {tab !== 'all' && (loading ? null : filtered.length === 0 ? (
+                    {tab !== 'all' && tab !== 'unread' && (loading ? null : filtered.length === 0 ? (
                         <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
                             <Inbox size={22} aria-hidden="true" />
                             {search.trim()
