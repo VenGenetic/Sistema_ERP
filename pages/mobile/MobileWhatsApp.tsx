@@ -122,6 +122,7 @@ interface Conversacion {
     last_message_direction: string | null;
     /** El agente contesta solo en las conversaciones que lo tengan activado. */
     bot_enabled: boolean;
+    selected_agent: 'intake' | 'sales' | null;
     /** `escalated` = el agente se rindió y pidió que conteste una persona. */
     status: string;
     /**
@@ -277,6 +278,7 @@ const MobileWhatsApp: React.FC = () => {
     const [soloEscalados, setSoloEscalados] = useState(false);
     const [cuantosEscalados, setCuantosEscalados] = useState(0);
     const [cambiandoBot, setCambiandoBot] = useState(false);
+    const [eligiendoAgente, setEligiendoAgente] = useState(false);
 
     /**
      * Estado del proceso del agente y el interruptor maestro. El MISMO
@@ -878,21 +880,27 @@ const MobileWhatsApp: React.FC = () => {
      * Importante que el fallo se vea: si esto falla en silencio, uno cree
      * que apagó el agente para un cliente y el agente le sigue contestando.
      */
-    const alternarBotDelChat = async () => {
+    const alternarBotDelChat = async (agente?: 'intake' | 'sales') => {
         if (!abierta || cambiandoBot) return;
+        if (!abierta.bot_enabled && !agente) {
+            setEligiendoAgente(true);
+            return;
+        }
         setCambiandoBot(true);
         const nuevo = !abierta.bot_enabled;
-        const { error: err } = await supabase
-            .from('agent_conversations')
-            .update({ bot_enabled: nuevo })
-            .eq('id', abierta.id);
+        const { error: err } = await supabase.rpc('set_conversation_agent', {
+            p_conversation_id: abierta.id,
+            p_enabled: nuevo,
+            p_selected_agent: agente ?? null,
+        });
         setCambiandoBot(false);
         if (err) {
             setError(`No se pudo cambiar el agente de esta conversación: ${err.message}`);
             return;
         }
-        setAbierta((prev) => (prev ? { ...prev, bot_enabled: nuevo } : prev));
-        setConversaciones((prev) => prev.map((c) => (c.id === abierta.id ? { ...c, bot_enabled: nuevo } : c)));
+        setEligiendoAgente(false);
+        setAbierta((prev) => (prev ? { ...prev, bot_enabled: nuevo, selected_agent: agente ?? prev.selected_agent } : prev));
+        setConversaciones((prev) => prev.map((c) => (c.id === abierta.id ? { ...c, bot_enabled: nuevo, selected_agent: agente ?? c.selected_agent } : c)));
     };
 
     const sinLeer = useMemo(
@@ -1001,6 +1009,24 @@ const MobileWhatsApp: React.FC = () => {
                     >
                         {abierta.bot_enabled ? <Bot size={20} aria-hidden="true" /> : <BotOff size={20} aria-hidden="true" />}
                     </button>
+
+                    {eligiendoAgente && (
+                        <div className="fixed inset-0 z-50 flex items-end bg-black/60" role="dialog" aria-modal="true" aria-labelledby="elegir-agente-movil">
+                            <div className="w-full rounded-t-3xl bg-wa-header p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                                <h3 id="elegir-agente-movil" className="text-[17px] font-semibold text-wa-text">¿Qué agente atenderá?</h3>
+                                <p className="mt-1 text-[13px] text-wa-meta">Elige antes de activar este chat.</p>
+                                <button onClick={() => alternarBotDelChat('intake')} disabled={cambiandoBot} className="mt-4 min-h-[64px] w-full rounded-xl bg-wa-hover px-4 text-left">
+                                    <span className="block text-[15px] font-semibold text-wa-text">Solo pedir información</span>
+                                    <span className="block text-[12px] text-wa-meta">Recopila los datos; no ofrece precio ni stock.</span>
+                                </button>
+                                <button onClick={() => alternarBotDelChat('sales')} disabled={cambiandoBot} className="mt-2 min-h-[64px] w-full rounded-xl bg-wa-hover px-4 text-left">
+                                    <span className="block text-[15px] font-semibold text-wa-text">Atención completa</span>
+                                    <span className="block text-[12px] text-wa-meta">Consulta catálogo, stock y precio.</span>
+                                </button>
+                                <button onClick={() => setEligiendoAgente(false)} disabled={cambiandoBot} className="mt-2 min-h-11 w-full text-[14px] font-medium text-wa-meta">Cancelar</button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* El resto, en un menú: cinco iconos en la cabecera de un
                         teléfono no entran, y los tres de acá se usan una vez

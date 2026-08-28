@@ -154,6 +154,7 @@ interface Conversation {
     customer_name: string | null;
     status: ConversationStatus;
     bot_enabled: boolean;
+    selected_agent: 'intake' | 'sales' | null;
     last_message_at: string | null;
     unread_count: number;
     lid: string | null;
@@ -299,6 +300,7 @@ interface SelectedContext {
     customerName: string | null;
     conversationStatus: ConversationStatus;
     botEnabled: boolean;
+    selectedAgent: 'intake' | 'sales' | null;
     lid: string | null;
     unreadCount: number;
     escalation: Escalation | null;
@@ -434,6 +436,7 @@ const WhatsAppInbox: React.FC = () => {
     const cacheMensajesRef = useRef(new Map<number, AgentMessage[]>());
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+    const [eligiendoAgente, setEligiendoAgente] = useState<SelectedContext | null>(null);
     const [closeInsteadOfReopen, setCloseInsteadOfReopen] = useState(false);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     /**
@@ -926,6 +929,7 @@ const WhatsAppInbox: React.FC = () => {
                 customerName: conv.customer_name,
                 conversationStatus: conv.status,
                 botEnabled: conv.bot_enabled,
+                selectedAgent: conv.selected_agent,
                 lid: conv.lid,
                 unreadCount: conv.unread_count,
                 escalation: null,
@@ -939,6 +943,7 @@ const WhatsAppInbox: React.FC = () => {
             customerName: conv?.customer_name ?? selectedEscalation.agent_conversations?.customer_name ?? null,
             conversationStatus: conv?.status ?? selectedEscalation.agent_conversations?.status ?? 'bot_active',
             botEnabled: conv?.bot_enabled ?? selectedEscalation.agent_conversations?.bot_enabled ?? false,
+            selectedAgent: conv?.selected_agent ?? null,
             lid: conv?.lid ?? null,
             unreadCount: conv?.unread_count ?? 0,
             escalation: selectedEscalation,
@@ -1176,12 +1181,17 @@ const WhatsAppInbox: React.FC = () => {
     // conversaciones habilitadas explícitamente acá (ver migración 0017 del
     // repo del agente). Arranca apagado para cada cliente nuevo.
     const handleToggleBot = async (ctx: SelectedContext) => {
+        if (!ctx.botEnabled) {
+            setEligiendoAgente(ctx);
+            return;
+        }
         setActionLoading(true);
         setErrorAccion(null);
-        const { error } = await supabase
-            .from('agent_conversations')
-            .update({ bot_enabled: !ctx.botEnabled })
-            .eq('id', ctx.conversationId);
+        const { error } = await supabase.rpc('set_conversation_agent', {
+            p_conversation_id: ctx.conversationId,
+            p_enabled: false,
+            p_selected_agent: null,
+        });
         setActionLoading(false);
         if (error) {
             // Importante que se vea: si esto falla en silencio, el equipo
@@ -1190,6 +1200,24 @@ const WhatsAppInbox: React.FC = () => {
             setErrorAccion(`No se pudo cambiar el agente de esta conversación: ${error.message}`);
             return;
         }
+        await Promise.all([fetchConversations(), fetchEscalations()]);
+    };
+
+    const activarAgenteDelChat = async (agente: 'intake' | 'sales') => {
+        if (!eligiendoAgente) return;
+        setActionLoading(true);
+        setErrorAccion(null);
+        const { error } = await supabase.rpc('set_conversation_agent', {
+            p_conversation_id: eligiendoAgente.conversationId,
+            p_enabled: true,
+            p_selected_agent: agente,
+        });
+        setActionLoading(false);
+        if (error) {
+            setErrorAccion(`No se pudo activar el agente: ${error.message}`);
+            return;
+        }
+        setEligiendoAgente(null);
         await Promise.all([fetchConversations(), fetchEscalations()]);
     };
 
@@ -2077,7 +2105,9 @@ const WhatsAppInbox: React.FC = () => {
                                         {selected.botEnabled
                                             ? globalBotEnabled === false
                                                 ? 'agente activado acá, pero apagado en general'
-                                                : 'el agente responde en este chat'
+                                                : selected.selectedAgent === 'sales'
+                                                    ? 'atenciÃ³n completa activa'
+                                                    : 'agente de informaciÃ³n activo'
                                             : 'contesta el vendedor'}
                                     </p>
                                 </div>
@@ -2107,6 +2137,26 @@ const WhatsAppInbox: React.FC = () => {
                                 >
                                     {selected.botEnabled ? <Bot size={19} aria-hidden="true" /> : <BotOff size={19} aria-hidden="true" />}
                                 </button>
+
+                                {eligiendoAgente?.conversationId === selected.conversationId && (
+                                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="elegir-agente-titulo">
+                                        <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl">
+                                            <h3 id="elegir-agente-titulo" className="text-lg font-semibold text-fg">¿Qué agente atenderá este chat?</h3>
+                                            <p className="mt-1 text-sm text-fg-muted">Elige el alcance antes de activarlo.</p>
+                                            <div className="mt-4 grid gap-3">
+                                                <button onClick={() => activarAgenteDelChat('intake')} disabled={actionLoading} className="rounded-xl border border-border p-4 text-left hover:bg-surface-2">
+                                                    <span className="block font-semibold text-fg">Solo pedir información</span>
+                                                    <span className="mt-1 block text-sm text-fg-muted">Recopila repuesto, moto, año y demás datos; no ofrece precios ni stock.</span>
+                                                </button>
+                                                <button onClick={() => activarAgenteDelChat('sales')} disabled={actionLoading} className="rounded-xl border border-border p-4 text-left hover:bg-surface-2">
+                                                    <span className="block font-semibold text-fg">Atención completa</span>
+                                                    <span className="mt-1 block text-sm text-fg-muted">Busca catálogo, confirma stock y precio, y atiende la venta completa.</span>
+                                                </button>
+                                            </div>
+                                            <button onClick={() => setEligiendoAgente(null)} disabled={actionLoading} className="mt-4 w-full rounded-lg px-3 py-2 text-sm font-medium text-fg-muted hover:bg-surface-2">Cancelar</button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <button
                                     onClick={() => marcarComoNoLeido(selected.conversationId)}

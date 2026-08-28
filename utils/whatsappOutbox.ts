@@ -29,7 +29,7 @@ export const CHAT_MEDIA_BUCKET = 'agent_chat_media';
  * agente con la cola de salida.
  */
 export const CAMPOS_CONV_BASE =
-    'id, phone_number, customer_name, status, bot_enabled, last_message_at, unread_count, lid';
+    'id, phone_number, customer_name, status, bot_enabled, selected_agent, last_message_at, unread_count, lid';
 export const CAMPOS_CONV_PREVIEW = `${CAMPOS_CONV_BASE}, last_message_preview, last_message_direction, etapa`;
 
 /** true cuando el error de PostgREST es "esa columna no existe". */
