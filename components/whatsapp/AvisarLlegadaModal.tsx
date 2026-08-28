@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -159,10 +159,13 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     const [estadoAgente, setEstadoAgente] = useState<EstadoAgente | null>(null);
     /** Avisos mandados en la última hora, para el tope. */
     const [recientes, setRecientes] = useState(0);
+    const enviandoRef = useRef(false);
+    const cargaRef = useRef(0);
 
     useBackDismiss(isOpen, onClose);
 
     const cargar = useCallback(async () => {
+        const turno = ++cargaRef.current;
         setCargando(true);
         setError(null);
         try {
@@ -171,6 +174,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                 soloDemandaId,
                 modo,
             });
+            if (turno !== cargaRef.current) return;
             setDemandas(filas);
             setHayMas(mas);
             // Sin lista que mostrar: la solicitud ya venia elegida.
@@ -182,9 +186,10 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                 setError('Ese pedido ya no se puede avisar: lo archivaron, lo cancelaron o ya se aviso.');
             }
         } catch (err: any) {
+            if (turno !== cargaRef.current) return;
             setError(err?.message ?? 'No se pudo cargar la lista.');
         } finally {
-            setCargando(false);
+            if (turno === cargaRef.current) setCargando(false);
         }
 
         /*
@@ -218,7 +223,10 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     }, [soloTelefono, soloDemandaId, modo]);
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            cargaRef.current += 1;
+            return;
+        }
         setAbierto(null);
         setAvisados(0);
         setUltimo(null);
@@ -266,7 +274,8 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
     };
 
     const enviar = async () => {
-        if (!abierto || enviando) return;
+        if (!abierto || enviandoRef.current) return;
+        enviandoRef.current = true;
         setEnviando(true);
         setError(null);
         try {
@@ -298,6 +307,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo mandar el aviso.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };
@@ -311,7 +321,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
      * en el caso normal.
      */
     const marcarAbonado = async (d: DemandaPorAvisar) => {
-        if (enviando) return;
+        if (enviandoRef.current) return;
         const precio = d.product?.price != null ? precioParaCliente(d.product.price) : null;
         const sugerido = precio != null ? abonoSugerido(precio) : 0;
         const escrito = window.prompt(
@@ -326,6 +336,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
             return;
         }
 
+        enviandoRef.current = true;
         setEnviando(true);
         setError(null);
         try {
@@ -341,12 +352,14 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo registrar el abono.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };
 
     const archivarSinMensaje = async () => {
-        if (!abierto || enviando) return;
+        if (!abierto || enviandoRef.current) return;
+        enviandoRef.current = true;
         setEnviando(true);
         setError(null);
         try {
@@ -358,6 +371,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo archivar el pedido.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };

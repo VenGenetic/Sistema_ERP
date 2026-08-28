@@ -18,6 +18,11 @@ import {
     type AdjuntoSubido,
     type NuevoMensaje,
 } from '../../utils/whatsappOutbox';
+import {
+    borrarBorradorWhatsApp,
+    guardarBorradorWhatsApp,
+    leerBorradorWhatsApp,
+} from '../../utils/whatsappDrafts';
 
 /**
  * La caja de escribir del chat: texto, fotos, archivos, respuestas rápidas
@@ -51,6 +56,15 @@ interface Props {
     onEnviar: (mensajes: NuevoMensaje[]) => Promise<void>;
     /** Se llama al anotar un pedido, para refrescar la ficha del cliente. */
     onPedidoRegistrado?: () => void;
+    /**
+     * Si la página puede mostrar la proforma como panel lateral, la abre
+     * ella y este componente NO monta la suya.
+     *
+     * Se decide arriba y no acá porque depende del ancho de la pantalla
+     * entera, no del compositor. Sin esta prop (móvil) sigue funcionando
+     * como siempre: modal propio.
+     */
+    onAbrirProforma?: () => void;
 }
 
 /** Adjunto en pantalla: mientras sube todavía no tiene URL. */
@@ -100,6 +114,7 @@ export const ChatComposer: React.FC<Props> = ({
     userId,
     onEnviar,
     onPedidoRegistrado,
+    onAbrirProforma,
 }) => {
     const [borrador, setBorrador] = useState('');
     const [adjuntos, setAdjuntos] = useState<AdjuntoLocal[]>([]);
@@ -142,16 +157,30 @@ export const ChatComposer: React.FC<Props> = ({
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const contenedorRef = useRef<HTMLDivElement>(null);
+    const generacionRef = useRef(0);
+    const enviandoRef = useRef(false);
 
-    // Cambiar de conversación limpia el borrador: seguir escribiendo en el
-    // chat equivocado es el error más caro que se puede cometer acá.
+    // Cambiar de conversación carga el borrador propio de ese cliente y
+    // descarta adjuntos: texto recuperable, archivos nunca mezclados.
     useEffect(() => {
-        setBorrador('');
-        setAdjuntos([]);
+        generacionRef.current += 1;
+        setBorrador(leerBorradorWhatsApp(conversationId, userId));
+        setAdjuntos((prev) => {
+            prev.forEach((a) => {
+                if (a.preview) URL.revokeObjectURL(a.preview);
+                if (a.subido) void borrarAdjunto(a.subido.url);
+            });
+            return [];
+        });
         setError(null);
         setMenuRapidas(false);
         setMenuHerramientas(false);
-    }, [conversationId]);
+    }, [conversationId, userId]);
+
+    useEffect(() => {
+        const t = setTimeout(() => guardarBorradorWhatsApp(conversationId, userId, borrador), 250);
+        return () => clearTimeout(t);
+    }, [conversationId, userId, borrador]);
 
     const cargarRapidas = useCallback(async () => {
         const { data, error: err } = await supabase
@@ -197,6 +226,7 @@ export const ChatComposer: React.FC<Props> = ({
     const agregarArchivos = useCallback(async (files: File[]) => {
         if (files.length === 0) return;
         setError(null);
+        const generacion = generacionRef.current;
 
         for (const file of files) {
             const key = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -205,8 +235,14 @@ export const ChatComposer: React.FC<Props> = ({
 
             try {
                 const subido = await subirAdjunto(file);
+                if (generacion !== generacionRef.current) {
+                    if (preview) URL.revokeObjectURL(preview);
+                    void borrarAdjunto(subido.url);
+                    continue;
+                }
                 setAdjuntos((prev) => prev.map((a) => (a.key === key ? { ...a, subido } : a)));
             } catch (err: any) {
+                if (generacion !== generacionRef.current) continue;
                 const mensaje = err?.message ?? 'No se pudo subir el archivo.';
                 setAdjuntos((prev) => prev.map((a) => (a.key === key ? { ...a, error: mensaje } : a)));
             }
@@ -254,7 +290,8 @@ export const ChatComposer: React.FC<Props> = ({
     const puedeEnviar = (borrador.trim().length > 0 || listos.length > 0) && !enviando && !subiendo;
 
     const enviar = async () => {
-        if (!puedeEnviar) return;
+        if (!puedeEnviar || enviandoRef.current) return;
+        enviandoRef.current = true;
         const texto = borrador.trim();
 
         // El texto va como pie de la PRIMERA foto, como en WhatsApp. Mandarlo
@@ -277,10 +314,12 @@ export const ChatComposer: React.FC<Props> = ({
             await onEnviar(mensajes);
             adjuntos.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
             setBorrador('');
+            borrarBorradorWhatsApp(conversationId, userId);
             setAdjuntos([]);
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo encolar el mensaje.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };
@@ -295,16 +334,21 @@ export const ChatComposer: React.FC<Props> = ({
      */
     const enviarNotaDeVoz = async (archivo: File) => {
         const subido = await subirAdjunto(archivo);
-        await onEnviar([
-            {
-                conversationId,
-                kind: 'audio',
-                mediaUrl: subido.url,
-                mediaMime: subido.mime,
-                mediaFilename: subido.filename,
-                isVoiceNote: true,
-            },
-        ]);
+        try {
+            await onEnviar([
+                {
+                    conversationId,
+                    kind: 'audio',
+                    mediaUrl: subido.url,
+                    mediaMime: subido.mime,
+                    mediaFilename: subido.filename,
+                    isVoiceNote: true,
+                },
+            ]);
+        } catch (err) {
+            await borrarAdjunto(subido.url);
+            throw err;
+        }
     };
 
     /* ---------------------------------------------------------------- */
@@ -464,7 +508,8 @@ export const ChatComposer: React.FC<Props> = ({
                         cuenta={itemsEnProforma}
                         onClick={() => {
                             setMenuHerramientas(false);
-                            setProformaAbierta(true);
+                            if (onAbrirProforma) onAbrirProforma();
+                            else setProformaAbierta(true);
                         }}
                     />
                     <Herramienta
@@ -664,14 +709,19 @@ export const ChatComposer: React.FC<Props> = ({
                 onEnviar={onEnviar}
             />
 
-            <ProformaBuilder
-                isOpen={proformaAbierta}
-                onClose={() => setProformaAbierta(false)}
-                conversationId={conversationId}
-                clienteLabel={clienteLabel}
-                clienteNombre={clienteNombre}
-                onEnviar={onEnviar}
-            />
+            {/* Solo cuando la página no la muestra al costado: dos
+                instancias del mismo armador serían dos búsquedas al catálogo
+                y dos consultas de stock por cada tecla. */}
+            {!onAbrirProforma && (
+                <ProformaBuilder
+                    isOpen={proformaAbierta}
+                    onClose={() => setProformaAbierta(false)}
+                    conversationId={conversationId}
+                    clienteLabel={clienteLabel}
+                    clienteNombre={clienteNombre}
+                    onEnviar={onEnviar}
+                />
+            )}
 
             <RegistrarPedidoModal
                 isOpen={pedidoAbierto}

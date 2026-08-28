@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageOff, Images, Loader2, MessageSquare, Search, X, ZoomIn } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { cn, focusRing } from '../ui/styles';
@@ -77,6 +77,7 @@ export const MediaGallery: React.FC<Props> = ({ onIrAlChat, onCerrar, formatearT
     const [error, setError] = useState<string | null>(null);
     const [busqueda, setBusqueda] = useState('');
     const [visor, setVisor] = useState<{ media: MediaItem[]; index: number } | null>(null);
+    const cargaRef = useRef(0);
 
     /**
      * Los datos del cliente se piden aparte y no como consulta anidada.
@@ -103,6 +104,7 @@ export const MediaGallery: React.FC<Props> = ({ onIrAlChat, onCerrar, formatearT
 
     const cargar = useCallback(
         async (desde: number) => {
+            const turno = ++cargaRef.current;
             const primeraVez = desde === 0;
             if (primeraVez) setCargando(true);
             else setCargandoMas(true);
@@ -134,6 +136,7 @@ export const MediaGallery: React.FC<Props> = ({ onIrAlChat, onCerrar, formatearT
                     .select('id')
                     .or(condiciones.join(','))
                     .limit(200);
+                if (turno !== cargaRef.current) return;
                 const ids = (coinciden ?? []).map((c: { id: number }) => c.id);
                 if (ids.length === 0) {
                     setFotos([]);
@@ -146,6 +149,7 @@ export const MediaGallery: React.FC<Props> = ({ onIrAlChat, onCerrar, formatearT
             }
 
             const { data, error: err } = await consulta;
+            if (turno !== cargaRef.current) return;
             setCargando(false);
             setCargandoMas(false);
 
@@ -167,7 +171,10 @@ export const MediaGallery: React.FC<Props> = ({ onIrAlChat, onCerrar, formatearT
     // La búsqueda va contra la base: se espera a que termine de tipear.
     useEffect(() => {
         const t = setTimeout(() => cargar(0), 350);
-        return () => clearTimeout(t);
+        return () => {
+            clearTimeout(t);
+            cargaRef.current += 1;
+        };
     }, [cargar]);
 
     /** Las fotos agrupadas por día, en el orden en que vinieron. */

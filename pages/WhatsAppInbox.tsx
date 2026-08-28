@@ -16,6 +16,8 @@ import {
     type EstadoAgente,
 } from '../components/whatsapp/agente';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
+import ProformaBuilder from '../components/whatsapp/ProformaBuilder';
+import { CONSULTA_PANTALLA_ANCHA, useMediaQuery } from '../hooks/useMediaQuery';
 import MenuTelefono from '../components/whatsapp/MenuTelefono';
 import NuevoChatModal from '../components/whatsapp/NuevoChatModal';
 import AvisarLlegadaModal from '../components/whatsapp/AvisarLlegadaModal';
@@ -397,6 +399,23 @@ const WhatsAppInbox: React.FC = () => {
      * bodega y el cliente está escribiendo justo ahora.
      */
     const agregarAProforma = useChatProformaStore((s) => s.agregar);
+
+    /**
+     * La proforma se arma en la tercera columna, al lado del hilo, para
+     * poder ir releyendo lo que el cliente pidió mientras se la arma --
+     * que es exactamente el trabajo: el cliente manda cuatro mensajes con
+     * cuatro repuestos y hay que ir sacándolos de ahí.
+     *
+     * Antes era un modal centrado que tapaba la conversación: para
+     * releer un mensaje había que cerrarlo, leer y volver a abrirlo.
+     *
+     * Solo cuando hay ancho para una tercera columna. Más angosto que eso
+     * no se dockea nada: se sigue usando el modal del compositor, que en
+     * esa pantalla es lo correcto.
+     */
+    const hayAnchoParaPanel = useMediaQuery(CONSULTA_PANTALLA_ANCHA);
+    const [proformaAbierta, setProformaAbierta] = useState(false);
+    const proformaEnPanel = hayAnchoParaPanel && proformaAbierta;
     const [conversationsLoading, setConversationsLoading] = useState(true);
     /** Total real en la base (o de la búsqueda), no el de las filas traídas. */
     const [totalConversaciones, setTotalConversaciones] = useState<number | null>(null);
@@ -769,6 +788,7 @@ const WhatsAppInbox: React.FC = () => {
         recargar: cargarCola,
         cancelar: handleCancelar,
         reintentar: handleReintentar,
+        descartar: handleDescartar,
     } = useColaDeSalida(selected?.conversationId ?? null, {
         onError: setErrorAccion,
         onYaHabiaSalido: () => setRecargarMensajes((n) => n + 1),
@@ -1084,7 +1104,6 @@ const WhatsAppInbox: React.FC = () => {
                 : mensajes;
 
             await encolarMensajes(conCita, userId);
-            setCitando(null);
 
             // El tilde azul también al responder, además de al abrir el
             // chat: si el cliente escribió mientras se le contestaba, ese
@@ -1093,16 +1112,19 @@ const WhatsAppInbox: React.FC = () => {
             // cambiar mientras tanto. No se espera: que falle el tilde no
             // puede romper el envío.
             const conversationId = mensajes[0]?.conversationId;
+            if (conversationId && conversacionAbiertaRef.current === conversationId) setCitando(null);
             if (conversationId) marcarLeidoEnWhatsApp(conversationId, userId).catch(() => {});
 
             // Aparece de inmediato en el hilo como "en cola"; el realtime de
             // agent_outbox lo va actualizando hasta que sale.
             await cargarCola();
         },
-        // `cargarCola` se define abajo con useCallback estable.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [userId, selected?.conversationId],
+        [userId, citando?.whatsapp_message_id, cargarCola],
     );
+
+    // Una cita pertenece al chat donde se eligio. Nunca se arrastra al
+    // siguiente cliente al cambiar de conversacion.
+    useEffect(() => setCitando(null), [selected?.conversationId]);
 
     /** Cancela un mensaje que todavía no salió. */
     /**
@@ -1788,6 +1810,7 @@ const WhatsAppInbox: React.FC = () => {
                                     items={enCola}
                                     onCancelar={handleCancelar}
                                     onReintentar={handleReintentar}
+                                    onDescartar={handleDescartar}
                                 />
                                 </div>
                             </div>
@@ -1814,6 +1837,11 @@ const WhatsAppInbox: React.FC = () => {
                                     userId={userId}
                                     onEnviar={enviarMensajes}
                                     onPedidoRegistrado={() => setRecargarFicha((n) => n + 1)}
+                                    // Sin ancho para la columna, el compositor
+                                    // sigue abriendo su propio modal.
+                                    onAbrirProforma={
+                                        hayAnchoParaPanel ? () => setProformaAbierta(true) : undefined
+                                    }
                                 />
                             </div>
 
@@ -1863,17 +1891,46 @@ const WhatsAppInbox: React.FC = () => {
                     )}
                 </div>
 
-                {/* ============================ FICHA ============================ */}
-                {/* Como el panel de "datos del contacto" de WhatsApp: tercera
-                    columna dentro de la misma lámina, no una tarjeta suelta. */}
-                {selected && (
+                {/* ================== TERCERA COLUMNA ================== */}
+                {/* La ficha del cliente, o la proforma mientras se la arma.
+                    Se turnan: a 1280px no entran las dos, y la proforma es
+                    la que necesita el chat al lado. Al cerrarla vuelve la
+                    ficha sola. */}
+                {selected && proformaEnPanel && (
+                    <div className="hidden w-[420px] shrink-0 flex-col border-l border-wa-divider bg-surface xl:flex 2xl:w-[460px]">
+                        <ProformaBuilder
+                            // Al cambiar de chat se remonta: el buscador y la
+                            // vista previa son de ESA cotización. El borrador
+                            // no se pierde, vive en el store por conversación.
+                            key={selected.conversationId}
+                            isOpen
+                            presentacion="panel"
+                            onClose={() => setProformaAbierta(false)}
+                            conversationId={selected.conversationId}
+                            clienteLabel={
+                                selected.customerName ||
+                                formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })
+                            }
+                            clienteNombre={selected.customerName}
+                            onEnviar={enviarMensajes}
+                        />
+                    </div>
+                )}
+
+                {selected && !proformaEnPanel && (
                     <div className="hidden w-[320px] shrink-0 overflow-y-auto wa-scroll border-l border-wa-divider bg-surface p-3 xl:block">
                         <CustomerPanel
                             key={`${selected.conversationId}-${recargarFicha}`}
                             conversationId={selected.conversationId}
                             phoneNumber={selected.phoneNumber}
                             customerName={selected.customerName}
-                            onCotizar={(producto) => agregarAProforma(selected.conversationId, producto)}
+                            onCotizar={(producto) => {
+                                agregarAProforma(selected.conversationId, producto);
+                                // Que el repuesto caiga en una proforma que no
+                                // se ve es la mitad del trabajo: se abre el
+                                // panel para que se vea entrar.
+                                if (hayAnchoParaPanel) setProformaAbierta(true);
+                            }}
                             onAvisar={() => {
                                 setAvisarTelefono(selected.phoneNumber);
                                 setAvisarAbierto(true);

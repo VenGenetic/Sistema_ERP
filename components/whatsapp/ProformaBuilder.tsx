@@ -15,6 +15,7 @@ import { capturarProformaComoArchivo, resumenDeProforma } from '../../utils/prof
 import { ProformaDocument, PROFORMA_WIDTH } from './ProformaDocument';
 import {
     buscarEnCatalogo,
+    borrarAdjunto,
     formatearPrecio,
     precioParaCliente,
     stockUtil,
@@ -104,6 +105,7 @@ export const ProformaBuilder: React.FC<Props> = ({
     const hojaRef = useRef<HTMLDivElement>(null);
     const buscadorRef = useRef<HTMLInputElement>(null);
     const contenedorPreviaRef = useRef<HTMLDivElement>(null);
+    const enviandoRef = useRef(false);
 
     /**
      * Cuánto hay que encoger la hoja para que entre en el panel.
@@ -150,7 +152,16 @@ export const ProformaBuilder: React.FC<Props> = ({
         return () => observador.disconnect();
     }, [isOpen]);
 
-    useBackDismiss(isOpen, onClose);
+    const enPanel = presentacion === 'panel';
+
+    /**
+     * El «atrás» solo cierra la proforma cuando es un overlay que tapa la
+     * pantalla. Acoplada al costado es parte de la página, como la ficha
+     * del cliente: empujar una entrada al historial haría que el botón
+     * atrás del navegador cierre un panel en vez de volver a donde el
+     * usuario venía.
+     */
+    useBackDismiss(isOpen && !enPanel, onClose);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -219,15 +230,18 @@ export const ProformaBuilder: React.FC<Props> = ({
     const hayItems = proforma.items.length > 0;
 
     const enviar = async () => {
-        if (!hayItems || enviando || !hojaRef.current) return;
+        if (!hayItems || enviandoRef.current || !hojaRef.current) return;
+        enviandoRef.current = true;
         setEnviando(true);
         setError(null);
+        let urlSubida: string | null = null;
         try {
             const archivo = await capturarProformaComoArchivo(
                 hojaRef.current,
                 `proforma-${new Date().toISOString().slice(0, 10)}.png`,
             );
             const subido = await subirAdjunto(archivo);
+            urlSubida = subido.url;
 
             const mensajes: NuevoMensaje[] = [
                 {
@@ -245,14 +259,17 @@ export const ProformaBuilder: React.FC<Props> = ({
             ];
 
             await onEnviar(mensajes);
+            urlSubida = null;
             // El borrador se limpia recién ACÁ, después de que se encoló: si
             // el envío falla, la proforma sigue armada y se puede reintentar
             // sin rehacerla.
             limpiar(conversationId);
             onClose();
         } catch (err: any) {
+            if (urlSubida) await borrarAdjunto(urlSubida);
             setError(err?.message ?? 'No se pudo enviar la proforma.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };
@@ -311,8 +328,6 @@ export const ProformaBuilder: React.FC<Props> = ({
     );
 
     if (!isOpen) return null;
-
-    const enPanel = presentacion === 'panel';
 
     return (
         <div

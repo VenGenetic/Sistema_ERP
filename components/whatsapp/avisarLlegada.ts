@@ -622,12 +622,19 @@ export const AVISOS_POR_HORA = 25;
  */
 export async function contarAvisosRecientes(): Promise<number> {
     const desde = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count, error } = await supabase
-        .from('product_demands')
-        .select('id', { count: 'exact', head: true })
-        .gte('notified_at', desde);
-    if (error) throw error;
-    return count ?? 0;
+    const contar = (columna: 'notified_at' | 'deposit_requested_at') =>
+        supabase
+            .from('product_demands')
+            .select('id', { count: 'exact', head: true })
+            .gte(columna, desde);
+
+    const [llegadas, abonos] = await Promise.all([contar('notified_at'), contar('deposit_requested_at')]);
+    if (llegadas.error) throw llegadas.error;
+    // Compatibilidad mientras se aplica la migracion del pedido de abono:
+    // el limite anterior sigue protegiendo los avisos de llegada.
+    if (abonos.error?.code === '42703') return llegadas.count ?? 0;
+    if (abonos.error) throw abonos.error;
+    return (llegadas.count ?? 0) + (abonos.count ?? 0);
 }
 
 export interface ResultadoAviso {

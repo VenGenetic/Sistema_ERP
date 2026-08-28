@@ -57,6 +57,7 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
     const [aviso, setAviso] = useState<string | null>(null);
 
     const buscadorRef = useRef<HTMLInputElement>(null);
+    const guardandoRef = useRef(false);
     useBackDismiss(isOpen, onClose);
 
     useEffect(() => {
@@ -97,7 +98,8 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
     }, [termino, isOpen, elegido]);
 
     const guardar = async () => {
-        if (!elegido || guardando) return;
+        if (!elegido || guardandoRef.current) return;
+        guardandoRef.current = true;
         setGuardando(true);
         setError(null);
         setAviso(null);
@@ -138,6 +140,7 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo anotar el pedido.');
         } finally {
+            guardandoRef.current = false;
             setGuardando(false);
         }
     };

@@ -52,6 +52,7 @@ import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
 import RegistrarPedidoModal from '../../components/whatsapp/RegistrarPedidoModal';
 import {
     borrarMensaje,
+    borrarAdjunto,
     CAMPOS_CONV_BASE,
     CAMPOS_CONV_PREVIEW,
     encolarMensajes,
@@ -62,6 +63,11 @@ import {
     subirAdjunto,
     type NuevoMensaje,
 } from '../../utils/whatsappOutbox';
+import {
+    borrarBorradorWhatsApp,
+    guardarBorradorWhatsApp,
+    leerBorradorWhatsApp,
+} from '../../utils/whatsappDrafts';
 
 /**
  * WhatsApp en el teléfono: leer la conversación y contestarle al cliente.
@@ -246,6 +252,7 @@ const MobileWhatsApp: React.FC = () => {
         recargar: recargarCola,
         cancelar: cancelarDeLaCola,
         reintentar: reintentarDeLaCola,
+        descartar: descartarDeLaCola,
     } = useColaDeSalida(abierta?.id ?? null, {
         onError: setError,
         onYaHabiaSalido: () => abierta && cargarMensajes(abierta.id),
@@ -255,6 +262,7 @@ const MobileWhatsApp: React.FC = () => {
     const fileRef = useRef<HTMLInputElement | null>(null);
     const composerRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const enviandoRef = useRef(false);
 
     /* ------------------------------------------------------------------ */
     /*  Lista                                                              */
@@ -442,6 +450,9 @@ const MobileWhatsApp: React.FC = () => {
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: false })
             .limit(MENSAJES_VISIBLES);
+        // La consulta anterior puede terminar despues de abrir otro cliente.
+        // Nunca se pinta el historial viejo dentro del chat nuevo.
+        if (abiertaRef.current !== conversationId) return;
         setCargandoChat(false);
         if (err) {
             setError(`No se pudo abrir el chat: ${err.message}`);
@@ -487,9 +498,13 @@ const MobileWhatsApp: React.FC = () => {
     useRepasoDelHilo(!!abierta, repasarHilo);
 
     const abrirChat = async (c: Conversacion) => {
+        // Se adelanta a React para que la consulta que arranca abajo sepa
+        // desde ya cual es el chat vigente.
+        abiertaRef.current = c.id;
         setAbierta(c);
         setMensajes([]);
-        setBorrador('');
+        setBorrador(leerBorradorWhatsApp(c.id, userId));
+        setCitando(null);
         setError(null);
         await cargarMensajes(c.id);
         // Abrirlo cuenta como leído en los DOS lados: el UPDATE de acá es
@@ -504,6 +519,13 @@ const MobileWhatsApp: React.FC = () => {
         }
         marcarLeidoEnWhatsApp(c.id, userId).catch(() => {});
     };
+
+    useEffect(() => {
+        if (!abierta) return;
+        const id = abierta.id;
+        const t = setTimeout(() => guardarBorradorWhatsApp(id, userId, borrador), 250);
+        return () => clearTimeout(t);
+    }, [abierta?.id, userId, borrador]);
 
     /**
      * Deja el chat como pendiente -- en la lista y en el teléfono -- y
@@ -583,18 +605,19 @@ const MobileWhatsApp: React.FC = () => {
     /*  Envío                                                              */
     /* ------------------------------------------------------------------ */
 
-    const enviar = async (mensajes: NuevoMensaje[]) => {
+    const enviar = async (mensajes: NuevoMensaje[], replyToWaId = citando?.whatsapp_message_id ?? null) => {
         // Si hay un mensaje citado, la cita viaja con el primero: es el que
         // WhatsApp muestra con la tarjetita arriba. Antes acá se dibujaba la
         // tarjeta de "respondiendo a" pero la cita NO se mandaba, así que el
         // cliente recibía una respuesta suelta sin saber a cuál de sus cinco
         // mensajes contestaba.
-        const conCita = citando?.whatsapp_message_id
-            ? mensajes.map((m, i) => (i === 0 ? { ...m, replyToWaId: citando.whatsapp_message_id } : m))
+        const conCita = replyToWaId
+            ? mensajes.map((m, i) => (i === 0 ? { ...m, replyToWaId } : m))
             : mensajes;
 
         await encolarMensajes(conCita, userId);
-        setCitando(null);
+        const conversationId = mensajes[0]?.conversationId;
+        if (conversationId && abiertaRef.current === conversationId) setCitando(null);
         // Aparece de inmediato al final del hilo como "en cola"; el realtime
         // de agent_outbox lo va actualizando hasta que sale.
         await recargarCola();
@@ -605,29 +628,38 @@ const MobileWhatsApp: React.FC = () => {
 
     const enviarTexto = async () => {
         const texto = borrador.trim();
-        if (!texto || !abierta || enviando) return;
+        if (!texto || !abierta || enviandoRef.current) return;
+        const conversationId = abierta.id;
+        const replyToWaId = citando?.whatsapp_message_id ?? null;
+        enviandoRef.current = true;
         setEnviando(true);
         setError(null);
         try {
-            await enviar([{ conversationId: abierta.id, body: texto, kind: 'text' }]);
-            setBorrador('');
+            await enviar([{ conversationId, body: texto, kind: 'text' }], replyToWaId);
+            borrarBorradorWhatsApp(conversationId, userId);
+            if (abiertaRef.current === conversationId) setBorrador('');
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo enviar.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };
 
     const enviarArchivos = async (files: File[]) => {
-        if (files.length === 0 || !abierta) return;
+        if (files.length === 0 || !abierta || enviandoRef.current) return;
+        const conversationId = abierta.id;
+        const texto = borrador.trim();
+        const replyToWaId = citando?.whatsapp_message_id ?? null;
+        enviandoRef.current = true;
         setEnviando(true);
         setError(null);
+        const subidos = [];
         try {
-            const subidos = await Promise.all(files.map((f) => subirAdjunto(f)));
-            const texto = borrador.trim();
+            for (const file of files) subidos.push(await subirAdjunto(file));
             await enviar(
                 subidos.map((s, i) => ({
-                    conversationId: abierta.id,
+                    conversationId,
                     // El texto va como pie de la primera, como en WhatsApp.
                     body: i === 0 && texto ? texto : null,
                     kind: s.kind,
@@ -635,28 +667,39 @@ const MobileWhatsApp: React.FC = () => {
                     mediaMime: s.mime,
                     mediaFilename: s.filename,
                 })),
+                replyToWaId,
             );
-            setBorrador('');
+            borrarBorradorWhatsApp(conversationId, userId);
+            if (abiertaRef.current === conversationId) setBorrador('');
         } catch (err: any) {
+            await Promise.all(subidos.map((s) => borrarAdjunto(s.url)));
             setError(err?.message ?? 'No se pudo enviar el archivo.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };
 
     const enviarNotaDeVoz = async (archivo: File) => {
         if (!abierta) return;
+        const conversationId = abierta.id;
+        const replyToWaId = citando?.whatsapp_message_id ?? null;
         const subido = await subirAdjunto(archivo);
-        await enviar([
-            {
-                conversationId: abierta.id,
-                kind: 'audio',
-                mediaUrl: subido.url,
-                mediaMime: subido.mime,
-                mediaFilename: subido.filename,
-                isVoiceNote: true,
-            },
-        ]);
+        try {
+            await enviar([
+                {
+                    conversationId,
+                    kind: 'audio',
+                    mediaUrl: subido.url,
+                    mediaMime: subido.mime,
+                    mediaFilename: subido.filename,
+                    isVoiceNote: true,
+                },
+            ], replyToWaId);
+        } catch (err) {
+            await borrarAdjunto(subido.url);
+            throw err;
+        }
     };
 
     const reaccionar = async (m: Mensaje, emoji: string) => {
@@ -955,6 +998,7 @@ const MobileWhatsApp: React.FC = () => {
                         items={enCola}
                         onCancelar={cancelarDeLaCola}
                         onReintentar={reintentarDeLaCola}
+                        onDescartar={descartarDeLaCola}
                         tactil
                     />
                     </div>

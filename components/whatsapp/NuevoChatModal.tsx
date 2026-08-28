@@ -64,10 +64,13 @@ export const NuevoChatModal: React.FC<Props> = ({ isOpen, onClose, onAbrir }) =>
     const [abriendo, setAbriendo] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const campoRef = useRef<HTMLInputElement>(null);
+    const busquedaRef = useRef(0);
+    const abriendoRef = useRef(false);
 
     // Cada apertura empieza limpia: dejar el número del cliente anterior
     // cargado es el camino corto a escribirle al equivocado.
     useEffect(() => {
+        busquedaRef.current += 1;
         if (!isOpen) return;
         setTexto('');
         setNombre('');
@@ -101,10 +104,13 @@ export const NuevoChatModal: React.FC<Props> = ({ isOpen, onClose, onAbrir }) =>
     const numero = useMemo(() => (esTelefonoEC(texto) ? normalizePhoneEC(texto) : null), [texto]);
 
     const buscar = useCallback(async (consulta: string) => {
+        const turno = ++busquedaRef.current;
         const limpio = limpiarParaFiltro(consulta);
         const digitos = limpio.replace(/\D/g, '');
         if (limpio.length < 2 && digitos.length < 3) {
             setResultados([]);
+            setBuscando(false);
+            setError(null);
             return;
         }
 
@@ -124,11 +130,13 @@ export const NuevoChatModal: React.FC<Props> = ({ isOpen, onClose, onAbrir }) =>
                 .order('last_message_at', { ascending: false, nullsFirst: false })
                 .limit(8);
             if (err) throw err;
+            if (turno !== busquedaRef.current) return;
             setResultados((data ?? []) as FilaEncontrada[]);
         } catch (err: any) {
+            if (turno !== busquedaRef.current) return;
             setError(err?.message ?? 'No se pudo buscar.');
         } finally {
-            setBuscando(false);
+            if (turno === busquedaRef.current) setBuscando(false);
         }
     }, []);
 
@@ -139,7 +147,8 @@ export const NuevoChatModal: React.FC<Props> = ({ isOpen, onClose, onAbrir }) =>
     }, [texto, isOpen, buscar]);
 
     const abrirNumero = async () => {
-        if (!numero || abriendo) return;
+        if (!numero || abriendoRef.current) return;
+        abriendoRef.current = true;
         setAbriendo(true);
         setError(null);
         try {
@@ -149,6 +158,7 @@ export const NuevoChatModal: React.FC<Props> = ({ isOpen, onClose, onAbrir }) =>
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo abrir el chat.');
         } finally {
+            abriendoRef.current = false;
             setAbriendo(false);
         }
     };

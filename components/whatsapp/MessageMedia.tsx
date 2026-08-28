@@ -61,16 +61,24 @@ const NotaDeVoz: React.FC<{ url: string }> = ({ url }) => {
             setSonando(false);
             setPosicion(0);
         };
+        const alPausar = () => setSonando(false);
+        const alReproducir = () => setSonando(true);
+        const alError = () => setNoSePuede(true);
         a.addEventListener('timeupdate', alActualizar);
         a.addEventListener('loadedmetadata', alCargar);
         a.addEventListener('durationchange', alCargar);
         a.addEventListener('ended', alTerminar);
-        a.addEventListener('error', () => setNoSePuede(true));
+        a.addEventListener('pause', alPausar);
+        a.addEventListener('play', alReproducir);
+        a.addEventListener('error', alError);
         return () => {
             a.removeEventListener('timeupdate', alActualizar);
             a.removeEventListener('loadedmetadata', alCargar);
             a.removeEventListener('durationchange', alCargar);
             a.removeEventListener('ended', alTerminar);
+            a.removeEventListener('pause', alPausar);
+            a.removeEventListener('play', alReproducir);
+            a.removeEventListener('error', alError);
         };
     }, []);
 

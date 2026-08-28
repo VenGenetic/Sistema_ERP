@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BadgeCheck, Bell, ExternalLink, Loader2, Package, RefreshCw, Send, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -87,22 +87,33 @@ export const CustomerPanel: React.FC<Props> = ({
     const [demandas, setDemandas] = useState<Demanda[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const cargaRef = useRef(0);
 
     const cargar = useCallback(async () => {
+        const turno = ++cargaRef.current;
         setCargando(true);
         setError(null);
         const local = cola(phoneNumber);
 
         try {
+            if (local.length < 7) {
+                if (turno === cargaRef.current) {
+                    setCliente(null);
+                    setDemandas([]);
+                }
+                return;
+            }
             // 1) Cliente del ERP. `ilike *cola*` en vez de igualdad: los
             //    teléfonos de `customers` están cargados a mano y vienen con
             //    espacios, guiones, +593 o el 0 adelante.
             if (local.length >= 7) {
-                const { data } = await supabase
+                const { data, error: errorCliente } = await supabase
                     .from('customers')
                     .select('id, name, identification_number, phone, customer_type, discount_percentage')
                     .ilike('phone', `%${local}%`)
                     .limit(1);
+                if (errorCliente) throw errorCliente;
+                if (turno !== cargaRef.current) return;
                 setCliente((data?.[0] as ClienteErp) ?? null);
             } else {
                 setCliente(null);
@@ -120,16 +131,21 @@ export const CustomerPanel: React.FC<Props> = ({
                 .order('created_at', { ascending: false })
                 .limit(10);
             if (errorDem) throw errorDem;
+            if (turno !== cargaRef.current) return;
             setDemandas((dem ?? []) as unknown as Demanda[]);
         } catch (err: any) {
+            if (turno !== cargaRef.current) return;
             setError(err?.message ?? 'No se pudo cargar la ficha del cliente.');
         } finally {
-            setCargando(false);
+            if (turno === cargaRef.current) setCargando(false);
         }
     }, [phoneNumber]);
 
     useEffect(() => {
         cargar();
+        return () => {
+            cargaRef.current += 1;
+        };
     }, [cargar, conversationId]);
 
     const activas = demandas.filter((d) => d.status === 'pending_stock' || d.status === 'stock_available');

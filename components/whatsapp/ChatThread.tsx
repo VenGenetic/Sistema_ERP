@@ -528,6 +528,7 @@ const Burbuja = memo<BurbujaProps>(
                                 onResponder={() => onResponder(m)}
                                 onReaccionar={(emoji) => onReaccionar(m, emoji)}
                                 onBorrar={m.direction === 'outbound' ? () => onBorrar(m) : undefined}
+                                textoCopiable={m.body?.trim() || undefined}
                                 alineacion="derecha"
                                 abrirHacia="abajo"
                                 claseBoton={cn(

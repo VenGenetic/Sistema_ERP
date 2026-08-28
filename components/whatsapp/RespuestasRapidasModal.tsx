@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Loader2, Pencil, Plus, Trash2, Zap } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import Modal from '../ui/Modal';
@@ -66,6 +66,7 @@ export const RespuestasRapidasModal: React.FC<Props> = ({
     const [guardando, setGuardando] = useState(false);
     /** La que preguntó si se quita. La confirmación va en la fila misma. */
     const [porQuitar, setPorQuitar] = useState<number | null>(null);
+    const guardandoRef = useRef(false);
 
     const cargar = useCallback(async () => {
         setCargando(true);
@@ -125,7 +126,8 @@ export const RespuestasRapidasModal: React.FC<Props> = ({
     const puedeGuardar = nombre.trim().length > 0 && cuerpo.trim().length > 0 && !guardando;
 
     const guardar = async () => {
-        if (!puedeGuardar || editando === null) return;
+        if (!puedeGuardar || editando === null || guardandoRef.current) return;
+        guardandoRef.current = true;
         setGuardando(true);
         setError(null);
 
@@ -142,6 +144,7 @@ export const RespuestasRapidasModal: React.FC<Props> = ({
                       .insert({ ...campos, created_by: userId ?? null, sort_order: alFinal })
                 : await supabase.from('agent_quick_replies').update(campos).eq('id', editando);
 
+        guardandoRef.current = false;
         setGuardando(false);
         if (err) {
             setError(`No se pudo guardar: ${err.message}`);

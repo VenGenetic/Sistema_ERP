@@ -4,7 +4,9 @@ import { supabase } from '../../supabaseClient';
 import { cn } from '../ui/styles';
 import {
     CAMPOS_COLA,
+    borrarAdjunto,
     cancelarMensaje,
+    descartarMensaje,
     KINDS_MENSAJE,
     reintentarMensaje,
     type MensajeEnCola,
@@ -43,6 +45,7 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
     // El id va por referencia para que `recargar` no cambie de identidad en
     // cada render: la caja de escribir la llama después de enviar.
     const idRef = useRef<number | null>(conversationId);
+    const operacionesRef = useRef(new Set<number>());
     idRef.current = conversationId;
 
     /**
@@ -121,6 +124,8 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
 
     const cancelar = useCallback(
         async (item: MensajeEnCola) => {
+            if (operacionesRef.current.has(item.id)) return;
+            operacionesRef.current.add(item.id);
             try {
                 const cancelado = await cancelarMensaje(item.id);
                 if (!cancelado) {
@@ -129,10 +134,14 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
                     // cliente ya tiene en el teléfono.
                     onError('Ese mensaje ya había salido, no se pudo cancelar.');
                     onYaHabiaSalido?.();
+                } else if (item.media_url) {
+                    await borrarAdjunto(item.media_url);
                 }
                 await recargar();
             } catch (err: any) {
                 onError(`No se pudo cancelar: ${err?.message ?? err}`);
+            } finally {
+                operacionesRef.current.delete(item.id);
             }
         },
         [onError, onYaHabiaSalido, recargar],
@@ -140,23 +149,46 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
 
     const reintentar = useCallback(
         async (item: MensajeEnCola) => {
+            if (operacionesRef.current.has(item.id)) return;
+            operacionesRef.current.add(item.id);
             try {
                 await reintentarMensaje(item.id);
                 await recargar();
             } catch (err: any) {
                 onError(`No se pudo reintentar: ${err?.message ?? err}`);
+            } finally {
+                operacionesRef.current.delete(item.id);
             }
         },
         [onError, recargar],
     );
 
-    return { enCola, recargar, cancelar, reintentar };
+    const descartar = useCallback(
+        async (item: MensajeEnCola) => {
+            if (operacionesRef.current.has(item.id)) return;
+            operacionesRef.current.add(item.id);
+            try {
+                const descartado = await descartarMensaje(item.id);
+                if (!descartado) onError('Ese mensaje ya no estaba fallido; se actualizo la cola.');
+                else if (item.media_url) await borrarAdjunto(item.media_url);
+                await recargar();
+            } catch (err: any) {
+                onError(`No se pudo descartar: ${err?.message ?? err}`);
+            } finally {
+                operacionesRef.current.delete(item.id);
+            }
+        },
+        [onError, recargar],
+    );
+
+    return { enCola, recargar, cancelar, reintentar, descartar };
 }
 
 interface PropsBurbujas {
     items: MensajeEnCola[];
     onCancelar: (item: MensajeEnCola) => void;
     onReintentar: (item: MensajeEnCola) => void;
+    onDescartar: (item: MensajeEnCola) => void;
     /** En el teléfono: texto y zonas táctiles más grandes. */
     tactil?: boolean;
 }
@@ -166,7 +198,7 @@ interface PropsBurbujas {
  * burbuja verde que un mensaje enviado pero atenuada y con el relojito: se
  * ve dónde va a quedar sin fingir que el cliente ya lo recibió.
  */
-export const BurbujasEnCola: React.FC<PropsBurbujas> = ({ items, onCancelar, onReintentar, tactil = false }) => (
+export const BurbujasEnCola: React.FC<PropsBurbujas> = ({ items, onCancelar, onReintentar, onDescartar, tactil = false }) => (
     <>
         {items.map((q) => (
             <div key={`cola-${q.id}`} className="group mt-0.5 flex justify-end px-2 md:px-4">
@@ -221,6 +253,15 @@ export const BurbujasEnCola: React.FC<PropsBurbujas> = ({ items, onCancelar, onR
                                     )}
                                 >
                                     <RotateCw size={12} aria-hidden="true" /> Reintentar
+                                </button>
+                                <button
+                                    onClick={() => onDescartar(q)}
+                                    className={cn(
+                                        'inline-flex items-center gap-1 underline underline-offset-2 hover:no-underline',
+                                        tactil && 'min-h-[32px] px-1',
+                                    )}
+                                >
+                                    <Ban size={12} aria-hidden="true" /> Descartar
                                 </button>
                             </>
                         ) : (

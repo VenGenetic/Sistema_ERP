@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Reply, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Copy, Reply, Trash2, X } from 'lucide-react';
 import { cn } from '../ui/styles';
 
 /**
@@ -25,6 +25,8 @@ interface Props {
      * que va a fallar.
      */
     onBorrar?: () => void;
+    /** Texto que se puede llevar al portapapeles. No envia nada. */
+    textoCopiable?: string;
     /** Clases del disparador; el móvil manda las suyas para llegar a 44px. */
     claseBoton?: string;
     /** De qué lado abrir el menú, para que no se salga de la burbuja. */
@@ -43,12 +45,14 @@ export const MessageActions: React.FC<Props> = ({
     onResponder,
     onReaccionar,
     onBorrar,
+    textoCopiable,
     claseBoton,
     alineacion = 'derecha',
     abrirHacia = 'arriba',
 }) => {
     const [abierto, setAbierto] = useState(false);
     const [haciaAbajo, setHaciaAbajo] = useState(abrirHacia === 'abajo');
+    const [copiado, setCopiado] = useState(false);
     const contenedorRef = useRef<HTMLDivElement>(null);
 
     /**
@@ -93,6 +97,18 @@ export const MessageActions: React.FC<Props> = ({
     const cerrarY = (accion: () => void) => () => {
         setAbierto(false);
         accion();
+    };
+
+    const copiar = async () => {
+        if (!textoCopiable) return;
+        try {
+            await navigator.clipboard.writeText(textoCopiable);
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 1600);
+        } catch {
+            // El navegador puede bloquear el portapapeles fuera de HTTPS.
+            setCopiado(false);
+        }
     };
 
     return (
@@ -140,6 +156,17 @@ export const MessageActions: React.FC<Props> = ({
                     >
                         <Reply size={14} aria-hidden="true" /> Responder citando
                     </button>
+
+                    {textoCopiable && (
+                        <button
+                            onClick={cerrarY(() => void copiar())}
+                            role="menuitem"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
+                        >
+                            {copiado ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                            {copiado ? 'Copiado' : 'Copiar mensaje'}
+                        </button>
+                    )}
 
                     {onBorrar && (
                         <button

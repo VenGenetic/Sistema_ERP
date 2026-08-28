@@ -238,6 +238,18 @@ export async function cancelarMensaje(id: number): Promise<boolean> {
     return (data?.length ?? 0) > 0;
 }
 
+/** Retira de la cola un mensaje fallido que la persona decide no reintentar. */
+export async function descartarMensaje(id: number): Promise<boolean> {
+    const { data, error } = await supabase
+        .from('agent_outbox')
+        .update({ status: 'canceled' })
+        .eq('id', id)
+        .eq('status', 'failed')
+        .select('id');
+    if (error) throw error;
+    return (data?.length ?? 0) > 0;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  ACCIONES SOBRE UN MENSAJE YA ENVIADO (migración 0031)                      */
 /* -------------------------------------------------------------------------- */

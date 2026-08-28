@@ -98,6 +98,7 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
     const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
     const inputRef = useRef<HTMLInputElement>(null);
+    const enviandoRef = useRef(false);
 
     useBackDismiss(isOpen, onClose);
 
@@ -240,7 +241,8 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
     );
 
     const enviar = async () => {
-        if (mensajes.length === 0 || enviando) return;
+        if (mensajes.length === 0 || enviandoRef.current) return;
+        enviandoRef.current = true;
         setEnviando(true);
         setErrorEnvio(null);
         try {
@@ -249,6 +251,7 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
         } catch (err: any) {
             setErrorEnvio(err?.message ?? 'No se pudo encolar el envío.');
         } finally {
+            enviandoRef.current = false;
             setEnviando(false);
         }
     };
