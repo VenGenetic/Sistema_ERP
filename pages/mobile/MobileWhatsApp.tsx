@@ -27,6 +27,7 @@ import {
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import VoiceRecorder from '../../components/whatsapp/VoiceRecorder';
+import BuscarEnHilo from '../../components/whatsapp/BuscarEnHilo';
 import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
 import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
 import MediaGallery from '../../components/whatsapp/MediaGallery';
@@ -35,7 +36,7 @@ import MenuTelefono from '../../components/whatsapp/MenuTelefono';
 import NuevoChatModal from '../../components/whatsapp/NuevoChatModal';
 import RespuestasRapidasModal from '../../components/whatsapp/RespuestasRapidasModal';
 import AvisarLlegadaModal from '../../components/whatsapp/AvisarLlegadaModal';
-import { BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
+import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
 import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/agente';
 import { fusionarMensajes, useRepasoDelHilo } from '../../components/whatsapp/hiloEnVivo';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
@@ -52,6 +53,7 @@ import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
 import RegistrarPedidoModal from '../../components/whatsapp/RegistrarPedidoModal';
 import {
     borrarMensaje,
+    editarMensaje,
     borrarAdjunto,
     CAMPOS_CONV_BASE,
     CAMPOS_CONV_PREVIEW,
@@ -59,6 +61,7 @@ import {
     faltaColumna,
     marcarLeidoEnWhatsApp,
     marcarNoLeido,
+    MAX_ADJUNTO_MB,
     reaccionarMensaje,
     subirAdjunto,
     type NuevoMensaje,
@@ -190,12 +193,15 @@ const MobileWhatsApp: React.FC = () => {
     const [nuevoChat, setNuevoChat] = useState(false);
     const [gestorRapidas, setGestorRapidas] = useState(false);
     const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+    const cacheMensajesRef = useRef(new Map<number, Mensaje[]>());
     const [cargandoChat, setCargandoChat] = useState(false);
     const [borrador, setBorrador] = useState('');
+    const [archivosPendientes, setArchivosPendientes] = useState<File[]>([]);
     const [enviando, setEnviando] = useState(false);
     const [error, setError] = useState<string | null>(null);
     /** Mensaje que se está citando en la próxima respuesta. */
     const [citando, setCitando] = useState<Mensaje | null>(null);
+    const [buscandoEnHilo, setBuscandoEnHilo] = useState(false);
     const [catalogoAbierto, setCatalogoAbierto] = useState(false);
     const [proformaAbierta, setProformaAbierta] = useState(false);
     const [pedidoAbierto, setPedidoAbierto] = useState(false);
@@ -249,10 +255,12 @@ const MobileWhatsApp: React.FC = () => {
      */
     const {
         enCola,
+        accionesFallidas,
         recargar: recargarCola,
         cancelar: cancelarDeLaCola,
         reintentar: reintentarDeLaCola,
         descartar: descartarDeLaCola,
+        resolverAccion,
     } = useColaDeSalida(abierta?.id ?? null, {
         onError: setError,
         onYaHabiaSalido: () => abierta && cargarMensajes(abierta.id),
@@ -443,7 +451,9 @@ const MobileWhatsApp: React.FC = () => {
     /* ------------------------------------------------------------------ */
 
     const cargarMensajes = useCallback(async (conversationId: number) => {
-        setCargandoChat(true);
+        const cache = cacheMensajesRef.current.get(conversationId);
+        if (cache) setMensajes(cache);
+        setCargandoChat(!cache);
         const { data, error: err } = await supabase
             .from('agent_messages')
             .select(CAMPOS_MSG)
@@ -458,7 +468,9 @@ const MobileWhatsApp: React.FC = () => {
             setError(`No se pudo abrir el chat: ${err.message}`);
             return;
         }
-        setMensajes((data as Mensaje[]).slice().reverse());
+        const filas = (data as Mensaje[]).slice().reverse();
+        cacheMensajesRef.current.set(conversationId, filas);
+        setMensajes(filas);
     }, []);
 
     /**
@@ -497,14 +509,20 @@ const MobileWhatsApp: React.FC = () => {
     abiertaRef.current = abierta?.id ?? null;
     useRepasoDelHilo(!!abierta, repasarHilo);
 
+    useEffect(() => {
+        if (abierta) cacheMensajesRef.current.set(abierta.id, mensajes);
+    }, [abierta?.id, mensajes]);
+
     const abrirChat = async (c: Conversacion) => {
         // Se adelanta a React para que la consulta que arranca abajo sepa
         // desde ya cual es el chat vigente.
         abiertaRef.current = c.id;
         setAbierta(c);
-        setMensajes([]);
+        setMensajes(cacheMensajesRef.current.get(c.id) ?? []);
         setBorrador(leerBorradorWhatsApp(c.id, userId));
+        setArchivosPendientes([]);
         setCitando(null);
+        setBuscandoEnHilo(false);
         setError(null);
         await cargarMensajes(c.id);
         // Abrirlo cuenta como leído en los DOS lados: el UPDATE de acá es
@@ -637,7 +655,10 @@ const MobileWhatsApp: React.FC = () => {
         try {
             await enviar([{ conversationId, body: texto, kind: 'text' }], replyToWaId);
             borrarBorradorWhatsApp(conversationId, userId);
-            if (abiertaRef.current === conversationId) setBorrador('');
+            if (abiertaRef.current === conversationId) {
+                setBorrador('');
+                setArchivosPendientes([]);
+            }
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo enviar.');
         } finally {
@@ -670,7 +691,10 @@ const MobileWhatsApp: React.FC = () => {
                 replyToWaId,
             );
             borrarBorradorWhatsApp(conversationId, userId);
-            if (abiertaRef.current === conversationId) setBorrador('');
+            if (abiertaRef.current === conversationId) {
+                setBorrador('');
+                setArchivosPendientes([]);
+            }
         } catch (err: any) {
             await Promise.all(subidos.map((s) => borrarAdjunto(s.url)));
             setError(err?.message ?? 'No se pudo enviar el archivo.');
@@ -725,6 +749,22 @@ const MobileWhatsApp: React.FC = () => {
             await borrarMensaje(abierta.id, m.whatsapp_message_id, userId);
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo borrar.');
+        }
+    };
+
+    const editar = async (m: Mensaje) => {
+        if (!abierta || !m.whatsapp_message_id || !m.body) return;
+        const conversationId = abierta.id;
+        const nuevo = window.prompt('Corregir mensaje:', m.body);
+        if (nuevo === null || nuevo.trim() === m.body.trim()) return;
+        if (!nuevo.trim()) {
+            setError('El mensaje corregido no puede quedar vacio.');
+            return;
+        }
+        try {
+            await editarMensaje(conversationId, m.whatsapp_message_id, nuevo, userId);
+        } catch (err: any) {
+            setError(`No se pudo editar: ${err?.message ?? err}`);
         }
     };
 
@@ -797,7 +837,17 @@ const MobileWhatsApp: React.FC = () => {
 
     /* Con algo escrito manda el botón verde; sin nada, el micrófono. Mientras
        se graba manda el grabador: el botón verde taparía sus controles. */
-    const mostrarEnviar = borrador.trim().length > 0 && !grabadorOcupado;
+    const mostrarEnviar = (borrador.trim().length > 0 || archivosPendientes.length > 0) && !grabadorOcupado;
+
+    const prepararArchivos = (files: File[]) => {
+        const demasiadoGrande = files.find((f) => f.size > MAX_ADJUNTO_MB * 1024 * 1024);
+        if (demasiadoGrande) {
+            setError(`${demasiadoGrande.name || 'El archivo'} supera el limite de ${MAX_ADJUNTO_MB} MB.`);
+            return;
+        }
+        setError(null);
+        setArchivosPendientes((prev) => [...prev, ...files].slice(0, 10));
+    };
 
     /** Una opción del menú "+". */
     const opcionMenu = (icono: React.ReactNode, texto: string, cuenta: number, accion: () => void) => (
@@ -893,6 +943,17 @@ const MobileWhatsApp: React.FC = () => {
                                         role="menuitem"
                                         onClick={() => {
                                             setMenuChat(false);
+                                            setBuscandoEnHilo(true);
+                                        }}
+                                        className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover"
+                                    >
+                                        <Search size={19} className="text-wa-meta" aria-hidden="true" />
+                                        Buscar en la conversación
+                                    </button>
+                                    <button
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setMenuChat(false);
                                             setFicha(true);
                                         }}
                                         className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover"
@@ -931,6 +992,10 @@ const MobileWhatsApp: React.FC = () => {
                         )}
                     </div>
                 </div>
+
+                {buscandoEnHilo && (
+                    <BuscarEnHilo mensajes={mensajes} onCerrar={() => setBuscandoEnHilo(false)} tactil />
+                )}
 
                 {/* Lo que se encole ahora NO va a salir. Se avisa arriba de todo
                     y no en la caja de escribir: hay que verlo ANTES de escribir. */}
@@ -989,6 +1054,7 @@ const MobileWhatsApp: React.FC = () => {
                         onResponder={setCitando}
                         onReaccionar={reaccionar}
                         onBorrar={borrar}
+                        onEditar={editar}
                         onTelefono={(numero, ancla) => setMenuTelefono({ numero, ancla })}
                     />
 
@@ -1001,6 +1067,7 @@ const MobileWhatsApp: React.FC = () => {
                         onDescartar={descartarDeLaCola}
                         tactil
                     />
+                    <AvisosAccionesFallidas items={accionesFallidas} onResolver={resolverAccion} />
                     </div>
                 </div>
 
@@ -1099,10 +1166,28 @@ const MobileWhatsApp: React.FC = () => {
                         accept="image/*,video/*,audio/*,application/pdf"
                         className="hidden"
                         onChange={(e) => {
-                            enviarArchivos(Array.from(e.target.files ?? []));
+                            prepararArchivos(Array.from(e.target.files ?? []));
                             e.target.value = '';
                         }}
                     />
+
+                    {archivosPendientes.length > 0 && (
+                        <div className="mb-1.5 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto px-1">
+                            {archivosPendientes.map((archivo, index) => (
+                                <div key={`${archivo.name}-${archivo.size}-${index}`} className="flex max-w-full items-center gap-1.5 rounded-lg bg-wa-input px-2 py-1.5 text-xs text-wa-text">
+                                    {archivo.type.startsWith('image/') ? <ImageIcon size={14} aria-hidden="true" /> : <FileText size={14} aria-hidden="true" />}
+                                    <span className="max-w-48 truncate">{archivo.name || 'archivo'}</span>
+                                    <button
+                                        onClick={() => setArchivosPendientes((prev) => prev.filter((_, i) => i !== index))}
+                                        aria-label={`Quitar ${archivo.name || 'archivo'}`}
+                                        className="flex h-7 w-7 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10"
+                                    >
+                                        <X size={14} aria-hidden="true" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="flex flex-wrap items-end gap-1.5">
                         {/* Adjuntar, catálogo, proforma, pedido y rápidas viven acá
@@ -1138,7 +1223,7 @@ const MobileWhatsApp: React.FC = () => {
 
                         {mostrarEnviar && (
                             <button
-                                onClick={enviarTexto}
+                                onClick={() => archivosPendientes.length > 0 ? enviarArchivos(archivosPendientes) : enviarTexto()}
                                 disabled={enviando}
                                 aria-label="Enviar"
                                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-wa-accent text-wa-accent-fg active:brightness-90 disabled:opacity-40"

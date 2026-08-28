@@ -307,6 +307,21 @@ export async function borrarMensaje(
     );
 }
 
+/** Corrige un mensaje de texto propio ya enviado. */
+export async function editarMensaje(
+    conversationId: number,
+    whatsappMessageId: string,
+    body: string,
+    userId: string | null,
+): Promise<void> {
+    const texto = body.trim();
+    if (!texto) throw new Error('El mensaje corregido no puede quedar vacio.');
+    await encolarAccion(
+        { conversation_id: conversationId, kind: 'edit', target_wa_id: whatsappMessageId, body: texto },
+        userId,
+    );
+}
+
 /** Pone (o quita, con emoji vacío) una reacción sobre un mensaje. */
 export async function reaccionarMensaje(
     conversationId: number,

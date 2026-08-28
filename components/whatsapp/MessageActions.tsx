@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Reply, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Copy, Pencil, Reply, Trash2, X } from 'lucide-react';
 import { cn } from '../ui/styles';
+import { copiarTexto } from '../../utils/portapapeles';
 
 /**
  * Lo que se puede hacer sobre un mensaje que ya está en el chat: citarlo
@@ -25,6 +26,7 @@ interface Props {
      * que va a fallar.
      */
     onBorrar?: () => void;
+    onEditar?: () => void;
     /** Texto que se puede llevar al portapapeles. No envia nada. */
     textoCopiable?: string;
     /** Clases del disparador; el móvil manda las suyas para llegar a 44px. */
@@ -45,6 +47,7 @@ export const MessageActions: React.FC<Props> = ({
     onResponder,
     onReaccionar,
     onBorrar,
+    onEditar,
     textoCopiable,
     claseBoton,
     alineacion = 'derecha',
@@ -53,6 +56,7 @@ export const MessageActions: React.FC<Props> = ({
     const [abierto, setAbierto] = useState(false);
     const [haciaAbajo, setHaciaAbajo] = useState(abrirHacia === 'abajo');
     const [copiado, setCopiado] = useState(false);
+    const [falloCopia, setFalloCopia] = useState(false);
     const contenedorRef = useRef<HTMLDivElement>(null);
 
     /**
@@ -101,14 +105,17 @@ export const MessageActions: React.FC<Props> = ({
 
     const copiar = async () => {
         if (!textoCopiable) return;
-        try {
-            await navigator.clipboard.writeText(textoCopiable);
+        const ok = await copiarTexto(textoCopiable);
+        if (ok) {
             setCopiado(true);
-            setTimeout(() => setCopiado(false), 1600);
-        } catch {
-            // El navegador puede bloquear el portapapeles fuera de HTTPS.
-            setCopiado(false);
+            setFalloCopia(false);
+        } else {
+            setFalloCopia(true);
         }
+        setTimeout(() => {
+            setCopiado(false);
+            setFalloCopia(false);
+        }, 1600);
     };
 
     return (
@@ -159,12 +166,22 @@ export const MessageActions: React.FC<Props> = ({
 
                     {textoCopiable && (
                         <button
-                            onClick={cerrarY(() => void copiar())}
+                            onClick={() => void copiar()}
                             role="menuitem"
                             className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
                         >
                             {copiado ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                            {copiado ? 'Copiado' : 'Copiar mensaje'}
+                            {copiado ? 'Copiado' : falloCopia ? 'No se pudo copiar' : 'Copiar mensaje'}
+                        </button>
+                    )}
+
+                    {onEditar && (
+                        <button
+                            onClick={cerrarY(onEditar)}
+                            role="menuitem"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
+                        >
+                            <Pencil size={14} aria-hidden="true" /> Editar mensaje
                         </button>
                     )}
 

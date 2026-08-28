@@ -39,8 +39,20 @@ interface Opciones {
     onYaHabiaSalido?: () => void;
 }
 
+export interface AccionFallida {
+    id: number;
+    kind: 'delete' | 'reaction' | 'edit' | 'read' | 'unread';
+    error: string | null;
+    created_at: string;
+    status: 'pending' | 'failed';
+}
+
+const KINDS_ACCION = ['delete', 'reaction', 'edit', 'read', 'unread'];
+
 export function useColaDeSalida(conversationId: number | null, { onError, onYaHabiaSalido }: Opciones) {
     const [enCola, setEnCola] = useState<MensajeEnCola[]>([]);
+    const [accionesFallidas, setAccionesFallidas] = useState<AccionFallida[]>([]);
+    const [hayAccionesPendientes, setHayAccionesPendientes] = useState(false);
 
     // El id va por referencia para que `recargar` no cambie de identidad en
     // cada render: la caja de escribir la llama después de enviar.
@@ -64,20 +76,34 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
         const id = idRef.current;
         if (!id) {
             setEnCola([]);
+            setAccionesFallidas([]);
+            setHayAccionesPendientes(false);
             return;
         }
-        const { data, error } = await supabase
-            .from('agent_outbox')
-            .select(CAMPOS_COLA)
-            .eq('conversation_id', id)
-            .in('status', ['pending', 'failed'])
-            .in('kind', KINDS_MENSAJE)
-            .order('created_at', { ascending: true });
-        if (error) {
-            console.error('No se pudo leer la cola de salida:', error.message);
+        const [mensajes, acciones] = await Promise.all([
+            supabase
+                .from('agent_outbox')
+                .select(CAMPOS_COLA)
+                .eq('conversation_id', id)
+                .in('status', ['pending', 'failed'])
+                .in('kind', KINDS_MENSAJE)
+                .order('created_at', { ascending: true }),
+            supabase
+                .from('agent_outbox')
+                .select('id, kind, error, created_at, status')
+                .eq('conversation_id', id)
+                .in('status', ['pending', 'failed'])
+                .in('kind', KINDS_ACCION)
+                .order('created_at', { ascending: true }),
+        ]);
+        if (mensajes.error || acciones.error) {
+            console.error('No se pudo leer la cola de salida:', mensajes.error?.message ?? acciones.error?.message);
             return;
         }
-        setEnCola((data ?? []) as unknown as MensajeEnCola[]);
+        setEnCola((mensajes.data ?? []) as unknown as MensajeEnCola[]);
+        const filasAccion = (acciones.data ?? []) as unknown as AccionFallida[];
+        setAccionesFallidas(filasAccion.filter((a) => a.status === 'failed'));
+        setHayAccionesPendientes(filasAccion.some((a) => a.status === 'pending'));
     }, []);
 
     useEffect(() => {
@@ -115,7 +141,7 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
      * como "En cola" para siempre aunque el cliente ya lo tenga. Solo corre
      * mientras hay pendientes, así que en un chat quieto no consulta nada.
      */
-    const hayPendientes = enCola.some((q) => q.status === 'pending');
+    const hayPendientes = hayAccionesPendientes || enCola.some((q) => q.status === 'pending');
     useEffect(() => {
         if (!hayPendientes) return;
         const t = setInterval(() => recargar(), REPASO_MS);
@@ -181,8 +207,47 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
         [onError, recargar],
     );
 
-    return { enCola, recargar, cancelar, reintentar, descartar };
+    const resolverAccion = useCallback(
+        async (item: AccionFallida, reintentar: boolean) => {
+            if (operacionesRef.current.has(item.id)) return;
+            operacionesRef.current.add(item.id);
+            try {
+                if (reintentar) await reintentarMensaje(item.id);
+                else await descartarMensaje(item.id);
+                await recargar();
+            } catch (err: any) {
+                onError(`No se pudo ${reintentar ? 'reintentar' : 'descartar'} la accion: ${err?.message ?? err}`);
+            } finally {
+                operacionesRef.current.delete(item.id);
+            }
+        },
+        [onError, recargar],
+    );
+
+    return { enCola, accionesFallidas, recargar, cancelar, reintentar, descartar, resolverAccion };
 }
+
+const NOMBRE_ACCION: Record<AccionFallida['kind'], string> = {
+    delete: 'borrar el mensaje', reaction: 'reaccionar', edit: 'editar el mensaje', read: 'marcar como leido', unread: 'marcar como pendiente',
+};
+
+export const AvisosAccionesFallidas: React.FC<{
+    items: AccionFallida[];
+    onResolver: (item: AccionFallida, reintentar: boolean) => void;
+}> = ({ items, onResolver }) => (
+    <>
+        {items.map((item) => (
+            <div key={`accion-${item.id}`} className="mx-3 my-1 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
+                <p className="font-semibold">No se pudo {NOMBRE_ACCION[item.kind]}.</p>
+                {item.error && <p className="mt-0.5 opacity-80">{item.error}</p>}
+                <div className="mt-1 flex gap-3">
+                    <button onClick={() => onResolver(item, true)} className="underline">Reintentar</button>
+                    <button onClick={() => onResolver(item, false)} className="underline">Descartar</button>
+                </div>
+            </div>
+        ))}
+    </>
+);
 
 interface PropsBurbujas {
     items: MensajeEnCola[];

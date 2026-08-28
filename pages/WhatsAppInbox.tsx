@@ -8,8 +8,9 @@ import {
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
+import BuscarEnHilo from '../components/whatsapp/BuscarEnHilo';
 import MediaGallery from '../components/whatsapp/MediaGallery';
-import { BurbujasEnCola, useColaDeSalida } from '../components/whatsapp/ColaDeSalida';
+import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../components/whatsapp/ColaDeSalida';
 import {
     avisoDeEnvio as avisoDelAgente,
     haceCuanto as timeAgo,
@@ -34,6 +35,7 @@ import ChatThread, {
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import {
     borrarMensaje,
+    editarMensaje,
     CAMPOS_CONV_BASE,
     CAMPOS_CONV_PREVIEW,
     encolarMensajes,
@@ -328,6 +330,8 @@ const WhatsAppInbox: React.FC = () => {
     const [galeria, setGaleria] = useState(false);
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [messages, setMessages] = useState<AgentMessage[]>([]);
+    const [messagesConversationId, setMessagesConversationId] = useState<number | null>(null);
+    const cacheMensajesRef = useRef(new Map<number, AgentMessage[]>());
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [closeInsteadOfReopen, setCloseInsteadOfReopen] = useState(false);
@@ -359,6 +363,7 @@ const WhatsAppInbox: React.FC = () => {
     const [recargarFicha, setRecargarFicha] = useState(0);
     /** Mensaje que se está citando en la próxima respuesta. */
     const [citando, setCitando] = useState<MensajeHilo | null>(null);
+    const [buscandoEnHilo, setBuscandoEnHilo] = useState(false);
 
     /**
      * Pone una reacción. Se pinta al instante y se corrige si falla: es
@@ -389,6 +394,21 @@ const WhatsAppInbox: React.FC = () => {
             await borrarMensaje(selected.conversationId, m.whatsapp_message_id, userId);
         } catch (err: any) {
             setErrorAccion(`No se pudo borrar: ${err?.message ?? err}`);
+        }
+    };
+
+    const editar = async (m: AgentMessage) => {
+        if (!selected || !m.whatsapp_message_id || !m.body) return;
+        const nuevo = window.prompt('Corregir mensaje:', m.body);
+        if (nuevo === null || nuevo.trim() === m.body.trim()) return;
+        if (!nuevo.trim()) {
+            setErrorAccion('El mensaje corregido no puede quedar vacio.');
+            return;
+        }
+        try {
+            await editarMensaje(selected.conversationId, m.whatsapp_message_id, nuevo, userId);
+        } catch (err: any) {
+            setErrorAccion(`No se pudo editar: ${err?.message ?? err}`);
         }
     };
 
@@ -785,14 +805,25 @@ const WhatsAppInbox: React.FC = () => {
     // `selectedConversationId`: sale del escalamiento.
     const {
         enCola,
+        accionesFallidas,
         recargar: cargarCola,
         cancelar: handleCancelar,
         reintentar: handleReintentar,
         descartar: handleDescartar,
+        resolverAccion,
     } = useColaDeSalida(selected?.conversationId ?? null, {
         onError: setErrorAccion,
         onYaHabiaSalido: () => setRecargarMensajes((n) => n + 1),
     });
+
+    const mensajesVisibles = useMemo(
+        () => selected && messagesConversationId === selected.conversationId ? messages : [],
+        [selected, messagesConversationId, messages],
+    );
+
+    useEffect(() => {
+        if (messagesConversationId) cacheMensajesRef.current.set(messagesConversationId, messages);
+    }, [messagesConversationId, messages]);
 
     /**
      * Vuelve a traer los últimos mensajes y los funde con los que ya están
@@ -860,17 +891,22 @@ const WhatsAppInbox: React.FC = () => {
     useEffect(() => {
         if (!selected) {
             setMessages([]);
+            setMessagesConversationId(null);
             return;
         }
         let cancelled = false;
-        setMessagesLoading(true);
+        const conversationId = selected.conversationId;
+        const cache = cacheMensajesRef.current.get(conversationId);
+        setMessages(cache ?? []);
+        setMessagesConversationId(conversationId);
+        setMessagesLoading(!cache);
         // Solo los últimos N: una conversación larga puede tener cientos de
         // mensajes y traerlos todos es lento y caro (se piden en orden
         // descendente y se revierte, para quedarse con los MÁS RECIENTES).
         supabase
             .from('agent_messages')
             .select(CAMPOS_MENSAJE)
-            .eq('conversation_id', selected.conversationId)
+            .eq('conversation_id', conversationId)
             .order('created_at', { ascending: false })
             .limit(MENSAJES_VISIBLES)
             .then(({ data, error }) => {
@@ -879,13 +915,17 @@ const WhatsAppInbox: React.FC = () => {
                 // mensajes registrados todavía", que es una conversación vacía
                 // -- exactamente lo contrario de lo que pasó.
                 if (error) setErrorCarga(`No se pudo abrir la conversación: ${error.message}`);
-                else if (data) setMessages((data as AgentMessage[]).slice().reverse());
+                else if (data) {
+                    const filas = (data as AgentMessage[]).slice().reverse();
+                    cacheMensajesRef.current.set(conversationId, filas);
+                    setMessages(filas);
+                    setMessagesConversationId(conversationId);
+                }
                 setMessagesLoading(false);
             });
         // Mensajes en vivo del chat abierto: sin esto había que refrescar la
         // página para ver lo que iba llegando (el filtro es por conversación,
         // así que no llegan eventos de otros chats).
-        const conversationId = selected.conversationId;
         const channel = supabase
             .channel(`agent_messages_conversation_${conversationId}`)
             .on(
@@ -1124,7 +1164,10 @@ const WhatsAppInbox: React.FC = () => {
 
     // Una cita pertenece al chat donde se eligio. Nunca se arrastra al
     // siguiente cliente al cambiar de conversacion.
-    useEffect(() => setCitando(null), [selected?.conversationId]);
+    useEffect(() => {
+        setCitando(null);
+        setBuscandoEnHilo(false);
+    }, [selected?.conversationId]);
 
     /** Cancela un mensaje que todavía no salió. */
     /**
@@ -1160,7 +1203,7 @@ const WhatsAppInbox: React.FC = () => {
      * pieza no es lo que nadie está buscando.
      */
     const abrirVisor = (mensaje: AgentMessage) => {
-        const fotos = messages.filter((m) => !!m.media_url && m.content_type === 'image');
+        const fotos = mensajesVisibles.filter((m) => !!m.media_url && m.content_type === 'image');
         const media: MediaItem[] = fotos.map((m) => ({ type: 'image', url: m.media_url!, title: m.body ?? undefined }));
         const index = Math.max(0, fotos.findIndex((m) => m.id === mensaje.id));
         setVisor({ media, index });
@@ -1746,6 +1789,15 @@ const WhatsAppInbox: React.FC = () => {
                                 </button>
 
                                 <button
+                                    onClick={() => setBuscandoEnHilo((v) => !v)}
+                                    aria-label="Buscar dentro de la conversación"
+                                    title="Buscar dentro de la conversación"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10"
+                                >
+                                    <Search size={18} aria-hidden="true" />
+                                </button>
+
+                                <button
                                     onClick={() => setRecargarMensajes((n) => n + 1)}
                                     disabled={messagesLoading}
                                     aria-label="Actualizar el chat"
@@ -1755,6 +1807,10 @@ const WhatsAppInbox: React.FC = () => {
                                     <RefreshCw size={18} className={cn(messagesLoading && 'animate-spin')} aria-hidden="true" />
                                 </button>
                             </div>
+
+                            {buscandoEnHilo && (
+                                <BuscarEnHilo mensajes={mensajesVisibles} onCerrar={() => setBuscandoEnHilo(false)} />
+                            )}
 
                             {/* Si el agente sigue habilitado en este chat, puede contestar
                                 encima de la persona que está atendiendo. No se apaga solo
@@ -1783,7 +1839,7 @@ const WhatsAppInbox: React.FC = () => {
                                     conversación. Lo que escribas desde el teléfono, no.
                                 </PildoraChat>
 
-                                {messages.length >= MENSAJES_VISIBLES && (
+                                {mensajesVisibles.length >= MENSAJES_VISIBLES && (
                                     <PildoraChat>
                                         Mostrando los últimos {MENSAJES_VISIBLES} mensajes de esta conversación.
                                     </PildoraChat>
@@ -1791,15 +1847,16 @@ const WhatsAppInbox: React.FC = () => {
 
                                 {messagesLoading ? (
                                     <PildoraChat>Cargando conversación…</PildoraChat>
-                                ) : messages.length === 0 ? (
+                                ) : mensajesVisibles.length === 0 ? (
                                     <PildoraChat>Sin mensajes registrados todavía.</PildoraChat>
                                 ) : (
                                     <ChatThread
-                                        mensajes={messages}
+                                        mensajes={mensajesVisibles}
                                         onAbrirFoto={abrirVisor}
                                         onResponder={setCitando}
                                         onReaccionar={reaccionar}
                                         onBorrar={borrar}
+                                        onEditar={editar}
                                         onTelefono={(numero, ancla) => setMenuTelefono({ numero, ancla })}
                                     />
                                 )}
@@ -1812,6 +1869,7 @@ const WhatsAppInbox: React.FC = () => {
                                     onReintentar={handleReintentar}
                                     onDescartar={handleDescartar}
                                 />
+                                <AvisosAccionesFallidas items={accionesFallidas} onResolver={resolverAccion} />
                                 </div>
                             </div>
 

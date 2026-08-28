@@ -346,12 +346,13 @@ interface BurbujaProps {
     onResponder: (m: MensajeHilo) => void;
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
+    onEditar: (m: MensajeHilo) => void;
     /** Tocaron un teléfono escrito dentro del mensaje. */
     onTelefono?: (numero: string, ancla: DOMRect) => void;
 }
 
 const Burbuja = memo<BurbujaProps>(
-    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onTelefono }) => {
+    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onTelefono }) => {
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
 
@@ -385,6 +386,8 @@ const Burbuja = memo<BurbujaProps>(
 
         return (
             <div
+                id={`wa-message-${m.id}`}
+                style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 80px' }}
                 className={cn(
                     'group flex px-2 md:px-4',
                     entrante ? 'justify-start' : 'justify-end',
@@ -528,6 +531,7 @@ const Burbuja = memo<BurbujaProps>(
                                 onResponder={() => onResponder(m)}
                                 onReaccionar={(emoji) => onReaccionar(m, emoji)}
                                 onBorrar={m.direction === 'outbound' ? () => onBorrar(m) : undefined}
+                                onEditar={m.direction === 'outbound' && m.content_type === 'text' && !!m.body ? () => onEditar(m) : undefined}
                                 textoCopiable={m.body?.trim() || undefined}
                                 alineacion="derecha"
                                 abrirHacia="abajo"
@@ -552,6 +556,7 @@ interface Props {
     onResponder: (m: MensajeHilo) => void;
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
+    onEditar: (m: MensajeHilo) => void;
     /**
      * Tocaron un teléfono escrito DENTRO de un mensaje. `ancla` es dónde
      * quedó el número en pantalla, para colgarle el menú al lado.
@@ -570,6 +575,7 @@ export const ChatThread: React.FC<Props> = ({
     onResponder,
     onReaccionar,
     onBorrar,
+    onEditar,
     onTelefono,
     tactil = false,
 }) => {
@@ -583,8 +589,8 @@ export const ChatThread: React.FC<Props> = ({
      * burbujas se redibujaban igual. La referencia guarda siempre la
      * versión más nueva, así que tampoco se cierra sobre datos viejos.
      */
-    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar, onTelefono });
-    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar, onTelefono };
+    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onTelefono });
+    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onTelefono };
 
     const acciones = useMemo(
         () => ({
@@ -592,6 +598,7 @@ export const ChatThread: React.FC<Props> = ({
             responder: (m: MensajeHilo) => ultimas.current.onResponder(m),
             reaccionar: (m: MensajeHilo, emoji: string) => ultimas.current.onReaccionar(m, emoji),
             borrar: (m: MensajeHilo) => ultimas.current.onBorrar(m),
+            editar: (m: MensajeHilo) => ultimas.current.onEditar(m),
             telefono: (numero: string, ancla: DOMRect) => ultimas.current.onTelefono?.(numero, ancla),
         }),
         [],
@@ -650,6 +657,7 @@ export const ChatThread: React.FC<Props> = ({
                         onResponder={acciones.responder}
                         onReaccionar={acciones.reaccionar}
                         onBorrar={acciones.borrar}
+                        onEditar={acciones.editar}
                         onTelefono={alTocarTelefono}
                     />
                 </React.Fragment>
