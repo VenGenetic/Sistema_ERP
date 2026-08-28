@@ -1,349 +1,186 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Boxes, ChevronRight, Download, FileText, Grid3X3, House, MessageCircle,
+  Monitor, Printer, ScanLine, Search, Smartphone, WifiOff, X,
+} from 'lucide-react';
 import { setPreferredViewMode } from '../../utils/deviceDetection';
 import { getPrintQueue } from '../../utils/mobilePrintQueue';
 import { supabase } from '../../supabaseClient';
 import { useProformaStore } from '../../store/useProformaStore';
 import { useInstallPrompt } from '../../hooks/useInstallPrompt';
-import { Download, FileText, House, LayoutGrid, MessageCircle, Monitor, Printer, ScanLine, Smartphone, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { cn } from '../ui/styles';
 
-/** Un solo sitio para el estilo de las pestañas: activo = ámbar y algo más grande. */
-const navItem = (isActive: boolean) =>
-    `flex flex-col items-center justify-center gap-0.5 px-2 min-w-[56px] min-h-[56px] rounded-2xl transition-all duration-300 ${
-        isActive ? 'text-amber-400 font-semibold scale-110' : 'text-slate-500 active:text-slate-200'
-    }`;
+type ModuleItem = {
+  label: string;
+  description: string;
+  to: string;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
+  accent: string;
+};
+
+const MODULES: ModuleItem[] = [
+  { label: 'WhatsApp', description: 'Clientes y conversaciones', to: '/mobile/whatsapp', icon: MessageCircle, accent: 'bg-emerald-500/15 text-emerald-300' },
+  { label: 'Catálogo', description: 'Productos, precios y stock', to: '/mobile/catalog', icon: Boxes, accent: 'bg-blue-500/15 text-blue-300' },
+  { label: 'Etiquetas', description: 'Cola e impresión móvil', to: '/mobile/labels', icon: Printer, accent: 'bg-amber-500/15 text-amber-300' },
+  { label: 'Inventario', description: 'Escanear y ajustar existencias', to: '/mobile/inventory', icon: ScanLine, accent: 'bg-cyan-500/15 text-cyan-300' },
+  { label: 'Proforma', description: 'Cotización en preparación', to: '/mobile/proforma', icon: FileText, accent: 'bg-violet-500/15 text-violet-300' },
+];
+
+const PAGE_META: Record<string, { title: string; eyebrow: string }> = {
+  '/mobile': { title: 'Centro de operaciones', eyebrow: 'Inicio' },
+  '/mobile/whatsapp': { title: 'WhatsApp', eyebrow: 'Atención al cliente' },
+  '/mobile/catalog': { title: 'Catálogo', eyebrow: 'Productos y stock' },
+  '/mobile/labels': { title: 'Etiquetas', eyebrow: 'Impresión móvil' },
+  '/mobile/inventory': { title: 'Inventario', eyebrow: 'Control de almacén' },
+  '/mobile/proforma': { title: 'Proforma', eyebrow: 'Cotización' },
+};
 
 const MobileLayout: React.FC = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const [queueCount, setQueueCount] = useState(0);
-    /** Chats de WhatsApp con mensajes sin leer. */
-    const [sinLeer, setSinLeer] = useState(0);
-    // El store persiste en localStorage, así que el contador sobrevive a
-    // recargas y refleja lo agregado desde el catálogo sin pedir nada a la red.
-    const proformaCount = useProformaStore(s => s.items.length);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { userProfile, session } = useAuth();
+  const [queueCount, setQueueCount] = useState(0);
+  const [sinLeer, setSinLeer] = useState(0);
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [moduleCenter, setModuleCenter] = useState(false);
+  const [query, setQuery] = useState('');
+  const proformaCount = useProformaStore((state) => state.items.length);
+  const { canInstall, promptInstall } = useInstallPrompt();
+  const [installSnoozed, setInstallSnoozed] = useState(() => {
+    try { return Date.now() < Number(localStorage.getItem('install_prompt_snoozed_until') || 0); }
+    catch { return false; }
+  });
 
-    const { canInstall, promptInstall } = useInstallPrompt();
+  const meta = PAGE_META[location.pathname] ?? { title: 'Xsistem ERP', eyebrow: 'Modo móvil' };
+  const initials = String(userProfile?.full_name || userProfile?.nickname || session?.user?.email || 'ERP')
+    .split(/\s|@/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  const visibleModules = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase('es');
+    return normalized ? MODULES.filter((item) => `${item.label} ${item.description}`.toLocaleLowerCase('es').includes(normalized)) : MODULES;
+  }, [query]);
 
-    /*
-        Descarte del aviso, con fecha de caducidad.
+  const refreshQueue = useCallback(async () => {
+    const queue = await getPrintQueue();
+    setQueueCount(queue.reduce((total, item) => total + item.quantity, 0));
+  }, []);
+  const refreshUnread = useCallback(async () => {
+    const { count, error } = await supabase.from('agent_conversations').select('id', { count: 'exact', head: true }).gt('unread_count', 0);
+    if (!error) setSinLeer(count ?? 0);
+  }, []);
 
-        Se guardaba un `true` sin más: un toque en la X y la invitación a
-        instalar no volvía nunca, en ese teléfono, para siempre. Y `dismissed`
-        también se marcaba al cerrar el diálogo de Chrome, así que abrirlo por
-        curiosidad y cerrarlo bastaba para perder el acceso definitivamente.
-
-        Ahora se pospone un mes, y cerrar el diálogo del navegador no cuenta
-        como un no. Además siempre queda la entrada fija en la pantalla de
-        Inicio, que no depende de esto.
-    */
-    const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
-    const [installSnoozed, setInstallSnoozed] = useState(() => {
-        try {
-            const until = Number(localStorage.getItem('install_prompt_snoozed_until') || 0);
-            return Date.now() < until;
-        } catch {
-            return false;
-        }
-    });
-
-    const snoozeInstall = () => {
-        setInstallSnoozed(true);
-        try {
-            localStorage.setItem('install_prompt_snoozed_until', String(Date.now() + SNOOZE_MS));
-        } catch {
-            // Modo privado: se oculta igual durante esta sesión.
-        }
+  useEffect(() => {
+    refreshQueue();
+    refreshUnread();
+  }, [location.pathname, refreshQueue, refreshUnread]);
+  useEffect(() => {
+    const interval = window.setInterval(refreshUnread, 120_000);
+    const onQueue = () => refreshQueue();
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    window.addEventListener('print-queue-changed', onQueue);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('print-queue-changed', onQueue);
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
     };
+  }, [refreshQueue, refreshUnread]);
+  useEffect(() => {
+    const root = document.documentElement;
+    const wasDark = root.classList.contains('dark');
+    root.classList.add('dark');
+    return () => { if (!wasDark) root.classList.remove('dark'); };
+  }, []);
+  useEffect(() => { setModuleCenter(false); setQuery(''); }, [location.pathname]);
 
-    const handleInstall = async () => {
-        await promptInstall();
-    };
+  const switchDesktop = () => {
+    setPreferredViewMode('desktop');
+    navigate('/', { replace: true });
+  };
+  const snoozeInstall = () => {
+    setInstallSnoozed(true);
+    try { localStorage.setItem('install_prompt_snoozed_until', String(Date.now() + 30 * 24 * 60 * 60 * 1000)); } catch { /* private mode */ }
+  };
 
-    const refreshQueueCount = useCallback(async () => {
-        const queue = await getPrintQueue();
-        setQueueCount(queue.reduce((total, item) => total + item.quantity, 0));
-    }, []);
+  const navClass = ({ isActive }: { isActive: boolean }) => cn(
+    'relative flex min-h-[58px] min-w-[58px] touch-manipulation flex-col items-center justify-center gap-1 rounded-2xl px-2 text-[10px] font-semibold transition-colors active:bg-white/10',
+    isActive ? 'text-blue-300' : 'text-slate-500',
+  );
 
-    /**
-     * Chats sin leer, para el punto del icono de WhatsApp.
-     *
-     * `head: true` con `count: 'exact'`: pide SOLO el número, sin traer una
-     * sola fila. En un teléfono con datos móviles importa -- traer las
-     * conversaciones para contarlas serían decenas de KB cada vez, y esto
-     * son unos bytes.
-     *
-     * Se relee al cambiar de pantalla y cada dos minutos. No usa realtime a
-     * propósito: `agent_conversations` cambia con CADA mensaje que entra, y
-     * una suscripción abierta todo el día en el teléfono gastaría datos y
-     * cuota para actualizar un numerito.
-     */
-    const refreshSinLeer = useCallback(async () => {
-        const { count, error } = await supabase
-            .from('agent_conversations')
-            .select('id', { count: 'exact', head: true })
-            .gt('unread_count', 0);
-        if (!error) setSinLeer(count ?? 0);
-    }, []);
+  return (
+    <div className="flex h-dvh-screen w-full flex-col overflow-hidden bg-[#070d1a] font-sans text-white">
+      <a href="#mobile-main" className="fixed left-3 top-3 z-[200] -translate-y-20 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold transition-transform focus:translate-y-0">Saltar al contenido</a>
 
-    useEffect(() => {
-        refreshSinLeer();
-        const t = setInterval(refreshSinLeer, 120000);
-        return () => clearInterval(t);
-    }, [location.pathname, refreshSinLeer]);
-
-    // Se refresca al montar y en cada cambio de ruta (por ejemplo al volver del
-    // catálogo después de encolar). El efecto de montaje aparte sobraba: éste ya
-    // corre en la primera pasada.
-    useEffect(() => {
-        refreshQueueCount();
-    }, [location.pathname, refreshQueueCount]);
-
-    // Refresh instantly on any queue mutation, even without navigating away
-    // (e.g. adding several items from the catalog without leaving the page).
-    useEffect(() => {
-        window.addEventListener('print-queue-changed', refreshQueueCount);
-        return () => window.removeEventListener('print-queue-changed', refreshQueueCount);
-    }, [refreshQueueCount]);
-
-    /*
-        Tema oscuro forzado mientras dure el modo móvil.
-
-        Los modales que esta parte comparte con el escritorio —editar producto,
-        demanda, etiquetas, edición en lote, sourcing, equivalentes...— se pintan
-        con tokens semánticos (`bg-surface`, `text-fg`) que siguen el tema del
-        escritorio. Con el tema claro activo, cada uno se abría en blanco dentro
-        de una interfaz que MASTER.md fija en `slate-950`: exactamente el fallo
-        que MobileSearchBar documenta haber arreglado en su campo y su panel.
-
-        La clase `dark` en <html> es lo único que decide esos tokens (ver
-        utils/theme.ts), así que se pone al entrar y se devuelve al salir. La
-        preferencia guardada del usuario no se toca: al volver al escritorio
-        manda otra vez la suya.
-    */
-    useEffect(() => {
-        const root = document.documentElement;
-        const wasDark = root.classList.contains('dark');
-        root.classList.add('dark');
-        return () => {
-            if (!wasDark) root.classList.remove('dark');
-        };
-    }, []);
-
-    const handleSwitchToDesktop = () => {
-        setPreferredViewMode('desktop');
-        navigate('/', { replace: true });
-    };
-
-    return (
-        <div className="flex flex-col h-dvh-screen w-full bg-slate-950 overflow-hidden font-sans">
-            {/* Header / Top Bar */}
-            <header className="bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 text-white px-4 py-2 flex items-center justify-between z-40">
-                <div className="flex items-center gap-2">
-                    <Smartphone size={18} className="text-amber-400" aria-hidden="true" />
-                    <span className="text-xs font-bold tracking-widest uppercase text-slate-300">Modo Móvil</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    {/*
-                        WhatsApp entra por aquí por el mismo motivo que la proforma:
-                        la barra inferior está llena. Va como icono a secas, con el
-                        contador de chats sin leer encima -- que es lo único que
-                        hace falta saber de un vistazo: si hay alguien esperando
-                        respuesta.
-                    */}
-                    <NavLink
-                        to="/mobile/whatsapp"
-                        aria-label={sinLeer > 0 ? `WhatsApp, ${sinLeer} chats sin leer` : 'WhatsApp'}
-                        className={({ isActive }) =>
-                            `relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border transition-colors ${
-                                isActive
-                                    ? 'bg-amber-500 text-slate-950 border-amber-400'
-                                    : 'bg-slate-900 text-slate-300 border-slate-800 active:bg-slate-800 active:text-white'
-                            }`
-                        }
-                    >
-                        <MessageCircle size={18} aria-hidden="true" />
-                        {sinLeer > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full border-2 border-slate-950">
-                                {sinLeer > 9 ? '9+' : sinLeer}
-                            </span>
-                        )}
-                    </NavLink>
-                    {/*
-                        La barra inferior ya está llena con cuatro destinos, así que
-                        la proforma entra por aquí. Se muestra siempre, no sólo con
-                        ítems: el catálogo ofrece «A proforma» en cada repuesto y sin
-                        este acceso no habría dónde ver lo agregado.
-                    */}
-                    <NavLink
-                        to="/mobile/proforma"
-                        aria-label={proformaCount > 0 ? `Proforma, ${proformaCount} ítems` : 'Proforma'}
-                        className={({ isActive }) =>
-                            `relative flex items-center gap-1.5 text-xs font-semibold min-h-[44px] px-3.5 rounded-full border transition-colors ${
-                                isActive
-                                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
-                                    : 'bg-slate-900 text-slate-300 border-slate-800 active:bg-slate-800 active:text-white'
-                            }`
-                        }
-                    >
-                        <FileText size={14} aria-hidden="true" />
-                        <span>Proforma</span>
-                        {proformaCount > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-amber-500 text-slate-950 text-xs font-black rounded-full border-2 border-slate-950">
-                                {proformaCount}
-                            </span>
-                        )}
-                    </NavLink>
-                    {/*
-                        «Escritorio» se queda como icono a secas: es una salida de
-                        emergencia que se usa una vez al día, y ocupaba tanto como
-                        la proforma, que es donde se trabaja. El sitio que libera
-                        se lo lleva la pastilla de la proforma.
-                    */}
-                    <button
-                        onClick={handleSwitchToDesktop}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-slate-900 text-slate-400 rounded-full border border-slate-800 active:bg-slate-800 active:text-white active:border-amber-500/40 transition-colors"
-                        aria-label="Ver versión completa de escritorio"
-                    >
-                        <Monitor size={16} aria-hidden="true" />
-                    </button>
-                </div>
-            </header>
-
-            {/*
-                Invitación a instalar. Sólo aparece cuando Chrome confirma que el
-                sitio es instalable y todavía no lo está; se descarta y no vuelve
-                a molestar. Va aquí y no en la cabecera porque un tercer botón
-                junto a «Proforma» y «Escritorio» no entra en pantallas angostas.
-            */}
-            {canInstall && !installSnoozed && (
-                <div className="mx-3 mt-2 flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
-                    <Download size={18} className="text-amber-400 shrink-0" aria-hidden="true" />
-                    <p className="flex-1 text-xs font-semibold text-slate-200 leading-snug">
-                        Instala LV Parts en tu teléfono para abrirlo como una app
-                    </p>
-                    <button
-                        onClick={handleInstall}
-                        className="shrink-0 min-h-[36px] px-3 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold active:bg-amber-600"
-                    >
-                        Instalar
-                    </button>
-                    <button
-                        onClick={snoozeInstall}
-                        aria-label="Ahora no"
-                        className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-500 active:text-slate-300"
-                    >
-                        <X size={16} aria-hidden="true" />
-                    </button>
-                </div>
-            )}
-
-            {/* Main Content Area */}
-            {/* data-mobile-scroll: aquí vive el scroll del modo móvil (no en <body>).
-                Las hojas inferiores lo congelan por su nombre mientras están abiertas. */}
-            <main data-mobile-scroll className="flex-1 overflow-y-auto pb-nav-safe hide-scrollbar scroll-smooth">
-                <div className="max-w-md mx-auto w-full h-full relative">
-                    <Outlet />
-                </div>
-            </main>
-
-            {/* Bottom Navigation Bar */}
-            {/*
-                z-[45]: por encima de la cabecera pegajosa y las barras flotantes de
-                la página (z-30/z-40), pero por debajo de CUALQUIER modal (z-50+).
-                Los modales del catálogo (registrar demanda, editar, etiquetas...) no
-                usan un portal — se renderizan dentro de <main>, antes que este <nav>
-                en el DOM — así que con el mismo z-index ganaba esta barra por venir
-                después en el árbol: tapaba media pantalla del modal sin que hubiera
-                nada que desplazar para alcanzar el botón de abajo.
-            */}
-            <nav className="fixed bottom-0 left-0 w-full z-[45] px-2 pb-safe pt-2">
-                <div className="max-w-md mx-auto relative">
-                    <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-xl border border-slate-800/70 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.5)] rounded-3xl"></div>
-                {/*
-                    Cuatro destinos, no cinco: «Escritorio» estaba aquí y en la cabecera,
-                    y gastaba uno de los pocos huecos de la barra. Se queda solo arriba.
-                */}
-                    <ul className="relative flex justify-around items-center px-2 py-2">
-                        <li>
-                            <NavLink to="/mobile" end className={({ isActive }) => navItem(isActive)}>
-                                {({ isActive }) => (
-                                    <>
-                                        <House
-                                            size={22}
-                                            strokeWidth={isActive ? 2.5 : 2}
-                                            className={`mb-0.5 transition-all duration-300 ${isActive ? 'drop-shadow-md' : ''}`}
-                                            aria-hidden="true"
-                                        />
-                                        <span className="text-xs uppercase tracking-wide font-medium leading-none">Inicio</span>
-                                    </>
-                                )}
-                            </NavLink>
-                        </li>
-                        <li>
-                            <NavLink to="/mobile/catalog" className={({ isActive }) => navItem(isActive)}>
-                                {({ isActive }) => (
-                                    <>
-                                        <LayoutGrid
-                                            size={22}
-                                            strokeWidth={isActive ? 2.5 : 2}
-                                            className={`mb-0.5 transition-all duration-300 ${isActive ? 'drop-shadow-md' : ''}`}
-                                            aria-hidden="true"
-                                        />
-                                        <span className="text-xs uppercase tracking-wide font-medium leading-none">Catálogo</span>
-                                    </>
-                                )}
-                            </NavLink>
-                        </li>
-                        <li className="relative -top-5">
-                            <NavLink
-                                to="/mobile/labels"
-                                aria-label="Imprimir etiquetas"
-                                className={({ isActive }) =>
-                                    `flex flex-col items-center justify-center w-[60px] h-[60px] rounded-full shadow-xl shadow-amber-500/30 transition-all duration-300 border-4 border-slate-950 ${
-                                        isActive
-                                            ? 'bg-amber-600 text-slate-950 scale-105'
-                                            : 'bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 active:opacity-90'
-                                    }`
-                                }
-                            >
-                                <Printer size={26} strokeWidth={2.25} aria-hidden="true" />
-                                {queueCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] flex items-center justify-center bg-slate-950 text-amber-300 text-xs font-black rounded-full border-2 border-amber-300 shadow-md">
-                                        {queueCount}
-                                    </span>
-                                )}
-                            </NavLink>
-                        </li>
-                        <li>
-                            <NavLink to="/mobile/inventory" className={({ isActive }) => navItem(isActive)}>
-                                {({ isActive }) => (
-                                    <>
-                                        <ScanLine
-                                            size={22}
-                                            strokeWidth={isActive ? 2.5 : 2}
-                                            className={`mb-0.5 transition-all duration-300 ${isActive ? 'drop-shadow-md' : ''}`}
-                                            aria-hidden="true"
-                                        />
-                                        <span className="text-xs uppercase tracking-wide font-medium leading-none">Inventario</span>
-                                    </>
-                                )}
-                            </NavLink>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-            <style>{`
-                .hide-scrollbar::-webkit-scrollbar {
-                    display: none;
-                }
-                .hide-scrollbar {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-            `}</style>
+      <header className="relative z-40 shrink-0 border-b border-white/[0.07] bg-[#0b1426]/95 px-4 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] backdrop-blur-xl">
+        <div className="mx-auto flex max-w-md items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-950/50">
+            <Smartphone size={19} aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-blue-300">
+              <span>{meta.eyebrow}</span><span className={cn('h-1.5 w-1.5 rounded-full', online ? 'bg-emerald-400' : 'bg-rose-400')} />
+              <span className="text-slate-500">{online ? 'En línea' : 'Sin conexión'}</span>
+            </div>
+            <h1 className="truncate text-base font-bold tracking-tight text-white">{meta.title}</h1>
+          </div>
+          <NavLink to="/mobile/proforma" aria-label={`Proforma${proformaCount ? `, ${proformaCount} ítems` : ''}`} className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 active:bg-white/10">
+            <FileText size={19} />
+            {proformaCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0b1426] bg-violet-500 px-1 text-[10px] font-black text-white">{proformaCount}</span>}
+          </NavLink>
+          <button type="button" onClick={() => setModuleCenter(true)} aria-label="Abrir todos los módulos" className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 active:bg-white/10"><Grid3X3 size={19} /></button>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 text-xs font-black text-slate-950" title={userProfile?.full_name || session?.user?.email}>{initials || 'ER'}</div>
         </div>
-    );
+      </header>
+
+      {!online && (
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-rose-500/15 px-4 py-2 text-xs font-semibold text-rose-200"><WifiOff size={14} /> Sin conexión. Algunas consultas esperarán a recuperar internet.</div>
+      )}
+      {canInstall && !installSnoozed && location.pathname === '/mobile' && (
+        <div className="mx-3 mt-2 flex shrink-0 items-center gap-2 rounded-2xl border border-blue-400/20 bg-blue-500/10 px-3 py-2">
+          <Download size={17} className="text-blue-300" />
+          <p className="min-w-0 flex-1 text-xs font-medium text-slate-200">Instala Xsistem como aplicación</p>
+          <button type="button" onClick={() => promptInstall()} className="min-h-9 rounded-xl bg-blue-500 px-3 text-xs font-bold text-white">Instalar</button>
+          <button type="button" onClick={snoozeInstall} aria-label="Ahora no" className="flex h-10 w-10 items-center justify-center text-slate-500"><X size={16} /></button>
+        </div>
+      )}
+
+      <main id="mobile-main" data-mobile-scroll tabIndex={-1} className="hide-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pb-nav-safe">
+        <div className="relative mx-auto h-full w-full max-w-md"><Outlet /></div>
+      </main>
+
+      <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-[45] px-2 pb-safe pt-2">
+        <div className="mx-auto max-w-md rounded-[24px] border border-white/10 bg-[#0d1729]/95 p-1.5 shadow-[0_-12px_40px_rgba(0,0,0,.35)] backdrop-blur-xl">
+          <ul className="grid grid-cols-5 items-end">
+            <li><NavLink to="/mobile" end className={navClass}><House size={21} /><span>Inicio</span></NavLink></li>
+            <li><NavLink to="/mobile/whatsapp" className={navClass}><span className="relative"><MessageCircle size={21} />{sinLeer > 0 && <span className="absolute -right-2 -top-2 h-2.5 w-2.5 rounded-full border-2 border-[#0d1729] bg-emerald-400" />}</span><span>WhatsApp</span></NavLink></li>
+            <li className="relative -top-3"><NavLink to="/mobile/labels" aria-label="Imprimir etiquetas" className="relative mx-auto flex h-14 w-14 touch-manipulation items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-950/50 active:bg-blue-700"><Printer size={24} />{queueCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0d1729] bg-amber-400 px-1 text-[10px] font-black text-slate-950">{queueCount > 99 ? '99+' : queueCount}</span>}</NavLink></li>
+            <li><NavLink to="/mobile/catalog" className={navClass}><Boxes size={21} /><span>Catálogo</span></NavLink></li>
+            <li><NavLink to="/mobile/inventory" className={navClass}><ScanLine size={21} /><span>Inventario</span></NavLink></li>
+          </ul>
+        </div>
+      </nav>
+
+      {moduleCenter && (
+        <div className="fixed inset-0 z-[100] flex items-end bg-black/60" onPointerDown={(event) => event.target === event.currentTarget && setModuleCenter(false)}>
+          <section role="dialog" aria-modal="true" aria-label="Todos los módulos" className="flex max-h-[88dvh] w-full flex-col rounded-t-[28px] border-t border-white/10 bg-[#0d1729] pb-[env(safe-area-inset-bottom)] shadow-2xl">
+            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-600" />
+            <div className="flex items-center gap-3 px-5 py-4"><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-[.15em] text-blue-300">Xsistem ERP</p><h2 className="text-xl font-bold">Centro de módulos</h2></div><button type="button" onClick={() => setModuleCenter(false)} aria-label="Cerrar" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-slate-400"><X size={20} /></button></div>
+            <div className="relative mx-4 mb-3"><Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" /><input value={query} onChange={(event) => setQuery(event.target.value)} autoFocus placeholder="Buscar módulo o función" aria-label="Buscar módulo" className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 pl-11 pr-4 text-base text-white outline-none placeholder:text-slate-500 focus:border-blue-400" /></div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+              {visibleModules.map((item) => { const Icon = item.icon; return <button key={item.to} type="button" onClick={() => navigate(item.to)} className="flex min-h-[66px] w-full touch-manipulation items-center gap-3 rounded-2xl px-3 text-left active:bg-white/5"><span className={cn('flex h-11 w-11 items-center justify-center rounded-xl', item.accent)}><Icon size={20} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-white">{item.label}</span><span className="block truncate text-xs text-slate-500">{item.description}</span></span><ChevronRight size={18} className="text-slate-600" /></button>; })}
+              <div className="my-2 border-t border-white/10" />
+              <button type="button" onClick={switchDesktop} className="flex min-h-[58px] w-full items-center gap-3 rounded-2xl px-3 text-left active:bg-white/5"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-700/30 text-slate-300"><Monitor size={20} /></span><span className="flex-1 text-sm font-bold">Abrir versión de escritorio</span><ChevronRight size={18} className="text-slate-600" /></button>
+            </div>
+          </section>
+        </div>
+      )}
+      <style>{`.hide-scrollbar::-webkit-scrollbar{display:none}.hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+    </div>
+  );
 };
 
 export default MobileLayout;

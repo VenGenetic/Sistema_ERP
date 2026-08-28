@@ -1,247 +1,118 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Download, FileText, LayoutGrid, Lightbulb, Printer, ScanLine, ShieldAlert, Smartphone } from 'lucide-react';
+import {
+  ArrowRight, Boxes, CheckCircle2, ClipboardList, FileText, MessageCircle,
+  PackageSearch, Printer, RefreshCw, ScanLine, TrendingUp,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../supabaseClient';
 import { getPrintQueue, getQueueTotalLabels } from '../../utils/mobilePrintQueue';
 import { getPrintHistory } from '../../utils/mobilePrintHistory';
 import { useProformaStore } from '../../store/useProformaStore';
-import { useInstallPrompt } from '../../hooks/useInstallPrompt';
+import { cn } from '../../components/ui/styles';
+import { setPreferredViewMode } from '../../utils/deviceDetection';
 
-/**
- * Nombre para saludar. El apodo manda sobre el nombre completo, y del nombre
- * completo solo se usa el primero: «Hola, Fernando» y no «Hola, Fernando Avila».
- */
-const useGreetingName = () => {
-    const { userProfile, session } = useAuth();
-    const raw =
-        userProfile?.nickname ||
-        userProfile?.full_name ||
-        session?.user?.user_metadata?.full_name ||
-        session?.user?.email?.split('@')[0];
-    return raw ? String(raw).trim().split(' ')[0] : null;
-};
+type Counters = { unread: number; demands: number; orders: number };
 
 const MobileDashboard: React.FC = () => {
-    const navigate = useNavigate();
-    const name = useGreetingName();
+  const navigate = useNavigate();
+  const { userProfile, session } = useAuth();
+  const name = String(userProfile?.nickname || userProfile?.full_name || session?.user?.email?.split('@')[0] || '')
+    .trim().split(' ')[0];
+  const proformaCount = useProformaStore((state) => state.items.length);
+  const [queueLabels, setQueueLabels] = useState(0);
+  const [lastPrinted, setLastPrinted] = useState<string | null>(null);
+  const [counters, setCounters] = useState<Counters>({ unread: 0, demands: 0, orders: 0 });
+  const [loading, setLoading] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
-    /*
-        La pantalla de inicio no decía nada: tres botones de navegación y un
-        consejo fijo. Lo que importa al abrir la app es qué quedó a medias, y
-        esos datos ya están en memoria —la cola en su caché de módulo, la
-        proforma en su store— así que enseñarlos no cuesta ni una petición.
-    */
-    const proformaCount = useProformaStore(s => s.items.length);
-    const [queueLabels, setQueueLabels] = useState(0);
-    const [lastPrinted, setLastPrinted] = useState<string | null>(null);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const [queue, unread, demands, orders] = await Promise.all([
+      getPrintQueue(),
+      supabase.from('agent_conversations').select('id', { count: 'exact', head: true }).gt('unread_count', 0),
+      supabase.from('product_demands').select('id', { count: 'exact', head: true }).in('status', ['pending_stock', 'stock_available']),
+      supabase.from('orders').select('id', { count: 'exact', head: true }).not('status', 'in', '(Borrador,Entregado,Cancelado,Reembolsado)'),
+    ]);
+    setQueueLabels(getQueueTotalLabels(queue));
+    setLastPrinted(getPrintHistory()[0]?.sku ?? null);
+    setCounters({
+      unread: unread.error ? 0 : unread.count ?? 0,
+      demands: demands.error ? 0 : demands.count ?? 0,
+      orders: orders.error ? 0 : orders.count ?? 0,
+    });
+    setUpdatedAt(new Date());
+    setLoading(false);
+  }, []);
 
-    const refreshCounters = useCallback(async () => {
-        setQueueLabels(getQueueTotalLabels(await getPrintQueue()));
-        setLastPrinted(getPrintHistory()[0]?.sku ?? null);
-    }, []);
+  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const onQueue = () => void refresh();
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
+    window.addEventListener('print-queue-changed', onQueue);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('print-queue-changed', onQueue);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refresh]);
 
-    useEffect(() => { refreshCounters(); }, [refreshCounters]);
+  const totalPending = counters.unread + counters.demands + counters.orders + queueLabels;
+  const dateLabel = useMemo(() => new Intl.DateTimeFormat('es-EC', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()), []);
 
-    useEffect(() => {
-        window.addEventListener('print-queue-changed', refreshCounters);
-        return () => window.removeEventListener('print-queue-changed', refreshCounters);
-    }, [refreshCounters]);
+  const Metric = ({ label, value, icon: Icon, tone, onClick }: { label: string; value: number; icon: React.ComponentType<{ size?: number; className?: string }>; tone: string; onClick: () => void }) => (
+    <button type="button" onClick={onClick} className="min-h-[92px] touch-manipulation rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3 text-left transition-colors active:bg-white/[0.08]">
+      <div className="flex items-start justify-between gap-2"><span className={cn('flex h-9 w-9 items-center justify-center rounded-xl', tone)}><Icon size={17} /></span><ArrowRight size={15} className="mt-1 text-slate-600" /></div>
+      <p className="mt-2 text-2xl font-black tabular-nums text-white">{loading ? '–' : value}</p>
+      <p className="text-[11px] font-semibold text-slate-400">{label}</p>
+    </button>
+  );
 
-    /*
-        Instalación en la pantalla de inicio.
-
-        El aviso de la cabecera sólo aparece cuando Chrome ofrece el evento, y
-        se puede posponer. Esta entrada está siempre: si se puede instalar,
-        instala; y si no, dice qué falta en vez de dejar al usuario buscando un
-        botón que nunca existió.
-    */
-    const { canInstall, installed, blocker, promptInstall } = useInstallPrompt();
-    const [installHelp, setInstallHelp] = useState(false);
-
-    return (
-        <div className="p-6 pt-12 pb-mobile-page min-h-full flex flex-col animate-fade-in">
-            {/* Header */}
-            <div className="mb-8">
-                {/* «Escritorio» vivía aquí y también en la cabecera del layout,
-                    que está en todas las pantallas. Se queda solo allí. */}
-                <h1 className="text-3xl font-black text-white tracking-tight mb-2">
-                    {name ? `Hola, ${name}` : 'Hola'}
-                </h1>
-                <p className="text-slate-400 text-sm">
-                    {queueLabels > 0 || proformaCount > 0
-                        ? 'Tienes trabajo a medias'
-                        : 'Todo al día. Escanea para empezar.'}
-                </p>
-
-                {(queueLabels > 0 || proformaCount > 0) && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                        {queueLabels > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => navigate('/mobile/labels')}
-                                className="min-h-[44px] px-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm font-bold flex items-center gap-2 active:bg-amber-500/20"
-                            >
-                                <Printer size={16} aria-hidden="true" />
-                                {queueLabels} etiqueta{queueLabels !== 1 ? 's' : ''} en cola
-                            </button>
-                        )}
-                        {proformaCount > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => navigate('/mobile/proforma')}
-                                className="min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 text-sm font-bold flex items-center gap-2 active:bg-slate-800"
-                            >
-                                <FileText size={16} aria-hidden="true" />
-                                {proformaCount} ítem{proformaCount !== 1 ? 's' : ''} en proforma
-                            </button>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <button
-                    onClick={() => navigate('/mobile/catalog')}
-                    className="flex flex-col items-center justify-center p-6 bg-slate-900 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.3)] border border-slate-800 active:border-amber-500/30 transition-all active:scale-95"
-                >
-                    <div className="w-14 h-14 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mb-3">
-                        <LayoutGrid size={30} aria-hidden="true" />
-                    </div>
-                    <span className="font-semibold text-white">Catálogo</span>
-                    <span className="text-xs text-slate-500 mt-1">Explorar stock</span>
-                </button>
-
-                <button
-                    onClick={() => navigate('/mobile/inventory')}
-                    className="flex flex-col items-center justify-center p-6 bg-slate-900 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.3)] border border-slate-800 active:border-cyan-500/30 transition-all active:scale-95"
-                >
-                    <div className="w-14 h-14 rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-3">
-                        <ScanLine size={30} aria-hidden="true" />
-                    </div>
-                    <span className="font-semibold text-white">Inventario</span>
-                    <span className="text-xs text-slate-500 mt-1">Ajuste rápido</span>
-                </button>
-            </div>
-
-            {/* Labels Quick Action - Full Width, Primary */}
-            <button
-                onClick={() => navigate('/mobile/labels')}
-                className="w-full flex items-center gap-4 p-5 bg-gradient-to-r from-amber-500 to-amber-400 rounded-3xl shadow-[0_8px_30px_rgba(245,158,11,0.25)] transition-all active:scale-[0.98] active:shadow-[0_8px_30px_rgba(245,158,11,0.4)] text-slate-950 mb-8"
-            >
-                <div className="w-14 h-14 rounded-full bg-slate-950/10 flex items-center justify-center backdrop-blur-sm flex-shrink-0">
-                    <Printer size={30} aria-hidden="true" />
-                </div>
-                <div className="flex-1 text-left">
-                    <span className="font-black text-lg block">Imprimir Etiquetas</span>
-                    <span className="text-slate-950/70 text-sm font-semibold">
-                        {lastPrinted ? `Último: ${lastPrinted}` : 'Buscar → Imprimir → Siguiente'}
-                    </span>
-                </div>
-                <ArrowRight size={26} className="text-slate-950/50" aria-hidden="true" />
-            </button>
-
-            {/* Instalar en el teléfono */}
-            {!installed && (
-                <div className="bg-slate-900 rounded-3xl border border-slate-800 mb-4 overflow-hidden">
-                    <button
-                        type="button"
-                        onClick={() => (canInstall ? promptInstall() : setInstallHelp(v => !v))}
-                        className="w-full flex items-center gap-3 p-5 text-left active:bg-slate-800/60"
-                    >
-                        <div className="w-12 h-12 shrink-0 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                            <Download size={24} aria-hidden="true" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <span className="font-semibold text-white block">Instalar en el teléfono</span>
-                            <span className="text-sm text-slate-500">
-                                {canInstall
-                                    ? 'Queda como una app, sin barra del navegador'
-                                    : blocker === 'sin-https'
-                                        ? 'No se puede desde esta dirección'
-                                        : blocker === 'ios'
-                                            ? 'En iPhone se añade a mano'
-                                            : 'Cómo hacerlo'}
-                            </span>
-                        </div>
-                        <ArrowRight size={20} className="text-slate-600 shrink-0" aria-hidden="true" />
-                    </button>
-
-                    {installHelp && !canInstall && (
-                        <div className="px-5 pb-5 -mt-1 animate-fade-in">
-                            {blocker === 'sin-https' ? (
-                                <div className="flex gap-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30">
-                                    <ShieldAlert size={18} className="text-rose-400 shrink-0 mt-0.5" aria-hidden="true" />
-                                    <div className="text-sm text-slate-300 leading-relaxed">
-                                        <p className="font-bold text-rose-300 mb-1">Estás entrando por una dirección sin candado</p>
-                                        <p>
-                                            El navegador sólo instala sitios servidos por HTTPS, así que desde
-                                            <code className="mx-1 px-1 py-0.5 rounded bg-slate-800 text-slate-200 text-xs">{window.location.host}</code>
-                                            no va a ofrecerlo. Abre la dirección publicada del sistema —la que empieza por
-                                            <strong className="text-slate-100"> https://</strong>— y vuelve a intentarlo desde ahí.
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : blocker === 'ios' ? (
-                                <ol className="flex flex-col gap-2.5 text-sm text-slate-300">
-                                    <li className="flex gap-2.5">
-                                        <span className="shrink-0 w-6 h-6 rounded-full bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center">1</span>
-                                        Toca el botón <strong className="text-slate-100">Compartir</strong> de Safari, el cuadrado con la flecha hacia arriba.
-                                    </li>
-                                    <li className="flex gap-2.5">
-                                        <span className="shrink-0 w-6 h-6 rounded-full bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center">2</span>
-                                        Baja hasta <strong className="text-slate-100">Añadir a pantalla de inicio</strong>.
-                                    </li>
-                                    <li className="flex gap-2.5">
-                                        <span className="shrink-0 w-6 h-6 rounded-full bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center">3</span>
-                                        Confirma con <strong className="text-slate-100">Añadir</strong>. El icono queda junto al resto de tus apps.
-                                    </li>
-                                </ol>
-                            ) : (
-                                <ol className="flex flex-col gap-2.5 text-sm text-slate-300">
-                                    <li className="flex gap-2.5">
-                                        <span className="shrink-0 w-6 h-6 rounded-full bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center">1</span>
-                                        Abre el menú de Chrome, los <strong className="text-slate-100">tres puntos</strong> de arriba a la derecha.
-                                    </li>
-                                    <li className="flex gap-2.5">
-                                        <span className="shrink-0 w-6 h-6 rounded-full bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center">2</span>
-                                        Elige <strong className="text-slate-100">Instalar aplicación</strong> o <strong className="text-slate-100">Añadir a pantalla de inicio</strong>.
-                                    </li>
-                                    <li className="flex gap-2.5">
-                                        <span className="shrink-0 w-6 h-6 rounded-full bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center">3</span>
-                                        Si no aparece, recarga la página una vez y vuelve a mirar: Chrome tarda unos segundos en decidir que el sitio es instalable.
-                                    </li>
-                                </ol>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {installed && (
-                <div className="flex items-center gap-3 p-4 mb-4 rounded-3xl bg-emerald-500/5 border border-emerald-500/20">
-                    <CheckCircle2 size={20} className="text-emerald-400 shrink-0" aria-hidden="true" />
-                    <span className="text-sm font-semibold text-slate-300">
-                        Estás usando LV Parts como app instalada
-                    </span>
-                    <Smartphone size={18} className="text-slate-600 ml-auto shrink-0" aria-hidden="true" />
-                </div>
-            )}
-
-            {/* Tip */}
-            <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800">
-                <div className="flex items-start gap-3">
-                    <Lightbulb size={22} className="text-amber-400 mt-0.5 shrink-0" aria-hidden="true" />
-                    <div>
-                        <h3 className="font-semibold text-white mb-1">Flujo Rápido</h3>
-                        <p className="text-sm text-slate-400 leading-relaxed">
-                            Usa <strong className="text-slate-300">Imprimir Etiquetas</strong> para escanear o buscar un repuesto, imprimir sus códigos de barras, y pasar al siguiente automáticamente.
-                        </p>
-                    </div>
-                </div>
-            </div>
+  return (
+    <div className="min-h-full px-4 pb-mobile-page pt-5">
+      <section className="relative overflow-hidden rounded-[28px] border border-blue-400/15 bg-gradient-to-br from-blue-600/25 via-[#101d35] to-[#0b1426] p-5 shadow-2xl shadow-black/20">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="relative">
+          <p className="text-xs font-semibold capitalize text-blue-300">{dateLabel}</p>
+          <h2 className="mt-1 text-2xl font-black tracking-tight text-white">{name ? `Hola, ${name}` : 'Hola'}</h2>
+          <p className="mt-1 max-w-[28ch] text-sm leading-5 text-slate-400">
+            {totalPending > 0 ? `Hay ${totalPending} tareas que requieren atención.` : 'Todo está al día. Puedes comenzar una nueva operación.'}
+          </p>
+          <div className="mt-4 flex items-center gap-2">
+            <button type="button" onClick={() => navigate('/mobile/whatsapp')} className="flex min-h-11 flex-1 touch-manipulation items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 text-sm font-bold text-white shadow-lg shadow-blue-950/40 active:bg-blue-600"><MessageCircle size={18} /> Atender clientes</button>
+            <button type="button" onClick={() => void refresh()} disabled={loading} aria-label="Actualizar indicadores" className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 disabled:opacity-50"><RefreshCw size={18} className={cn(loading && 'animate-spin')} /></button>
+          </div>
         </div>
-    );
+      </section>
+
+      <div className="mt-5 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-blue-300">Operación en vivo</p><h2 className="text-base font-bold text-white">Pendientes</h2></div>{updatedAt && <span className="text-[10px] text-slate-600">{updatedAt.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}</span>}</div>
+      <section className="mt-3 grid grid-cols-2 gap-3">
+        <Metric label="Chats sin leer" value={counters.unread} icon={MessageCircle} tone="bg-emerald-500/15 text-emerald-300" onClick={() => navigate('/mobile/whatsapp')} />
+        <Metric label="Etiquetas en cola" value={queueLabels} icon={Printer} tone="bg-amber-500/15 text-amber-300" onClick={() => navigate('/mobile/labels')} />
+        <Metric label="Demandas de stock" value={counters.demands} icon={PackageSearch} tone="bg-cyan-500/15 text-cyan-300" onClick={() => navigate('/mobile/inventory')} />
+        <Metric label="Órdenes activas" value={counters.orders} icon={ClipboardList} tone="bg-violet-500/15 text-violet-300" onClick={() => { setPreferredViewMode('desktop'); navigate('/orders'); }} />
+      </section>
+
+      <div className="mt-6"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-blue-300">Accesos rápidos</p><h2 className="text-base font-bold text-white">Herramientas</h2></div>
+      <section className="mt-3 space-y-2">
+        {[
+          { label: 'Escanear inventario', detail: 'Consultar y ajustar stock', to: '/mobile/inventory', icon: ScanLine, tone: 'bg-cyan-500/15 text-cyan-300' },
+          { label: 'Buscar en catálogo', detail: 'Precios, fotos y disponibilidad', to: '/mobile/catalog', icon: Boxes, tone: 'bg-blue-500/15 text-blue-300' },
+          { label: 'Imprimir etiquetas', detail: queueLabels ? `${queueLabels} pendientes${lastPrinted ? ` · último ${lastPrinted}` : ''}` : 'Cola vacía, lista para trabajar', to: '/mobile/labels', icon: Printer, tone: 'bg-amber-500/15 text-amber-300' },
+          { label: 'Continuar proforma', detail: proformaCount ? `${proformaCount} productos en preparación` : 'Crear una nueva cotización', to: '/mobile/proforma', icon: FileText, tone: 'bg-violet-500/15 text-violet-300' },
+        ].map((action) => {
+          const Icon = action.icon;
+          return <button key={action.to + action.label} type="button" onClick={() => navigate(action.to)} className="flex min-h-[68px] w-full touch-manipulation items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] px-3 text-left transition-colors active:bg-white/[0.08]"><span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', action.tone)}><Icon size={20} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-white">{action.label}</span><span className="block truncate text-xs text-slate-500">{action.detail}</span></span><ArrowRight size={18} className="text-slate-600" /></button>;
+        })}
+      </section>
+
+      <div className="mt-5 flex items-center gap-3 rounded-2xl border border-emerald-400/10 bg-emerald-500/[0.06] p-3">
+        <CheckCircle2 size={19} className="shrink-0 text-emerald-400" />
+        <div className="min-w-0"><p className="text-xs font-bold text-emerald-200">Sistema móvil operativo</p><p className="text-[11px] text-slate-500">WhatsApp, catálogo, impresión e inventario conectados.</p></div>
+        <TrendingUp size={17} className="ml-auto text-slate-600" />
+      </div>
+    </div>
+  );
 };
 
 export default MobileDashboard;

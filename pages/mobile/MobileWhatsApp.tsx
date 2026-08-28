@@ -1,10 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Archive,
     ArrowLeft,
+    Bell,
+    BellOff,
     Bot,
     BotOff,
     ClipboardList,
+    CheckCheck,
     ContactRound,
+    Copy,
     FileText,
     ImageIcon,
     Images,
@@ -15,6 +20,7 @@ import {
     MessageSquarePlus,
     MoreVertical,
     Package,
+    Pin,
     Plus,
     RefreshCw,
     RotateCw,
@@ -125,6 +131,30 @@ interface Conversacion {
     etapa?: Etapa;
 }
 
+type FiltroLista = 'all' | 'unread' | 'archived';
+interface PreferenciasConversacion {
+    pinned: number[];
+    archived: number[];
+    muted: number[];
+}
+
+const PREFERENCIAS_VACIAS: PreferenciasConversacion = { pinned: [], archived: [], muted: [] };
+
+function leerPreferencias(userId: string | null): PreferenciasConversacion {
+    try {
+        const raw = localStorage.getItem(`wa-conversation-preferences:${userId ?? 'anonymous'}`);
+        if (!raw) return PREFERENCIAS_VACIAS;
+        const parsed = JSON.parse(raw) as Partial<PreferenciasConversacion>;
+        return {
+            pinned: Array.isArray(parsed.pinned) ? parsed.pinned : [],
+            archived: Array.isArray(parsed.archived) ? parsed.archived : [],
+            muted: Array.isArray(parsed.muted) ? parsed.muted : [],
+        };
+    } catch {
+        return PREFERENCIAS_VACIAS;
+    }
+}
+
 /**
  * El mensaje es EL MISMO tipo que usa la bandeja de escritorio, no una copia:
  * las burbujas las dibuja `ChatThread`, que es el mismo componente. Si acá se
@@ -193,6 +223,9 @@ const MobileWhatsApp: React.FC = () => {
     const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
     const [cargando, setCargando] = useState(true);
     const [busqueda, setBusqueda] = useState('');
+    const [filtroLista, setFiltroLista] = useState<FiltroLista>('all');
+    const [preferencias, setPreferencias] = useState<PreferenciasConversacion>(() => leerPreferencias(userId));
+    const [accionesConversacion, setAccionesConversacion] = useState<Conversacion | null>(null);
     const [abierta, setAbierta] = useState<Conversacion | null>(null);
     /**
      * El teléfono que se tocó DENTRO de un mensaje y dónde estaba en
@@ -282,6 +315,22 @@ const MobileWhatsApp: React.FC = () => {
     const composerRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const enviandoRef = useRef(false);
+    const pulsacionRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pulsacionLargaRef = useRef(false);
+
+    useEffect(() => setPreferencias(leerPreferencias(userId)), [userId]);
+    useEffect(() => {
+        try {
+            localStorage.setItem(`wa-conversation-preferences:${userId ?? 'anonymous'}`, JSON.stringify(preferencias));
+        } catch { /* El almacenamiento puede estar deshabilitado. */ }
+    }, [preferencias, userId]);
+
+    const alternarPreferencia = (key: keyof PreferenciasConversacion, id: number) => {
+        setPreferencias((actual) => ({
+            ...actual,
+            [key]: actual[key].includes(id) ? actual[key].filter((item) => item !== id) : [...actual[key], id],
+        }));
+    };
 
     /* ------------------------------------------------------------------ */
     /*  Lista                                                              */
@@ -298,6 +347,7 @@ const MobileWhatsApp: React.FC = () => {
                 .order('last_message_at', { ascending: false, nullsFirst: false })
                 .limit(POR_PAGINA);
             if (soloEscalados) q = q.eq('status', 'escalated');
+            if (filtroLista === 'unread') q = q.gt('unread_count', 0);
             const texto = busqueda.trim();
             if (texto) {
                 const digitos = texto.replace(/\D/g, '');
@@ -320,7 +370,7 @@ const MobileWhatsApp: React.FC = () => {
         }
         setError(null);
         setConversaciones((data ?? []) as unknown as Conversacion[]);
-    }, [busqueda, soloEscalados]);
+    }, [busqueda, soloEscalados, filtroLista]);
 
     // Cuántos hay escalados. Es un `count` sin filas: no trae datos, solo el
     // número, así que se puede repasar sin gastar cuota.
@@ -408,6 +458,11 @@ const MobileWhatsApp: React.FC = () => {
                 { event: 'UPDATE', schema: 'public', table: 'agent_conversations' },
                 (payload) => {
                     const fila = payload.new as Conversacion;
+                    if (filtroLista === 'unread') {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => cargarLista(true), 1200);
+                        return;
+                    }
                     setConversaciones((prev) => {
                         if (!prev.some((c) => c.id === fila.id)) return prev;
                         return prev
@@ -443,7 +498,7 @@ const MobileWhatsApp: React.FC = () => {
             clearTimeout(timer);
             canal.unsubscribe();
         };
-    }, [cargarLista]);
+    }, [cargarLista, filtroLista]);
 
     /**
      * Y la red de abajo, por si el realtime no llega: solo con la pantalla
@@ -570,6 +625,20 @@ const MobileWhatsApp: React.FC = () => {
             setAbierta(null);
         } catch (err: any) {
             setError(err?.message ?? 'No se pudo marcar sin leer.');
+        }
+    };
+
+    const marcarComoLeido = async (c: Conversacion) => {
+        try {
+            marcarLeidoEnWhatsApp(c.id, userId).catch(() => {});
+            const { error: err } = await supabase
+                .from('agent_conversations')
+                .update({ unread_count: 0 })
+                .eq('id', c.id);
+            if (err) throw err;
+            setConversaciones((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread_count: 0 } : x)));
+        } catch (err: any) {
+            setError(err?.message ?? 'No se pudo marcar como leído.');
         }
     };
 
@@ -830,6 +899,15 @@ const MobileWhatsApp: React.FC = () => {
         () => conversaciones.reduce((n, c) => n + (c.unread_count > 0 ? 1 : 0), 0),
         [conversaciones],
     );
+    const conversacionesVisibles = useMemo(() => {
+        let rows = filtroLista === 'archived'
+            ? conversaciones.filter((c) => preferencias.archived.includes(c.id))
+            : conversaciones.filter((c) => !preferencias.archived.includes(c.id));
+        if (filtroLista === 'unread') rows = rows.filter((c) => c.unread_count > 0);
+        return [...rows].sort((a, b) =>
+            Number(preferencias.pinned.includes(b.id)) - Number(preferencias.pinned.includes(a.id)),
+        );
+    }, [conversaciones, filtroLista, preferencias]);
 
     /* ------------------------------------------------------------------ */
 
@@ -1451,6 +1529,29 @@ const MobileWhatsApp: React.FC = () => {
                         </button>
                     )}
                 </div>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+                    {([
+                        { id: 'all' as FiltroLista, label: 'Todos', count: null },
+                        { id: 'unread' as FiltroLista, label: 'No leídos', count: sinLeer },
+                        { id: 'archived' as FiltroLista, label: 'Archivados', count: preferencias.archived.length },
+                    ]).map((filtro) => (
+                        <button
+                            key={filtro.id}
+                            type="button"
+                            onClick={() => setFiltroLista(filtro.id)}
+                            aria-pressed={filtroLista === filtro.id}
+                            className={cn(
+                                'min-h-[36px] shrink-0 touch-manipulation rounded-full px-3 text-[13px] font-semibold transition-colors active:brightness-90',
+                                filtroLista === filtro.id
+                                    ? 'bg-wa-accent text-wa-accent-fg'
+                                    : 'bg-wa-inset/10 text-wa-meta',
+                            )}
+                        >
+                            {filtro.label}
+                            {filtro.count !== null && filtro.count > 0 && <span className="ml-1 tabular-nums">{filtro.count}</span>}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {(cuantosEscalados > 0 || soloEscalados) && (
@@ -1565,17 +1666,41 @@ const MobileWhatsApp: React.FC = () => {
                 {cargando && conversaciones.length === 0 && (
                     <p className="py-10 text-center text-sm text-wa-meta">Cargando chats…</p>
                 )}
-                {!cargando && conversaciones.length === 0 && (
+                {!cargando && conversacionesVisibles.length === 0 && (
                     <p className="py-10 text-center text-sm text-wa-meta">
-                        {busqueda.trim() ? 'Ningún chat coincide.' : 'Todavía no hay conversaciones.'}
+                        {busqueda.trim()
+                            ? 'Ningún chat coincide.'
+                            : filtroLista === 'unread'
+                              ? 'No tienes mensajes sin leer.'
+                              : filtroLista === 'archived'
+                                ? 'No tienes conversaciones archivadas.'
+                                : 'Todavía no hay conversaciones.'}
                     </p>
                 )}
 
-                {conversaciones.map((c) => (
+                {conversacionesVisibles.map((c) => (
                     <button
                         key={c.id}
-                        onClick={() => abrirChat(c)}
-                        className="flex w-full items-center gap-3 pl-3 text-left active:bg-wa-hover"
+                        onClick={() => {
+                            if (pulsacionLargaRef.current) {
+                                pulsacionLargaRef.current = false;
+                                return;
+                            }
+                            abrirChat(c);
+                        }}
+                        onPointerDown={() => {
+                            pulsacionLargaRef.current = false;
+                            pulsacionRef.current = setTimeout(() => {
+                                pulsacionLargaRef.current = true;
+                                setAccionesConversacion(c);
+                                navigator.vibrate?.(12);
+                            }, 500);
+                        }}
+                        onPointerUp={() => { if (pulsacionRef.current) clearTimeout(pulsacionRef.current); }}
+                        onPointerCancel={() => { if (pulsacionRef.current) clearTimeout(pulsacionRef.current); }}
+                        onPointerMove={() => { if (pulsacionRef.current) clearTimeout(pulsacionRef.current); }}
+                        onContextMenu={(event) => { event.preventDefault(); setAccionesConversacion(c); }}
+                        className="flex w-full touch-manipulation items-center gap-3 pl-3 text-left transition-colors active:bg-wa-hover"
                     >
                         <Avatar nombre={c.customer_name} telefono={c.phone_number} />
 
@@ -1643,6 +1768,12 @@ const MobileWhatsApp: React.FC = () => {
                                         {NOMBRE_DE_ETAPA[c.etapa]}
                                     </span>
                                 )}
+                                {preferencias.muted.includes(c.id) && (
+                                    <BellOff size={14} className="shrink-0 text-wa-meta" aria-label="Conversación silenciada" />
+                                )}
+                                {preferencias.pinned.includes(c.id) && (
+                                    <Pin size={14} className="shrink-0 text-wa-meta" aria-label="Conversación fijada" />
+                                )}
                                 {c.unread_count > 0 && (
                                     <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent-strong px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
                                         {c.unread_count}
@@ -1653,6 +1784,61 @@ const MobileWhatsApp: React.FC = () => {
                     </button>
                 ))}
             </div>
+
+            {accionesConversacion && (() => {
+                const c = accionesConversacion;
+                const fijada = preferencias.pinned.includes(c.id);
+                const archivada = preferencias.archived.includes(c.id);
+                const silenciada = preferencias.muted.includes(c.id);
+                const optionClass = 'flex min-h-[48px] w-full touch-manipulation items-center gap-3 px-5 text-left text-[15px] text-wa-text transition-colors active:bg-wa-hover';
+                return (
+                    <div className="fixed inset-0 z-[120] flex items-end bg-black/55" onPointerDown={(event) => event.target === event.currentTarget && setAccionesConversacion(null)}>
+                        <section role="dialog" aria-modal="true" aria-label={`Opciones de ${c.customer_name || formatearTelefono(c)}`} className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-3xl border-t border-wa-divider bg-wa-panel pb-[env(safe-area-inset-bottom)] shadow-2xl">
+                            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-wa-meta/40" />
+                            <div className="border-b border-wa-divider px-5 pb-3 pt-3">
+                                <div className="flex items-center gap-3">
+                                    <Avatar nombre={c.customer_name} telefono={c.phone_number} tam="sm" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-base font-semibold text-wa-text">{c.customer_name || formatearTelefono(c)}</p>
+                                        <p className="truncate text-xs text-wa-meta">{formatearTelefono(c)}</p>
+                                    </div>
+                                    <button type="button" onClick={() => setAccionesConversacion(null)} aria-label="Cerrar opciones" className="flex h-11 w-11 items-center justify-center rounded-full text-wa-meta active:bg-wa-hover"><X size={20} /></button>
+                                </div>
+                                {c.last_message_preview && (
+                                    <div className="wa-wallpaper mt-3 max-h-[28vh] overflow-y-auto rounded-xl p-2.5">
+                                        <div className={cn('flex', c.last_message_direction === 'outbound' ? 'justify-end' : 'justify-start')}>
+                                            <div className={cn('max-w-[92%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-[13.5px] leading-5 text-wa-text shadow-sm', c.last_message_direction === 'outbound' ? 'bg-wa-out' : 'bg-wa-in')}>
+                                                {c.last_message_direction === 'outbound' && <span className="mb-0.5 block text-[10px] font-semibold uppercase text-wa-meta-out">Tú enviaste</span>}
+                                                {c.last_message_preview}
+                                            </div>
+                                        </div>
+                                        <p className="mt-2 text-center text-[10px] text-wa-meta">Vista previa · no marca como leído</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="min-h-0 flex-1 overflow-y-auto py-1">
+                                <button className={optionClass} onClick={() => { setAccionesConversacion(null); abrirChat(c); }}><MessageCircle size={19} className="text-wa-meta" /> Abrir conversación</button>
+                                <button className={optionClass} onClick={async () => { setAccionesConversacion(null); c.unread_count > 0 ? await marcarComoLeido(c) : await marcarComoNoLeido(c); }}>
+                                    {c.unread_count > 0 ? <CheckCheck size={19} className="text-wa-meta" /> : <MailQuestion size={19} className="text-wa-meta" />}
+                                    {c.unread_count > 0 ? 'Marcar como leído' : 'Marcar como no leído'}
+                                </button>
+                                <button className={optionClass} onClick={() => { alternarPreferencia('pinned', c.id); setAccionesConversacion(null); }}><Pin size={19} className="text-wa-meta" /> {fijada ? 'Desfijar conversación' : 'Fijar conversación'}</button>
+                                <button className={optionClass} onClick={() => { alternarPreferencia('muted', c.id); setAccionesConversacion(null); }}>
+                                    {silenciada ? <Bell size={19} className="text-wa-meta" /> : <BellOff size={19} className="text-wa-meta" />}
+                                    {silenciada ? 'Activar notificaciones' : 'Silenciar notificaciones'}
+                                </button>
+                                <button className={optionClass} onClick={() => { alternarPreferencia('archived', c.id); setAccionesConversacion(null); }}><Archive size={19} className="text-wa-meta" /> {archivada ? 'Desarchivar conversación' : 'Archivar conversación'}</button>
+                                <button className={optionClass} onClick={async () => { setAccionesConversacion(null); await abrirChat(c); setFicha(true); }}><ContactRound size={19} className="text-wa-meta" /> Ver información del cliente</button>
+                                <button className={optionClass} onClick={async () => {
+                                    try { await navigator.clipboard.writeText(formatearTelefono(c)); }
+                                    catch { setError('No se pudo copiar el número.'); }
+                                    setAccionesConversacion(null);
+                                }}><Copy size={19} className="text-wa-meta" /> Copiar número</button>
+                            </div>
+                        </section>
+                    </div>
+                );
+            })()}
 
             <NuevoChatModal
                 isOpen={nuevoChat}

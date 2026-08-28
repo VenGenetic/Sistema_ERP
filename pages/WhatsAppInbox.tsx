@@ -376,6 +376,15 @@ const WhatsAppInbox: React.FC = () => {
         x: number;
         y: number;
     } | null>(null);
+    const [messagePreview, setMessagePreview] = useState<{
+        name: string;
+        phone: string;
+        text: string;
+        outbound: boolean;
+        time: string | null;
+        x: number;
+        y: number;
+    } | null>(null);
 
     useEffect(() => {
         setConversationPreferences(readConversationPreferences(userId));
@@ -1818,8 +1827,23 @@ const WhatsAppInbox: React.FC = () => {
                                 <button
                                     key={c.id}
                                     onClick={() => setSelectedConversationId(c.id)}
+                                    onMouseEnter={(event) => {
+                                        if (!c.last_message_preview) return;
+                                        const rect = event.currentTarget.getBoundingClientRect();
+                                        setMessagePreview({
+                                            name: c.customer_name || formatPhone(c),
+                                            phone: formatPhone(c),
+                                            text: c.last_message_preview,
+                                            outbound: c.last_message_direction === 'outbound',
+                                            time: c.last_message_at,
+                                            x: Math.max(12, Math.min(rect.right + 10, window.innerWidth - 390)),
+                                            y: Math.max(12, Math.min(rect.top, window.innerHeight - 220)),
+                                        });
+                                    }}
+                                    onMouseLeave={() => setMessagePreview(null)}
                                     onContextMenu={(event) => {
                                         event.preventDefault();
+                                        setMessagePreview(null);
                                         const menuWidth = 248;
                                         const menuHeight = 320;
                                         setConversationMenu({
@@ -1866,6 +1890,7 @@ const WhatsAppInbox: React.FC = () => {
                                             entrar uno por uno para poder triar. */}
                                         <div className="mt-0.5 flex items-center gap-1.5">
                                             <p
+                                                title={c.last_message_preview || undefined}
                                                 className={cn(
                                                     'min-w-0 flex-1 truncate text-[13.5px] leading-[19px]',
                                                     c.unread_count > 0 ? 'text-wa-text' : 'text-wa-meta',
@@ -2302,6 +2327,38 @@ const WhatsAppInbox: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {messagePreview && !conversationMenu && (
+                <div
+                    role="tooltip"
+                    style={{ left: messagePreview.x, top: messagePreview.y }}
+                    className="pointer-events-none fixed z-[110] w-[min(380px,calc(100vw-24px))] overflow-hidden rounded-xl border border-wa-divider bg-wa-panel shadow-2xl"
+                >
+                    <div className="flex items-start justify-between gap-3 border-b border-wa-divider bg-wa-header px-4 py-3">
+                        <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-wa-text">{messagePreview.name}</p>
+                            <p className="truncate text-xs text-wa-meta">{messagePreview.phone}</p>
+                        </div>
+                        {messagePreview.time && (
+                            <span className="shrink-0 text-[11px] text-wa-meta">{horaLista(messagePreview.time)}</span>
+                        )}
+                    </div>
+                    <div className="wa-wallpaper p-3">
+                        <div className={cn('flex', messagePreview.outbound ? 'justify-end' : 'justify-start')}>
+                            <div className={cn(
+                                'max-w-[92%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-[13.5px] leading-5 text-wa-text shadow-sm',
+                                messagePreview.outbound ? 'bg-wa-out' : 'bg-wa-in',
+                            )}>
+                                {messagePreview.outbound && <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-wa-meta-out">Tú enviaste</span>}
+                                {messagePreview.text}
+                            </div>
+                        </div>
+                    </div>
+                    <p className="border-t border-wa-divider bg-wa-header px-4 py-2 text-[10px] text-wa-meta">
+                        Vista previa · no marca el chat como leído
+                    </p>
+                </div>
+            )}
 
             {/* Menú contextual de conversación, como WhatsApp Web. Las
                 preferencias de organización son personales para este usuario. */}
