@@ -23,6 +23,15 @@ import MenuTelefono from '../components/whatsapp/MenuTelefono';
 import NuevoChatModal from '../components/whatsapp/NuevoChatModal';
 import AvisarLlegadaModal from '../components/whatsapp/AvisarLlegadaModal';
 import { contarPorAvisar, type ModoAviso } from '../components/whatsapp/avisarLlegada';
+import {
+    CLASE_DE_ETAPA,
+    contarListasParaVendedor,
+    ETAPAS_QUE_SE_MARCAN,
+    FILTROS_DE_ETAPA,
+    marcarEtapa,
+    NOMBRE_DE_ETAPA,
+    type Etapa,
+} from '../components/whatsapp/etapas';
 import { fusionarMensajes, useRepasoDelHilo } from '../components/whatsapp/hiloEnVivo';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
 import ChatThread, {
@@ -148,6 +157,12 @@ interface Conversation {
     last_message_at: string | null;
     unread_count: number;
     lid: string | null;
+    /**
+     * En qué punto del flujo está. Opcional porque la migración 0035 se
+     * corre a mano: mientras no exista la columna, la fila llega sin esto
+     * y la bandeja se ve igual que antes.
+     */
+    etapa?: Etapa;
     /**
      * Último mensaje, para saber de qué habla el chat sin abrirlo
      * (migración 0032). Es una vista previa para triar: la fuente de
@@ -293,6 +308,16 @@ const WhatsAppInbox: React.FC = () => {
 
     // Solo el número, sin traer las filas: el botón vive en una pantalla
     // que queda abierta todo el día.
+    /**
+     * Cuántos clientes están esperando a un vendedor. Se cuenta contra la
+     * base y no sobre las filas cargadas: la lista trae las 200 más
+     * recientes, y una ficha lista de hace tres días quedaría afuera justo
+     * cuando es la que más importa.
+     */
+    const contarListas = useCallback(async () => {
+        setListasParaVendedor(await contarListasParaVendedor());
+    }, []);
+
     const contarAvisos = useCallback(async () => {
         try {
             const [enBodega, enImportadora] = await Promise.all([
@@ -321,6 +346,14 @@ const WhatsAppInbox: React.FC = () => {
      */
     const [tab, setTab] = useState<Tab>('all');
     /**
+     * Filtro por etapa del flujo. Es OTRA cosa que las pestañas de arriba:
+     * esas eligen qué lista se mira (conversaciones o escalamientos), esto
+     * filtra la lista de conversaciones por en qué punto están.
+     */
+    const [filtroEtapa, setFiltroEtapa] = useState<string>('todas');
+    /** null = la migración 0035 todavía no corrió; distinto de 0. */
+    const [listasParaVendedor, setListasParaVendedor] = useState<number | null>(null);
+    /**
      * La galería de fotos recibidas, en la columna de la conversación.
      *
      * El caso es el comprobante de pago: el cliente manda la foto, media
@@ -346,6 +379,12 @@ const WhatsAppInbox: React.FC = () => {
     const [nuevoChat, setNuevoChat] = useState(false);
     const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
     const [globalBotEnabled, setGlobalBotEnabled] = useState<boolean | null>(null);
+    /**
+     * Los dos agentes, por separado. `null` mientras no se sabe, y también
+     * cuando la migración 0035 no corrió -- ahí no se muestran, en vez de
+     * mostrarlos apagados y hacer creer que el agente está frenado.
+     */
+    const [agentes, setAgentes] = useState<{ recepcion: boolean; ventas: boolean } | null>(null);
     const [search, setSearch] = useState('');
     /** Se incrementa para forzar una relectura del chat abierto. */
     const [recargarMensajes, setRecargarMensajes] = useState(0);
@@ -530,7 +569,7 @@ const WhatsAppInbox: React.FC = () => {
     const fetchSettings = useCallback(async () => {
         const { data, error } = await supabase
             .from('agent_settings')
-            .select('bot_auto_reply_enabled')
+            .select('bot_auto_reply_enabled, intake_agent_enabled, sales_agent_enabled')
             .eq('id', 1)
             .maybeSingle();
         if (error) {
@@ -538,6 +577,12 @@ const WhatsAppInbox: React.FC = () => {
             return;
         }
         setGlobalBotEnabled(Boolean(data?.bot_auto_reply_enabled));
+        const fila = data as { intake_agent_enabled?: boolean; sales_agent_enabled?: boolean } | null;
+        setAgentes(
+            fila?.intake_agent_enabled === undefined
+                ? null
+                : { recepcion: Boolean(fila.intake_agent_enabled), ventas: Boolean(fila.sales_agent_enabled) },
+        );
     }, []);
 
     const fetchEscalations = useCallback(async (silencioso = false) => {
@@ -580,6 +625,7 @@ const WhatsAppInbox: React.FC = () => {
         fetchSettings();
         fetchEstadoAgente();
         contarAvisos();
+        contarListas();
 
         // El latido se relee solo: si el agente se cae con la pantalla
         // abierta, el aviso tiene que aparecer sin que nadie recargue.
@@ -664,7 +710,7 @@ const WhatsAppInbox: React.FC = () => {
             clearInterval(latido);
             channel.unsubscribe();
         };
-    }, [fetchEscalations, fetchConversations, fetchSettings, fetchEstadoAgente, contarAvisos]);
+    }, [fetchEscalations, fetchConversations, fetchSettings, fetchEstadoAgente, contarAvisos, contarListas]);
 
     /**
      * La búsqueda de conversaciones va contra la base, así que se espera a
@@ -726,9 +772,23 @@ const WhatsAppInbox: React.FC = () => {
     // La pestaña "Todas" ya viene filtrada por la base (ver
     // `filtroBusqueda`), así que no se vuelve a filtrar acá: hacerlo
     // descartaría resultados legítimos que la consulta sí encontró.
-    const filteredConversations = conversations;
+    /**
+     * Las etapas que deja pasar el filtro elegido. `null` = todas.
+     */
+    const etapasDelFiltro = useMemo(
+        () => FILTROS_DE_ETAPA.find((f) => f.id === filtroEtapa)?.etapas ?? null,
+        [filtroEtapa],
+    );
+
+    const filteredConversations = useMemo(() => {
+        if (!etapasDelFiltro) return conversations;
+        // Una fila sin `etapa` (migración sin correr) no se esconde: sin el
+        // dato, sacarla de la lista sería peor que mostrarla de más.
+        return conversations.filter((c) => !c.etapa || etapasDelFiltro.includes(c.etapa));
+    }, [conversations, etapasDelFiltro]);
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
+
 
     /**
      * Métricas del día, calculadas sobre lo ya cargado (sin consultas
@@ -1019,8 +1079,11 @@ const WhatsAppInbox: React.FC = () => {
             .update({ status: 'human_active' })
             .eq('id', escalation.conversation_id);
         if (errorConv) setErrorAccion(`Se reclamó, pero la conversación no quedó marcada: ${errorConv.message}`);
+        // La etapa va aparte de `status`: es la que hace que el chat
+        // desaparezca de "listas para vendedor" ahora que alguien lo tomó.
+        await marcarEtapa(escalation.conversation_id, 'human_assigned', 'Un vendedor reclamó el escalamiento');
         setActionLoading(false);
-        await Promise.all([fetchEscalations(), fetchConversations()]);
+        await Promise.all([fetchEscalations(), fetchConversations(), contarListas()]);
     };
 
     // El agente NO le contesta a nadie por su cuenta: solo responde en las
@@ -1042,6 +1105,32 @@ const WhatsAppInbox: React.FC = () => {
             return;
         }
         await Promise.all([fetchConversations(), fetchEscalations()]);
+    };
+
+    /**
+     * Prende o apaga uno de los dos agentes (migración 0035).
+     *
+     * Son dos y no un modo porque el punto de partida real es "recepción
+     * automática + vendedor humano": la recepción junta los datos del
+     * repuesto y deja la ficha lista, y ahí se detiene. El vendedor es el
+     * que dice precios y confirma stock, y por eso arranca apagado.
+     */
+    const handleToggleAgente = async (cual: 'recepcion' | 'ventas') => {
+        if (!agentes) return;
+        setActionLoading(true);
+        const columna = cual === 'recepcion' ? 'intake_agent_enabled' : 'sales_agent_enabled';
+        const { error } = await supabase
+            .from('agent_settings')
+            .update({ [columna]: !agentes[cual], updated_at: new Date().toISOString(), updated_by: userId })
+            .eq('id', 1);
+        setActionLoading(false);
+        if (error) {
+            // Que se vea: creer que quedó apagado cuando sigue contestando
+            // es exactamente el error que no se puede permitir.
+            setErrorAccion(`No se pudo cambiar el agente: ${error.message}`);
+            return;
+        }
+        await fetchSettings();
     };
 
     /**
@@ -1226,9 +1315,17 @@ const WhatsAppInbox: React.FC = () => {
             .update({ status: closeInsteadOfReopen ? 'closed' : 'bot_active' })
             .eq('id', escalation.conversation_id);
         if (errorConv) setErrorAccion(`Quedó resuelta, pero la conversación no cambió de estado: ${errorConv.message}`);
+        // Devolverla al bot la manda al principio del flujo, no a "lista
+        // para vendedor": si el cliente vuelve a escribir, la recepción
+        // arranca de nuevo con todo el historial a la vista.
+        await marcarEtapa(
+            escalation.conversation_id,
+            closeInsteadOfReopen ? 'resolved' : 'intake_in_progress',
+            closeInsteadOfReopen ? 'Se marcó resuelta y cerrada' : 'Se resolvió y volvió al agente',
+        );
         setActionLoading(false);
         setCloseInsteadOfReopen(false);
-        await Promise.all([fetchEscalations(), fetchConversations()]);
+        await Promise.all([fetchEscalations(), fetchConversations(), contarListas()]);
     };
 
     return (
@@ -1303,6 +1400,54 @@ const WhatsAppInbox: React.FC = () => {
                     </span>
                     Agente automático
                 </button>
+
+                {/* Los dos agentes por separado. Solo aparecen si la migración
+                    0035 corrió: sin ella no hay nada que prender.
+
+                    Cuelgan del maestro a propósito -- con el maestro apagado se
+                    ven atenuados, porque no contesta ninguno aunque estén los
+                    dos encendidos. */}
+                {agentes && (
+                    <div
+                        className={cn(
+                            'flex shrink-0 items-center gap-1.5 rounded-lg border border-subtle bg-surface px-2 py-1',
+                            !globalBotEnabled && 'opacity-60',
+                        )}
+                        title={
+                            globalBotEnabled
+                                ? 'Qué agente contesta. La recepción junta los datos del repuesto; el vendedor cotiza contra el catálogo.'
+                                : 'El interruptor general está apagado: no contesta ninguno de los dos.'
+                        }
+                    >
+                        {([
+                            { id: 'recepcion' as const, texto: 'Recepción', activo: agentes.recepcion },
+                            { id: 'ventas' as const, texto: 'Vendedor', activo: agentes.ventas },
+                        ]).map((a) => (
+                            <button
+                                key={a.id}
+                                onClick={() => handleToggleAgente(a.id)}
+                                disabled={actionLoading}
+                                role="switch"
+                                aria-checked={a.activo}
+                                aria-label={`Agente ${a.texto}`}
+                                className={cn(
+                                    'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] font-semibold transition-colors disabled:opacity-50',
+                                    focusRing,
+                                    a.activo ? 'bg-success-soft text-success-soft-fg' : 'text-fg-muted hover:bg-surface-hover',
+                                )}
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        'h-1.5 w-1.5 shrink-0 rounded-full',
+                                        a.activo ? 'bg-success' : 'bg-surface-3 ring-1 ring-strong',
+                                    )}
+                                />
+                                {a.texto}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* La cola de "ya llegó lo que pediste".
                     Va en la barra de arriba y con el número a la vista porque
@@ -1524,6 +1669,42 @@ const WhatsAppInbox: React.FC = () => {
                                 </button>
                             ))}
                         </div>
+
+                        {/* Segunda fila: en qué punto del flujo está cada chat.
+                            Va aparte de las pestañas de arriba porque es otro eje
+                            -- arriba se elige QUÉ lista se mira, acá se filtra la
+                            de conversaciones. Solo aplica a esa lista, así que solo
+                            se muestra ahí. */}
+                        {tab === 'all' && (
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                {FILTROS_DE_ETAPA.map((f) => {
+                                    // El único conteo que se muestra es el que se mira:
+                                    // cuántos clientes están esperando a un vendedor.
+                                    const cuenta = f.id === 'listas' ? listasParaVendedor : null;
+                                    return (
+                                        <button
+                                            key={f.id}
+                                            onClick={() => setFiltroEtapa(f.id)}
+                                            aria-pressed={filtroEtapa === f.id}
+                                            className={cn(
+                                                'rounded-full px-2.5 py-0.5 text-[11.5px] font-medium transition-colors',
+                                                focusRing,
+                                                filtroEtapa === f.id
+                                                    ? 'bg-wa-inset/[0.16] text-wa-text'
+                                                    : 'text-wa-meta hover:bg-wa-inset/[0.08]',
+                                            )}
+                                        >
+                                            {f.texto}
+                                            {cuenta !== null && cuenta > 0 && (
+                                                <span className="ml-1 tabular-nums font-semibold text-wa-accent-strong">
+                                                    {cuenta}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <div className="wa-scroll min-h-0 flex-1 overflow-y-auto">
@@ -1611,6 +1792,21 @@ const WhatsAppInbox: React.FC = () => {
                                                     className="shrink-0 text-wa-accent-strong"
                                                     aria-label="El agente responde en este chat"
                                                 />
+                                            )}
+
+                                            {/* Solo las etapas que piden algo de alguien.
+                                                Marcar las siete convertiría la lista en un
+                                                semáforo ilegible: "precalificando" es el
+                                                estado normal de casi todas. */}
+                                            {c.etapa && ETAPAS_QUE_SE_MARCAN.has(c.etapa) && (
+                                                <span
+                                                    className={cn(
+                                                        'shrink-0 rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold leading-none',
+                                                        CLASE_DE_ETAPA[c.etapa],
+                                                    )}
+                                                >
+                                                    {NOMBRE_DE_ETAPA[c.etapa]}
+                                                </span>
                                             )}
 
                                             {c.unread_count > 0 && (

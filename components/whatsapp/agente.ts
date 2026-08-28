@@ -93,11 +93,23 @@ export function useAgente(userId: string | null) {
     const [estado, setEstado] = useState<EstadoAgente | null>(null);
     /** `null` mientras no se sabe: no es lo mismo que "apagado". */
     const [globalEncendido, setGlobalEncendido] = useState<boolean | null>(null);
+    /**
+     * Los dos agentes, por separado. El de RECEPCIÓN junta los datos del
+     * repuesto; el VENDEDOR cotiza contra el catálogo.
+     *
+     * Están aparte del maestro porque el punto de partida real del
+     * negocio es "recepción automática + vendedor humano", y eso no se
+     * puede expresar con un solo interruptor. El maestro sigue mandando
+     * por encima: apagado, no contesta ninguno.
+     */
+    const [agentes, setAgentes] = useState<{ recepcion: boolean; ventas: boolean } | null>(null);
 
     const leer = useCallback(async () => {
         const { data, error } = await supabase
             .from('agent_settings')
-            .select('agent_last_seen_at, agent_connection, agent_outbound_mode, bot_auto_reply_enabled')
+            .select(
+                'agent_last_seen_at, agent_connection, agent_outbound_mode, bot_auto_reply_enabled, intake_agent_enabled, sales_agent_enabled',
+            )
             .eq('id', 1)
             .maybeSingle();
         if (error || !data) {
@@ -111,6 +123,18 @@ export function useAgente(userId: string | null) {
             agent_outbound_mode: fila.agent_outbound_mode,
         });
         setGlobalEncendido(Boolean(fila.bot_auto_reply_enabled));
+        // Si la migración 0035 no corrió, las columnas no vienen: queda en
+        // null y la pantalla no muestra los interruptores, en vez de
+        // mostrarlos apagados y hacer creer que el agente está frenado.
+        const conAgentes = data as { intake_agent_enabled?: boolean; sales_agent_enabled?: boolean };
+        setAgentes(
+            conAgentes.intake_agent_enabled === undefined
+                ? null
+                : {
+                      recepcion: Boolean(conAgentes.intake_agent_enabled),
+                      ventas: Boolean(conAgentes.sales_agent_enabled),
+                  },
+        );
     }, []);
 
     useEffect(() => {
@@ -139,5 +163,25 @@ export function useAgente(userId: string | null) {
         return error ? `No se pudo cambiar el interruptor general: ${error.message}` : null;
     }, [globalEncendido, userId, leer]);
 
-    return { estado, globalEncendido, recargar: leer, alternarGlobal };
+    /**
+     * Prende o apaga uno de los dos agentes. Devuelve el error para que la
+     * pantalla lo muestre: igual que con el maestro, creer que quedó
+     * apagado cuando sigue encendido es el error que no se puede permitir.
+     */
+    const alternarAgente = useCallback(
+        async (cual: 'recepcion' | 'ventas'): Promise<string | null> => {
+            if (!agentes) return null;
+            const columna = cual === 'recepcion' ? 'intake_agent_enabled' : 'sales_agent_enabled';
+            const { error } = await supabase
+                .from('agent_settings')
+                .update({ [columna]: !agentes[cual], updated_at: new Date().toISOString(), updated_by: userId })
+                .eq('id', 1);
+            await leer();
+            const nombre = cual === 'recepcion' ? 'de recepción' : 'vendedor';
+            return error ? `No se pudo cambiar el agente ${nombre}: ${error.message}` : null;
+        },
+        [agentes, userId, leer],
+    );
+
+    return { estado, globalEncendido, agentes, recargar: leer, alternarGlobal, alternarAgente };
 }

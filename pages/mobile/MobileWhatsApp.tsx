@@ -50,6 +50,12 @@ import ChatThread, {
 import { cn } from '../../components/ui/styles';
 import CatalogSendModal from '../../components/whatsapp/CatalogSendModal';
 import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
+import {
+    CLASE_DE_ETAPA,
+    ETAPAS_QUE_SE_MARCAN,
+    NOMBRE_DE_ETAPA,
+    type Etapa,
+} from '../../components/whatsapp/etapas';
 import RegistrarPedidoModal from '../../components/whatsapp/RegistrarPedidoModal';
 import {
     borrarMensaje,
@@ -112,6 +118,11 @@ interface Conversacion {
     bot_enabled: boolean;
     /** `escalated` = el agente se rindió y pidió que conteste una persona. */
     status: string;
+    /**
+     * En qué punto del flujo está (migración 0035). Opcional: la migración
+     * se corre a mano, y hasta entonces la lista se ve igual que antes.
+     */
+    etapa?: Etapa;
 }
 
 /**
@@ -239,7 +250,7 @@ const MobileWhatsApp: React.FC = () => {
      * módulo que usa la bandeja: la regla de cuándo avisar que un mensaje no
      * va a salir no puede estar escrita dos veces.
      */
-    const { estado: estadoAgente, globalEncendido, alternarGlobal } = useAgente(userId);
+    const { estado: estadoAgente, globalEncendido, agentes, alternarGlobal, alternarAgente } = useAgente(userId);
     const aviso = useMemo(() => avisoDeEnvio(estadoAgente, haceCuanto), [estadoAgente]);
 
     /** Cuántos repuestos tiene a medio armar la proforma de este chat. */
@@ -1491,6 +1502,49 @@ const MobileWhatsApp: React.FC = () => {
                 </button>
             </div>
 
+            {/* Qué agente contesta. La recepción junta los datos del repuesto y
+                se detiene ahí; el vendedor cotiza contra el catálogo, y por eso
+                se puede dejar apagado mientras atiende una persona.
+
+                Solo aparece si la migración 0035 corrió: sin ella no hay nada
+                que prender, y mostrarlos apagados haría creer que el agente
+                está frenado. */}
+            {agentes && (
+                <div
+                    className={cn(
+                        'flex shrink-0 items-center gap-2 border-b border-wa-divider bg-wa-panel px-4 py-2',
+                        !globalEncendido && 'opacity-60',
+                    )}
+                >
+                    <span className="text-[13px] text-wa-meta">Contesta:</span>
+                    {([
+                        { id: 'recepcion' as const, texto: 'Recepción', activo: agentes.recepcion },
+                        { id: 'ventas' as const, texto: 'Vendedor', activo: agentes.ventas },
+                    ]).map((a) => (
+                        <button
+                            key={a.id}
+                            onClick={async () => {
+                                const err = await alternarAgente(a.id);
+                                if (err) setError(err);
+                            }}
+                            role="switch"
+                            aria-checked={a.activo}
+                            aria-label={`Agente ${a.texto}`}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold transition-colors',
+                                a.activo ? 'bg-wa-accent/[0.16] text-wa-accent' : 'bg-wa-inset/[0.08] text-wa-meta',
+                            )}
+                        >
+                            <span
+                                aria-hidden="true"
+                                className={cn('h-1.5 w-1.5 rounded-full', a.activo ? 'bg-wa-accent' : 'bg-wa-meta/50')}
+                            />
+                            {a.texto}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {aviso && (
                 <div className="flex shrink-0 items-start gap-2 border-b border-wa-divider bg-wa-notice px-4 py-2">
                     <RotateCw size={15} className="mt-0.5 shrink-0 text-wa-notice-text" aria-hidden="true" />
@@ -1575,6 +1629,19 @@ const MobileWhatsApp: React.FC = () => {
                                         className="shrink-0 text-warning"
                                         aria-label="El agente escaló esta conversación"
                                     />
+                                )}
+                                {/* Solo las etapas que piden algo de alguien: marcar
+                                    las siete convertiría la lista en un semáforo
+                                    ilegible. Ver components/whatsapp/etapas.ts. */}
+                                {c.etapa && ETAPAS_QUE_SE_MARCAN.has(c.etapa) && (
+                                    <span
+                                        className={cn(
+                                            'shrink-0 rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold leading-none',
+                                            CLASE_DE_ETAPA[c.etapa],
+                                        )}
+                                    >
+                                        {NOMBRE_DE_ETAPA[c.etapa]}
+                                    </span>
                                 )}
                                 {c.unread_count > 0 && (
                                     <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-wa-accent-strong px-1.5 text-[12px] font-bold leading-none text-wa-accent-fg">
