@@ -12,6 +12,7 @@ import {
     type ChatProforma,
 } from '../../store/useChatProformaStore';
 import { capturarProformaComoArchivo, resumenDeProforma } from '../../utils/proformaImage';
+import { registerProformaAnalytics } from '../../utils/whatsappWorkflow';
 import { ProformaDocument, PROFORMA_WIDTH } from './ProformaDocument';
 import {
     buscarEnCatalogo,
@@ -228,6 +229,17 @@ export const ProformaBuilder: React.FC<Props> = ({
     const subtotal = subtotalDe(proforma);
     const total = totalDe(proforma);
     const hayItems = proforma.items.length > 0;
+    const advertencias = useMemo(() => {
+        const rows: string[] = [];
+        const sinPrecio = proforma.items.filter((item) => item.unitPrice <= 0).length;
+        const sinFoto = proforma.items.filter((item) => !item.imageUrl).length;
+        const agotados = proforma.items.filter((item) => stockInfo[item.productId]?.status === 'out_of_stock').length;
+        if (sinPrecio) rows.push(`${sinPrecio} repuesto${sinPrecio > 1 ? 's' : ''} sin precio.`);
+        if (agotados) rows.push(`${agotados} repuesto${agotados > 1 ? 's' : ''} figura${agotados > 1 ? 'n' : ''} sin stock.`);
+        if (sinFoto) rows.push(`${sinFoto} repuesto${sinFoto > 1 ? 's' : ''} aparecerá${sinFoto > 1 ? 'n' : ''} sin fotografía.`);
+        if (!clienteNombre?.trim()) rows.push('La proforma no tiene nombre de cliente.');
+        return rows;
+    }, [proforma.items, stockInfo, clienteNombre]);
 
     const enviar = async () => {
         if (!hayItems || enviandoRef.current || !hojaRef.current) return;
@@ -259,6 +271,9 @@ export const ProformaBuilder: React.FC<Props> = ({
             ];
 
             await onEnviar(mensajes);
+            // Registro analítico interno. No manda ningún mensaje adicional y
+            // sus fallos no bloquean la cotización que ya quedó encolada.
+            await registerProformaAnalytics(conversationId, proforma.items);
             urlSubida = null;
             // El borrador se limpia recién ACÁ, después de que se encoló: si
             // el envío falla, la proforma sigue armada y se puede reintentar
@@ -633,6 +648,12 @@ export const ProformaBuilder: React.FC<Props> = ({
                     }
                 >
                     {error && <p className={cn('text-xs text-danger', !enPanel && 'mr-auto')}>{error}</p>}
+                    {!error && advertencias.length > 0 && (
+                        <div role="status" className="rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-2xs text-warning-soft-fg">
+                            <p className="font-semibold">Revisá antes de enviar:</p>
+                            <ul className="mt-0.5 list-disc pl-4">{advertencias.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                        </div>
+                    )}
                     {!error && hayItems && (
                         <label className={cn('flex items-center gap-1.5 text-xs text-fg-muted', !enPanel && 'mr-auto')}>
                             <input

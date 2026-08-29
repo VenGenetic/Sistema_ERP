@@ -7,8 +7,8 @@
 ---
 
 **Project:** Xsistem ERP
-**Generated:** 2026-08-28 18:13:06
-**Category:** News/Media Platform
+**Generated:** 2026-08-29 09:04:34
+**Category:** Analytics Dashboard
 
 ---
 
@@ -18,24 +18,24 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#0891B2` | `--color-primary` |
-| Secondary | `#22D3EE` | `--color-secondary` |
-| CTA/Accent | `#059669` | `--color-cta` |
-| Background | `#ECFEFF` | `--color-background` |
-| Text | `#164E63` | `--color-text` |
+| Primary | `#1E40AF` | `--color-primary` |
+| Secondary | `#3B82F6` | `--color-secondary` |
+| CTA/Accent | `#F59E0B` | `--color-cta` |
+| Background | `#F8FAFC` | `--color-background` |
+| Text | `#1E3A8A` | `--color-text` |
 
-**Color Notes:** Calm cyan + health green
+**Color Notes:** Blue data + amber highlights
 
 ### Typography
 
-- **Heading Font:** Lexend
-- **Body Font:** Source Sans 3
-- **Mood:** corporate, trustworthy, accessible, readable, professional, clean
-- **Google Fonts:** [Lexend + Source Sans 3](https://fonts.google.com/share?selection.family=Lexend:wght@300;400;500;600;700|Source+Sans+3:wght@300;400;500;600;700)
+- **Heading Font:** Fira Code
+- **Body Font:** Fira Sans
+- **Mood:** dashboard, data, analytics, code, technical, precise
+- **Google Fonts:** [Fira Code + Fira Sans](https://fonts.google.com/share?selection.family=Fira+Code:wght@400;500;600;700|Fira+Sans:wght@300;400;500;600;700)
 
 **CSS Import:**
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
 ```
 
 ### Spacing Variables
@@ -68,7 +68,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #059669;
+  background: #F59E0B;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -85,8 +85,8 @@
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #0891B2;
-  border: 2px solid #0891B2;
+  color: #1E40AF;
+  border: 2px solid #1E40AF;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -99,7 +99,7 @@
 
 ```css
 .card {
-  background: #ECFEFF;
+  background: #F8FAFC;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -125,9 +125,9 @@
 }
 
 .input:focus {
-  border-color: #0891B2;
+  border-color: #1E40AF;
   outline: none;
-  box-shadow: 0 0 0 3px #0891B220;
+  box-shadow: 0 0 0 3px #1E40AF20;
 }
 ```
 
@@ -153,28 +153,28 @@
 
 ## Style Guidelines
 
-**Style:** Exaggerated Minimalism
+**Style:** Data-Dense Dashboard
 
-**Keywords:** Bold minimalism, oversized typography, high contrast, negative space, loud minimal, statement design
+**Keywords:** Multiple charts/widgets, data tables, KPI cards, minimal padding, grid layout, space-efficient, maximum data visibility
 
-**Best For:** Fashion, architecture, portfolios, agency landing pages, luxury brands, editorial
+**Best For:** Business intelligence dashboards, financial analytics, enterprise reporting, operational dashboards, data warehousing
 
-**Key Effects:** font-size: clamp(3rem 10vw 12rem), font-weight: 900, letter-spacing: -0.05em, massive whitespace
+**Key Effects:** Hover tooltips, chart zoom on click, row highlighting on hover, smooth filter animations, data loading spinners
 
 ### Page Pattern
 
-**Pattern Name:** App Store Style Landing
+**Pattern Name:** Portfolio Grid
 
-- **Conversion Strategy:** Show real screenshots. Include ratings (4.5+ stars). QR code for mobile. Platform-specific CTAs.
-- **CTA Placement:** Download buttons prominent (App Store + Play Store) throughout
-- **Section Order:** 1. Hero with device mockup, 2. Screenshots carousel, 3. Features with icons, 4. Reviews/ratings, 5. Download CTAs
+- **Conversion Strategy:**  hover overlay info,  lightbox view, Visuals first. Filter by category. Fast loading essential.
+- **CTA Placement:** Project Card Hover + Footer Contact
+- **Section Order:** 1. Hero (Name/Role), 2. Project Grid (Masonry), 3. About/Philosophy, 4. Contact
 
 ---
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Cluttered layout
-- ❌ Slow loading
+- ❌ Ornate design
+- ❌ No filtering
 
 ### Additional Forbidden Patterns
 

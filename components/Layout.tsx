@@ -59,14 +59,15 @@ const STORAGE_COLLAPSED = 'erp_sidebar_collapsed';
 const STORAGE_FAVORITES = 'erp_sidebar_favorites';
 
 const DASHBOARD: NavigationItem = {
-  id: 'dashboard', label: 'Inicio', title: 'Panel principal', to: '/', icon: Home, aliases: ['dashboard', 'panel'],
+  id: 'whatsapp-home', label: 'WhatsApp', title: 'Centro de trabajo · WhatsApp', to: '/whatsapp-inbox', icon: MessageCircle, badge: 'whatsapp', aliases: ['inicio', 'chat', 'mensajes', 'clientes'],
 };
 
 const GROUPS: NavigationGroup[] = [
   {
     id: 'operations', label: 'Operaciones', items: [
       { id: 'customers', label: 'Clientes', title: 'Gestión de clientes', to: '/customers', icon: Users, permission: 'customers', aliases: ['buscar cliente', 'nuevo cliente'] },
-      { id: 'whatsapp', label: 'WhatsApp', title: 'Bandeja de WhatsApp', to: '/whatsapp-inbox', icon: MessageCircle, badge: 'whatsapp', aliases: ['chat', 'mensajes', 'cliente'] },
+      { id: 'dashboard', label: 'Indicadores', title: 'Indicadores del negocio', to: '/dashboard', icon: Home, aliases: ['dashboard', 'panel', 'estadísticas'] },
+      { id: 'whatsapp-analytics', label: 'Analítica WhatsApp', title: 'Analítica comercial de WhatsApp', to: '/whatsapp-analytics', icon: BarChart3, aliases: ['solicitudes', 'modelos', 'conversión', 'clientes frecuentes'] },
       { id: 'products', label: 'Catálogo', title: 'Catálogo de productos', to: '/products', icon: Boxes, permission: 'products', aliases: ['producto', 'productos'] },
       { id: 'orders', label: 'Órdenes', title: 'Gestión de órdenes', to: '/orders', icon: ShoppingCart, permission: 'orders', badge: 'orders', aliases: ['pedido', 'pedidos'] },
       { id: 'shipments', label: 'Envíos', title: 'Órdenes y envíos', to: '/orders/envios', icon: Truck, permission: 'orders', badge: 'shipments', aliases: ['despacho', 'entrega'] },
@@ -147,7 +148,9 @@ export default function Layout() {
   const activeItem = useMemo(() => [...allItems]
     .sort((a, b) => b.to.length - a.to.length)
     .find(item => routeMatches(location.pathname, item.to)), [allItems, location.pathname]);
-  const favoriteItems = favorites.map(id => allItems.find(item => item.id === id)).filter(Boolean) as NavigationItem[];
+  const favoriteItems = favorites
+    .map(id => allItems.find(item => item.id === id))
+    .filter((item): item is NavigationItem => Boolean(item) && item!.id !== DASHBOARD.id);
 
   const commandResults = useMemo(() => {
     const query = commandQuery.trim().toLocaleLowerCase('es');

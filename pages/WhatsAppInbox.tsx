@@ -3,8 +3,8 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
-    Archive, ArrowLeft, Bell, BellOff, Bot, BotOff, CheckCheck, Clock, Copy, HandCoins, Headset, Images, Inbox,
-    MailQuestion, MessageSquarePlus, Pin, RefreshCw, RotateCw, Search, User, X,
+    Archive, ArrowLeft, ArrowRight, Bell, BellOff, Bot, BotOff, CheckCheck, Clock, Copy, HandCoins, Headset, Images, Inbox,
+    MailQuestion, MessageSquarePlus, Pin, RefreshCw, RotateCw, Search, Sparkles, User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 import ChatComposer from '../components/whatsapp/ChatComposer';
@@ -18,6 +18,8 @@ import {
 } from '../components/whatsapp/agente';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import ProformaBuilder from '../components/whatsapp/ProformaBuilder';
+import ProductMessagePanel from '../components/whatsapp/ProductMessagePanel';
+import ConversationWorkCard from '../components/whatsapp/ConversationWorkCard';
 import { CONSULTA_PANTALLA_ANCHA, useMediaQuery } from '../hooks/useMediaQuery';
 import MenuTelefono from '../components/whatsapp/MenuTelefono';
 import NuevoChatModal from '../components/whatsapp/NuevoChatModal';
@@ -42,6 +44,8 @@ import ChatThread, {
     type MensajeHilo,
 } from '../components/whatsapp/ChatThread';
 import { useChatProformaStore } from '../store/useChatProformaStore';
+import { getDueWorkIds } from '../utils/whatsappWorkflow';
+import { attributeMessages } from '../utils/messageAttribution';
 import {
     borrarMensaje,
     editarMensaje,
@@ -231,7 +235,7 @@ const Avatar: React.FC<{ nombre: string | null; telefono: string; tam?: 'sm' | '
     );
 };
 
-type Tab = 'pending' | 'resolved' | 'all' | 'unread' | 'archived';
+type Tab = 'pending' | 'resolved' | 'all' | 'unread' | 'archived' | 'ai_ready' | 'attention';
 
 interface ConversationPreferences {
     pinned: number[];
@@ -528,6 +532,7 @@ const WhatsAppInbox: React.FC = () => {
      * bodega y el cliente está escribiendo justo ahora.
      */
     const agregarAProforma = useChatProformaStore((s) => s.agregar);
+    const proformasPorConversacion = useChatProformaStore((s) => s.porConversacion);
 
     /**
      * La proforma se arma en la tercera columna, al lado del hilo, para
@@ -544,6 +549,7 @@ const WhatsAppInbox: React.FC = () => {
      */
     const hayAnchoParaPanel = useMediaQuery(CONSULTA_PANTALLA_ANCHA);
     const [proformaAbierta, setProformaAbierta] = useState(false);
+    const [productoDelMensaje, setProductoDelMensaje] = useState<number | null>(null);
     const proformaEnPanel = hayAnchoParaPanel && proformaAbierta;
     const [conversationsLoading, setConversationsLoading] = useState(true);
     /** Total real en la base (o de la búsqueda), no el de las filas traídas. */
@@ -555,6 +561,18 @@ const WhatsAppInbox: React.FC = () => {
      */
     const [errorCarga, setErrorCarga] = useState<string | null>(null);
     const [errorAccion, setErrorAccion] = useState<string | null>(null);
+    const [attentionIds, setAttentionIds] = useState<number[]>([]);
+
+    // Una ficha abierta pertenece al chat donde se tocó. Al cambiar de
+    // cliente se cierra para no mostrar por accidente el repuesto anterior.
+    useEffect(() => setProductoDelMensaje(null), [selectedConversationId]);
+    useEffect(() => {
+        let active = true;
+        const refresh = () => getDueWorkIds().then((ids) => active && setAttentionIds(ids)).catch(() => {});
+        void refresh();
+        const timer = window.setInterval(refresh, 60_000);
+        return () => { active = false; window.clearInterval(timer); };
+    }, []);
 
     /**
      * La búsqueda vigente, legible desde los callbacks sin recrearlos. Los
@@ -599,6 +617,9 @@ const WhatsAppInbox: React.FC = () => {
             const filtro = filtroBusqueda(searchRef.current);
             if (filtro) q = q.or(filtro);
             if (tabRef.current === 'unread') q = q.gt('unread_count', 0);
+            // La IA de recepción marca esta etapa únicamente cuando ya
+            // recopiló los datos y el caso quedó preparado para cotizar.
+            if (tabRef.current === 'ai_ready') q = q.eq('etapa', 'ready_for_sales');
             return q;
         };
 
@@ -606,6 +627,13 @@ const WhatsAppInbox: React.FC = () => {
         // si no. Pedirla a secas dejaría la bandeja SIN LISTA, no sin vista
         // previa (ver CAMPOS_CONV_PREVIEW).
         let { data, error, count } = await consulta(CAMPOS_CONV_PREVIEW);
+        if (tabRef.current === 'ai_ready' && faltaColumna(error)) {
+            if (!silencioso) setConversationsLoading(false);
+            setConversations([]);
+            setTotalConversaciones(0);
+            setErrorCarga('Para usar “IA lista” falta aplicar la migración de etapas del agente (0035).');
+            return;
+        }
         if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE));
 
         if (!silencioso) setConversationsLoading(false);
@@ -866,6 +894,8 @@ const WhatsAppInbox: React.FC = () => {
             ? conversations.filter((c) => conversationPreferences.archived.includes(c.id))
             : conversations.filter((c) => !conversationPreferences.archived.includes(c.id));
         if (tab === 'unread') rows = rows.filter((c) => c.unread_count > 0);
+        if (tab === 'ai_ready') rows = rows.filter((c) => c.etapa === 'ready_for_sales');
+        if (tab === 'attention') rows = rows.filter((c) => c.unread_count > 0 || c.etapa === 'ready_for_sales' || attentionIds.includes(c.id));
         if (etapasDelFiltro && tab === 'all') {
             rows = rows.filter((c) => !c.etapa || etapasDelFiltro.includes(c.etapa));
         }
@@ -874,7 +904,7 @@ const WhatsAppInbox: React.FC = () => {
             const bPinned = conversationPreferences.pinned.includes(b.id) ? 1 : 0;
             return bPinned - aPinned;
         });
-    }, [conversations, etapasDelFiltro, tab, conversationPreferences]);
+    }, [conversations, etapasDelFiltro, tab, conversationPreferences, attentionIds]);
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
@@ -920,7 +950,7 @@ const WhatsAppInbox: React.FC = () => {
     // así el botón refleja el estado real aunque el escalamiento se haya
     // traído antes del último cambio.
     const selected: SelectedContext | null = useMemo(() => {
-        if (tab === 'all' || tab === 'unread' || tab === 'archived') {
+        if (tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention') {
             const conv = conversations.find((c) => c.id === selectedConversationId);
             if (!conv) return null;
             return {
@@ -949,6 +979,38 @@ const WhatsAppInbox: React.FC = () => {
             escalation: selectedEscalation,
         };
     }, [tab, conversations, selectedConversationId, selectedEscalation]);
+
+    const colaDeAtencion = useMemo(() => conversations.filter((conversation) =>
+        !conversationPreferences.archived.includes(conversation.id) &&
+        (conversation.unread_count > 0 || conversation.etapa === 'ready_for_sales' || attentionIds.includes(conversation.id)),
+    ), [conversations, conversationPreferences.archived, attentionIds]);
+
+    const abrirSiguientePendiente = useCallback(() => {
+        if (colaDeAtencion.length === 0) return;
+        const actual = colaDeAtencion.findIndex((conversation) => conversation.id === selectedConversationId);
+        const siguiente = colaDeAtencion[(actual + 1 + colaDeAtencion.length) % colaDeAtencion.length];
+        setSelectedId(null);
+        setSelectedConversationId(siguiente.id);
+        setTab('attention');
+    }, [colaDeAtencion, selectedConversationId]);
+
+    useEffect(() => {
+        const onShortcut = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement | null;
+            const editing = target?.matches('input, textarea, select, [contenteditable="true"]');
+            if (editing || event.ctrlKey || event.metaKey || event.altKey) return;
+            if (event.key.toLowerCase() === 'n') { event.preventDefault(); abrirSiguientePendiente(); }
+            if (event.key.toLowerCase() === 'r' && selected) {
+                event.preventDefault();
+                document.querySelector<HTMLTextAreaElement>('[aria-label="Mensaje para el cliente"]')?.focus();
+            }
+            if (event.key.toLowerCase() === 'p' && selected && hayAnchoParaPanel) {
+                event.preventDefault(); setProductoDelMensaje(null); setProformaAbierta(true);
+            }
+        };
+        window.addEventListener('keydown', onShortcut);
+        return () => window.removeEventListener('keydown', onShortcut);
+    }, [abrirSiguientePendiente, selected, hayAnchoParaPanel]);
 
     // La cola de salida vive en components/whatsapp/ColaDeSalida.tsx: el modo
     // móvil usa el MISMO hook y las mismas burbujas. Va acá y no más arriba
@@ -1010,7 +1072,7 @@ const WhatsAppInbox: React.FC = () => {
         if (error || !data) return;
         // Pudieron cambiar de chat mientras viajaba la consulta.
         if (conversacionAbiertaRef.current !== id) return;
-        const recientes = (data as AgentMessage[]).slice().reverse();
+        const recientes = await attributeMessages((data as AgentMessage[]).slice().reverse());
         setMessages((prev) => fusionarMensajes(prev, recientes));
     }, []);
 
@@ -1060,14 +1122,14 @@ const WhatsAppInbox: React.FC = () => {
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: false })
             .limit(MENSAJES_VISIBLES)
-            .then(({ data, error }) => {
+            .then(async ({ data, error }) => {
                 if (cancelled) return;
                 // Un fallo acá (RLS, red) dejaba la pantalla diciendo "Sin
                 // mensajes registrados todavía", que es una conversación vacía
                 // -- exactamente lo contrario de lo que pasó.
                 if (error) setErrorCarga(`No se pudo abrir la conversación: ${error.message}`);
                 else if (data) {
-                    const filas = (data as AgentMessage[]).slice().reverse();
+                    const filas = await attributeMessages((data as AgentMessage[]).slice().reverse());
                     cacheMensajesRef.current.set(conversationId, filas);
                     setMessages(filas);
                     setMessagesConversationId(conversationId);
@@ -1181,7 +1243,7 @@ const WhatsAppInbox: React.FC = () => {
     // conversaciones habilitadas explícitamente acá (ver migración 0017 del
     // repo del agente). Arranca apagado para cada cliente nuevo.
     const handleToggleBot = async (ctx: SelectedContext) => {
-        if (!ctx.botEnabled) {
+        if (!ctx.botEnabled || ctx.conversationStatus !== 'bot_active') {
             setEligiendoAgente(ctx);
             return;
         }
@@ -1205,6 +1267,7 @@ const WhatsAppInbox: React.FC = () => {
 
     const activarAgenteDelChat = async (agente: 'intake' | 'sales') => {
         if (!eligiendoAgente) return;
+        const conversationId = eligiendoAgente.conversationId;
         setActionLoading(true);
         setErrorAccion(null);
         const { error } = await supabase.rpc('set_conversation_agent', {
@@ -1218,6 +1281,12 @@ const WhatsAppInbox: React.FC = () => {
             return;
         }
         setEligiendoAgente(null);
+        // Activar resuelve cualquier escalamiento abierto. Si estábamos en
+        // "Pendientes", esa fila desaparece de la pestaña; se mantiene el
+        // mismo chat abierto cambiando a la lista general.
+        setSelectedId(null);
+        setSelectedConversationId(conversationId);
+        setTab('all');
         await Promise.all([fetchConversations(), fetchEscalations()]);
     };
 
@@ -1521,8 +1590,9 @@ const WhatsAppInbox: React.FC = () => {
                             )}
                         />
                     </span>
-                    Agente automático
+                    Todos los agentes · {globalBotEnabled ? 'Activados' : 'Desactivados'}
                 </button>
+
 
                 {/* Los dos agentes por separado. Solo aparecen si la migración
                     0035 corrió: sin ella no hay nada que prender.
@@ -1769,12 +1839,16 @@ const WhatsAppInbox: React.FC = () => {
                             {(
                                 [
                                     { id: 'all' as Tab, texto: 'Todas', cuenta: null },
+                                    { id: 'attention' as Tab, texto: 'Por atender', cuenta: filteredConversations.length, icono: Clock },
                                     { id: 'unread' as Tab, texto: 'No leídos', cuenta: metricas.sinLeer },
+                                    { id: 'ai_ready' as Tab, texto: 'IA lista', cuenta: listasParaVendedor, icono: Sparkles },
                                     { id: 'archived' as Tab, texto: 'Archivados', cuenta: conversationPreferences.archived.length },
                                     { id: 'pending' as Tab, texto: 'Pendientes', cuenta: pendingCount },
                                     { id: 'resolved' as Tab, texto: 'Resueltas', cuenta: null },
                                 ]
-                            ).map((c) => (
+                            ).map((c) => {
+                                const Icono = 'icono' in c ? c.icono : null;
+                                return (
                                 <button
                                     key={c.id}
                                     onClick={() => setTab(c.id)}
@@ -1787,12 +1861,14 @@ const WhatsAppInbox: React.FC = () => {
                                             : 'bg-wa-inset/[0.06] text-wa-meta hover:bg-wa-inset/10',
                                     )}
                                 >
+                                    {Icono && <Icono size={12} className="mr-1 inline-block align-[-2px]" aria-hidden="true" />}
                                     {c.texto}
                                     {c.cuenta !== null && c.cuenta > 0 && (
                                         <span className="ml-1 tabular-nums opacity-70">{c.cuenta}</span>
                                     )}
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {/* Segunda fila: en qué punto del flujo está cada chat.
@@ -1836,9 +1912,9 @@ const WhatsAppInbox: React.FC = () => {
                     {/* Cada pestaña espera SU propia carga: la de "Todas" usaba el
                         loading de escalamientos y por eso mostraba "no hay
                         conversaciones" mientras la consulta seguía en vuelo. */}
-                    {(tab === 'all' || tab === 'unread' || tab === 'archived' ? conversationsLoading : loading) ? (
+                    {(tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention' ? conversationsLoading : loading) ? (
                         <div className="p-8 text-center text-sm text-wa-meta">Cargando…</div>
-                    ) : tab === 'all' || tab === 'unread' || tab === 'archived' ? (
+                    ) : tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention' ? (
                         filteredConversations.length === 0 ? (
                             <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
                                 <Inbox size={22} aria-hidden="true" />
@@ -1846,6 +1922,10 @@ const WhatsAppInbox: React.FC = () => {
                                     ? `Ningún cliente coincide con "${search.trim()}".`
                                     : tab === 'unread'
                                       ? 'No tienes mensajes sin leer.'
+                                      : tab === 'ai_ready'
+                                        ? 'La IA todavía no ha dejado conversaciones listas para cotizar.'
+                                      : tab === 'attention'
+                                        ? 'No hay conversaciones que requieran atención ahora.'
                                       : tab === 'archived'
                                         ? 'No tienes conversaciones archivadas.'
                                       : 'Todavía no hay conversaciones de WhatsApp.'}
@@ -1976,6 +2056,11 @@ const WhatsAppInbox: React.FC = () => {
                                                     {c.unread_count}
                                                 </span>
                                             )}
+                                            {(proformasPorConversacion[c.id]?.items.length ?? 0) > 0 && (
+                                                <span title="Proforma en preparación" className="shrink-0 rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                                    {proformasPorConversacion[c.id].items.length} en proforma
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </button>
@@ -1983,14 +2068,14 @@ const WhatsAppInbox: React.FC = () => {
                         )
                     ) : null}
 
-                    {(tab === 'all' || tab === 'unread' || tab === 'archived') && !conversationsLoading && hayMas && (
+                    {(tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention') && !conversationsLoading && hayMas && (
                         <p className="px-4 py-3 text-center text-[12px] text-wa-meta">
                             Mostrando las {conversations.length} más recientes de {totalConversaciones}.
                             {' '}Usá el buscador para encontrar una conversación puntual.
                         </p>
                     )}
 
-                    {tab !== 'all' && tab !== 'unread' && tab !== 'archived' && (loading ? null : filtered.length === 0 ? (
+                    {tab !== 'all' && tab !== 'unread' && tab !== 'archived' && tab !== 'ai_ready' && tab !== 'attention' && (loading ? null : filtered.length === 0 ? (
                         <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
                             <Inbox size={22} aria-hidden="true" />
                             {search.trim()
@@ -2102,7 +2187,7 @@ const WhatsAppInbox: React.FC = () => {
                                         {selected.customerName &&
                                             formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })}
                                         {selected.customerName && ' · '}
-                                        {selected.botEnabled
+                                        {selected.botEnabled && selected.conversationStatus === 'bot_active'
                                             ? globalBotEnabled === false
                                                 ? 'agente activado acá, pero apagado en general'
                                                 : selected.selectedAgent === 'sales'
@@ -2124,18 +2209,18 @@ const WhatsAppInbox: React.FC = () => {
                                 <button
                                     onClick={() => handleToggleBot(selected)}
                                     disabled={actionLoading}
-                                    aria-label={selected.botEnabled ? 'Desactivar el agente en este chat' : 'Activar el agente en este chat'}
+                                    aria-label={selected.botEnabled && selected.conversationStatus === 'bot_active' ? 'Desactivar el agente en este chat' : 'Activar el agente en este chat'}
                                     title={
-                                        selected.botEnabled
+                                        selected.botEnabled && selected.conversationStatus === 'bot_active'
                                             ? 'El agente está contestando en este chat. Apagalo para responder vos.'
                                             : 'Activar el agente en este chat'
                                     }
                                     className={cn(
                                         'flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-wa-inset/10',
-                                        selected.botEnabled ? 'text-wa-accent' : 'text-wa-meta',
+                                        selected.botEnabled && selected.conversationStatus === 'bot_active' ? 'text-wa-accent' : 'text-wa-meta',
                                     )}
                                 >
-                                    {selected.botEnabled ? <Bot size={19} aria-hidden="true" /> : <BotOff size={19} aria-hidden="true" />}
+                                    {selected.botEnabled && selected.conversationStatus === 'bot_active' ? <Bot size={19} aria-hidden="true" /> : <BotOff size={19} aria-hidden="true" />}
                                 </button>
 
                                 {eligiendoAgente?.conversationId === selected.conversationId && (
@@ -2175,6 +2260,16 @@ const WhatsAppInbox: React.FC = () => {
                                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10"
                                 >
                                     <Search size={18} aria-hidden="true" />
+                                </button>
+
+                                <button
+                                    onClick={abrirSiguientePendiente}
+                                    disabled={colaDeAtencion.length === 0}
+                                    aria-label="Abrir el siguiente cliente por atender"
+                                    title="Siguiente cliente por atender (N)"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10 disabled:opacity-30"
+                                >
+                                    <ArrowRight size={18} aria-hidden="true" />
                                 </button>
 
                                 <button
@@ -2237,6 +2332,10 @@ const WhatsAppInbox: React.FC = () => {
                                         onReaccionar={reaccionar}
                                         onBorrar={borrar}
                                         onEditar={editar}
+                                        onProducto={(productId) => {
+                                            setProformaAbierta(false);
+                                            setProductoDelMensaje(productId);
+                                        }}
                                         onTelefono={(numero, ancla) => setMenuTelefono({ numero, ancla })}
                                     />
                                 )}
@@ -2334,7 +2433,22 @@ const WhatsAppInbox: React.FC = () => {
                     Se turnan: a 1280px no entran las dos, y la proforma es
                     la que necesita el chat al lado. Al cerrarla vuelve la
                     ficha sola. */}
-                {selected && proformaEnPanel && (
+                {selected && productoDelMensaje !== null && (
+                    <div className="hidden w-[360px] shrink-0 flex-col border-l border-wa-divider bg-surface xl:flex 2xl:w-[400px]">
+                        <ProductMessagePanel
+                            key={productoDelMensaje}
+                            productId={productoDelMensaje}
+                            onClose={() => setProductoDelMensaje(null)}
+                            onCotizar={(producto) => {
+                                agregarAProforma(selected.conversationId, producto);
+                                setProductoDelMensaje(null);
+                                setProformaAbierta(true);
+                            }}
+                        />
+                    </div>
+                )}
+
+                {selected && productoDelMensaje === null && proformaEnPanel && (
                     <div className="hidden w-[420px] shrink-0 flex-col border-l border-wa-divider bg-surface xl:flex 2xl:w-[460px]">
                         <ProformaBuilder
                             // Al cambiar de chat se remonta: el buscador y la
@@ -2355,8 +2469,12 @@ const WhatsAppInbox: React.FC = () => {
                     </div>
                 )}
 
-                {selected && !proformaEnPanel && (
+                {selected && productoDelMensaje === null && !proformaEnPanel && (
                     <div className="hidden w-[320px] shrink-0 overflow-y-auto wa-scroll border-l border-wa-divider bg-surface p-3 xl:block">
+                        <ConversationWorkCard
+                            conversationId={selected.conversationId}
+                            aiReady={conversations.find((conversation) => conversation.id === selected.conversationId)?.etapa === 'ready_for_sales'}
+                        />
                         <CustomerPanel
                             key={`${selected.conversationId}-${recargarFicha}`}
                             conversationId={selected.conversationId}

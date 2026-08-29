@@ -22,6 +22,21 @@ export async function capturarProformaComoArchivo(
 ): Promise<File> {
     const { default: html2canvas } = await import('html2canvas');
 
+    // La hoja puede estar fuera de pantalla y las fotos vienen de Storage.
+    // Esperarlas evita capturar recuadros vacíos si alguien pulsa Enviar
+    // inmediatamente después de agregar el último repuesto.
+    const imagenes = Array.from(nodo.querySelectorAll('img'));
+    await Promise.all(imagenes.map(async (imagen) => {
+        if (imagen.complete) return;
+        await Promise.race([
+            new Promise<void>((resolver) => {
+                imagen.addEventListener('load', () => resolver(), { once: true });
+                imagen.addEventListener('error', () => resolver(), { once: true });
+            }),
+            new Promise<void>((resolver) => window.setTimeout(resolver, 4_000)),
+        ]);
+    }));
+
     const canvas = await html2canvas(nodo, {
         useCORS: true,
         scale: ESCALA,

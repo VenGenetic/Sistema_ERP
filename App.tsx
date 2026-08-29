@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Navigate, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -33,6 +33,7 @@ const InventoryMode = React.lazy(() => import('./pages/InventoryMode').then(modu
 const InventorySession = React.lazy(() => import('./pages/InventorySession').then(module => ({ default: module.InventorySession })));
 const POE = React.lazy(() => import('./pages/POE'));
 const WhatsAppInbox = React.lazy(() => import('./pages/WhatsAppInbox'));
+const WhatsAppAnalytics = React.lazy(() => import('./pages/WhatsAppAnalytics'));
 
 // Lazy load mobile pages
 const MobileLayout = React.lazy(() => import('./components/mobile/MobileLayout'));
@@ -70,16 +71,19 @@ const App: React.FC = () => {
               
               {/* Mobile App Route */}
               <Route path="/mobile" element={<MobileLayout />}>
-                <Route index element={<MobileDashboard />} />
+                <Route index element={<Navigate to="whatsapp" replace />} />
+                <Route path="dashboard" element={<MobileDashboard />} />
                 <Route path="catalog" element={<MobileCatalog />} />
                 <Route path="labels" element={<MobileLabels />} />
                 <Route path="proforma" element={<MobileProforma />} />
                 <Route path="inventory" element={<MobileInventory />} />
                 <Route path="whatsapp" element={<MobileWhatsApp />} />
+                <Route path="analytics" element={<WhatsAppAnalytics />} />
               </Route>
 
               <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
+                <Route index element={<Navigate to="whatsapp-inbox" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
                 <Route path="team" element={<Team />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="products" element={<Products />} />
@@ -91,6 +95,7 @@ const App: React.FC = () => {
                 <Route path="replenishment" element={<Replenishment />} />
                 <Route path="product-demands" element={<ProductDemands />} />
                 <Route path="whatsapp-inbox" element={<WhatsAppInbox />} />
+                <Route path="whatsapp-analytics" element={<WhatsAppAnalytics />} />
                 <Route path="sourcing" element={<SourcingPipeline />} />
                 <Route path="orders/*" element={<Orders />} />
                 <Route path="commissions" element={<CommissionDashboard />} />

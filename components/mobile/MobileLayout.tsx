@@ -22,6 +22,7 @@ type ModuleItem = {
 
 const MODULES: ModuleItem[] = [
   { label: 'WhatsApp', description: 'Clientes y conversaciones', to: '/mobile/whatsapp', icon: MessageCircle, accent: 'bg-emerald-500/15 text-emerald-300' },
+  { label: 'Analítica', description: 'Solicitudes, modelos y conversión', to: '/mobile/analytics', icon: Grid3X3, accent: 'bg-cyan-500/15 text-cyan-300' },
   { label: 'Catálogo', description: 'Productos, precios y stock', to: '/mobile/catalog', icon: Boxes, accent: 'bg-blue-500/15 text-blue-300' },
   { label: 'Etiquetas', description: 'Cola e impresión móvil', to: '/mobile/labels', icon: Printer, accent: 'bg-amber-500/15 text-amber-300' },
   { label: 'Inventario', description: 'Escanear y ajustar existencias', to: '/mobile/inventory', icon: ScanLine, accent: 'bg-cyan-500/15 text-cyan-300' },
@@ -29,8 +30,10 @@ const MODULES: ModuleItem[] = [
 ];
 
 const PAGE_META: Record<string, { title: string; eyebrow: string }> = {
-  '/mobile': { title: 'Centro de operaciones', eyebrow: 'Inicio' },
+  '/mobile': { title: 'WhatsApp', eyebrow: 'Centro de trabajo' },
+  '/mobile/dashboard': { title: 'Centro de operaciones', eyebrow: 'Indicadores' },
   '/mobile/whatsapp': { title: 'WhatsApp', eyebrow: 'Atención al cliente' },
+  '/mobile/analytics': { title: 'Analítica comercial', eyebrow: 'WhatsApp' },
   '/mobile/catalog': { title: 'Catálogo', eyebrow: 'Productos y stock' },
   '/mobile/labels': { title: 'Etiquetas', eyebrow: 'Impresión móvil' },
   '/mobile/inventory': { title: 'Inventario', eyebrow: 'Control de almacén' },
@@ -54,6 +57,7 @@ const MobileLayout: React.FC = () => {
   });
 
   const meta = PAGE_META[location.pathname] ?? { title: 'Xsistem ERP', eyebrow: 'Modo móvil' };
+  const whatsappActivo = location.pathname === '/mobile/whatsapp';
   const initials = String(userProfile?.full_name || userProfile?.nickname || session?.user?.email || 'ERP')
     .split(/\s|@/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const visibleModules = useMemo(() => {
@@ -115,7 +119,7 @@ const MobileLayout: React.FC = () => {
     <div className="flex h-dvh-screen w-full flex-col overflow-hidden bg-[#070d1a] font-sans text-white">
       <a href="#mobile-main" className="fixed left-3 top-3 z-[200] -translate-y-20 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold transition-transform focus:translate-y-0">Saltar al contenido</a>
 
-      <header className="relative z-40 shrink-0 border-b border-white/[0.07] bg-[#0b1426]/95 px-4 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] backdrop-blur-xl">
+      {!whatsappActivo && <header className="relative z-40 shrink-0 border-b border-white/[0.07] bg-[#0b1426]/95 px-4 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] backdrop-blur-xl">
         <div className="mx-auto flex max-w-md items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-950/50">
             <Smartphone size={19} aria-hidden="true" />
@@ -134,7 +138,7 @@ const MobileLayout: React.FC = () => {
           <button type="button" onClick={() => setModuleCenter(true)} aria-label="Abrir todos los módulos" className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 active:bg-white/10"><Grid3X3 size={19} /></button>
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 text-xs font-black text-slate-950" title={userProfile?.full_name || session?.user?.email}>{initials || 'ER'}</div>
         </div>
-      </header>
+      </header>}
 
       {!online && (
         <div className="flex shrink-0 items-center justify-center gap-2 bg-rose-500/15 px-4 py-2 text-xs font-semibold text-rose-200"><WifiOff size={14} /> Sin conexión. Algunas consultas esperarán a recuperar internet.</div>
@@ -155,8 +159,8 @@ const MobileLayout: React.FC = () => {
       <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-[45] px-2 pb-safe pt-2">
         <div className="mx-auto max-w-md rounded-[24px] border border-white/10 bg-[#0d1729]/95 p-1.5 shadow-[0_-12px_40px_rgba(0,0,0,.35)] backdrop-blur-xl">
           <ul className="grid grid-cols-5 items-end">
-            <li><NavLink to="/mobile" end className={navClass}><House size={21} /><span>Inicio</span></NavLink></li>
             <li><NavLink to="/mobile/whatsapp" className={navClass}><span className="relative"><MessageCircle size={21} />{sinLeer > 0 && <span className="absolute -right-2 -top-2 h-2.5 w-2.5 rounded-full border-2 border-[#0d1729] bg-emerald-400" />}</span><span>WhatsApp</span></NavLink></li>
+            <li><NavLink to="/mobile/dashboard" className={navClass}><House size={21} /><span>Panel</span></NavLink></li>
             <li className="relative -top-3"><NavLink to="/mobile/labels" aria-label="Imprimir etiquetas" className="relative mx-auto flex h-14 w-14 touch-manipulation items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-950/50 active:bg-blue-700"><Printer size={24} />{queueCount > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0d1729] bg-amber-400 px-1 text-[10px] font-black text-slate-950">{queueCount > 99 ? '99+' : queueCount}</span>}</NavLink></li>
             <li><NavLink to="/mobile/catalog" className={navClass}><Boxes size={21} /><span>Catálogo</span></NavLink></li>
             <li><NavLink to="/mobile/inventory" className={navClass}><ScanLine size={21} /><span>Inventario</span></NavLink></li>

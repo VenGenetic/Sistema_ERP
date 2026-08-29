@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { STOCK_STATUS_LABELS, type ProformaStockInfo } from '../../utils/proformaStock';
 import type { ChatProforma } from '../../store/useChatProformaStore';
 import { subtotalDe, totalDe } from '../../store/useChatProformaStore';
@@ -33,6 +33,26 @@ const ESTILO_STOCK: Record<string, string> = {
     in_stock: 'bg-success-soft text-success',
     backorder: 'bg-warning-soft text-warning',
     out_of_stock: 'bg-danger-soft text-danger',
+};
+
+/** Foto estable para la captura: si falta o CORS la rechaza, deja un
+ * recuadro limpio en vez del icono roto del navegador. */
+const FotoProducto: React.FC<{ url: string | null; nombre: string }> = ({ url, nombre }) => {
+    const [fallo, setFallo] = useState(false);
+    if (!url || fallo) {
+        return <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-1 text-center text-[8px] font-bold uppercase leading-tight text-slate-400">Sin foto</div>;
+    }
+    return (
+        <img
+            src={url}
+            alt={nombre}
+            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
+            loading="eager"
+            onError={() => setFallo(true)}
+            className="h-12 w-12 rounded-lg border border-slate-200 bg-white object-contain"
+        />
+    );
 };
 
 interface Props {
@@ -81,6 +101,7 @@ export const ProformaDocument = React.forwardRef<HTMLDivElement, Props>(
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="border-b-2 border-slate-800">
+                                    <th className="w-14 py-2 text-left text-xs font-bold uppercase tracking-wide text-fg">Foto</th>
                                     <th className="text-left py-2 font-bold text-fg text-xs uppercase tracking-wide">SKU</th>
                                     <th className="text-left py-2 font-bold text-fg text-xs uppercase tracking-wide">Descripción</th>
                                     <th className="text-center py-2 font-bold text-fg text-xs uppercase tracking-wide">Cant</th>
@@ -93,6 +114,7 @@ export const ProformaDocument = React.forwardRef<HTMLDivElement, Props>(
                                     const estado = stockInfo[item.productId]?.status;
                                     return (
                                         <tr key={item.id} className="border-b border-slate-100">
+                                            <td className="py-2.5 pr-2"><FotoProducto url={item.imageUrl} nombre={item.name} /></td>
                                             <td className="py-2.5 font-mono text-[11px] font-bold text-fg-muted">{item.sku}</td>
                                             <td className="py-2.5 text-fg font-medium">
                                                 {item.name}

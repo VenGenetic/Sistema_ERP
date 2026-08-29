@@ -392,6 +392,13 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                 </p>
                             )}
 
+                            {armados.length >= 2 && (
+                                <div className="overflow-hidden rounded-xl border border-primary/20 bg-primary-soft/30">
+                                    <div className="border-b border-primary/15 px-3 py-2"><p className="text-xs font-bold text-fg">Comparación rápida</p><p className="text-2xs text-fg-muted">Precio y disponibilidad de los seleccionados</p></div>
+                                    <div className="overflow-x-auto"><table className="w-full text-[11px]"><thead className="text-left text-fg-muted"><tr><th className="px-3 py-1.5">Repuesto</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-3 py-1.5 text-right">Stock</th></tr></thead><tbody className="divide-y divide-primary/10">{armados.map((item) => { const stock = stockUtil(item.producto); return <tr key={`compare-${item.producto.product_id}`}><td className="max-w-40 truncate px-3 py-2 font-medium text-fg">{item.producto.name}</td><td className="px-2 py-2 text-right font-semibold tabular-nums text-fg">{formatearPrecio(item.precio)}</td><td className="px-3 py-2 text-right text-fg-muted">{stock.local > 0 ? `${stock.local} local` : stock.hay ? `${stock.importador} import.` : 'Agotado'}</td></tr>; })}</tbody></table></div>
+                                </div>
+                            )}
+
                             {armados.map((a) => {
                                 const fotos = fotosDe(a.producto);
                                 return (

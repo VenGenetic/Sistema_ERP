@@ -1,5 +1,6 @@
-import React, { memo, useEffect, useMemo, useRef } from 'react';
-import { AlertCircle, Check, CheckCheck, Clock3 } from 'lucide-react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertCircle, Bot, Check, CheckCheck, Clock3, UserRound } from 'lucide-react';
 import { cn } from '../ui/styles';
 import MessageMedia from './MessageMedia';
 import MessageActions from './MessageActions';
@@ -51,9 +52,15 @@ export interface MensajeHilo {
     delivery_status?: DeliveryStatus | null;
     action_taken: string | null;
     media_url: string | null;
+    /** Repuesto vinculado internamente. Nunca se renderiza del lado del cliente. */
+    product_id?: number | null;
     whatsapp_message_id: string | null;
     deleted_at: string | null;
     reaction: string | null;
+    sender_kind?: 'customer' | 'human' | 'agent' | 'unknown';
+    sender_label?: string;
+    sender_email?: string | null;
+    sender_account_id?: string | null;
 }
 
 /**
@@ -347,14 +354,27 @@ interface BurbujaProps {
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
     onEditar: (m: MensajeHilo) => void;
+    /** Abre la ficha interna del repuesto asociado al mensaje. */
+    onProducto?: (productId: number) => void;
     /** Tocaron un teléfono escrito dentro del mensaje. */
     onTelefono?: (numero: string, ancla: DOMRect) => void;
 }
 
 const Burbuja = memo<BurbujaProps>(
-    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onTelefono }) => {
+    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono }) => {
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
+        const [autorMenu, setAutorMenu] = useState<{ x: number; y: number } | null>(null);
+
+        useEffect(() => {
+            if (!autorMenu) return;
+            const close = () => setAutorMenu(null);
+            const escape = (event: KeyboardEvent) => event.key === 'Escape' && close();
+            window.addEventListener('click', close);
+            window.addEventListener('scroll', close, true);
+            window.addEventListener('keydown', escape);
+            return () => { window.removeEventListener('click', close); window.removeEventListener('scroll', close, true); window.removeEventListener('keydown', escape); };
+        }, [autorMenu]);
 
         /* Archivo sin pie de foto: no se escribe "Foto" ni "Nota de voz"
            debajo. El reproductor ya dice que es una nota de voz y la tarjeta
@@ -387,6 +407,14 @@ const Burbuja = memo<BurbujaProps>(
         return (
             <div
                 id={`wa-message-${m.id}`}
+                onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setAutorMenu({
+                        x: Math.max(12, Math.min(event.clientX, window.innerWidth - 276)),
+                        y: Math.max(12, Math.min(event.clientY, window.innerHeight - 150)),
+                    });
+                }}
                 style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 80px' }}
                 className={cn(
                     'group flex px-2 md:px-4',
@@ -450,6 +478,19 @@ const Burbuja = memo<BurbujaProps>(
                             <span className={cn(borrado && 'italic text-wa-meta')}>
                                 {borrado ? (
                                     'Se borró este mensaje'
+                                ) : m.product_id && onProducto ? (
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            onProducto(m.product_id!);
+                                        }}
+                                        title="Ver este repuesto en el panel lateral"
+                                        className="cursor-pointer text-left underline decoration-dotted underline-offset-4 transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                    >
+                                        <TextoConTelefonos texto={textoDe(m)} />
+                                        <span className="ml-1.5 whitespace-nowrap text-[10px] font-semibold text-primary no-underline">Ver repuesto</span>
+                                    </button>
                                 ) : (
                                     <TextoConTelefonos texto={textoDe(m)} onTelefono={onTelefono} />
                                 )}
@@ -544,6 +585,24 @@ const Burbuja = memo<BurbujaProps>(
                         </div>
                     )}
                 </div>
+                {autorMenu && createPortal(
+                    <div
+                        role="dialog"
+                        aria-label="Autor del mensaje"
+                        onClick={(event) => event.stopPropagation()}
+                        className="fixed z-[150] w-64 overflow-hidden rounded-xl border border-wa-divider bg-wa-panel shadow-2xl"
+                        style={{ left: autorMenu.x, top: autorMenu.y }}
+                    >
+                        <div className="flex items-start gap-3 border-b border-wa-divider px-4 py-3">
+                            <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', m.sender_kind === 'agent' ? 'bg-primary-soft text-primary' : 'bg-wa-inset/10 text-wa-meta')}>
+                                {m.sender_kind === 'agent' ? <Bot size={18} /> : <UserRound size={18} />}
+                            </span>
+                            <div className="min-w-0"><p className="text-2xs font-bold uppercase tracking-wide text-wa-meta">Enviado por</p><p className="truncate text-sm font-semibold text-wa-text">{m.sender_label || (entrante ? 'Cliente · WhatsApp' : m.action_taken === 'human_reply' ? 'Vendedor' : 'Agente IA')}</p>{m.sender_email && <p className="truncate text-xs text-wa-meta">{m.sender_email}</p>}</div>
+                        </div>
+                        <div className="px-4 py-2 text-[11px] text-wa-meta"><p>{new Date(m.created_at).toLocaleString('es-EC')}</p>{m.sender_account_id && <p className="mt-0.5 truncate font-mono text-[9px] opacity-70">Cuenta {m.sender_account_id}</p>}</div>
+                    </div>,
+                    document.body,
+                )}
             </div>
         );
     },
@@ -557,6 +616,8 @@ interface Props {
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
     onEditar: (m: MensajeHilo) => void;
+    /** Solo para la interfaz interna: abre el producto enlazado al mensaje. */
+    onProducto?: (productId: number) => void;
     /**
      * Tocaron un teléfono escrito DENTRO de un mensaje. `ancla` es dónde
      * quedó el número en pantalla, para colgarle el menú al lado.
@@ -576,6 +637,7 @@ export const ChatThread: React.FC<Props> = ({
     onReaccionar,
     onBorrar,
     onEditar,
+    onProducto,
     onTelefono,
     tactil = false,
 }) => {
@@ -589,8 +651,8 @@ export const ChatThread: React.FC<Props> = ({
      * burbujas se redibujaban igual. La referencia guarda siempre la
      * versión más nueva, así que tampoco se cierra sobre datos viejos.
      */
-    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onTelefono });
-    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onTelefono };
+    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono });
+    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono };
 
     const acciones = useMemo(
         () => ({
@@ -599,6 +661,7 @@ export const ChatThread: React.FC<Props> = ({
             reaccionar: (m: MensajeHilo, emoji: string) => ultimas.current.onReaccionar(m, emoji),
             borrar: (m: MensajeHilo) => ultimas.current.onBorrar(m),
             editar: (m: MensajeHilo) => ultimas.current.onEditar(m),
+            producto: (productId: number) => ultimas.current.onProducto?.(productId),
             telefono: (numero: string, ancla: DOMRect) => ultimas.current.onTelefono?.(numero, ancla),
         }),
         [],
@@ -611,6 +674,7 @@ export const ChatThread: React.FC<Props> = ({
         entre renders, que es lo que mantiene vivo el `memo` de la burbuja.
     */
     const alTocarTelefono = onTelefono ? acciones.telefono : undefined;
+    const alTocarProducto = onProducto ? acciones.producto : undefined;
 
     return (
     <>
@@ -658,6 +722,7 @@ export const ChatThread: React.FC<Props> = ({
                         onReaccionar={acciones.reaccionar}
                         onBorrar={acciones.borrar}
                         onEditar={acciones.editar}
+                        onProducto={alTocarProducto}
                         onTelefono={alTocarTelefono}
                     />
                 </React.Fragment>
