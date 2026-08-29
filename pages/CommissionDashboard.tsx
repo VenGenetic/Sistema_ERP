@@ -168,7 +168,7 @@ const CommissionDashboard: React.FC = () => {
                     <div className="space-y-6">
                         {/* Global Pool */}
                         <div className="bg-primary rounded-xl shadow-lg p-6 text-white border border-primary/50 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-5 rounded-full blur-xl"></div>
+                            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white dark:bg-surface opacity-5 rounded-full blur-xl"></div>
                             <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-primary opacity-20 rounded-full blur-2xl"></div>
 
                             <h2 className="text-white font-medium text-sm mb-1 relative z-10 flex justify-between">

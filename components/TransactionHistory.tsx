@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { Transaction, TransactionLine, Account } from '../types/finance';
 import { useNavigate } from 'react-router-dom';
 import { getAccountEffect, categoryDisplayName } from '../utils/accountNature';
+import { formatearMoneda } from '../utils/moneda';
 import {
   ChevronRight,
   Search,
@@ -67,9 +68,7 @@ const TransactionHistory: React.FC = () => {
         t.reference_type.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const formatCurrency = (amount: number, currency: string = 'USD') => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
-    };
+    const formatCurrency = (amount: number, currency: string = 'USD') => formatearMoneda(amount, currency);
 
     const getTransactionTotal = (t: ExpandedTransaction) => {
         // Total is sum of debits (should equal sum of credits)

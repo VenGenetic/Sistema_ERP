@@ -473,7 +473,7 @@ export const BatchProductEntry: React.FC<BatchProductEntryProps> = ({ isOpen, on
                                 <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-32">SKU *</th>
                                 <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-48">Nombre *</th>
                                 <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-24">Cant.</th>
-                                <th className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider w-32 ${entryByPrice ? 'text-warning italic' : 'text-slate-500'}`} title="Costo Unitario Sin IVA">
+                                <th className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider w-32 ${entryByPrice ? 'text-warning italic' : 'text-slate-500 dark:text-slate-400'}`} title="Costo Unitario Sin IVA">
                                     {entryByPrice ? 'Costo (Calc)' : 'Costo S/I *'}
                                 </th>
                                 <th className="px-4 py-2.5 text-xs font-semibold text-fg-muted uppercase tracking-wider w-32" title="Opcional: Si hay descuento">Costo Desc.</th>

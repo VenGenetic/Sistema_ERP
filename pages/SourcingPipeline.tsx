@@ -219,7 +219,7 @@ const SourcingPipeline: React.FC = () => {
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={() => handleToggleImporterOverride(item)}
-                                                    className={`p-1 hover:bg-surface-hover rounded ${item.importer_unavailable_override ? 'text-warning' : 'text-slate-500 hover:text-warning'}`}
+                                                    className={`p-1 hover:bg-surface-hover rounded ${item.importer_unavailable_override ? 'text-warning' : 'text-slate-500 dark:text-slate-400 hover:text-warning'}`}
                                                     title={item.importer_unavailable_override
                                                         ? 'Quitar marca de "agotado en importadora"'
                                                         : 'La importadora dice que hay stock pero en realidad no hay: marcar como agotado'}

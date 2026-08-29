@@ -12,6 +12,7 @@
  * no depende del tema claro/oscuro ni del tamaño de la ventana.
  */
 import { loadBrandLogo } from './brandLogo';
+import { precioParaCliente } from './precioCliente';
 import { getThumbnailUrl } from './image';
 
 export interface ShareCardProduct {
@@ -32,15 +33,8 @@ const SIZE = 1200;
 const CENTER = SIZE / 2;
 const FONT = '"Inter", "Helvetica Neue", Arial, sans-serif';
 
-/**
- * Precio tal como se le muestra al cliente: redondeado al entero de arriba y
- * sin centavos (12.12 y 12.56 salen igual, $13).
- *
- * Es la misma convención que ya usan ShareDemandModal y la proforma, así que
- * un repuesto cotizado por WhatsApp y el mismo repuesto en una proforma dan la
- * misma cifra; mostrar el PVP crudo aquí abriría discusiones por centavos.
- */
-const customerPriceText = (price?: number | null): string => `$${Math.ceil(Number(price) || 0)}`;
+/** Precio tal como se le muestra al cliente (ver `utils/precioCliente.ts`). */
+const customerPriceText = (price?: number | null): string => `$${precioParaCliente(Number(price) || 0)}`;
 
 /**
  * Carga la imagen del repuesto para dibujarla en el canvas.

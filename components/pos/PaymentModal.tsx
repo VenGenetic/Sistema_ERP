@@ -55,9 +55,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-200">
+            <div className="bg-white dark:bg-surface rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-200">
                 {/* Header */}
-                <div className="p-6 bg-slate-50 border-b border-subtle text-center">
+                <div className="p-6 bg-slate-50 dark:bg-slate-800 border-b border-subtle text-center">
                     <h2 className="text-2xl font-bold text-fg tracking-tight">Cobrar Venta</h2>
                     <p className="text-fg-muted text-sm mt-1">{customer.name}</p>
                 </div>
@@ -82,7 +82,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                             <span className="text-[11px] font-bold text-fg-muted uppercase tracking-wider mb-1.5 block text-center">
                                 Fecha del Registro
                             </span>
-                            <div className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${ saleDate !== todayEcuador() ? 'border-warning bg-white' : 'border-slate-200 bg-white' }`}>
+                            <div className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${ saleDate !== todayEcuador() ? 'border-warning bg-white dark:bg-surface dark:bg-surface' : 'border-slate-200 bg-white' }`}>
                                 <Calendar size={18} className="text-fg-subtle" aria-hidden="true" />
                                 <input
                                     type="date"
@@ -102,7 +102,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
 
                     {/* Payment Form */}
                     <div className="space-y-4">
-                        <div className="bg-slate-50 p-4 rounded-xl border border-subtle">
+                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-subtle">
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input 
                                     type="checkbox" 
@@ -127,7 +127,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                             )}
                         </div>
 
-                        <div className="bg-slate-50 p-4 rounded-xl border border-subtle">
+                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-subtle">
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input 
                                     type="checkbox" 
@@ -148,12 +148,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                                     <div
                                         key={acc.id}
                                         onClick={() => setSelectedAccount(acc.id)}
-                                        className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAccount === acc.id ? 'border-primary bg-primary-soft/50 shadow-sm' : 'border-slate-200 hover:border-slate-300 bg-white' }`}
+                                        className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAccount === acc.id ? 'border-primary bg-primary-soft/50 shadow-sm' : 'border-slate-200 hover:border-slate-300 bg-white dark:bg-surface' }`}
                                     >
                                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedAccount === acc.id ? 'border-primary' : 'border-slate-300' }`}>
                                             {selectedAccount === acc.id && <div className="w-2.5 h-2.5 bg-primary rounded-full"></div>}
                                         </div>
-                                        <span className={`font-bold ${selectedAccount === acc.id ? 'text-primary' : 'text-slate-700'}`}>
+                                        <span className={`font-bold ${selectedAccount === acc.id ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>
                                             {acc.name}
                                         </span>
                                     </div>
@@ -164,11 +164,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-subtle flex gap-3 bg-slate-50">
+                <div className="p-4 border-t border-subtle flex gap-3 bg-slate-50 dark:bg-slate-800">
                     <button
                         onClick={onClose}
                         disabled={isProcessing}
-                        className="flex-1 py-3 px-4 bg-white border border-strong text-fg font-bold rounded-xl hover:bg-surface-hover transition-colors disabled:opacity-50"
+                        className="flex-1 py-3 px-4 bg-white dark:bg-surface border border-strong text-fg font-bold rounded-xl hover:bg-surface-hover transition-colors disabled:opacity-50"
                     >
                         Cancelar
                     </button>

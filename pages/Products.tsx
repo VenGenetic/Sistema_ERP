@@ -22,6 +22,7 @@ import { ShareCardPreviewModal } from '../components/ShareCardPreviewModal';
 import { ProformaPanel } from '../components/ProformaPanel';
 import { useProformaStore } from '../store/useProformaStore';
 import { cn, badge, button, input, focusRing, skeleton } from '../components/ui/styles';
+import { money } from '../utils/moneda';
 import {
   ArrowDown,
   ArrowUp,
@@ -79,21 +80,6 @@ import {
  */
 const PLACEHOLDER_IMAGE_SVG = (size: number) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`;
-
-/**
- * Formato de moneda del catálogo.
- *
- * `toFixed(2)` dejaba "1234.50" sin separador de miles: en costos de repuestos
- * importados eso se lee mal de un vistazo. `Intl` agrupa y coloca el símbolo
- * según la configuración regional del negocio (Ecuador, USD).
- */
-const currencyFormatter = new Intl.NumberFormat('es-EC', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-});
-const money = (value: number | null | undefined) => currencyFormatter.format(value || 0);
 
 /** Escapa un término del usuario para poder meterlo en un RegExp sin romperlo. */
 const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

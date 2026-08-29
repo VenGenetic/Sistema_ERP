@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Account } from '../types/finance';
 import { getAccountNatureLabel, categoryDisplayName } from '../utils/accountNature';
+import { formatearMoneda } from '../utils/moneda';
 import {
   Lightbulb,
   Pencil,
@@ -30,9 +31,7 @@ const FinanceConfig: React.FC = () => {
         setLoading(false);
     };
 
-    const formatCurrency = (amount: number, currency: string = 'USD') => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
-    };
+    const formatCurrency = (amount: number, currency: string = 'USD') => formatearMoneda(amount, currency);
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">

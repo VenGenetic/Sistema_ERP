@@ -6,9 +6,6 @@ import urllib.error
 import mimetypes
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Clave de servicio de Supabase por defecto si no se encuentra en el archivo .env
-FALLBACK_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6c2RzbXNreW9zZXBlbWFsYWdlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTMzMTk4MywiZXhwIjoyMDg2OTA3OTgzfQ.XY-OoGMVyhCcJIbb2sq7VSGL1NnEzZszjs8a6BswizE"
-
 def load_env(env_path):
     env_vars = {}
     if os.path.exists(env_path):
@@ -115,16 +112,14 @@ def main():
     env_vars = load_env(env_path)
 
     supabase_url = env_vars.get("VITE_SUPABASE_URL")
-    service_key = env_vars.get("VITE_SUPABASE_SERVICE_ROLE_KEY")
+    service_key = env_vars.get("SUPABASE_SERVICE_ROLE_KEY") or env_vars.get("VITE_SUPABASE_SERVICE_ROLE_KEY")
 
     if not supabase_url:
         print("[ERROR] VITE_SUPABASE_URL no encontrado en .env")
         sys.exit(1)
         
     if not service_key:
-        print("[ADVERTENCIA] No se encontro VITE_SUPABASE_SERVICE_ROLE_KEY en .env.")
-        print("[INFO] Usando clave de servicio administrativa por defecto...")
-        service_key = FALLBACK_SERVICE_KEY
+        raise SystemExit("Falta SUPABASE_SERVICE_ROLE_KEY en .env (Supabase -> Project Settings -> API).")
 
     # 2. Seleccionar directorio
     if args.dir:

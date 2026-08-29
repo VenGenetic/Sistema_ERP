@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { Account, Transaction, TransactionLine } from '../types/finance';
 import NewTransactionModal from './NewTransactionModal';
 import { getAccountNatureLabel } from '../utils/accountNature';
+import { formatearMoneda } from '../utils/moneda';
 import {
   History,
   Plus,
@@ -85,9 +86,7 @@ const AccountDetails: React.FC = () => {
         }
     };
 
-    const formatCurrency = (amount: number, currency: string = 'USD') => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
-    };
+    const formatCurrency = (amount: number, currency: string = 'USD') => formatearMoneda(amount, currency);
 
     if (loading && !account) {
         return <div className="p-8 text-center text-fg-muted">Cargando detalles de la cuenta...</div>;

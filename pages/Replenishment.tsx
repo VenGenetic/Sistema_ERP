@@ -693,7 +693,7 @@ const Replenishment: React.FC = () => {
                                                     {prod.imagen ? (
                                                         <div 
                                                             onClick={() => handleOpenLightbox(prod)}
-                                                            className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white shadow-sm relative cursor-zoom-in group/img"
+                                                            className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white dark:bg-surface shadow-sm relative cursor-zoom-in group/img"
                                                         >
                                                             <ImageIcon size={16} className="text-fg-subtle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0" aria-hidden="true" />
                                                             <img 
@@ -745,7 +745,7 @@ const Replenishment: React.FC = () => {
 
                                             {/* Stock Importadora */}
                                             <td className="px-4 py-3 text-center align-middle">
-                                                <span className={`px-2 py-0.5 text-[11px] font-bold rounded-lg ${prod.cantidad > 0 ? 'bg-primary-soft text-primary border border-primary/20 dark:border-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-505 border border-subtle dark:border-slate-700'}`}>
+                                                <span className={`px-2 py-0.5 text-[11px] font-bold rounded-lg ${prod.cantidad > 0 ? 'bg-primary-soft text-primary border border-primary/20 dark:border-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-subtle dark:border-slate-700'}`}>
                                                     {prod.cantidad} uds
                                                 </span>
                                             </td>
@@ -903,7 +903,7 @@ const Replenishment: React.FC = () => {
                                 {item.imagen ? (
                                     <div 
                                         onClick={() => handleOpenLightbox(item)}
-                                        className="h-9 w-9 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white shadow-sm relative cursor-zoom-in group/cartimg"
+                                        className="h-9 w-9 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white dark:bg-surface shadow-sm relative cursor-zoom-in group/cartimg"
                                     >
                                         <img src={item.imagen} alt="" className="h-full w-full object-cover group-hover/cartimg:scale-105 transition-transform" />
                                     </div>

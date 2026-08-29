@@ -276,7 +276,7 @@ export const POETable: React.FC = () => {
                             e.stopPropagation();
                             setActiveSidePeekColumnId(isSidePeekActive ? null : col.id);
                           }}
-                          className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${ isSidePeekActive ? 'opacity-100 bg-primary-soft text-primary' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500' }`}
+                          className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${ isSidePeekActive ? 'opacity-100 bg-primary-soft text-primary' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400' }`}
                           title="Propiedades y Consola de Edición"
                         >
                           <Settings className="w-3.5 h-3.5" />

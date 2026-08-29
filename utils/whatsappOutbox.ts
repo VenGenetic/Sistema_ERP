@@ -14,6 +14,11 @@
  */
 
 import { supabase } from '../supabaseClient';
+import { precioParaCliente, formatearPrecio } from './precioCliente';
+
+// La regla de precio al cliente vive en `utils/precioCliente.ts`; se reexporta
+// para no romper a quien ya la importaba desde acá.
+export { precioParaCliente, formatearPrecio };
 
 /** Bucket público con la media del chat (migración 0026). */
 export const CHAT_MEDIA_BUCKET = 'agent_chat_media';
@@ -415,19 +420,6 @@ export interface ProductoCatalogo {
     gallery?: Array<{ url: string; type: 'image' | 'video' }> | null;
 }
 
-/**
- * El precio que se le dice al cliente: redondeado hacia ARRIBA al dólar
- * entero. Es la misma regla que aplica el bot (`agente/src/utils/pricing.ts`)
- * -- si acá se mostrara el precio crudo, el mismo repuesto tendría dos
- * precios distintos según quién conteste.
- */
-export function precioParaCliente(price: number): number {
-    return Math.ceil(price);
-}
-
-export function formatearPrecio(valor: number): string {
-    return `$${valor.toFixed(2)}`;
-}
 
 /**
  * Stock que de verdad se puede vender.

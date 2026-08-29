@@ -22,6 +22,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { money } from '../utils/moneda';
 import {
   AlertTriangle,
   Download,
@@ -88,7 +89,6 @@ interface Props {
     onClose: () => void;
 }
 
-const money = (v: number) => `$${(v || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const r2 = (v: number) => Math.round((v || 0) * 100) / 100;
 
 export const GeneratePurchaseOrderModal: React.FC<Props> = ({ isOpen, onClose }) => {

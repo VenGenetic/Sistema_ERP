@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, CalendarDays, Download, MessageCircle, PackageSearch, RefreshCw, ShoppingCart, TrendingUp, Users } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { button, cn, focusRing, input } from '../components/ui/styles';
+import { money } from '../utils/moneda';
 
 interface Kpis { requests: number; customers: number; identified: number; quoted: number; sold: number; revenue: number; conversionRate: number; }
 interface ProductRow { product_id: number | null; name: string; sku: string | null; requests: number; units: number; sold: number; }
@@ -12,7 +13,6 @@ interface FunnelRow { stage: string; value: number; }
 interface Analytics { kpis: Kpis; topProducts: ProductRow[]; topModels: ModelRow[]; topCustomers: CustomerRow[]; daily: DailyRow[]; funnel: FunnelRow[]; generatedAt: string; }
 
 const EMPTY: Analytics = { kpis: { requests: 0, customers: 0, identified: 0, quoted: 0, sold: 0, revenue: 0, conversionRate: 0 }, topProducts: [], topModels: [], topCustomers: [], daily: [], funnel: [], generatedAt: '' };
-const money = (value: number) => value.toLocaleString('es-EC', { style: 'currency', currency: 'USD' });
 
 const MiniBar: React.FC<{ value: number; max: number; tone?: string }> = ({ value, max, tone = 'bg-primary' }) => (
     <div className="h-2 overflow-hidden rounded-full bg-surface-3" aria-hidden="true"><div className={cn('h-full rounded-full transition-[width] duration-300', tone)} style={{ width: `${max ? Math.max(3, value / max * 100) : 0}%` }} /></div>

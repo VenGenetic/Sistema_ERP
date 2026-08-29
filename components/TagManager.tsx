@@ -71,7 +71,7 @@ const SortableTagItem = ({ tag, onEdit, onDelete }: { tag: Tag, onEdit: () => vo
                 <div 
                     {...attributes} 
                     {...listeners} 
-                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-fg-subtle hover:text-slate-500"
+                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-fg-subtle hover:text-slate-500 dark:hover:text-slate-400"
                 >
                     <GripVertical size={18} aria-hidden="true" />
                 </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { formatearMoneda } from '../utils/moneda';
 import {
   Banknote,
   Box,
@@ -667,7 +668,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div>
                         <div className="text-2xl font-bold text-fg font-mono">
-                            {isLoading ? '...' : `$${netLiquidity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            {isLoading ? '...' : formatearMoneda(netLiquidity)}
                         </div>
                         <div className="text-xs text-success mt-1 flex items-center gap-1">
                             <TrendingUp size={14} aria-hidden="true" />
@@ -759,7 +760,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div>
                         <div className="text-2xl font-bold text-fg font-mono">
-                            {isLoading ? '...' : `$${capitalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            {isLoading ? '...' : formatearMoneda(capitalCost)}
                         </div>
                         <div className="text-xs text-primary mt-1 flex items-center gap-1">
                             <RefreshCw size={14} aria-hidden="true" />
@@ -814,7 +815,7 @@ const Dashboard: React.FC = () => {
                             <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div>
                                     <span className="block text-xs font-semibold text-fg-muted uppercase">Estado</span>
-                                    <span className={`font-bold mt-1 inline-block px-2 py-0.5 rounded ${selectedTill.status === 'open' ? 'bg-success-soft text-success' : 'bg-slate-200 text-slate-700'}`}>
+                                    <span className={`font-bold mt-1 inline-block px-2 py-0.5 rounded ${selectedTill.status === 'open' ? 'bg-success-soft text-success' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
                                         {selectedTill.status === 'open' ? 'ABIERTA' : 'CERRADA'}
                                     </span>
                                 </div>
@@ -1611,11 +1612,11 @@ const Dashboard: React.FC = () => {
             {/* Close Till Modal */}
             {isClosingTill && selectedTill && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-surface rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
                         <h2 className="text-xl font-bold text-fg mb-4 border-b pb-2">Cerrar Caja: {selectedTillDate}</h2>
                         
                         <div className="space-y-4">
-                            <div className="bg-slate-50 p-3 rounded-lg border border-subtle text-sm">
+                            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-subtle text-sm">
                                 <div className="flex justify-between mb-1">
                                     <span className="text-fg-muted">Efectivo Inicial:</span>
                                     <span className="font-bold">${Number(selectedTill.initial_cash).toFixed(2)}</span>
@@ -1671,7 +1672,7 @@ const Dashboard: React.FC = () => {
             {/* Edit Till Modal */}
             {isEditingTill && selectedTill && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200 my-8">
+                    <div className="bg-white dark:bg-surface rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200 my-8">
                         <h2 className="text-xl font-bold text-fg mb-4 border-b pb-2 text-danger">Modo Administrador: Editar Caja</h2>
                         
                         <div className="space-y-4">

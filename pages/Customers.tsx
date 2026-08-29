@@ -844,13 +844,13 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
             <div className="flex space-x-1 bg-surface-3 p-1 rounded-xl mb-4 max-w-fit">
                 <button
                     onClick={() => setActiveTab('waitlist')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'waitlist' ? 'bg-white dark:bg-slate-700 text-primary shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'waitlist' ? 'bg-white dark:bg-slate-700 text-primary shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     CRM Lista de Espera (Teléfonos)
                 </button>
                 <button
                     onClick={() => setActiveTab('pos')}
-                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'pos' ? 'bg-white dark:bg-slate-700 text-primary shadow' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'pos' ? 'bg-white dark:bg-slate-700 text-primary shadow' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     Clientes Facturación POS
                 </button>
@@ -928,7 +928,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                 return (
                                                     <button
                                                         onClick={() => setSelectedCustomerForDrawer(customer)}
-                                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm transition-all duration-300 hover:scale-105 ${ custRequests.length === 0 ? 'bg-slate-100 text-fg-muted hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400' : hasStockReady ? 'bg-success text-white animate-pulse hover:bg-success' : isUrgentCust ? 'bg-warning text-white hover:bg-warning' : 'bg-primary-soft text-primary hover:bg-primary-soft border border-primary/20 dark:border-primary/50' }`}
+                                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm transition-all duration-300 hover:scale-105 ${ custRequests.length === 0 ? 'bg-slate-100 text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700 dark:bg-slate-800 dark:text-slate-400' : hasStockReady ? 'bg-success text-white animate-pulse hover:bg-success' : isUrgentCust ? 'bg-warning text-white hover:bg-warning' : 'bg-primary-soft text-primary hover:bg-primary-soft border border-primary/20 dark:border-primary/50' }`}
                                                     >
                                                         <Bell className={`w-3.5 h-3.5 ${hasStockReady ? 'animate-bounce' : ''}`} />
                                                         {custRequests.length === 0 ? (
@@ -1393,7 +1393,7 @@ const filteredUnifiedCustomers = unifiedCustomers.filter(c => {
                                                     <button
                                                         type="button"
                                                         onClick={() => setSelectedProduct(null)}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-slate-600"
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-slate-600 dark:hover:text-slate-300"
                                                     >
                                                         <X className="w-4 h-4" />
                                                     </button>

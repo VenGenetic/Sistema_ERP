@@ -20,7 +20,7 @@ envContent.split('\n').forEach(line => {
 });
 
 const url = envVars['VITE_SUPABASE_URL'];
-const key = envVars['VITE_SUPABASE_SERVICE_ROLE_KEY'] || envVars['VITE_SUPABASE_ANON_KEY'];
+const key = envVars['SUPABASE_SERVICE_ROLE_KEY'] || envVars['VITE_SUPABASE_SERVICE_ROLE_KEY'] || envVars['VITE_SUPABASE_ANON_KEY'];
 
 if (!url || !key) {
     console.error('❌ Error: Falta VITE_SUPABASE_URL o Key en el archivo .env');

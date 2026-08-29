@@ -819,7 +819,7 @@ const ProductDemands: React.FC = () => {
                 >
                     <span
                         aria-hidden="true"
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${ demand.is_approved ? 'translate-x-4' : 'translate-x-0' }`}
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out ${ demand.is_approved ? 'translate-x-4' : 'translate-x-0' }`}
                     />
                 </button>
                 <span className={`text-xs font-medium ${demand.is_approved ? 'text-primary' : 'text-fg-muted'}`}>
@@ -1633,7 +1633,7 @@ const ProductDemands: React.FC = () => {
                                 <Flag size={18} className="text-primary" aria-hidden="true" />
                                 Asignar Orden
                             </h3>
-                            <button onClick={() => setFlagActionDemand(null)} className={`text-fg-subtle hover:text-slate-600 transition-colors ${focusRing}`}>
+                            <button onClick={() => setFlagActionDemand(null)} className={`text-fg-subtle hover:text-slate-600 dark:hover:text-slate-300 transition-colors ${focusRing}`}>
                                 <X size={20} aria-hidden="true" />
                             </button>
                         </div>

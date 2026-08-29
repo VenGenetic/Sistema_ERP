@@ -21,7 +21,7 @@ envContent.split('\n').forEach(line => {
 
 const url = envVars['VITE_SUPABASE_URL'];
 // Use Service Role Key if available, otherwise fallback to Anon Key
-const key = envVars['VITE_SUPABASE_SERVICE_ROLE_KEY'] || envVars['VITE_SUPABASE_ANON_KEY'];
+const key = envVars['SUPABASE_SERVICE_ROLE_KEY'] || envVars['VITE_SUPABASE_SERVICE_ROLE_KEY'] || envVars['VITE_SUPABASE_ANON_KEY'];
 
 if (!url || !key) {
     console.error('Missing VITE_SUPABASE_URL or Key in .env');

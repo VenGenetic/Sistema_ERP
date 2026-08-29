@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { money } from '../utils/moneda';
 import {
   Activity,
   Banknote,
@@ -239,7 +240,7 @@ const Expenses: React.FC = () => {
                     <div>
                         <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Gastado Hoy</p>
                         <h3 className="text-2xl font-bold text-fg mt-1">
-                            ${stats.today.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {money(stats.today)}
                         </h3>
                     </div>
                     <div className="p-3 bg-danger-soft text-danger rounded-xl">
@@ -251,7 +252,7 @@ const Expenses: React.FC = () => {
                     <div>
                         <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Gasto esta Semana</p>
                         <h3 className="text-2xl font-bold text-fg mt-1">
-                            ${stats.week.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {money(stats.week)}
                         </h3>
                     </div>
                     <div className="p-3 bg-warning-soft text-warning rounded-xl">
@@ -263,7 +264,7 @@ const Expenses: React.FC = () => {
                     <div>
                         <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Gasto este Mes</p>
                         <h3 className="text-2xl font-bold text-fg mt-1">
-                            ${stats.month.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {money(stats.month)}
                         </h3>
                     </div>
                     <div className="p-3 bg-primary-soft text-primary rounded-xl">

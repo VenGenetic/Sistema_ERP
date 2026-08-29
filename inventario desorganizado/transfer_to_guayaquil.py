@@ -10,7 +10,9 @@ load_dotenv(dotenv_path=env_path)
 # Supabase configuration
 URL = os.getenv("VITE_SUPABASE_URL")
 # Using the same service role key as in the JS script
-SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6c2RzbXNreW9zZXBlbWFsYWdlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTMzMTk4MywiZXhwIjoyMDg2OTA3OTgzfQ.XY-OoGMVyhCcJIbb2sq7VSGL1NnEzZszjs8a6BswizE"
+SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+if not SERVICE_ROLE_KEY:
+    raise SystemExit("Falta SUPABASE_SERVICE_ROLE_KEY en .env (Supabase -> Project Settings -> API).")
 
 if not URL:
     print("Error: VITE_SUPABASE_URL not found in .env file.")

@@ -554,7 +554,7 @@ export const InventorySession: React.FC = () => {
                                     {isLastInteracted && (
                                         <div className="bg-primary text-white px-3 py-1 text-[11px] font-bold tracking-wider uppercase flex items-center justify-between shadow-sm">
                                             <span className="flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                                                <span className="w-2 h-2 rounded-full bg-white dark:bg-surface shadow-sm" />
                                                 ⭐ ÚLTIMO ESCANEADO / AÑADIDO
                                             </span>
                                             <span className="text-2xs font-semibold bg-black/20 px-2 py-0.5 rounded">Activo</span>

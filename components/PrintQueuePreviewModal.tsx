@@ -324,7 +324,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                             <img 
                                                 src={getThumbnailUrl(item.image_url, 100)} 
                                                 alt={item.name} 
-                                                className="w-11 h-11 object-cover rounded-xl border border-subtle shrink-0 bg-white" 
+                                                className="w-11 h-11 object-cover rounded-xl border border-subtle shrink-0 bg-white dark:bg-surface" 
                                             />
                                         ) : (
                                             <div className="w-11 h-11 bg-slate-200/60 dark:bg-slate-700/60 rounded-xl flex items-center justify-center text-fg-subtle shrink-0">
@@ -420,13 +420,13 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                         </div>
 
                                         {/* Physical A4 Sheet representation */}
-                                        <div className="w-full aspect-[210/297] bg-white text-black rounded-sm shadow-lg dark:shadow-xl dark:shadow-black/70 border border-slate-300/80 dark:border-slate-700 p-3 sm:p-4 grid grid-cols-3 grid-rows-7 gap-0 relative overflow-hidden ring-4 ring-black/5 dark:ring-white/5">
+                                        <div className="w-full aspect-[210/297] bg-white dark:bg-surface text-black rounded-sm shadow-lg dark:shadow-xl dark:shadow-black/70 border border-slate-300/80 dark:border-slate-700 p-3 sm:p-4 grid grid-cols-3 grid-rows-7 gap-0 relative overflow-hidden ring-4 ring-black/5 dark:ring-white/5">
                                             {Array.from({ length: 21 }).map((_, slotIdx) => {
                                                 const label = page[slotIdx];
                                                 return (
                                                     <div 
                                                         key={slotIdx} 
-                                                        className="border border-dashed border-slate-300/90 flex items-center justify-center p-1 sm:p-1.5 relative overflow-hidden bg-white group select-none"
+                                                        className="border border-dashed border-slate-300/90 flex items-center justify-center p-1 sm:p-1.5 relative overflow-hidden bg-white dark:bg-surface group select-none"
                                                     >
                                                         {label ? (
                                                             labelImages[label.sku] ? (
@@ -441,7 +441,7 @@ export const PrintQueuePreviewModal: React.FC<PrintQueuePreviewModalProps> = ({
                                                                 </div>
                                                             )
                                                         ) : (
-                                                            <div className="w-full h-full flex flex-col items-center justify-center text-2xs sm:text-xs text-fg-subtle font-bold bg-slate-50/50">
+                                                            <div className="w-full h-full flex flex-col items-center justify-center text-2xs sm:text-xs text-fg-subtle font-bold bg-slate-50/50 dark:bg-slate-800/50">
                                                                 <span>Vacío</span>
                                                             </div>
                                                         )}

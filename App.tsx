@@ -44,11 +44,14 @@ const MobileLabels = React.lazy(() => import('./pages/mobile/MobileLabels'));
 const MobileProforma = React.lazy(() => import('./pages/mobile/MobileProforma'));
 const MobileWhatsApp = React.lazy(() => import('./pages/mobile/MobileWhatsApp'));
 
+// Primera pantalla que ve el usuario mientras carga el chunk de la página.
+// Va con tokens del tema (no gray-900/white fijos): con colores fijos, abrir el
+// sistema en tema claro arrancaba con un fogonazo oscuro en cada navegación.
 const LoadingFallback = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+  <div className="min-h-screen flex items-center justify-center bg-bg text-fg">
     <div className="flex flex-col items-center gap-4">
-      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-sm text-gray-400">Cargando...</p>
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-sm text-fg-muted">Cargando...</p>
     </div>
   </div>
 );

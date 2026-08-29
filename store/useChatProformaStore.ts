@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { precioParaCliente } from '../utils/precioCliente';
 
 /**
  * Proformas en borrador de la Bandeja de WhatsApp, UNA POR CONVERSACIÓN.
@@ -100,11 +101,9 @@ export const useChatProformaStore = create<Estado>()(
                                     name: producto.name,
                                     imageUrl: producto.image_url,
                                     quantity: cantidad,
-                                    // Mismo redondeo hacia arriba que usa el agente
-                                    // para cotizar (ver utils/whatsappOutbox.ts): el
-                                    // cliente tiene que escuchar el mismo precio
-                                    // conteste quien conteste.
-                                    unitPrice: Math.ceil(producto.price ?? 0),
+                                    // Precio al cliente (ver `utils/precioCliente.ts`):
+                                    // la misma cifra conteste quien conteste.
+                                    unitPrice: precioParaCliente(producto.price ?? 0),
                                 },
                             ],
                         };

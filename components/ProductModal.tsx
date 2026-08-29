@@ -1268,7 +1268,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             onChange={(e) => setFormData({ ...formData, isDiscontinued: e.target.checked })} 
                                         />
                                         <div className={`block w-14 h-8 rounded-full transition-colors ${formData.isDiscontinued ? 'bg-danger' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                                        <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.isDiscontinued ? 'transform translate-x-6' : ''}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white dark:bg-surface w-6 h-6 rounded-full transition-transform ${formData.isDiscontinued ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
                                     <div>
                                         <span className="text-sm font-bold text-fg block">Marcar como Descontinuado</span>
@@ -1299,7 +1299,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             onChange={(e) => setFormData({ ...formData, importerUnavailable: e.target.checked })}
                                         />
                                         <div className={`block w-14 h-8 rounded-full transition-colors ${formData.importerUnavailable ? 'bg-warning' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                                        <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${formData.importerUnavailable ? 'transform translate-x-6' : ''}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white dark:bg-surface w-6 h-6 rounded-full transition-transform ${formData.importerUnavailable ? 'transform translate-x-6' : ''}`}></div>
                                     </div>
                                     <div>
                                         <span className="text-sm font-bold text-fg block">Marcar como Agotado en Importadora</span>
@@ -1382,7 +1382,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                             onChange={(e) => setStockAdjustment(prev => ({ ...prev, isPurchase: e.target.checked }))}
                                                         />
                                                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-warning"></div>
-                                                        <span className="ml-2 text-sm text-fg-muted font-medium group-hover:text-slate-900 transition-colors">Registrar como compra financiera</span>
+                                                        <span className="ml-2 text-sm text-fg-muted font-medium group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Registrar como compra financiera</span>
                                                     </label>
                                                     {stockAdjustment.isPurchase && (
                                                         <div className="bg-warning-soft border border-warning/20 rounded-lg p-3">
@@ -1420,7 +1420,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                             onChange={(e) => setStockAdjustment(prev => ({ ...prev, isMerma: e.target.checked }))}
                                                         />
                                                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-danger"></div>
-                                                        <span className="ml-2 text-sm text-fg-muted font-medium group-hover:text-slate-900 transition-colors">Registrar como merma (pérdida contable)</span>
+                                                        <span className="ml-2 text-sm text-fg-muted font-medium group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Registrar como merma (pérdida contable)</span>
                                                     </label>
                                                     {stockAdjustment.isMerma && (
                                                         <div className="bg-danger-soft border border-danger/20 rounded-lg p-3">
@@ -1495,7 +1495,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                 return (
                                                     <tr key={prod.id} className="hover:bg-surface-hover transition-colors">
                                                         <td className="px-4 py-3">
-                                                            <div className="w-8 h-8 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
+                                                            <div className="w-8 h-8 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                                                 {prod.image_url ? (
                                                                     <img src={prod.image_url} alt="" className="w-full h-full object-cover" />
                                                                 ) : (
@@ -1555,7 +1555,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             return (
                                                 <div key={lp.id} className="flex items-center justify-between p-2 bg-surface-2 border border-subtle rounded-lg group hover:border-slate-300 transition-colors">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded border border-subtle overflow-hidden shrink-0 bg-white flex items-center justify-center shadow-sm">
+                                                        <div className="w-10 h-10 rounded border border-subtle overflow-hidden shrink-0 bg-white dark:bg-surface flex items-center justify-center shadow-sm">
                                                             {lp.image_url ? (
                                                                 <img src={lp.image_url} alt="" className="w-full h-full object-cover" />
                                                             ) : (
@@ -1642,11 +1642,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     const totalStock = (pm.local_stock || 0) + (pm.importer_stock || 0);
                                     return (
                                         <div key={pm.id} className="flex items-center gap-2.5 p-2 bg-surface-2 border border-subtle rounded-lg shadow-xs">
-                                            <div className="w-8 h-8 rounded border border-subtle bg-white overflow-hidden shrink-0">
+                                            <div className="w-8 h-8 rounded border border-subtle bg-white dark:bg-surface overflow-hidden shrink-0">
                                                 {pm.image_url ? (
                                                     <img src={pm.image_url} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                                    <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                                         <ImageIcon size={14} className="text-fg-subtle" aria-hidden="true" />
                                                     </div>
                                                 )}

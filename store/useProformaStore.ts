@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { precioParaCliente } from '../utils/precioCliente';
 
 export interface ProformaItem {
     id: string; // `product-${productId}` — stable key, enables merge-on-re-add
@@ -58,11 +59,9 @@ export const useProformaStore = create<ProformaState>()(
                         sku: product.sku,
                         name: product.name,
                         quantity,
-                        // Auto-filled price rounds up to the next whole unit (e.g. 16.15 -> 17,
-                        // 16.99 -> 17) rather than using the raw PVP — same convention already
-                        // used for customer-facing prices in ShareDemandModal.tsx. Still editable
-                        // afterward via updateUnitPrice.
-                        unitPrice: Math.ceil(product.price),
+                        // Precio al cliente (ver `utils/precioCliente.ts`); editable
+                        // después con updateUnitPrice.
+                        unitPrice: precioParaCliente(product.price),
                     }],
                 };
             }),

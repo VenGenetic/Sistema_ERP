@@ -22,6 +22,7 @@ import {
     rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { formatearMoneda } from '../utils/moneda';
 import {
   Banknote,
   CreditCard,
@@ -226,9 +227,7 @@ const FinanceDashboard: React.FC = () => {
         }
     };
 
-    const formatCurrency = (amount: number, currency: string) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
-    };
+    const formatCurrency = (amount: number, currency: string) => formatearMoneda(amount, currency);
 
     return (
         <div className="flex flex-col gap-6">

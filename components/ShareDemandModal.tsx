@@ -9,6 +9,7 @@ import {
   User,
   X,
 } from 'lucide-react';
+import { precioParaCliente } from '../utils/precioCliente';
 
 interface ProductDemand {
     id: number;
@@ -214,7 +215,7 @@ export const ShareDemandModal: React.FC<ShareDemandModalProps> = ({
                                     <h3 className="text-[14px] font-semibold text-fg leading-tight">{demand.product?.name || 'Producto Desconocido'}</h3>
                                     {demand.product?.price != null && (
                                         <div className="mt-1 flex items-baseline gap-1">
-                                            <span className="text-[15px] font-bold text-success">${Math.ceil(demand.product.price)}</span>
+                                            <span className="text-[15px] font-bold text-success">${precioParaCliente(demand.product.price)}</span>
                                             {importerStock <= 0 && <span className="text-[11px] font-medium text-fg-muted">(precio estimado)</span>}
                                         </div>
                                     )}

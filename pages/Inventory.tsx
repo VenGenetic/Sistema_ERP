@@ -909,7 +909,7 @@ const Inventory: React.FC = () => {
                                     <div className={`p-3 rounded-lg ${wh.type === 'physical' ? 'bg-primary-soft text-primary dark:text-primary' : 'bg-primary-soft text-primary dark:text-primary'}`}>
                                         {wh.type === 'physical' ? <Store size={24} aria-hidden="true" /> : <Cloud size={24} aria-hidden="true" />}
                                     </div>
-                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${wh.is_active ? 'bg-success-soft text-success dark:text-success' : 'bg-slate-100 text-slate-600'}`}>
+                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${wh.is_active ? 'bg-success-soft text-success dark:text-success' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
                                         {wh.is_active ? 'Activo' : 'Inactivo'}
                                     </span>
                                 </div>
@@ -1013,7 +1013,7 @@ const Inventory: React.FC = () => {
                                                     <td className="px-4 py-3 font-medium text-fg">
                                                         <div className="flex items-center gap-3">
                                                             {group.product?.image_url ? (
-                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white shadow-sm relative">
+                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white dark:bg-surface shadow-sm relative">
                                                                     <ImageIcon size={20} className="text-fg-subtle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0" aria-hidden="true" />
                                                                     <img 
                                                                        src={getThumbnailUrl(group.product.image_url, 80, 80)} 
@@ -1215,7 +1215,7 @@ const Inventory: React.FC = () => {
             {/* Lost Demand Modal */}
             {isLostDemandModalOpen && (
                 <div className="fixed inset-0 z-[160] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-surface rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 border-b border-subtle flex justify-between items-center bg-warning-soft">
                             <h2 className="font-bold text-warning uppercase tracking-tight flex items-center gap-2">
                                 <TriangleAlert size={20} aria-hidden="true" />
@@ -1230,7 +1230,7 @@ const Inventory: React.FC = () => {
                                 <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Repuesto Buscado</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-slate-100 border border-subtle rounded-lg p-3 text-sm font-medium text-fg-muted outline-none focus:border-warning focus:bg-white transition-colors"
+                                    className="w-full bg-slate-100 dark:bg-slate-800 border border-subtle rounded-lg p-3 text-sm font-medium text-fg-muted outline-none focus:border-warning focus:bg-white transition-colors"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     placeholder="Ej: Filtro de aceite"
@@ -1243,7 +1243,7 @@ const Inventory: React.FC = () => {
                                 <input
                                     autoFocus
                                     type="text"
-                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
+                                    className="w-full bg-white dark:bg-surface border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: Yamaha"
                                     value={lostDemandBrand}
                                     onChange={(e) => setLostDemandBrand(e.target.value)}
@@ -1254,7 +1254,7 @@ const Inventory: React.FC = () => {
                                 <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
+                                    className="w-full bg-white dark:bg-surface border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: FZ16 2015"
                                     value={lostDemandBikeModel}
                                     onChange={(e) => setLostDemandBikeModel(e.target.value)}

@@ -92,7 +92,7 @@ export const ProformaPanel: React.FC = () => {
                     title="Ver proforma"
                 >
                     <FileText size={24} aria-hidden="true" />
-                    <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] flex items-center justify-center bg-white text-success text-[11px] font-bold rounded-full shadow-md border-2 border-success">
+                    <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] flex items-center justify-center bg-white dark:bg-surface text-success text-[11px] font-bold rounded-full shadow-md border-2 border-success">
                         {items.length}
                     </span>
                 </button>
@@ -163,7 +163,7 @@ export const ProformaPanel: React.FC = () => {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
-                                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-fg-muted flex items-center justify-center text-xs font-bold hover:bg-slate-300">−</button>
+                                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-fg-muted flex items-center justify-center text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600">−</button>
                                     <input
                                         type="number"
                                         min="1"
@@ -171,7 +171,7 @@ export const ProformaPanel: React.FC = () => {
                                         onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
                                         className="w-10 h-6 text-center bg-surface border border-subtle rounded text-xs font-bold text-fg p-0 focus:ring-0"
                                     />
-                                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-fg-muted flex items-center justify-center text-xs font-bold hover:bg-slate-300">+</button>
+                                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 text-fg-muted flex items-center justify-center text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600">+</button>
                                 </div>
                                 <button onClick={() => removeItem(item.id)} className="p-1 text-danger hover:text-danger hover:bg-danger-soft rounded-lg transition-colors" title="Eliminar">
                                     <X size={16} aria-hidden="true" />

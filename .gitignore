@@ -28,3 +28,12 @@ feeds
 # Pedidos generados con scripts/generar_pedido_importadora.py: llevan
 # teléfonos de clientes y costos de la importadora, no van al repo.
 pedido_importadora_*.xlsx
+
+# Estado local del CLI de Supabase (versiones detectadas, url del pooler):
+# es de esta máquina, no del proyecto.
+supabase/.temp/
+
+# Salidas de herramientas y compilaciones intermedias
+*.tsbuildinfo
+__pycache__/
+*.pyc

@@ -22,6 +22,7 @@ import { addToQueue } from '../../utils/mobilePrintQueue';
 import { deliverProductCard, renderProductCard } from '../../utils/productShareCard';
 import { compressImageForUpload } from '../../utils/imageCompression';
 import { useProformaStore } from '../../store/useProformaStore';
+import { money } from '../../utils/moneda';
 
 import {
     ArrowUp,
@@ -141,9 +142,6 @@ const FILTER_GROUPS = [
         ],
     },
 ] as const;
-
-const money = (v: number | null | undefined) =>
-    `$${(v || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /* ────────────────────────────────────────────────────────────────────────────
    SUB-COMPONENTES

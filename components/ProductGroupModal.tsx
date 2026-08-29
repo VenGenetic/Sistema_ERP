@@ -399,7 +399,7 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                                         return (
                                             <tr key={prod.id} className="hover:bg-surface-hover transition-colors">
                                                 <td className="px-4 py-3">
-                                                    <div className="w-7 h-7 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
+                                                    <div className="w-7 h-7 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                                         {prod.image_url ? (
                                                             <img src={prod.image_url} alt="" className="w-full h-full object-cover" />
                                                         ) : (
@@ -467,7 +467,7 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                                 return (
                                     <tr key={prod.id} className={`hover:bg-surface-hover transition-colors ${isCurrent ? 'bg-primary-soft/30 dark:bg-primary/10' : ''}`}>
                                         <td className="px-4 py-3">
-                                            <div className="w-9 h-9 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center shadow-sm">
+                                            <div className="w-9 h-9 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-sm">
                                                 {prod.image_url ? (
                                                     <img src={getThumbnailUrl(prod.image_url, 40, 40)} alt="" className="w-full h-full object-cover" />
                                                 ) : (
@@ -581,11 +581,11 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                                     const totalStock = (pm.local_stock || 0) + (pm.importer_stock || 0);
                                     return (
                                         <div key={pm.id} className="flex items-center gap-2.5 p-2 bg-surface-2 border border-subtle rounded-lg shadow-xs">
-                                            <div className="w-8 h-8 rounded border border-subtle bg-white overflow-hidden shrink-0">
+                                            <div className="w-8 h-8 rounded border border-subtle bg-white dark:bg-surface overflow-hidden shrink-0">
                                                 {pm.image_url ? (
                                                     <img src={pm.image_url} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                                    <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                                                         <ImageIcon size={14} className="text-fg-subtle" aria-hidden="true" />
                                                     </div>
                                                 )}

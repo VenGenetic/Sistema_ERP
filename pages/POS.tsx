@@ -881,7 +881,7 @@ const POS: React.FC = () => {
     const hasDraftItems = cart.some(item => item.product.sku.startsWith('DRAFT-'));
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-fg font-sans">
+        <div className="flex flex-col h-screen bg-bg overflow-hidden text-fg font-sans">
             <PaymentModal
                 isOpen={isPaymentModalOpen}
                 onClose={() => setIsPaymentModalOpen(false)}
@@ -892,7 +892,7 @@ const POS: React.FC = () => {
             {/* Till Open Modal Blocking Overlay */}
             {isTillModalOpen && !activeTill && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-surface rounded-2xl shadow-xl p-6 md:p-8 w-full max-w-md animate-in fade-in zoom-in duration-200">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="bg-warning-soft p-3 rounded-full text-warning-soft-fg">
                                 <AlertTriangle size={28} />
@@ -948,10 +948,10 @@ const POS: React.FC = () => {
             {/* Stock Edit Modal */}
             {isStockEditModalOpen && stockEditItem && (
                 <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
+                    <div className="bg-white dark:bg-surface rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="font-bold text-fg text-lg">Ajuste de Stock Rápido</h2>
-                            <button onClick={() => setIsStockEditModalOpen(false)} className="text-fg-subtle hover:text-slate-600">✕</button>
+                            <button onClick={() => setIsStockEditModalOpen(false)} className="text-fg-subtle hover:text-slate-600 dark:hover:text-slate-300">✕</button>
                         </div>
                         <div className="mb-4 text-sm text-fg-muted">
                             <strong>{stockEditItem.product.name}</strong><br />
@@ -981,18 +981,18 @@ const POS: React.FC = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white px-4 md:px-6 py-3 shadow-md flex justify-between items-center z-20">
+            <header className="bg-white dark:bg-surface px-4 md:px-6 py-3 shadow-md flex justify-between items-center z-20">
                 <div className="flex items-center gap-2 md:gap-4">
                     {!isCashier ? (
                         <>
-                            <button onClick={handleExit} className="flex items-center gap-2 text-fg-muted hover:text-slate-800 transition-colors">
+                            <button onClick={handleExit} className="flex items-center gap-2 text-fg-muted hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
                                 <ArrowLeft size={20} />
                                 <span className="font-medium text-sm hidden sm:inline">Volver</span>
                             </button>
-                            <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-fg-muted hover:text-primary transition-colors bg-slate-100 hover:bg-primary-soft px-3 py-1.5 rounded-lg text-sm font-semibold">
+                            <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-fg-muted hover:text-primary transition-colors bg-slate-100 dark:bg-slate-800 hover:bg-primary-soft px-3 py-1.5 rounded-lg text-sm font-semibold">
                                 Dashboard
                             </button>
-                            <button onClick={() => navigate('/orders')} className="flex items-center gap-1 text-fg-muted hover:text-primary transition-colors bg-slate-100 hover:bg-primary-soft px-3 py-1.5 rounded-lg text-sm font-semibold">
+                            <button onClick={() => navigate('/orders')} className="flex items-center gap-1 text-fg-muted hover:text-primary transition-colors bg-slate-100 dark:bg-slate-800 hover:bg-primary-soft px-3 py-1.5 rounded-lg text-sm font-semibold">
                                 Pipeline Pedidos
                             </button>
                         </>
@@ -1002,13 +1002,13 @@ const POS: React.FC = () => {
                             <span className="font-medium text-sm hidden sm:inline">Salir</span>
                         </button>
                     )}
-                    <div className="h-6 w-px bg-slate-300 mx-1 md:mx-2"></div>
+                    <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1 md:mx-2"></div>
 
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-1 md:gap-2">
                         <span className="text-2xs md:text-sm font-semibold text-fg-muted hidden md:inline">Cliente:</span>
                         <div
                             onClick={() => setIsCustomerModalOpen(true)}
-                            className="flex items-center gap-2 bg-slate-50 hover:bg-surface-hover px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-subtle cursor-pointer transition-colors"
+                            className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 hover:bg-surface-hover px-2 py-1 md:px-3 md:py-1.5 rounded-lg border border-subtle cursor-pointer transition-colors"
                         >
                             <span className="font-bold text-fg text-xs md:text-sm truncate max-w-[120px] md:max-w-xs">{customer.name}</span>
                             {customer.claimed_by && (
@@ -1033,15 +1033,15 @@ const POS: React.FC = () => {
                 <div className="flex-1 flex flex-col p-4 md:p-6 pb-2 md:pb-4 overflow-y-auto">
 
                     {/* Search Bar / Manual Toggle */}
-                    <div className="mb-4 z-10 bg-white p-1 rounded-lg border border-subtle inline-flex shadow-sm">
+                    <div className="mb-4 z-10 bg-white dark:bg-surface p-1 rounded-lg border border-subtle inline-flex shadow-sm">
                         <button 
-                            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${!isManualMode ? 'bg-primary-soft text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${!isManualMode ? 'bg-primary-soft text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                             onClick={() => setIsManualMode(false)}
                         >
                             Catálogo
                         </button>
                         <button 
-                            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${isManualMode ? 'bg-warning-soft text-warning shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${isManualMode ? 'bg-warning-soft text-warning shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                             onClick={() => setIsManualMode(true)}
                         >
                             Venta Manual
@@ -1050,7 +1050,7 @@ const POS: React.FC = () => {
 
                     <div className="mb-4 relative z-10">
                         {isManualMode ? (
-                            <form onSubmit={handleAddManualProduct} className="bg-white p-4 border border-warning/20 rounded-xl shadow-sm text-left">
+                            <form onSubmit={handleAddManualProduct} className="bg-white dark:bg-surface p-4 border border-warning/20 rounded-xl shadow-sm text-left">
                                 <h3 className="font-bold text-warning mb-3 text-sm flex items-center gap-2">
                                     <AlertTriangle size={16} /> Agregar Producto No Registrado
                                 </h3>
@@ -1093,7 +1093,7 @@ const POS: React.FC = () => {
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Buscar producto (F2)"
-                                    className="block w-full pl-10 pr-3 py-3 md:py-4 border border-strong rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary text-sm md:text-lg shadow-sm"
+                                    className="block w-full pl-10 pr-3 py-3 md:py-4 border border-strong rounded-xl leading-5 bg-white dark:bg-surface placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary text-sm md:text-lg shadow-sm"
                                     autoFocus
                                 />
                             </div>
@@ -1101,7 +1101,7 @@ const POS: React.FC = () => {
 
                         {/* Search Results Dropdown */}
                         {!isManualMode && searchQuery.trim().length > 0 && (
-                            <div className="absolute top-full mt-2 w-full bg-white border border-subtle rounded-xl shadow-lg overflow-hidden max-h-96 overflow-y-auto">
+                            <div className="absolute top-full mt-2 w-full bg-white dark:bg-surface border border-subtle rounded-xl shadow-lg overflow-hidden max-h-96 overflow-y-auto">
                                 {searchResults.length > 0 ? (
                                     <ul className="divide-y divide-slate-100">
                                         {searchResults.map((result, idx) => (
@@ -1121,7 +1121,7 @@ const POS: React.FC = () => {
                                                     </div>
                                                     <div className="text-xs font-mono text-fg-muted">{result.product.sku}</div>
                                                     <div className="flex items-center gap-3 mt-1.5">
-                                                        <span className="inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded bg-slate-100 text-fg-muted">
+                                                        <span className="inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-fg-muted">
                                                             <MapPin size={10} /> {result.warehouse_name}
                                                         </span>
                                                         <span className={`inline-flex items-center gap-1 text-2xs font-bold px-2 py-0.5 rounded ${result.current_stock > 5 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
@@ -1143,7 +1143,7 @@ const POS: React.FC = () => {
                                                             setStockEditNewValue(result.current_stock);
                                                             setIsStockEditModalOpen(true); 
                                                         }}
-                                                        className="text-2xs bg-slate-200 hover:bg-slate-300 text-fg-muted font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors"
+                                                        className="text-2xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-fg-muted font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors"
                                                     >
                                                         <Edit3 size={10} /> Corregir Stock
                                                     </button>
@@ -1164,10 +1164,10 @@ const POS: React.FC = () => {
                     </div>
 
                     {/* Cart Items (Mobile Stack / Desktop Table) */}
-                    <div className="flex-1 bg-white border border-subtle rounded-xl shadow-sm overflow-hidden flex flex-col">
+                    <div className="flex-1 bg-white dark:bg-surface border border-subtle rounded-xl shadow-sm overflow-hidden flex flex-col">
 
                         {/* Desktop Table Header */}
-                        <div className="hidden md:flex bg-slate-50 border-b border-subtle px-4 py-3 sticky top-0">
+                        <div className="hidden md:flex bg-slate-50 dark:bg-slate-800 border-b border-subtle px-4 py-3 sticky top-0">
                             <div className="flex-1 text-xs font-bold text-fg-muted uppercase tracking-wider">Producto</div>
                             <div className="w-24 text-center text-xs font-bold text-fg-muted uppercase tracking-wider">Precio</div>
                             <div className="w-28 text-center text-xs font-bold text-fg-muted uppercase tracking-wider">Cant</div>
@@ -1190,7 +1190,7 @@ const POS: React.FC = () => {
                                             <div className="flex-1">
                                                 <div className="text-sm font-bold text-fg">{item.product.name}</div>
                                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                    <span className="text-2xs bg-slate-100 text-fg-muted px-1.5 rounded">{item.product.sku}</span>
+                                                    <span className="text-2xs bg-slate-100 dark:bg-slate-800 text-fg-muted px-1.5 rounded">{item.product.sku}</span>
                                                     <span className="text-2xs text-fg-subtle">{item.warehouse_name}</span>
                                                     {item.warehouse_id !== 0 && !item.product.sku.startsWith('DRAFT-') && (
                                                         <>
@@ -1203,7 +1203,7 @@ const POS: React.FC = () => {
                                                                     setStockEditNewValue(item.current_stock);
                                                                     setIsStockEditModalOpen(true);
                                                                 }}
-                                                                className="text-2xs bg-slate-200 hover:bg-slate-300 text-fg-muted font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors"
+                                                                className="text-2xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-fg-muted font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors"
                                                                 title="Corregir stock antes de cerrar la venta"
                                                             >
                                                                 <Edit3 size={10} /> Editar
@@ -1244,7 +1244,7 @@ const POS: React.FC = () => {
                                                     ) : (
                                                         <button
                                                             onClick={() => setEditingPriceId(item.id)}
-                                                            className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded cursor-pointer transition-colors ${item.unitPrice < item.product.price ? 'bg-warning-soft text-warning border border-warning/20 hover:bg-warning-soft' : item.unitPrice > item.product.price ? 'bg-primary-soft text-primary border border-primary/20 hover:bg-primary-soft' : 'text-slate-500 hover:bg-surface-hover border border-transparent' }`}
+                                                            className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded cursor-pointer transition-colors ${item.unitPrice < item.product.price ? 'bg-warning-soft text-warning border border-warning/20 hover:bg-warning-soft' : item.unitPrice > item.product.price ? 'bg-primary-soft text-primary border border-primary/20 hover:bg-primary-soft' : 'text-slate-500 dark:text-slate-400 hover:bg-surface-hover border border-transparent' }`}
                                                             title="Click para editar precio"
                                                         >
                                                             <span className="md:hidden text-xs text-fg-subtle mr-0.5">Pu:</span>
@@ -1265,7 +1265,7 @@ const POS: React.FC = () => {
                                                     <div className="flex items-center border border-strong rounded overflow-hidden">
                                                         <button
                                                             onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                                                            className="px-2 py-1 bg-slate-50 text-fg-muted hover:bg-slate-200"
+                                                            className="px-2 py-1 bg-slate-50 dark:bg-slate-800 text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700"
                                                         >-</button>
                                                         <input
                                                             type="number"
@@ -1276,7 +1276,7 @@ const POS: React.FC = () => {
                                                         />
                                                         <button
                                                             onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                                                            className="px-2 py-1 bg-slate-50 text-fg-muted hover:bg-slate-200"
+                                                            className="px-2 py-1 bg-slate-50 dark:bg-slate-800 text-fg-muted hover:bg-slate-200 dark:hover:bg-slate-700"
                                                         >+</button>
                                                     </div>
                                                 </div>
@@ -1301,8 +1301,8 @@ const POS: React.FC = () => {
                 </div>
 
                 {/* Right Side / Bottom: Total & Checkout */}
-                <div className="md:w-96 bg-white border-t md:border-t-0 md:border-l border-subtle shadow-lg md:shadow-none flex flex-col z-20 shrink-0">
-                    <div className="p-5 flex-1 bg-slate-50/50">
+                <div className="md:w-96 bg-white dark:bg-surface border-t md:border-t-0 md:border-l border-subtle shadow-lg md:shadow-none flex flex-col z-20 shrink-0">
+                    <div className="p-5 flex-1 bg-slate-50/50 dark:bg-slate-800/50">
                         <h2 className="text-sm font-bold text-fg-muted mb-4 flex items-center justify-between">
                             Resumen de Venta
                         </h2>
@@ -1335,7 +1335,7 @@ const POS: React.FC = () => {
 
                     </div>
 
-                    <div className="p-4 bg-white border-t border-subtle">
+                    <div className="p-4 bg-white dark:bg-surface border-t border-subtle">
                         <button
                             onClick={handleSaveDraft}
                             disabled={cart.length === 0 || isSearching}
@@ -1364,10 +1364,10 @@ const POS: React.FC = () => {
             {/* Customer Lookup Modal */}
             {isCustomerModalOpen && (
                 <div className="fixed inset-0 z-[150] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90dvh]">
-                        <div className="p-4 border-b border-subtle flex justify-between items-center bg-slate-50">
+                    <div className="bg-white dark:bg-surface rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90dvh]">
+                        <div className="p-4 border-b border-subtle flex justify-between items-center bg-slate-50 dark:bg-slate-800">
                             <h2 className="font-bold text-fg uppercase tracking-tight">Vincular Cliente al Carrito</h2>
-                            <button onClick={() => setIsCustomerModalOpen(false)} className="text-fg-muted hover:text-slate-800 font-bold px-2 py-1 rounded hover:bg-slate-200 transition-colors">
+                            <button onClick={() => setIsCustomerModalOpen(false)} className="text-fg-muted hover:text-slate-800 dark:hover:text-slate-200 font-bold px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                                 ✕
                             </button>
                         </div>
@@ -1375,7 +1375,7 @@ const POS: React.FC = () => {
                             <input
                                 autoFocus
                                 type="text"
-                                className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-primary outline-none mb-4"
+                                className="w-full bg-white dark:bg-surface border border-strong rounded-lg p-3 text-sm focus:border-primary outline-none mb-4"
                                 placeholder="Buscar por nombre o cédula..."
                                 value={customerSearchQuery}
                                 onChange={(e) => setCustomerSearchQuery(e.target.value)}
@@ -1399,7 +1399,7 @@ const POS: React.FC = () => {
                                             <div className="flex gap-2 items-center">
                                                 {c.claimed_by && <span className="bg-primary-soft text-primary-soft-fg px-1 py-0.5 rounded font-bold text-[12px]">REFERIDO</span>}
                                                 {c.phone && <span>📞 {c.phone}</span>}
-                                                {c.customer_type && <span className="uppercase text-2xs font-bold text-fg-subtle border border-subtle px-1 py-0.5 rounded bg-white">{c.customer_type}</span>}
+                                                {c.customer_type && <span className="uppercase text-2xs font-bold text-fg-subtle border border-subtle px-1 py-0.5 rounded bg-white dark:bg-surface">{c.customer_type}</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -1435,7 +1435,7 @@ const POS: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 border-t border-subtle text-center flex justify-between items-center">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-subtle text-center flex justify-between items-center">
                             <span className="text-xs text-fg-subtle">Selecciona "Consumidor Final" si no requiere datos.</span>
                             <button
                                 onClick={() => {
@@ -1455,7 +1455,7 @@ const POS: React.FC = () => {
             {/* Lost Demand Modal */}
             {isLostDemandModalOpen && (
                 <div className="fixed inset-0 z-[160] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-surface rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 border-b border-subtle flex justify-between items-center bg-warning-soft">
                             <h2 className="font-bold text-warning uppercase tracking-tight flex items-center gap-2">
                                 <AlertTriangle className="w-5 h-5" />
@@ -1471,7 +1471,7 @@ const POS: React.FC = () => {
                                 <input
                                     type="text"
                                     disabled
-                                    className="w-full bg-slate-100 border border-subtle rounded-lg p-3 text-sm font-medium text-fg-muted outline-none"
+                                    className="w-full bg-slate-100 dark:bg-slate-800 border border-subtle rounded-lg p-3 text-sm font-medium text-fg-muted outline-none"
                                     value={searchQuery}
                                 />
                             </div>
@@ -1482,7 +1482,7 @@ const POS: React.FC = () => {
                                 <input
                                     autoFocus
                                     type="text"
-                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
+                                    className="w-full bg-white dark:bg-surface border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: Yamaha"
                                     value={lostDemandBrand}
                                     onChange={(e) => setLostDemandBrand(e.target.value)}
@@ -1493,7 +1493,7 @@ const POS: React.FC = () => {
                                 <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider mb-1">Modelo o Cilindraje (Opcional)</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-white border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
+                                    className="w-full bg-white dark:bg-surface border border-strong rounded-lg p-3 text-sm focus:border-warning outline-none"
                                     placeholder="Ej: FZ16 2015"
                                     value={lostDemandBikeModel}
                                     onChange={(e) => setLostDemandBikeModel(e.target.value)}

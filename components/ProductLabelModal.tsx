@@ -271,13 +271,13 @@ export const ProductLabelModal: React.FC<ProductLabelModalProps> = ({ isOpen, on
                             <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg mb-4 w-full max-w-sm">
                                 <button
                                     onClick={() => setActiveTab('image')}
-                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${ activeTab === 'image' ? 'bg-white dark:bg-slate-700 text-fg shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:hover:text-slate-200' }`}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${ activeTab === 'image' ? 'bg-white dark:bg-slate-700 text-fg shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-200' }`}
                                 >
                                     Etiqueta Sola
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('pdf')}
-                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${ activeTab === 'pdf' ? 'bg-white dark:bg-slate-700 text-fg shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:hover:text-slate-200' }`}
+                                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${ activeTab === 'pdf' ? 'bg-white dark:bg-slate-700 text-fg shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-200' }`}
                                 >
                                     Vista Previa PDF
                                 </button>

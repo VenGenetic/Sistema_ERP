@@ -58,8 +58,16 @@ export const VALID_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
 
 /**
  * Checks if a transition from one status to another is allowed.
+ *
+ * Cancelar se permite desde CUALQUIER estado, no solo desde los que figuran en
+ * VALID_TRANSITIONS: así lo hace el RPC `update_order_status`
+ * (`supabase/migrations/20260712130000_simplify_and_integrate_till.sql`, la
+ * cláusula "IF NOT v_allowed AND v_new_status = 'Cancelado'"), que existe para
+ * poder cerrar órdenes viejas atascadas en estados que ya no se usan. Sin esta
+ * línea el cliente bloquearía un movimiento que la base sí acepta.
  */
 export function isTransitionAllowed(from: OrderStatus, to: OrderStatus): boolean {
+    if (to === 'Cancelado') return from !== 'Cancelado';
     return VALID_TRANSITIONS[from]?.includes(to) ?? false;
 }
 

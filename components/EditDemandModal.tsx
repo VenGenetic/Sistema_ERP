@@ -236,7 +236,7 @@ export const EditDemandModal: React.FC<EditDemandModalProps> = ({
                                 >
                                     <span
                                         aria-hidden="true"
-                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${ isApproved ? 'translate-x-5' : 'translate-x-0' }`}
+                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out ${ isApproved ? 'translate-x-5' : 'translate-x-0' }`}
                                     />
                                 </button>
                                 <div>

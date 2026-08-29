@@ -1,8 +1,14 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://xzsdsmskyosepemalage.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6c2RzbXNreW9zZXBlbWFsYWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMzE5ODMsImV4cCI6MjA4NjkwNzk4M30.G14fWxtjFRmjy2NqZM4fWncD4NbzGC6uT8i3bA0844k';
+require('dotenv').config();
 
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error('Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en .env');
+    process.exit(1);
+}
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {

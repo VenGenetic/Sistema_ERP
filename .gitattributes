@@ -1,0 +1,19 @@
+# Normaliza los finales de línea: en el repo siempre LF, en el disco lo que
+# use cada sistema. Sin esto, editar un archivo desde Windows lo marcaba
+# entero como cambiado aunque solo se tocara una línea.
+* text=auto eol=lf
+
+# Binarios: git no debe tocarlos ni intentar diferenciarlos como texto.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.xlsx   binary
+*.xls    binary
+*.zip    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary

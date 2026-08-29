@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { reprintOrderReceipt } from '../utils/thermalReceipt';
+import { formatearMoneda } from '../utils/moneda';
 import {
     FREE_SALE_WAREHOUSE_ID,
     InventoryLevelRow,
@@ -309,8 +310,7 @@ const DailyRegistry: React.FC = () => {
         );
     }, [dailySummaries]);
 
-    const formatCurrency = (val: number) =>
-        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+    const formatCurrency = (val: number) => formatearMoneda(val);
 
     const setQuickRange = (days: number) => {
         setDateRange({
@@ -613,7 +613,7 @@ const DailyRegistry: React.FC = () => {
                             <button
                                 key={label}
                                 onClick={() => setQuickRange(days)}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${ activeBtn(days) ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-700 hover:bg-white dark:hover:bg-slate-700' }`}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${ activeBtn(days) ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700' }`}
                             >
                                 {label}
                             </button>
@@ -904,7 +904,7 @@ const DailyRegistry: React.FC = () => {
                                                                                             <button
                                                                                                 onClick={() => { setEditingOrderId(null); setEditingDate(''); }}
                                                                                                 disabled={loading}
-                                                                                                className="text-2xs font-bold bg-slate-200 text-fg-muted px-2 py-0.5 rounded hover:bg-slate-300 transition-colors disabled:opacity-50"
+                                                                                                className="text-2xs font-bold bg-slate-200 dark:bg-slate-700 text-fg-muted px-2 py-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
                                                                                             >
                                                                                                 ✕
                                                                                             </button>
@@ -1105,7 +1105,7 @@ const DailyRegistry: React.FC = () => {
                                     setOrderToEdit(null);
                                     setEditCartItems([]);
                                 }}
-                                className="p-1 rounded-full text-fg-subtle hover:bg-surface-hover hover:text-slate-600"
+                                className="p-1 rounded-full text-fg-subtle hover:bg-surface-hover hover:text-slate-600 dark:hover:text-slate-300"
                             >
                                 <X size={18} aria-hidden="true" />
                             </button>
@@ -1211,14 +1211,14 @@ const DailyRegistry: React.FC = () => {
                                                 <div className="flex items-center gap-1 mr-4">
                                                     <button
                                                         onClick={() => updateEditCartQty(item.product_id, item.quantity - 1)}
-                                                        className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-fg-muted hover:bg-slate-300"
+                                                        className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-fg-muted hover:bg-slate-300 dark:hover:bg-slate-600"
                                                     >
                                                         <Minus size={14} aria-hidden="true" />
                                                     </button>
                                                     <span className="font-mono text-xs font-bold w-6 text-center">{item.quantity}</span>
                                                     <button
                                                         onClick={() => updateEditCartQty(item.product_id, item.quantity + 1)}
-                                                        className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-fg-muted hover:bg-slate-300"
+                                                        className="p-1 rounded bg-slate-200 dark:bg-slate-800 text-fg-muted hover:bg-slate-300 dark:hover:bg-slate-600"
                                                     >
                                                         <Plus size={14} aria-hidden="true" />
                                                     </button>
@@ -1277,7 +1277,7 @@ const DailyRegistry: React.FC = () => {
                                     setEditCartItems([]);
                                 }}
                                 disabled={isSavingEdit}
-                                className="px-4 py-2 text-xs font-bold bg-slate-100 text-fg-muted rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
+                                className="px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-fg-muted rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
                             >
                                 Cancelar
                             </button>
