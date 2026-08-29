@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { SourcingQuickEditModal } from '../components/SourcingQuickEditModal';
+import { FotoRepuesto } from '../components/FotoRepuesto';
 import { getStockAvailableDemandCount, warnRevertedDemands } from '../utils/importerOverride';
 import {
   ArrowRight,
   Ban,
   Check,
-  Image as ImageIcon,
   Inbox,
   Package,
   PackageX,
@@ -186,13 +186,13 @@ const SourcingPipeline: React.FC = () => {
                                 {colItems.map(item => (
                                     <div key={item.id} className="bg-surface p-4 rounded-lg shadow-sm border border-subtle flex flex-col gap-3 group hover:border-primary/20 transition-all">
                                         <div className="flex gap-3">
-                                            {item.image_url ? (
-                                                <img src={item.image_url} alt={item.name} className="w-12 h-12 rounded object-cover border border-slate-100 dark:border-slate-800" />
-                                            ) : (
-                                                <div className="w-12 h-12 rounded bg-surface-2 border border-slate-100 dark:border-slate-700 flex items-center justify-center flex-shrink-0">
-                                                    <ImageIcon size={20} className="text-fg-subtle" aria-hidden="true" />
-                                                </div>
-                                            )}
+                                            <FotoRepuesto
+                                                url={item.image_url}
+                                                sku={item.sku}
+                                                nombre={item.name}
+                                                iconSize={20}
+                                                className="w-12 h-12 rounded border border-slate-100 dark:border-slate-800"
+                                            />
                                             <div className="flex flex-col overflow-hidden">
                                                 <span className="text-xs font-mono text-fg-muted truncate">{item.sku}</span>
                                                 <span className="text-sm font-semibold text-fg line-clamp-2 leading-tight" title={item.name}>{item.name}</span>

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useBackDismiss } from '../hooks/useBackDismiss';
 import { supabase } from '../supabaseClient';
-import { getThumbnailUrl } from '../utils/image';
+import { FotoRepuesto } from './FotoRepuesto';
 import {
-  Image as ImageIcon,
   Info,
   Link as LinkIcon,
   Link2Off,
@@ -399,13 +398,13 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                                         return (
                                             <tr key={prod.id} className="hover:bg-surface-hover transition-colors">
                                                 <td className="px-4 py-3">
-                                                    <div className="w-7 h-7 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                                                        {prod.image_url ? (
-                                                            <img src={prod.image_url} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <ImageIcon size={14} className="text-fg-subtle" aria-hidden="true" />
-                                                        )}
-                                                    </div>
+                                                    <FotoRepuesto
+                                                        url={prod.image_url}
+                                                        sku={prod.sku}
+                                                        nombre={prod.name}
+                                                        iconSize={14}
+                                                        className="w-7 h-7 rounded border border-subtle bg-slate-100 dark:bg-slate-800"
+                                                    />
                                                 </td>
                                                 <td className="px-4 py-3 font-mono font-bold">{prod.sku}</td>
                                                 <td className="px-4 py-3 truncate max-w-[200px]" title={prod.name}>{prod.name}</td>
@@ -467,13 +466,13 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                                 return (
                                     <tr key={prod.id} className={`hover:bg-surface-hover transition-colors ${isCurrent ? 'bg-primary-soft/30 dark:bg-primary/10' : ''}`}>
                                         <td className="px-4 py-3">
-                                            <div className="w-9 h-9 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-sm">
-                                                {prod.image_url ? (
-                                                    <img src={getThumbnailUrl(prod.image_url, 40, 40)} alt="" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <ImageIcon size={16} className="text-fg-subtle" aria-hidden="true" />
-                                                )}
-                                            </div>
+                                            <FotoRepuesto
+                                                url={prod.image_url}
+                                                sku={prod.sku}
+                                                nombre={prod.name}
+                                                iconSize={16}
+                                                className="w-9 h-9 rounded border border-subtle bg-slate-100 dark:bg-slate-800 shadow-sm"
+                                            />
                                         </td>
                                         <td className="px-4 py-3">
                                             <input
@@ -581,15 +580,13 @@ export const ProductGroupModal: React.FC<ProductGroupModalProps> = ({
                                     const totalStock = (pm.local_stock || 0) + (pm.importer_stock || 0);
                                     return (
                                         <div key={pm.id} className="flex items-center gap-2.5 p-2 bg-surface-2 border border-subtle rounded-lg shadow-xs">
-                                            <div className="w-8 h-8 rounded border border-subtle bg-white dark:bg-surface overflow-hidden shrink-0">
-                                                {pm.image_url ? (
-                                                    <img src={pm.image_url} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                                                        <ImageIcon size={14} className="text-fg-subtle" aria-hidden="true" />
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <FotoRepuesto
+                                                url={pm.image_url}
+                                                sku={pm.sku}
+                                                nombre={pm.name}
+                                                iconSize={14}
+                                                className="w-8 h-8 rounded border border-subtle bg-white dark:bg-surface"
+                                            />
                                             <div>
                                                 <div className="text-[11px] font-bold text-fg flex items-center gap-1.5">
                                                     {pm.sku}

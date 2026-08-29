@@ -6,9 +6,9 @@ import { BatchProductEntry } from '../components/BatchProductEntry'; // New Comp
 import { PartProfileModal } from '../components/PartProfileModal'; // New Component
 import { ProductModal } from '../components/ProductModal';
 import { FitmentSearch } from '../components/FitmentSearch'; // New Component
-import { getThumbnailUrl } from '../utils/image';
 import { Button, Input } from '../components/ui';
 import { cn, page, table as t } from '../components/ui/styles';
+import { FotoRepuesto } from '../components/FotoRepuesto';
 import {
   ArrowDown,
   ArrowLeftRight,
@@ -1013,27 +1013,13 @@ const Inventory: React.FC = () => {
                                                     <td className="px-4 py-3 font-medium text-fg">
                                                         <div className="flex items-center gap-3">
                                                             {group.product?.image_url ? (
-                                                                <div className="h-10 w-10 flex-shrink-0 rounded-lg overflow-hidden border border-subtle bg-white dark:bg-surface shadow-sm relative">
-                                                                    <ImageIcon size={20} className="text-fg-subtle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0" aria-hidden="true" />
-                                                                    <img 
-                                                                       src={getThumbnailUrl(group.product.image_url, 80, 80)} 
-                                                                       alt="" 
-                                                                       loading="lazy"
-                                                                       decoding="async"
-                                                                       className="h-full w-full object-cover relative z-10 transition-opacity duration-300" 
-                                                                       onError={(e) => {
-                                                                           const target = e.currentTarget;
-                                                                           if (target.src.includes('render/image')) {
-                                                                               target.src = group.product.image_url || '';
-                                                                           } else {
-                                                                               target.style.opacity = '0';
-                                                                           }
-                                                                       }}
-                                                                       onLoad={(e) => {
-                                                                           e.currentTarget.style.opacity = '1';
-                                                                       }}
-                                                                    />
-                                                                </div>
+                                                                <FotoRepuesto
+                                                                    url={group.product.image_url}
+                                                                    sku={group.product.sku}
+                                                                    nombre={group.product.name}
+                                                                    iconSize={20}
+                                                                    className="h-10 w-10 rounded-lg border border-subtle bg-white dark:bg-surface shadow-sm"
+                                                                />
                                                             ) : (
                                                                 <div className="h-10 w-10 flex-shrink-0 rounded-lg border border-dashed border-strong bg-surface-2 flex items-center justify-center">
                                                                     <ImageIcon size={20} className="text-fg-subtle" aria-hidden="true" />

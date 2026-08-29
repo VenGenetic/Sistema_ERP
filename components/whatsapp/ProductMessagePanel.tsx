@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Box, ImageOff, Loader2, PackagePlus, RefreshCw, X } from 'lucide-react';
+import { Box, Loader2, PackagePlus, RefreshCw, X } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { badge, button, cn } from '../ui/styles';
+import { FotoRepuesto } from '../FotoRepuesto';
 import { formatearPrecio, precioParaCliente, stockUtil, type ProductoCatalogo } from '../../utils/whatsappOutbox';
 
 interface Props {
@@ -65,7 +66,15 @@ const ProductMessagePanel: React.FC<Props> = ({ productId, onClose, onCotizar })
             ) : (
                 <>
                     <div className="min-h-0 flex-1 overflow-y-auto wa-scroll p-4">
-                        {producto.image_url ? <img src={producto.image_url} alt={producto.name} className="aspect-square w-full rounded-xl border border-subtle bg-surface-2 object-contain" /> : <div className="flex aspect-square w-full items-center justify-center rounded-xl border border-subtle bg-surface-2 text-fg-subtle"><ImageOff size={32} /></div>}
+                        <FotoRepuesto
+                            url={producto.image_url}
+                            sku={producto.sku}
+                            nombre={producto.name}
+                            gallery={producto.gallery}
+                            contain
+                            iconSize={32}
+                            className="aspect-square w-full rounded-xl border border-subtle bg-surface-2"
+                        />
                         <h3 className="mt-4 text-base font-bold leading-snug text-fg">{producto.name}</h3>
                         <p className="mt-1 font-mono text-xs text-fg-muted">SKU {producto.sku}</p>
                         <div className="mt-4 grid grid-cols-2 gap-2">

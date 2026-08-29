@@ -4,7 +4,6 @@ import {
     ArrowLeft,
     Bell,
     Check,
-    ImageOff,
     Loader2,
     HandCoins,
     MessageCircle,
@@ -15,6 +14,7 @@ import {
 import { supabase } from '../../supabaseClient';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { badge, button, cn, input, modal } from '../ui/styles';
+import { FotoRepuesto } from '../FotoRepuesto';
 import { avisoDeEnvio, haceCuanto, type EstadoAgente } from './agente';
 import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
 import { buildWhatsAppDemandURL, openWhatsApp } from '../../utils/whatsapp';
@@ -83,36 +83,6 @@ interface Props {
     /** Saltar al chat del cliente. Si no se pasa, no se ofrece. */
     onAbrirChat?: (conversationId: number) => void;
 }
-
-const Miniatura: React.FC<{ url: string | null | undefined; alt: string; grande?: boolean }> = ({
-    url,
-    alt,
-    grande = false,
-}) => {
-    const [falló, setFalló] = useState(false);
-    const medida = grande ? 'h-20 w-20' : 'h-11 w-11';
-    if (!url || falló) {
-        return (
-            <div
-                className={cn(
-                    medida,
-                    'shrink-0 rounded-lg flex items-center justify-center bg-surface-3 text-fg-subtle',
-                )}
-            >
-                <ImageOff size={grande ? 22 : 16} aria-hidden="true" />
-            </div>
-        );
-    }
-    return (
-        <img
-            src={url}
-            alt={alt}
-            loading="lazy"
-            onError={() => setFalló(true)}
-            className={cn(medida, 'shrink-0 rounded-lg object-cover bg-surface-3')}
-        />
-    );
-};
 
 /** true si ya pasó la semana y se le puede volver a pedir el abono. */
 function puedeReinsistir(pedidoEl: string): boolean {
@@ -479,7 +449,13 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                     {abierto ? (
                         <div className="space-y-3">
                             <div className="flex items-start gap-3 rounded-xl border border-subtle bg-surface-2 p-3">
-                                <Miniatura url={producto?.image_url} alt={producto?.name ?? 'Repuesto'} grande />
+                                <FotoRepuesto
+                                    url={producto?.image_url}
+                                    sku={producto?.sku}
+                                    nombre={producto?.name}
+                                    iconSize={22}
+                                    className="h-20 w-20 rounded-lg"
+                                />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium leading-snug text-fg">
                                         {producto?.name ?? 'Repuesto sin vincular'}
@@ -692,7 +668,11 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                         const s = d.product ? stockUtil(d.product) : null;
                                         return (
                                             <div key={d.id} className="flex items-center gap-3 py-2.5">
-                                                <Miniatura url={d.product?.image_url} alt={d.product?.name ?? ''} />
+                                                <FotoRepuesto
+                                                    url={d.product?.image_url}
+                                                    sku={d.product?.sku}
+                                                    nombre={d.product?.name}
+                                                />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="line-clamp-2 text-xs font-medium leading-snug text-fg">
                                                         {d.product?.name ?? 'Repuesto sin vincular'}

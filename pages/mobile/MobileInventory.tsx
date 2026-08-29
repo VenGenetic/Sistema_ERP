@@ -3,6 +3,7 @@ import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
 import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngine';
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
+import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
 import { AlertCircle, CheckCircle2, ImageOff, MapPin, Minus, Package, Plus, SearchX, Undo2, WifiOff } from 'lucide-react';
 
 const LAST_WAREHOUSE_KEY = 'mobile:lastWarehouseId';
@@ -30,6 +31,8 @@ const MobileInventory: React.FC = () => {
     const { products: allProducts, loading: catalogLoading, refresh: refreshCatalog } = useMobileProducts();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    /** La foto del repuesto a pantalla completa: en 144px no se distingue un retén de otro. */
+    const [foto, setFoto] = useState<MediaItem[]>([]);
     const [warehouses, setWarehouses] = useState<any[]>([]);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
@@ -454,13 +457,28 @@ const MobileInventory: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="w-36 h-36 rounded-2xl bg-slate-800/60 mb-4 p-2 border border-slate-700 flex items-center justify-center shadow-inner">
-                                {imageUrl ? (
+                            {imageUrl ? (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setFoto([
+                                            {
+                                                type: 'image',
+                                                url: selectedProduct.image_url || imageUrl,
+                                                title: `${selectedProduct.sku} - ${selectedProduct.name}`,
+                                            },
+                                        ])
+                                    }
+                                    aria-label="Ver la foto en grande"
+                                    className="w-36 h-36 rounded-2xl bg-slate-800/60 mb-4 p-2 border border-slate-700 flex items-center justify-center shadow-inner active:scale-95 transition-transform"
+                                >
                                     <img src={imageUrl} alt={selectedProduct.name} className="w-full h-full object-contain" />
-                                ) : (
+                                </button>
+                            ) : (
+                                <div className="w-36 h-36 rounded-2xl bg-slate-800/60 mb-4 p-2 border border-slate-700 flex items-center justify-center shadow-inner">
                                     <ImageOff size={48} className="text-slate-600" aria-hidden="true" />
-                                )}
-                            </div>
+                                </div>
+                            )}
 
                             <span className="text-sm font-mono font-extrabold text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-xl mb-1.5 border border-cyan-500/20">
                                 {selectedProduct.sku}
@@ -538,6 +556,8 @@ const MobileInventory: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <MediaLightbox isOpen={foto.length > 0} media={foto} onClose={() => setFoto([])} />
         </div>
     );
 };

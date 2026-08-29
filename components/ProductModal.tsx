@@ -5,6 +5,7 @@ import { compressImageForUpload } from '../utils/imageCompression';
 import { BrandSelect } from './BrandSelect';
 import { WarehouseSelect } from './WarehouseSelect';
 import { TagManager, Tag } from './TagManager';
+import { FotoRepuesto } from './FotoRepuesto';
 import {
   Banknote,
   Boxes,
@@ -15,7 +16,6 @@ import {
   Dices,
   Download,
   History,
-  Image as ImageIcon,
   ImagePlus,
   Info,
   Link2Off,
@@ -1495,13 +1495,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                                 return (
                                                     <tr key={prod.id} className="hover:bg-surface-hover transition-colors">
                                                         <td className="px-4 py-3">
-                                                            <div className="w-8 h-8 rounded border border-subtle overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                                                                {prod.image_url ? (
-                                                                    <img src={prod.image_url} alt="" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <ImageIcon size={16} className="text-fg-subtle" aria-hidden="true" />
-                                                                )}
-                                                            </div>
+                                                            <FotoRepuesto
+                                                                    url={prod.image_url}
+                                                                    sku={prod.sku}
+                                                                    nombre={prod.name}
+                                                                    iconSize={16}
+                                                                    className="w-8 h-8 rounded border border-subtle bg-slate-100 dark:bg-slate-800"
+                                                                />
                                                         </td>
                                                         <td className="px-4 py-3 font-mono font-bold text-xs">{prod.sku}</td>
                                                         <td className="px-4 py-3 max-w-[150px] truncate" title={prod.name}>{prod.name}</td>
@@ -1555,13 +1555,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                             return (
                                                 <div key={lp.id} className="flex items-center justify-between p-2 bg-surface-2 border border-subtle rounded-lg group hover:border-slate-300 transition-colors">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded border border-subtle overflow-hidden shrink-0 bg-white dark:bg-surface flex items-center justify-center shadow-sm">
-                                                            {lp.image_url ? (
-                                                                <img src={lp.image_url} alt="" className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <ImageIcon size={18} className="text-fg-subtle" aria-hidden="true" />
-                                                            )}
-                                                        </div>
+                                                        <FotoRepuesto
+                                                            url={lp.image_url}
+                                                            sku={lp.sku}
+                                                            nombre={lp.name}
+                                                            iconSize={18}
+                                                            className="w-10 h-10 rounded border border-subtle bg-white dark:bg-surface shadow-sm"
+                                                        />
                                                         <div>
                                                             <div className="text-xs font-bold text-fg flex items-center gap-1.5">
                                                                 {lp.sku}
@@ -1642,15 +1642,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
                                     const totalStock = (pm.local_stock || 0) + (pm.importer_stock || 0);
                                     return (
                                         <div key={pm.id} className="flex items-center gap-2.5 p-2 bg-surface-2 border border-subtle rounded-lg shadow-xs">
-                                            <div className="w-8 h-8 rounded border border-subtle bg-white dark:bg-surface overflow-hidden shrink-0">
-                                                {pm.image_url ? (
-                                                    <img src={pm.image_url} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                                                        <ImageIcon size={14} className="text-fg-subtle" aria-hidden="true" />
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <FotoRepuesto
+                                                url={pm.image_url}
+                                                sku={pm.sku}
+                                                nombre={pm.name}
+                                                iconSize={14}
+                                                className="w-8 h-8 rounded border border-subtle bg-white dark:bg-surface"
+                                            />
                                             <div>
                                                 <div className="text-[11px] font-bold text-fg flex items-center gap-1.5">
                                                     {pm.sku}

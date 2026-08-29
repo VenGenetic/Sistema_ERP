@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, ImageOff, Loader2, Minus, Plus, Search, Send, ShoppingCart, Store, Trash2, X } from 'lucide-react';
+import { FileText, Loader2, Minus, Plus, Search, Send, ShoppingCart, Store, Trash2, X } from 'lucide-react';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { convertProformaToPosCart } from '../../utils/proformaToCart';
-import { badge, button, cn, input, modal } from '../ui/styles';
+import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
+import { FotoRepuesto } from '../FotoRepuesto';
 import { fetchProformaStockInfo, type ProformaStockInfo } from '../../utils/proformaStock';
 import {
     subtotalDe,
@@ -58,18 +59,6 @@ interface Props {
     clienteNombre: string | null;
     onEnviar: (mensajes: NuevoMensaje[]) => Promise<void>;
 }
-
-const Miniatura: React.FC<{ url: string | null; alt: string; className?: string }> = ({ url, alt, className }) => {
-    const [falló, setFalló] = useState(false);
-    if (!url || falló) {
-        return (
-            <div className={cn('flex items-center justify-center bg-surface-3 text-fg-subtle', className)}>
-                <ImageOff size={16} aria-hidden="true" />
-            </div>
-        );
-    }
-    return <img src={url} alt={alt} loading="lazy" onError={() => setFalló(true)} className={cn('object-cover bg-surface-3', className)} />;
-};
 
 export const ProformaBuilder: React.FC<Props> = ({
     isOpen,
@@ -422,12 +411,29 @@ export const ProformaBuilder: React.FC<Props> = ({
                                 const stock = stockUtil(p);
                                 const puesto = enProforma.has(p.product_id);
                                 return (
-                                    <button
+                                    <div
                                         key={p.product_id}
+                                        role="button"
+                                        tabIndex={0}
                                         onClick={() => agregar(conversationId, p)}
-                                        className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-surface-hover"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                agregar(conversationId, p);
+                                            }
+                                        }}
+                                        className={cn(
+                                            focusRing,
+                                            'w-full cursor-pointer text-left px-4 py-2.5 flex items-center gap-3 hover:bg-surface-hover',
+                                        )}
                                     >
-                                        <Miniatura url={p.image_url} alt={p.name} className="w-11 h-11 rounded-lg shrink-0" />
+                                        <FotoRepuesto
+                                            url={p.image_url}
+                                            sku={p.sku}
+                                            nombre={p.name}
+                                            gallery={p.gallery}
+                                            className="w-11 h-11 rounded-lg"
+                                        />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
                                             <p className="text-2xs text-fg-subtle truncate">{p.sku}</p>
@@ -449,7 +455,7 @@ export const ProformaBuilder: React.FC<Props> = ({
                                         <span className={cn('shrink-0 p-1.5 rounded-lg', puesto ? 'text-success' : 'text-fg-subtle')}>
                                             <Plus size={16} aria-hidden="true" />
                                         </span>
-                                    </button>
+                                    </div>
                                 );
                             })}
                         </div>
@@ -506,7 +512,7 @@ export const ProformaBuilder: React.FC<Props> = ({
                             {proforma.items.map((item) => (
                                 <div key={item.id} className="rounded-xl border border-subtle bg-surface p-2.5">
                                     <div className="flex items-start gap-2">
-                                        <Miniatura url={item.imageUrl} alt={item.name} className="w-10 h-10 rounded-lg shrink-0" />
+                                        <FotoRepuesto url={item.imageUrl} sku={item.sku} nombre={item.name} className="w-10 h-10 rounded-lg" />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-xs font-medium text-fg leading-snug line-clamp-2">{item.name}</p>
                                             <p className="text-2xs text-fg-subtle">{item.sku}</p>

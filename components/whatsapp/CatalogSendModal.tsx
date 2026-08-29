@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ImageOff, Loader2, Minus, Package, Plus, Search, Send, Trash2, X } from 'lucide-react';
+import { Check, ImageOff, Loader2, Minus, Package, Plus, Search, Send, Trash2, X, ZoomIn } from 'lucide-react';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
-import { badge, button, cn, input, modal } from '../ui/styles';
+import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
+import { MediaLightbox, type MediaItem } from '../MediaLightbox';
 import {
     buscarEnCatalogo,
     formatearPrecio,
@@ -96,6 +97,26 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
     const [armados, setArmados] = useState<Armado[]>([]);
     const [enviando, setEnviando] = useState(false);
     const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+
+    /**
+     * La foto del repuesto en grande.
+     *
+     * Acá la tarjeta entera es el botón que elige el producto, así que la
+     * lupa va aparte, en una esquina: si la foto abriera el visor, elegir un
+     * repuesto se volvería un juego de puntería.
+     */
+    const [foto, setFoto] = useState<MediaItem[]>([]);
+
+    const verFoto = useCallback((p: ProductoCatalogo) => {
+        if (!p.image_url) return;
+        const título = `${p.sku} - ${p.name}`;
+        setFoto([
+            { type: 'image', url: p.image_url, title: título },
+            ...(p.gallery ?? [])
+                .filter((m) => m?.url && m.url !== p.image_url)
+                .map((m) => ({ type: m.type, url: m.url, title: título })),
+        ]);
+    }, []);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const enviandoRef = useRef(false);
@@ -325,11 +346,21 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                     const elegido = yaElegido(p.product_id);
                                     const stock = stockUtil(p);
                                     return (
-                                        <button
+                                        <div
                                             key={p.product_id}
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-pressed={elegido}
                                             onClick={() => alternarProducto(p)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    alternarProducto(p);
+                                                }
+                                            }}
                                             className={cn(
-                                                'text-left rounded-xl border overflow-hidden transition-colors',
+                                                focusRing,
+                                                'cursor-pointer text-left rounded-xl border overflow-hidden transition-colors',
                                                 elegido
                                                     ? 'border-primary bg-primary-soft/50'
                                                     : 'border-subtle bg-surface hover:border-strong hover:bg-surface-hover',
@@ -337,6 +368,23 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                         >
                                             <div className="relative">
                                                 <Miniatura url={p.image_url} alt={p.name} className="w-full h-28" />
+                                                {p.image_url && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            verFoto(p);
+                                                        }}
+                                                        title="Ver la foto en grande"
+                                                        aria-label={`Ver la foto de ${p.name} en grande`}
+                                                        className={cn(
+                                                            focusRing,
+                                                            'absolute top-1.5 left-1.5 rounded-full bg-black/55 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/75',
+                                                        )}
+                                                    >
+                                                        <ZoomIn size={12} aria-hidden="true" />
+                                                    </button>
+                                                )}
                                                 {elegido && (
                                                     <span className="absolute top-1.5 right-1.5 rounded-full bg-primary text-primary-fg p-1">
                                                         <Check size={12} aria-hidden="true" />
@@ -369,7 +417,7 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                                 </div>
                                                 <p className="text-2xs text-fg-subtle mt-1 truncate">{p.sku}</p>
                                             </div>
-                                        </button>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -566,6 +614,8 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                     </button>
                 </div>
             </div>
+
+            <MediaLightbox isOpen={foto.length > 0} media={foto} onClose={() => setFoto([])} />
         </div>
     );
 };

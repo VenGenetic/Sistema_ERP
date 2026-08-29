@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ImageOff, Loader2, Package, Search, X } from 'lucide-react';
+import { Loader2, Package, Search, X } from 'lucide-react';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { supabase } from '../../supabaseClient';
-import { badge, button, cn, input, modal } from '../ui/styles';
+import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
+import { FotoRepuesto } from '../FotoRepuesto';
 import { buscarEnCatalogo, formatearPrecio, precioParaCliente, stockUtil, type ProductoCatalogo } from '../../utils/whatsappOutbox';
 
 /**
@@ -24,20 +25,6 @@ interface Props {
     userId: string | null;
     onRegistrado: () => void;
 }
-
-const Miniatura: React.FC<{ url: string | null; alt: string }> = ({ url, alt }) => {
-    const [falló, setFalló] = useState(false);
-    if (!url || falló) {
-        return (
-            <div className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center bg-surface-3 text-fg-subtle">
-                <ImageOff size={16} aria-hidden="true" />
-            </div>
-        );
-    }
-    return (
-        <img src={url} alt={alt} loading="lazy" onError={() => setFalló(true)} className="w-11 h-11 rounded-lg shrink-0 object-cover bg-surface-3" />
-    );
-};
 
 export const RegistrarPedidoModal: React.FC<Props> = ({
     isOpen,
@@ -193,12 +180,23 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
                                 {resultados.map((p) => {
                                     const stock = stockUtil(p);
                                     return (
-                                        <button
+                                        <div
                                             key={p.product_id}
+                                            role="button"
+                                            tabIndex={0}
                                             onClick={() => setElegido(p)}
-                                            className="w-full text-left py-2.5 flex items-center gap-3 hover:bg-surface-hover"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    setElegido(p);
+                                                }
+                                            }}
+                                            className={cn(
+                                                focusRing,
+                                                'w-full cursor-pointer text-left py-2.5 flex items-center gap-3 hover:bg-surface-hover',
+                                            )}
                                         >
-                                            <Miniatura url={p.image_url} alt={p.name} />
+                                            <FotoRepuesto url={p.image_url} sku={p.sku} nombre={p.name} />
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
                                                 <p className="text-2xs text-fg-subtle truncate">{p.sku}</p>
@@ -213,7 +211,7 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
                                             >
                                                 {stock.hay ? 'hay stock' : 'sin stock'}
                                             </span>
-                                        </button>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -221,7 +219,7 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
                     ) : (
                         <>
                             <div className="flex items-center gap-3 rounded-xl border border-subtle bg-surface-2 p-3">
-                                <Miniatura url={elegido.image_url} alt={elegido.name} />
+                                <FotoRepuesto url={elegido.image_url} sku={elegido.sku} nombre={elegido.name} />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium text-fg leading-snug">{elegido.name}</p>
                                     <p className="text-2xs text-fg-subtle">

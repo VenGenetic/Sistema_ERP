@@ -6,6 +6,7 @@ import WhatsAppButton from '../components/WhatsAppButton';
 import { isTransitionAllowed } from '../utils/orderStateMachine';
 import { reprintOrderReceipt } from '../utils/thermalReceipt';
 import OrderShipments from './OrderShipments';
+import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
 
 // Interfaces
 interface OrderItem { id: string; product: { name: string; sku: string }; quantity: number; unitPrice: number; subtotal: number; }
@@ -42,6 +43,8 @@ const OrdersPipeline: React.FC = () => {
     const [shippingAddress, setShippingAddress] = useState('');
     const [shippingCost, setShippingCost] = useState(0);
     const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+    /** El comprobante a pantalla completa: en 160px de alto no se lee un monto ni un número de referencia. */
+    const [comprobante, setComprobante] = useState<MediaItem[]>([]);
     const [uploading, setUploading] = useState(false);
     
     // Drag & Drop / Transition state
@@ -506,9 +509,19 @@ const OrdersPipeline: React.FC = () => {
 
                                         {/* Visualización de la Captura */}
                                         {receiptPreview && (
-                                            <div className="mt-2 rounded-lg border border-subtle overflow-hidden relative">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setComprobante([
+                                                        { type: 'image', url: receiptPreview, title: 'Comprobante de pago' },
+                                                    ])
+                                                }
+                                                title="Ver el comprobante en grande"
+                                                aria-label="Ver el comprobante en grande"
+                                                className="mt-2 block w-full cursor-zoom-in rounded-lg border border-subtle overflow-hidden relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                            >
                                                 <img src={receiptPreview} alt="Comprobante" className="w-full h-auto object-contain max-h-40" />
-                                            </div>
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -589,6 +602,8 @@ const OrdersPipeline: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <MediaLightbox isOpen={comprobante.length > 0} media={comprobante} onClose={() => setComprobante([])} />
         </div>
     );
 };
