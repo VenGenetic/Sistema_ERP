@@ -28,16 +28,45 @@ export const BuscarEnHilo: React.FC<Props> = ({ mensajes, onCerrar, tactil = fal
         return mensajes.filter((m) => !m.deleted_at && normalizar(m.body ?? '').includes(q)).map((m) => m.id);
     }, [mensajes, termino]);
 
-    useEffect(() => setIndice(Math.max(0, coincidencias.length - 1)), [termino, coincidencias.length]);
+    /** Lleva el hilo hasta ese mensaje y lo marca un momento. */
+    const resaltar = (id: number) => {
+        const nodo = document.getElementById(`wa-message-${id}`);
+        if (!nodo) return;
+        nodo.scrollIntoView({ behavior: 'auto', block: 'center' });
+        nodo.classList.add('ring-2', 'ring-wa-accent', 'ring-offset-2');
+        window.setTimeout(() => nodo.classList.remove('ring-2', 'ring-wa-accent', 'ring-offset-2'), 1400);
+    };
+
+    /*
+        Al escribir se salta SOLO a la coincidencia más reciente.
+
+        Antes el buscador contaba los resultados y no se movía: decía
+        «5/5» con el hilo clavado donde estaba, y había que apretar Enter
+        para que pasara algo -- y ese Enter, desde la última, daba la
+        vuelta y llevaba a la MÁS VIEJA. Buscar «transferencia» en un chat
+        de meses aterrizaba en el comprobante del año pasado.
+
+        Se depende de los ids y no del array: el repaso del hilo cada
+        ocho segundos lo reconstruye, y sin esto cada repaso volvería a
+        arrancarle la pantalla de las manos a quien está leyendo.
+    */
+    const idsCoincidentes = coincidencias.join(',');
+    useEffect(() => {
+        if (coincidencias.length === 0) {
+            setIndice(0);
+            return;
+        }
+        const ultima = coincidencias.length - 1;
+        setIndice(ultima);
+        resaltar(coincidencias[ultima]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [idsCoincidentes]);
 
     const ir = (nuevo: number) => {
         if (coincidencias.length === 0) return;
         const siguiente = (nuevo + coincidencias.length) % coincidencias.length;
         setIndice(siguiente);
-        const nodo = document.getElementById(`wa-message-${coincidencias[siguiente]}`);
-        nodo?.scrollIntoView({ behavior: 'auto', block: 'center' });
-        nodo?.classList.add('ring-2', 'ring-wa-accent', 'ring-offset-2');
-        window.setTimeout(() => nodo?.classList.remove('ring-2', 'ring-wa-accent', 'ring-offset-2'), 1400);
+        resaltar(coincidencias[siguiente]);
     };
 
     return (

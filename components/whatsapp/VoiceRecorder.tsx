@@ -76,6 +76,13 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton,
     const recorderRef = useRef<MediaRecorder | null>(null);
     const trozosRef = useRef<Blob[]>([]);
     const cronometroRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    /*
+        La URL del blob, por referencia. La limpieza del desmontaje corre
+        una sola vez y con `[]` se cerraba sobre el `grabacion` del primer
+        render -- siempre null -- así que una nota grabada y no enviada
+        dejaba su blob colgado en memoria hasta recargar la página.
+    */
+    const urlGrabacionRef = useRef<string | null>(null);
 
     /** Suelta el micrófono: si no, el navegador deja el indicador encendido. */
     const soltarMicrofono = () => {
@@ -87,9 +94,8 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton,
         () => () => {
             if (cronometroRef.current) clearInterval(cronometroRef.current);
             soltarMicrofono();
-            if (grabacion) URL.revokeObjectURL(grabacion.url);
+            if (urlGrabacionRef.current) URL.revokeObjectURL(urlGrabacionRef.current);
         },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         [],
     );
 
@@ -113,7 +119,9 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton,
             rec.ondataavailable = (e) => e.data.size > 0 && trozosRef.current.push(e.data);
             rec.onstop = () => {
                 const blob = new Blob(trozosRef.current, { type: mime });
-                setGrabacion({ blob, url: URL.createObjectURL(blob), mime });
+                const url = URL.createObjectURL(blob);
+                urlGrabacionRef.current = url;
+                setGrabacion({ blob, url, mime });
                 soltarMicrofono();
             };
 
@@ -121,19 +129,27 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton,
             rec.start();
             setGrabando(true);
             setSegundos(0);
-            cronometroRef.current = setInterval(() => {
-                setSegundos((s) => {
-                    // Se corta sola en el tope en vez de grabar diez minutos
-                    // que después nadie va a escuchar.
-                    if (s + 1 >= MAX_SEGUNDOS) detener();
-                    return s + 1;
-                });
-            }, 1000);
+            /*
+                El actualizador de `setSegundos` solo cuenta. El corte en el
+                tope vive en su propio efecto: llamar a `detener()` -- que
+                cambia tres estados y para el MediaRecorder -- desde dentro
+                de un actualizador es un efecto colateral en una función que
+                React puede volver a ejecutar, y en modo estricto la
+                grabación se cortaba dos veces.
+            */
+            cronometroRef.current = setInterval(() => setSegundos((s) => s + 1), 1000);
         } catch {
             // Lo más común: la persona rechazó el permiso del micrófono.
             setError('No se pudo usar el micrófono. Revisá el permiso del navegador.');
         }
     };
+
+    /* Se corta sola en el tope: nadie escucha una nota de tres minutos, y
+       una grabación abierta por olvido se queda con el micrófono. */
+    useEffect(() => {
+        if (grabando && segundos >= MAX_SEGUNDOS) detener();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [grabando, segundos]);
 
     const detener = () => {
         if (cronometroRef.current) clearInterval(cronometroRef.current);
@@ -144,6 +160,7 @@ export const VoiceRecorder: React.FC<Props> = ({ onEnviar, disabled, claseBoton,
 
     const descartar = () => {
         if (grabacion) URL.revokeObjectURL(grabacion.url);
+        urlGrabacionRef.current = null;
         setGrabacion(null);
         setSegundos(0);
     };

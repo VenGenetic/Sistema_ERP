@@ -4,6 +4,7 @@ import { FileText, Loader2, Minus, Plus, Search, Send, ShoppingCart, Store, Tras
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { convertProformaToPosCart } from '../../utils/proformaToCart';
 import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
+import { Tooltip } from '../ui/Tooltip';
 import { FotoRepuesto } from '../FotoRepuesto';
 import { fetchProformaStockInfo, type ProformaStockInfo } from '../../utils/proformaStock';
 import {
@@ -435,7 +436,9 @@ export const ProformaBuilder: React.FC<Props> = ({
                                             className="w-11 h-11 rounded-lg"
                                         />
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                                            <Tooltip texto={p.name}>
+                                                <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                                            </Tooltip>
                                             <p className="text-2xs text-fg-subtle truncate">{p.sku}</p>
                                         </div>
                                         <div className="text-right shrink-0">
@@ -514,7 +517,9 @@ export const ProformaBuilder: React.FC<Props> = ({
                                     <div className="flex items-start gap-2">
                                         <FotoRepuesto url={item.imageUrl} sku={item.sku} nombre={item.name} className="w-10 h-10 rounded-lg" />
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-xs font-medium text-fg leading-snug line-clamp-2">{item.name}</p>
+                                            <Tooltip texto={item.name}>
+                                                <p className="text-xs font-medium text-fg leading-snug line-clamp-2">{item.name}</p>
+                                            </Tooltip>
                                             <p className="text-2xs text-fg-subtle">{item.sku}</p>
                                         </div>
                                         <button

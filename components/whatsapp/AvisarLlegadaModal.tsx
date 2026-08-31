@@ -14,6 +14,7 @@ import {
 import { supabase } from '../../supabaseClient';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { badge, button, cn, input, modal } from '../ui/styles';
+import { Tooltip } from '../ui/Tooltip';
 import { FotoRepuesto } from '../FotoRepuesto';
 import { avisoDeEnvio, haceCuanto, type EstadoAgente } from './agente';
 import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
@@ -674,9 +675,11 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                                     nombre={d.product?.name}
                                                 />
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="line-clamp-2 text-xs font-medium leading-snug text-fg">
-                                                        {d.product?.name ?? 'Repuesto sin vincular'}
-                                                    </p>
+                                                    <Tooltip texto={d.product?.name}>
+                                                        <p className="line-clamp-2 text-xs font-medium leading-snug text-fg">
+                                                            {d.product?.name ?? 'Repuesto sin vincular'}
+                                                        </p>
+                                                    </Tooltip>
                                                     <p className="truncate text-2xs text-fg-subtle">
                                                         {d.customer_name?.trim() || d.phone_number} · pedido{' '}
                                                         {esperandoDesde(d.created_at)}

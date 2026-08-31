@@ -464,7 +464,14 @@ export function textoDeProducto(p: ProductoCatalogo, opciones: OpcionesTextoProd
     const lineas: string[] = [p.name];
 
     const precio = opciones.precio ?? (p.price != null ? precioParaCliente(p.price) : null);
-    if (opciones.incluirPrecio && precio != null) {
+    /*
+        Un precio de cero NO se escribe. Un repuesto sin precio en el
+        catálogo llegaba acá como 0 y el mensaje salía diciendo
+        "Precio: $0.00" -- que en un chat con un cliente no es un dato
+        faltante, es una oferta. Sin precio se manda el repuesto y la
+        disponibilidad, y el precio lo dice quien atiende.
+    */
+    if (opciones.incluirPrecio && precio != null && precio > 0) {
         lineas.push(`Precio: ${formatearPrecio(precio)}`);
     }
 

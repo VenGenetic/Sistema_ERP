@@ -45,6 +45,7 @@ import ChatThread, {
 } from '../components/whatsapp/ChatThread';
 import { useChatProformaStore } from '../store/useChatProformaStore';
 import { getDueWorkIds } from '../utils/whatsappWorkflow';
+import { buscarConversacionesPorTexto } from '../utils/whatsappConversationSearch';
 import { attributeMessages } from '../utils/messageAttribution';
 import {
     borrarMensaje,
@@ -235,7 +236,16 @@ const Avatar: React.FC<{ nombre: string | null; telefono: string; tam?: 'sm' | '
     );
 };
 
-type Tab = 'pending' | 'resolved' | 'all' | 'unread' | 'archived' | 'ai_ready' | 'attention';
+type Tab =
+    | 'pending'
+    | 'resolved'
+    | 'all'
+    | 'unread'
+    | 'archived'
+    | 'ai_ready'
+    | 'ai_active'
+    | 'answered'
+    | 'attention';
 
 interface ConversationPreferences {
     pinned: number[];
@@ -452,6 +462,8 @@ const WhatsAppInbox: React.FC = () => {
     const [menuTelefono, setMenuTelefono] = useState<{ numero: string; ancla: DOMRect } | null>(null);
     const [nuevoChat, setNuevoChat] = useState(false);
     const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+    // El chat abierto no depende de que siga dentro del filtro visible.
+    const [selectedConversationCache, setSelectedConversationCache] = useState<Conversation | null>(null);
     const [globalBotEnabled, setGlobalBotEnabled] = useState<boolean | null>(null);
     /**
      * Los dos agentes, por separado. `null` mientras no se sabe, y también
@@ -562,6 +574,26 @@ const WhatsAppInbox: React.FC = () => {
     const [errorCarga, setErrorCarga] = useState<string | null>(null);
     const [errorAccion, setErrorAccion] = useState<string | null>(null);
     const [attentionIds, setAttentionIds] = useState<number[]>([]);
+    /**
+     * Abrir un chat manda el acuse de lectura a WhatsApp, pero no lo saca de
+     * la lista de pendientes en mitad del trabajo. Se limpia al actualizar la
+     * bandeja o al recargar la página, que es cuando se vuelve a leer el
+     * estado real del teléfono.
+     */
+    const noLeidosConservadosRef = useRef<Set<number>>(new Set());
+    const [noLeidosConservados, setNoLeidosConservados] = useState<Set<number>>(() => new Set());
+    const actualizarNoLeidoConservado = useCallback((conversationId: number, conservar: boolean) => {
+        const siguiente = new Set(noLeidosConservadosRef.current);
+        if (conservar) siguiente.add(conversationId);
+        else siguiente.delete(conversationId);
+        noLeidosConservadosRef.current = siguiente;
+        setNoLeidosConservados(siguiente);
+    }, []);
+    const limpiarNoLeidosConservados = useCallback(() => {
+        const siguiente = new Set<number>();
+        noLeidosConservadosRef.current = siguiente;
+        setNoLeidosConservados(siguiente);
+    }, []);
 
     // Una ficha abierta pertenece al chat donde se tocó. Al cambiar de
     // cliente se cierra para no mostrar por accidente el repuesto anterior.
@@ -604,7 +636,28 @@ const WhatsAppInbox: React.FC = () => {
     const fetchConversations = useCallback(async (silencioso = false) => {
         if (!silencioso) setConversationsLoading(true);
 
-        const consulta = (campos: string) => {
+        const termino = searchRef.current.trim();
+        let resultadosDeTexto: Awaited<ReturnType<typeof buscarConversacionesPorTexto>> = null;
+        let errorDeBusqueda: string | null = null;
+
+        if (termino.length >= 2) {
+            try {
+                resultadosDeTexto = await buscarConversacionesPorTexto(termino, CONVERSACIONES_POR_PAGINA);
+            } catch (err: any) {
+                console.error('Error buscando mensajes de WhatsApp:', err?.message ?? err);
+                errorDeBusqueda = 'No se pudo buscar dentro de los mensajes; se buscará por nombre y número.';
+            }
+        }
+
+        if (resultadosDeTexto && resultadosDeTexto.conversationIds.length === 0) {
+            if (!silencioso) setConversationsLoading(false);
+            setConversations([]);
+            setTotalConversaciones(0);
+            setErrorCarga(null);
+            return;
+        }
+
+        const consulta = (campos: string, incluirEtapa = true) => {
             let q = supabase
                 .from('agent_conversations')
                 // `count: 'exact'` da el total REAL de la tabla (o de la
@@ -614,9 +667,19 @@ const WhatsAppInbox: React.FC = () => {
                 .select(campos, { count: 'exact' })
                 .order('last_message_at', { ascending: false, nullsFirst: false })
                 .limit(CONVERSACIONES_POR_PAGINA);
-            const filtro = filtroBusqueda(searchRef.current);
-            if (filtro) q = q.or(filtro);
-            if (tabRef.current === 'unread') q = q.gt('unread_count', 0);
+            if (resultadosDeTexto) {
+                q = q.in('id', resultadosDeTexto.conversationIds);
+            } else {
+                const filtro = filtroBusqueda(searchRef.current);
+                if (filtro) q = q.or(filtro);
+            }
+            if (tabRef.current === 'unread') {
+                const condiciones = ['unread_count.gt.0'];
+                if (incluirEtapa) condiciones.push('etapa.eq.ready_for_sales');
+                const conservados = [...noLeidosConservadosRef.current];
+                if (conservados.length > 0) condiciones.push(`id.in.(${conservados.join(',')})`);
+                q = q.or(condiciones.join(','));
+            }
             // La IA de recepción marca esta etapa únicamente cuando ya
             // recopiló los datos y el caso quedó preparado para cotizar.
             if (tabRef.current === 'ai_ready') q = q.eq('etapa', 'ready_for_sales');
@@ -634,7 +697,7 @@ const WhatsAppInbox: React.FC = () => {
             setErrorCarga('Para usar “IA lista” falta aplicar la migración de etapas del agente (0035).');
             return;
         }
-        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE));
+        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE, false));
 
         if (!silencioso) setConversationsLoading(false);
         if (error) {
@@ -642,9 +705,14 @@ const WhatsAppInbox: React.FC = () => {
             setErrorCarga(`No se pudieron cargar las conversaciones: ${error.message}`);
             return;
         }
-        setErrorCarga(null);
+        setErrorCarga(errorDeBusqueda);
         setConversations((data ?? []) as unknown as Conversation[]);
-        setTotalConversaciones(count ?? null);
+        // En "Todas" el RPC conoce el total real de coincidencias. Los otros
+        // filtros agregan reglas propias, así que su conteo sigue saliendo de
+        // la consulta final para no mostrar una cifra engañosa.
+        setTotalConversaciones(
+            tabRef.current === 'all' && resultadosDeTexto ? resultadosDeTexto.total : count ?? null,
+        );
     }, []);
 
     /**
@@ -889,13 +957,28 @@ const WhatsAppInbox: React.FC = () => {
         [filtroEtapa],
     );
 
+    /**
+     * "No leído" en la bandeja significa "todavía requiere seguimiento":
+     * incluye el contador real, los datos que la IA ya dejó listos para el
+     * vendedor y los chats recién abiertos que se conservan hasta refrescar.
+     */
+    const tienePendienteVisual = useCallback(
+        (conversation: Pick<Conversation, 'id' | 'unread_count' | 'etapa'>) =>
+            conversation.unread_count > 0 ||
+            conversation.etapa === 'ready_for_sales' ||
+            noLeidosConservados.has(conversation.id),
+        [noLeidosConservados],
+    );
+
     const filteredConversations = useMemo(() => {
         let rows = tab === 'archived'
             ? conversations.filter((c) => conversationPreferences.archived.includes(c.id))
             : conversations.filter((c) => !conversationPreferences.archived.includes(c.id));
-        if (tab === 'unread') rows = rows.filter((c) => c.unread_count > 0);
+        if (tab === 'unread') rows = rows.filter(tienePendienteVisual);
         if (tab === 'ai_ready') rows = rows.filter((c) => c.etapa === 'ready_for_sales');
-        if (tab === 'attention') rows = rows.filter((c) => c.unread_count > 0 || c.etapa === 'ready_for_sales' || attentionIds.includes(c.id));
+        if (tab === 'ai_active') rows = rows.filter((c) => c.bot_enabled && c.status === 'bot_active');
+        if (tab === 'answered') rows = rows.filter((c) => c.last_message_direction === 'outbound' && !tienePendienteVisual(c));
+        if (tab === 'attention') rows = rows.filter((c) => tienePendienteVisual(c) || attentionIds.includes(c.id));
         if (etapasDelFiltro && tab === 'all') {
             rows = rows.filter((c) => !c.etapa || etapasDelFiltro.includes(c.etapa));
         }
@@ -904,7 +987,7 @@ const WhatsAppInbox: React.FC = () => {
             const bPinned = conversationPreferences.pinned.includes(b.id) ? 1 : 0;
             return bPinned - aPinned;
         });
-    }, [conversations, etapasDelFiltro, tab, conversationPreferences, attentionIds]);
+    }, [conversations, etapasDelFiltro, tab, conversationPreferences, attentionIds, tienePendienteVisual]);
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
@@ -917,14 +1000,16 @@ const WhatsAppInbox: React.FC = () => {
      */
     const metricas = useMemo(() => {
         const activos = conversations.filter((c) => c.bot_enabled).length;
-        const sinLeer = conversations.filter((c) => c.unread_count > 0).length;
+        const sinLeer = conversations.filter(tienePendienteVisual).length;
+        const iaAtendiendo = conversations.filter((c) => c.bot_enabled && c.status === 'bot_active').length;
+        const respondidos = conversations.filter((c) => c.last_message_direction === 'outbound' && !tienePendienteVisual(c)).length;
         const hoy = new Date().toISOString().slice(0, 10);
         const escaladosHoy = escalations.filter((e) => e.created_at.slice(0, 10) === hoy).length;
         // El total sale del `count` de la consulta; el resto se calcula
         // sobre lo cargado y por eso se aclara en pantalla que es "de las
         // recientes" cuando hay más de las que entran en una página.
-        return { activos, sinLeer, escaladosHoy, total: totalConversaciones ?? conversations.length };
-    }, [conversations, escalations, totalConversaciones]);
+        return { activos, sinLeer, iaAtendiendo, respondidos, escaladosHoy, total: totalConversaciones ?? conversations.length };
+    }, [conversations, escalations, totalConversaciones, tienePendienteVisual]);
 
     /** Hay más conversaciones que las traídas en esta página. */
     const hayMas = totalConversaciones !== null && totalConversaciones > conversations.length;
@@ -944,14 +1029,25 @@ const WhatsAppInbox: React.FC = () => {
 
     const selectedEscalation = escalations.find((e) => e.id === selectedId) ?? null;
 
+    useEffect(() => {
+        if (selectedConversationId === null) {
+            setSelectedConversationCache(null);
+            return;
+        }
+        const current = conversations.find((conversation) => conversation.id === selectedConversationId);
+        if (current) setSelectedConversationCache(current);
+    }, [conversations, selectedConversationId]);
+
     // Un solo "seleccionado" para las tres pestañas: en Pendientes/Resueltas
     // viene de un escalamiento, en Todas de la conversación suelta. El
     // `bot_enabled` se lee siempre de `conversations` cuando está cargada,
     // así el botón refleja el estado real aunque el escalamiento se haya
     // traído antes del último cambio.
     const selected: SelectedContext | null = useMemo(() => {
-        if (tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention') {
-            const conv = conversations.find((c) => c.id === selectedConversationId);
+        if (tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'ai_active' || tab === 'answered' || tab === 'attention') {
+            // Al marcarlo leído puede salir de la lista filtrada; el hilo sigue abierto.
+            const conv = conversations.find((c) => c.id === selectedConversationId)
+                ?? (selectedConversationCache?.id === selectedConversationId ? selectedConversationCache : null);
             if (!conv) return null;
             return {
                 conversationId: conv.id,
@@ -978,12 +1074,12 @@ const WhatsAppInbox: React.FC = () => {
             unreadCount: conv?.unread_count ?? 0,
             escalation: selectedEscalation,
         };
-    }, [tab, conversations, selectedConversationId, selectedEscalation]);
+    }, [tab, conversations, selectedConversationId, selectedConversationCache, selectedEscalation]);
 
     const colaDeAtencion = useMemo(() => conversations.filter((conversation) =>
         !conversationPreferences.archived.includes(conversation.id) &&
-        (conversation.unread_count > 0 || conversation.etapa === 'ready_for_sales' || attentionIds.includes(conversation.id)),
-    ), [conversations, conversationPreferences.archived, attentionIds]);
+        (tienePendienteVisual(conversation) || attentionIds.includes(conversation.id)),
+    ), [conversations, conversationPreferences.archived, attentionIds, tienePendienteVisual]);
 
     const abrirSiguientePendiente = useCallback(() => {
         if (colaDeAtencion.length === 0) return;
@@ -999,6 +1095,15 @@ const WhatsAppInbox: React.FC = () => {
             const target = event.target as HTMLElement | null;
             const editing = target?.matches('input, textarea, select, [contenteditable="true"]');
             if (editing || event.ctrlKey || event.metaKey || event.altKey) return;
+            /*
+                Con un modal abierto los atajos NO corren. El catálogo, la
+                proforma y el aviso de llegada se manejan con el mouse: al
+                tocar una tarjeta el foco queda en un `div role="button"`,
+                que no es un campo de texto, así que la siguiente letra que
+                se escribía saltaba de conversación o abría un panel DETRÁS
+                del modal -- sin que nada en pantalla lo explicara.
+            */
+            if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
             if (event.key.toLowerCase() === 'n') { event.preventDefault(); abrirSiguientePendiente(); }
             if (event.key.toLowerCase() === 'r' && selected) {
                 event.preventDefault();
@@ -1195,8 +1300,9 @@ const WhatsAppInbox: React.FC = () => {
     }, [selected?.conversationId, recargarMensajes]);
 
     /**
-     * Tener el chat a la vista con algo sin leer lo marca como leído -- acá
-     * y en WhatsApp.
+     * Tener el chat a la vista manda el acuse de lectura a WhatsApp, pero lo
+     * conserva en "No leídos" durante esta sesión para que no desaparezca
+     * debajo de quien lo está atendiendo.
      *
      * Depende del CONTEO y no solo de qué chat está abierto: si el cliente
      * escribe mientras la conversación está en pantalla, esa vuelta también
@@ -1209,7 +1315,7 @@ const WhatsAppInbox: React.FC = () => {
      */
     useEffect(() => {
         if (selected && selected.unreadCount > 0) {
-            marcarLeida(selected.conversationId);
+            marcarLeida(selected.conversationId, true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selected?.conversationId, selected?.unreadCount]);
@@ -1378,7 +1484,8 @@ const WhatsAppInbox: React.FC = () => {
      * pendiente en el teléfono y el siguiente `chats.update` lo devolvía a
      * la lista como si nadie lo hubiera abierto.
      */
-    const marcarLeida = useCallback(async (conversationId: number) => {
+    const marcarLeida = useCallback(async (conversationId: number, conservarEnLista = false) => {
+        actualizarNoLeidoConservado(conversationId, conservarEnLista);
         // No se espera ni rompe la apertura del chat: es un acuse, y que
         // el agente esté caído no puede impedir abrir una conversación.
         marcarLeidoEnWhatsApp(conversationId, userIdRef.current).catch((err) =>
@@ -1396,7 +1503,7 @@ const WhatsAppInbox: React.FC = () => {
         setConversations((prev) =>
             prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 0 } : c)),
         );
-    }, []);
+    }, [actualizarNoLeidoConservado]);
 
 
     /**
@@ -1455,6 +1562,7 @@ const WhatsAppInbox: React.FC = () => {
         setErrorAccion(null);
         try {
             await marcarNoLeido(conversationId, userId);
+            actualizarNoLeidoConservado(conversationId, true);
             setConversations((prev) =>
                 prev.map((c) => (c.id === conversationId ? { ...c, unread_count: 1 } : c)),
             );
@@ -1698,6 +1806,7 @@ const WhatsAppInbox: React.FC = () => {
 
                 <button
                     onClick={() => {
+                        limpiarNoLeidosConservados();
                         fetchEscalations();
                         fetchConversations();
                         fetchSettings();
@@ -1781,8 +1890,8 @@ const WhatsAppInbox: React.FC = () => {
                                 type="search"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Buscar por nombre o teléfono"
-                                aria-label="Buscar cliente por teléfono o nombre"
+                                placeholder="Buscar por nombre, número o mensaje"
+                                aria-label="Buscar chat por nombre, teléfono o palabras del mensaje"
                                 className="h-9 w-full rounded-lg border-none bg-wa-input pl-9 pr-9 text-[13.5px] text-wa-text outline-none placeholder:text-wa-meta focus:ring-0"
                             />
                             {search && (
@@ -1839,9 +1948,11 @@ const WhatsAppInbox: React.FC = () => {
                             {(
                                 [
                                     { id: 'all' as Tab, texto: 'Todas', cuenta: null },
-                                    { id: 'attention' as Tab, texto: 'Por atender', cuenta: filteredConversations.length, icono: Clock },
+                                    { id: 'attention' as Tab, texto: 'Por atender', cuenta: colaDeAtencion.length, icono: Clock },
                                     { id: 'unread' as Tab, texto: 'No leídos', cuenta: metricas.sinLeer },
                                     { id: 'ai_ready' as Tab, texto: 'IA lista', cuenta: listasParaVendedor, icono: Sparkles },
+                                    { id: 'ai_active' as Tab, texto: 'IA atiende', cuenta: metricas.iaAtendiendo, icono: Bot },
+                                    { id: 'answered' as Tab, texto: 'Respondidos', cuenta: metricas.respondidos, icono: CheckCheck },
                                     { id: 'archived' as Tab, texto: 'Archivados', cuenta: conversationPreferences.archived.length },
                                     { id: 'pending' as Tab, texto: 'Pendientes', cuenta: pendingCount },
                                     { id: 'resolved' as Tab, texto: 'Resueltas', cuenta: null },
@@ -1912,9 +2023,9 @@ const WhatsAppInbox: React.FC = () => {
                     {/* Cada pestaña espera SU propia carga: la de "Todas" usaba el
                         loading de escalamientos y por eso mostraba "no hay
                         conversaciones" mientras la consulta seguía en vuelo. */}
-                    {(tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention' ? conversationsLoading : loading) ? (
+                    {(tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'ai_active' || tab === 'answered' || tab === 'attention' ? conversationsLoading : loading) ? (
                         <div className="p-8 text-center text-sm text-wa-meta">Cargando…</div>
-                    ) : tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention' ? (
+                    ) : tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'ai_active' || tab === 'answered' || tab === 'attention' ? (
                         filteredConversations.length === 0 ? (
                             <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
                                 <Inbox size={22} aria-hidden="true" />
@@ -1924,6 +2035,10 @@ const WhatsAppInbox: React.FC = () => {
                                       ? 'No tienes mensajes sin leer.'
                                       : tab === 'ai_ready'
                                         ? 'La IA todavía no ha dejado conversaciones listas para cotizar.'
+                                      : tab === 'ai_active'
+                                        ? 'La IA no está atendiendo conversaciones en este momento.'
+                                      : tab === 'answered'
+                                        ? 'Todavía no hay conversaciones respondidas.'
                                       : tab === 'attention'
                                         ? 'No hay conversaciones que requieran atención ahora.'
                                       : tab === 'archived'
@@ -1935,6 +2050,7 @@ const WhatsAppInbox: React.FC = () => {
                                 <button
                                     key={c.id}
                                     onClick={() => setSelectedConversationId(c.id)}
+                                    aria-current={selectedConversationId === c.id ? 'page' : undefined}
                                     onMouseEnter={(event) => {
                                         if (!c.last_message_preview) return;
                                         const rect = event.currentTarget.getBoundingClientRect();
@@ -1961,8 +2077,11 @@ const WhatsAppInbox: React.FC = () => {
                                         });
                                     }}
                                     className={cn(
-                                        'w-full cursor-pointer text-left flex items-center gap-3 pl-3 transition-colors',
-                                        selectedConversationId === c.id ? 'bg-wa-active' : 'hover:bg-wa-hover',
+                                        'relative w-full cursor-pointer text-left flex items-center gap-3 pl-3 transition-colors before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-transparent',
+                                        focusRing,
+                                        selectedConversationId === c.id
+                                            ? 'bg-wa-active before:bg-wa-accent ring-1 ring-inset ring-wa-accent/30'
+                                            : 'hover:bg-wa-hover',
                                     )}
                                 >
                                     <Avatar nombre={c.customer_name} telefono={c.phone_number} />
@@ -1977,7 +2096,7 @@ const WhatsAppInbox: React.FC = () => {
                                             <span
                                                 className={cn(
                                                     'truncate text-[16px] leading-[21px] text-wa-text',
-                                                    c.unread_count > 0 ? 'font-semibold' : 'font-normal',
+                                                    tienePendienteVisual(c) ? 'font-semibold' : 'font-normal',
                                                 )}
                                             >
                                                 {c.customer_name || formatPhone(c)}
@@ -1986,7 +2105,7 @@ const WhatsAppInbox: React.FC = () => {
                                                 <span
                                                     className={cn(
                                                         'shrink-0 text-[12px] leading-[16px]',
-                                                        c.unread_count > 0 ? 'font-semibold text-wa-accent-strong' : 'text-wa-meta',
+                                                        tienePendienteVisual(c) ? 'font-semibold text-wa-accent-strong' : 'text-wa-meta',
                                                     )}
                                                 >
                                                     {horaLista(c.last_message_at)}
@@ -2001,7 +2120,7 @@ const WhatsAppInbox: React.FC = () => {
                                                 title={c.last_message_preview || undefined}
                                                 className={cn(
                                                     'min-w-0 flex-1 truncate text-[13.5px] leading-[19px]',
-                                                    c.unread_count > 0 ? 'text-wa-text' : 'text-wa-meta',
+                                                    tienePendienteVisual(c) ? 'text-wa-text' : 'text-wa-meta',
                                                 )}
                                             >
                                                 {c.last_message_preview ? (
@@ -2068,14 +2187,14 @@ const WhatsAppInbox: React.FC = () => {
                         )
                     ) : null}
 
-                    {(tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'attention') && !conversationsLoading && hayMas && (
+                    {(tab === 'all' || tab === 'unread' || tab === 'archived' || tab === 'ai_ready' || tab === 'ai_active' || tab === 'answered' || tab === 'attention') && !conversationsLoading && hayMas && (
                         <p className="px-4 py-3 text-center text-[12px] text-wa-meta">
                             Mostrando las {conversations.length} más recientes de {totalConversaciones}.
                             {' '}Usá el buscador para encontrar una conversación puntual.
                         </p>
                     )}
 
-                    {tab !== 'all' && tab !== 'unread' && tab !== 'archived' && tab !== 'ai_ready' && tab !== 'attention' && (loading ? null : filtered.length === 0 ? (
+                    {tab !== 'all' && tab !== 'unread' && tab !== 'archived' && tab !== 'ai_ready' && tab !== 'ai_active' && tab !== 'answered' && tab !== 'attention' && (loading ? null : filtered.length === 0 ? (
                         <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
                             <Inbox size={22} aria-hidden="true" />
                             {search.trim()
@@ -2191,8 +2310,8 @@ const WhatsAppInbox: React.FC = () => {
                                             ? globalBotEnabled === false
                                                 ? 'agente activado acá, pero apagado en general'
                                                 : selected.selectedAgent === 'sales'
-                                                    ? 'atenciÃ³n completa activa'
-                                                    : 'agente de informaciÃ³n activo'
+                                                    ? 'atención completa activa'
+                                                    : 'agente de información activo'
                                             : 'contesta el vendedor'}
                                     </p>
                                 </div>
@@ -2535,6 +2654,7 @@ const WhatsAppInbox: React.FC = () => {
                 const pinned = conversationPreferences.pinned.includes(c.id);
                 const archived = conversationPreferences.archived.includes(c.id);
                 const muted = conversationPreferences.muted.includes(c.id);
+                const noLeidoEnLista = c.unread_count > 0 || noLeidosConservados.has(c.id);
                 const itemClass = 'flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-[13.5px] text-wa-text transition-colors hover:bg-wa-hover disabled:cursor-not-allowed disabled:opacity-50';
                 return (
                     <div
@@ -2558,12 +2678,12 @@ const WhatsAppInbox: React.FC = () => {
                             disabled={actionLoading}
                             onClick={async () => {
                                 setConversationMenu(null);
-                                if (c.unread_count > 0) await marcarLeida(c.id);
+                                if (noLeidoEnLista) await marcarLeida(c.id);
                                 else await marcarComoNoLeido(c.id);
                             }}
                         >
-                            {c.unread_count > 0 ? <CheckCheck size={17} aria-hidden="true" /> : <MailQuestion size={17} aria-hidden="true" />}
-                            {c.unread_count > 0 ? 'Marcar como leído' : 'Marcar como no leído'}
+                            {noLeidoEnLista ? <CheckCheck size={17} aria-hidden="true" /> : <MailQuestion size={17} aria-hidden="true" />}
+                            {noLeidoEnLista ? 'Marcar como leído' : 'Marcar como no leído'}
                         </button>
                         <button role="menuitem" className={itemClass} onClick={() => { toggleConversationPreference('pinned', c.id); setConversationMenu(null); }}>
                             <Pin size={17} aria-hidden="true" /> {pinned ? 'Desfijar conversación' : 'Fijar conversación'}

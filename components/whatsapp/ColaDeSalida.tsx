@@ -108,7 +108,12 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
 
     useEffect(() => {
         if (!conversationId) {
+            // Se limpia TODO, no solo las burbujas: los avisos de acciones
+            // fallidas del chat anterior se quedaban en pantalla y volvían a
+            // aparecer sobre el hilo del cliente siguiente.
             setEnCola([]);
+            setAccionesFallidas([]);
+            setHayAccionesPendientes(false);
             return;
         }
         recargar();

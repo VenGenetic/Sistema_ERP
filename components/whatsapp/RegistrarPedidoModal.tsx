@@ -3,6 +3,7 @@ import { Loader2, Package, Search, X } from 'lucide-react';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { supabase } from '../../supabaseClient';
 import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
+import { Tooltip } from '../ui/Tooltip';
 import { FotoRepuesto } from '../FotoRepuesto';
 import { buscarEnCatalogo, formatearPrecio, precioParaCliente, stockUtil, type ProductoCatalogo } from '../../utils/whatsappOutbox';
 
@@ -198,7 +199,9 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
                                         >
                                             <FotoRepuesto url={p.image_url} sku={p.sku} nombre={p.name} />
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                                                <Tooltip texto={p.name}>
+                                                    <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                                                </Tooltip>
                                                 <p className="text-2xs text-fg-subtle truncate">{p.sku}</p>
                                             </div>
                                             <span

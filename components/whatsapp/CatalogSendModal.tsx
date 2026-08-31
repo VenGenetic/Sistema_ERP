@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ImageOff, Loader2, Minus, Package, Plus, Search, Send, Trash2, X, ZoomIn } from 'lucide-react';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
+import { Tooltip } from '../ui/Tooltip';
 import { MediaLightbox, type MediaItem } from '../MediaLightbox';
 import {
     buscarEnCatalogo,
@@ -60,7 +61,11 @@ interface Armado {
 
 function armadoInicial(producto: ProductoCatalogo): Armado {
     const opciones = {
-        incluirPrecio: true,
+        // Sin precio en el catálogo el interruptor arranca APAGADO. Antes
+        // arrancaba encendido con el precio en cero y el mensaje salía
+        // diciendo "Precio: $0.00": un repuesto que nadie cargó parecía
+        // regalado. Se puede encender y escribir el precio a mano.
+        incluirPrecio: producto.price != null,
         incluirDisponibilidad: true,
         precio: producto.price != null ? precioParaCliente(producto.price) : 0,
     };
@@ -134,6 +139,10 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
         setBuscado(false);
         setErrorBusqueda(null);
         setErrorEnvio(null);
+        // También el visor: el componente no se desmonta al cerrar el modal,
+        // así que una foto que quedó abierta reaparecía a pantalla completa
+        // -- la del cliente anterior -- apenas se volvía a abrir el catálogo.
+        setFoto([]);
         const t = setTimeout(() => inputRef.current?.focus(), 50);
         return () => clearTimeout(t);
     }, [isOpen]);
@@ -392,7 +401,9 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                                 )}
                                             </div>
                                             <div className="p-2.5">
-                                                <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                                                <Tooltip texto={p.name}>
+                                                    <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                                                </Tooltip>
                                                 <div className="mt-1.5 flex items-center justify-between gap-2">
                                                     <span className="text-sm font-semibold text-fg tnum">
                                                         {p.price != null ? formatearPrecio(precioParaCliente(p.price)) : 'sin precio'}
@@ -415,7 +426,9 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                                               : 'sin stock'}
                                                     </span>
                                                 </div>
-                                                <p className="text-2xs text-fg-subtle mt-1 truncate">{p.sku}</p>
+                                                <Tooltip texto={p.sku}>
+                                                    <p className="text-2xs text-fg-subtle mt-1 truncate">{p.sku}</p>
+                                                </Tooltip>
                                             </div>
                                         </div>
                                     );
@@ -443,7 +456,7 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                             {armados.length >= 2 && (
                                 <div className="overflow-hidden rounded-xl border border-primary/20 bg-primary-soft/30">
                                     <div className="border-b border-primary/15 px-3 py-2"><p className="text-xs font-bold text-fg">Comparación rápida</p><p className="text-2xs text-fg-muted">Precio y disponibilidad de los seleccionados</p></div>
-                                    <div className="overflow-x-auto"><table className="w-full text-[11px]"><thead className="text-left text-fg-muted"><tr><th className="px-3 py-1.5">Repuesto</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-3 py-1.5 text-right">Stock</th></tr></thead><tbody className="divide-y divide-primary/10">{armados.map((item) => { const stock = stockUtil(item.producto); return <tr key={`compare-${item.producto.product_id}`}><td className="max-w-40 truncate px-3 py-2 font-medium text-fg">{item.producto.name}</td><td className="px-2 py-2 text-right font-semibold tabular-nums text-fg">{formatearPrecio(item.precio)}</td><td className="px-3 py-2 text-right text-fg-muted">{stock.local > 0 ? `${stock.local} local` : stock.hay ? `${stock.importador} import.` : 'Agotado'}</td></tr>; })}</tbody></table></div>
+                                    <div className="overflow-x-auto"><table className="w-full text-[11px]"><thead className="text-left text-fg-muted"><tr><th className="px-3 py-1.5">Repuesto</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-3 py-1.5 text-right">Stock</th></tr></thead><tbody className="divide-y divide-primary/10">{armados.map((item) => { const stock = stockUtil(item.producto); return <tr key={`compare-${item.producto.product_id}`}><td className="max-w-40 px-3 py-2 font-medium text-fg"><Tooltip texto={item.producto.name}><span className="block truncate">{item.producto.name}</span></Tooltip></td><td className="px-2 py-2 text-right font-semibold tabular-nums text-fg">{formatearPrecio(item.precio)}</td><td className="px-3 py-2 text-right text-fg-muted">{stock.local > 0 ? `${stock.local} local` : stock.hay ? `${stock.importador} import.` : 'Agotado'}</td></tr>; })}</tbody></table></div>
                                 </div>
                             )}
 
@@ -555,6 +568,13 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                                     >
                                                         <Plus size={11} aria-hidden="true" />
                                                     </button>
+                                                    {/* En cero no se manda ningún precio: se avisa
+                                                        para que nadie crea que el cliente lo vio. */}
+                                                    {a.precio <= 0 && (
+                                                        <span className="text-2xs text-warning-soft-fg">
+                                                            sin precio · no se incluye
+                                                        </span>
+                                                    )}
                                                     {/* Si se movió del de lista se avisa: es fácil
                                                         mandar un precio ajustado sin darse cuenta. */}
                                                     {a.producto.price != null &&

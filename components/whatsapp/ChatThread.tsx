@@ -57,6 +57,12 @@ export interface MensajeHilo {
     whatsapp_message_id: string | null;
     deleted_at: string | null;
     reaction: string | null;
+    /**
+     * El mensaje al que ESTE contesta, identificado como lo identifica
+     * WhatsApp. Opcional: una pantalla que no traiga la columna dibuja el
+     * hilo igual, solo que sin las tarjetitas de cita.
+     */
+    reply_to_wa_id?: string | null;
     sender_kind?: 'customer' | 'human' | 'agent' | 'unknown';
     sender_label?: string;
     sender_email?: string | null;
@@ -340,8 +346,44 @@ export function useHiloPegadoAbajo(
     }, [ref, conversacion]);
 }
 
+/**
+ * La tarjetita del mensaje citado, arriba del texto de la burbuja.
+ *
+ * WhatsApp la dibuja siempre que alguien contesta a un mensaje puntual, y
+ * sin ella una respuesta pierde su referente: el cliente manda cinco
+ * mensajes seguidos, el vendedor contesta al tercero, y en el hilo del ERP
+ * quedaba un «sí, ese lo tengo» suelto que no se sabía a qué contestaba.
+ * El dato (`reply_to_wa_id`) ya viajaba desde la base sin que nadie lo
+ * dibujara.
+ *
+ * Solo se muestra cuando el mensaje citado está entre los cargados: una
+ * tarjeta vacía diciendo «contesta a algo» no le sirve a nadie.
+ */
+const Citado: React.FC<{ mensaje: MensajeHilo; entrante: boolean }> = ({ mensaje, entrante }) => (
+    <div
+        className={cn(
+            'mb-1 flex items-stretch gap-1.5 overflow-hidden rounded-[5px]',
+            entrante ? 'bg-wa-inset/[0.06]' : 'bg-black/[0.06]',
+        )}
+    >
+        {/* La barra de color de la izquierda es la señal de WhatsApp para
+            «esto es una cita»; sin ella la tarjeta se lee como un aviso. */}
+        <span className="w-1 shrink-0 bg-wa-accent" aria-hidden="true" />
+        <div className="min-w-0 flex-1 py-1 pr-1.5">
+            <p className="text-[12px] font-semibold leading-[15px] text-wa-accent">
+                {mensaje.direction === 'inbound' ? 'Cliente' : 'Vos'}
+            </p>
+            <p className="line-clamp-2 break-words text-[12.5px] leading-[16px] text-wa-meta">
+                {mensaje.deleted_at ? 'Se borró este mensaje' : textoDe(mensaje)}
+            </p>
+        </div>
+    </div>
+);
+
 interface BurbujaProps {
     m: MensajeHilo;
+    /** El mensaje al que contesta, si está entre los cargados. */
+    citado?: MensajeHilo;
     /**
      * Primera del grupo: lleva la colita y la esquina cuadrada. Las que
      * siguen del mismo autor se pegan sin pico, como en WhatsApp.
@@ -361,7 +403,7 @@ interface BurbujaProps {
 }
 
 const Burbuja = memo<BurbujaProps>(
-    ({ m, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono }) => {
+    ({ m, citado, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono }) => {
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
         const [autorMenu, setAutorMenu] = useState<{ x: number; y: number } | null>(null);
@@ -451,6 +493,8 @@ const Burbuja = memo<BurbujaProps>(
                             Vendedor
                         </p>
                     )}
+
+                    {citado && !borrado && !sticker && <Citado mensaje={citado} entrante={entrante} />}
 
                     {m.media_url && !borrado && (
                         <div className={cn(mediaAlBorde ? 'overflow-hidden rounded-[6px]' : !soloMedia && 'mb-1')}>
@@ -572,7 +616,15 @@ const Burbuja = memo<BurbujaProps>(
                                 onResponder={() => onResponder(m)}
                                 onReaccionar={(emoji) => onReaccionar(m, emoji)}
                                 onBorrar={m.direction === 'outbound' ? () => onBorrar(m) : undefined}
-                                onEditar={m.direction === 'outbound' && m.content_type === 'text' && !!m.body ? () => onEditar(m) : undefined}
+                                onEditar={
+                                    m.direction === 'outbound' &&
+                                    m.content_type === 'text' &&
+                                    !!m.body &&
+                                    !!m.whatsapp_message_id &&
+                                    !m.deleted_at
+                                        ? () => onEditar(m)
+                                        : undefined
+                                }
                                 textoCopiable={m.body?.trim() || undefined}
                                 alineacion="derecha"
                                 abrirHacia="abajo"
@@ -676,6 +728,20 @@ export const ChatThread: React.FC<Props> = ({
     const alTocarTelefono = onTelefono ? acciones.telefono : undefined;
     const alTocarProducto = onProducto ? acciones.producto : undefined;
 
+    /*
+        De qué mensaje habla cada cita. Se arma UNA vez por hilo y no una
+        búsqueda por burbuja: con cien mensajes eso sería un recorrido de
+        cien por cada uno en cada render.
+
+        Devuelve el objeto que ya está en `mensajes`, así que la burbuja
+        recibe siempre la misma referencia y su `memo` sigue vivo.
+    */
+    const porWaId = useMemo(() => {
+        const mapa = new Map<string, MensajeHilo>();
+        for (const m of mensajes) if (m.whatsapp_message_id) mapa.set(m.whatsapp_message_id, m);
+        return mapa;
+    }, [mensajes]);
+
     return (
     <>
         {mensajes.map((m, i) => {
@@ -715,6 +781,7 @@ export const ChatThread: React.FC<Props> = ({
                     )}
                     <Burbuja
                         m={m}
+                        citado={m.reply_to_wa_id ? porWaId.get(m.reply_to_wa_id) : undefined}
                         primeraDelGrupo={primeraDelGrupo}
                         tactil={tactil}
                         onAbrirFoto={acciones.abrirFoto}

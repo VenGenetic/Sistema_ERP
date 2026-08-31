@@ -17,6 +17,7 @@ import {
     Loader2,
     MailQuestion,
     Headset,
+    HandCoins,
     MessageCircle,
     MessageSquarePlus,
     MoreVertical,
@@ -44,6 +45,7 @@ import MenuTelefono from '../../components/whatsapp/MenuTelefono';
 import NuevoChatModal from '../../components/whatsapp/NuevoChatModal';
 import RespuestasRapidasModal from '../../components/whatsapp/RespuestasRapidasModal';
 import AvisarLlegadaModal from '../../components/whatsapp/AvisarLlegadaModal';
+import { contarPorAvisar, type ModoAviso } from '../../components/whatsapp/avisarLlegada';
 import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
 import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/agente';
 import { fusionarMensajes, useRepasoDelHilo } from '../../components/whatsapp/hiloEnVivo';
@@ -61,6 +63,7 @@ import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
 import ProductMessagePanel from '../../components/whatsapp/ProductMessagePanel';
 import ConversationWorkCard from '../../components/whatsapp/ConversationWorkCard';
 import { getDueWorkIds } from '../../utils/whatsappWorkflow';
+import { buscarConversacionesPorTexto } from '../../utils/whatsappConversationSearch';
 import { attributeMessages } from '../../utils/messageAttribution';
 import {
     CLASE_DE_ETAPA,
@@ -138,7 +141,7 @@ interface Conversacion {
     etapa?: Etapa;
 }
 
-type FiltroLista = 'all' | 'unread' | 'archived' | 'ai_ready' | 'attention';
+type FiltroLista = 'all' | 'unread' | 'archived' | 'ai_ready' | 'ai_active' | 'answered' | 'attention';
 interface PreferenciasConversacion {
     pinned: number[];
     archived: number[];
@@ -175,7 +178,7 @@ const POR_PAGINA = 40;
 const MENSAJES_VISIBLES = 40;
 
 const CAMPOS_MSG =
-    'id, direction, content_type, body, media_url, product_id, created_at, delivery_status, action_taken, whatsapp_message_id, deleted_at, reaction';
+    'id, direction, content_type, body, media_url, product_id, created_at, delivery_status, action_taken, whatsapp_message_id, deleted_at, reaction, reply_to_wa_id';
 
 /** Los números se guardan como solo dígitos (migración 0021). */
 function formatearTelefono(c: Pick<Conversacion, 'phone_number' | 'lid'>): string {
@@ -234,6 +237,21 @@ const MobileWhatsApp: React.FC = () => {
     const [preferencias, setPreferencias] = useState<PreferenciasConversacion>(() => leerPreferencias(userId));
     const [accionesConversacion, setAccionesConversacion] = useState<Conversacion | null>(null);
     const [abierta, setAbierta] = useState<Conversacion | null>(null);
+    /** Chats abiertos que siguen en la lista de pendientes hasta actualizar. */
+    const noLeidosConservadosRef = useRef<Set<number>>(new Set());
+    const [noLeidosConservados, setNoLeidosConservados] = useState<Set<number>>(() => new Set());
+    const actualizarNoLeidoConservado = useCallback((conversationId: number, conservar: boolean) => {
+        const siguiente = new Set(noLeidosConservadosRef.current);
+        if (conservar) siguiente.add(conversationId);
+        else siguiente.delete(conversationId);
+        noLeidosConservadosRef.current = siguiente;
+        setNoLeidosConservados(siguiente);
+    }, []);
+    const limpiarNoLeidosConservados = useCallback(() => {
+        const siguiente = new Set<number>();
+        noLeidosConservadosRef.current = siguiente;
+        setNoLeidosConservados(siguiente);
+    }, []);
     /**
      * El teléfono que se tocó DENTRO de un mensaje y dónde estaba en
      * pantalla, para colgarle el menú al lado. Lo dibuja la pantalla y no
@@ -272,6 +290,9 @@ const MobileWhatsApp: React.FC = () => {
     const [ficha, setFicha] = useState(false);
     /** "Ya llegó lo que pediste", para el cliente del chat abierto. */
     const [avisarAbierto, setAvisarAbierto] = useState(false);
+    const [modoAviso, setModoAviso] = useState<ModoAviso>('llego');
+    const [porAvisar, setPorAvisar] = useState(0);
+    const [porPedirAbono, setPorPedirAbono] = useState(0);
     /** El menú "⋮" de la cabecera del chat. */
     const [menuChat, setMenuChat] = useState(false);
     const [mostrarAgentes, setMostrarAgentes] = useState(false);
@@ -296,6 +317,23 @@ const MobileWhatsApp: React.FC = () => {
      */
     const { estado: estadoAgente, globalEncendido, agentes, alternarGlobal, alternarAgente } = useAgente(userId);
     const aviso = useMemo(() => avisoDeEnvio(estadoAgente, haceCuanto), [estadoAgente]);
+
+    const contarAvisos = useCallback(async () => {
+        try {
+            const [enBodega, enImportadora] = await Promise.all([
+                contarPorAvisar('llego'),
+                contarPorAvisar('abono'),
+            ]);
+            setPorAvisar(enBodega);
+            setPorPedirAbono(enImportadora);
+        } catch (err) {
+            console.error('No se pudieron contar los pedidos por avisar en móvil:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        contarAvisos();
+    }, [contarAvisos]);
 
     /** Cuántos repuestos tiene a medio armar la proforma de este chat. */
     const itemsEnProforma = useChatProformaStore(
@@ -360,17 +398,44 @@ const MobileWhatsApp: React.FC = () => {
     const cargarLista = useCallback(async (silencioso = false) => {
         if (!silencioso) setCargando(true);
 
-        const consulta = (campos: string) => {
+        const texto = busqueda.trim();
+        let resultadosDeTexto: Awaited<ReturnType<typeof buscarConversacionesPorTexto>> = null;
+        let errorDeBusqueda: string | null = null;
+
+        if (texto.length >= 2) {
+            try {
+                resultadosDeTexto = await buscarConversacionesPorTexto(texto, POR_PAGINA);
+            } catch (err: any) {
+                console.error('Error buscando mensajes de WhatsApp en móvil:', err?.message ?? err);
+                errorDeBusqueda = 'No se pudo buscar dentro de los mensajes; se buscará por nombre y número.';
+            }
+        }
+
+        if (resultadosDeTexto && resultadosDeTexto.conversationIds.length === 0) {
+            if (!silencioso) setCargando(false);
+            setConversaciones([]);
+            setError(null);
+            return;
+        }
+
+        const consulta = (campos: string, incluirEtapa = true) => {
             let q = supabase
                 .from('agent_conversations')
                 .select(campos)
                 .order('last_message_at', { ascending: false, nullsFirst: false })
                 .limit(POR_PAGINA);
             if (soloEscalados) q = q.eq('status', 'escalated');
-            if (filtroLista === 'unread') q = q.gt('unread_count', 0);
+            if (filtroLista === 'unread') {
+                const condiciones = ['unread_count.gt.0'];
+                if (incluirEtapa) condiciones.push('etapa.eq.ready_for_sales');
+                const conservados = [...noLeidosConservadosRef.current];
+                if (conservados.length > 0) condiciones.push(`id.in.(${conservados.join(',')})`);
+                q = q.or(condiciones.join(','));
+            }
             if (filtroLista === 'ai_ready') q = q.eq('etapa', 'ready_for_sales');
-            const texto = busqueda.trim();
-            if (texto) {
+            if (resultadosDeTexto) {
+                q = q.in('id', resultadosDeTexto.conversationIds);
+            } else if (texto) {
                 const digitos = texto.replace(/\D/g, '');
                 const condiciones = [`customer_name.ilike.*${texto.replace(/[,()*\\"]/g, ' ')}*`];
                 if (digitos) condiciones.push(`phone_number.ilike.*${digitos}*`);
@@ -388,14 +453,14 @@ const MobileWhatsApp: React.FC = () => {
             setError('Para usar “IA lista” falta aplicar la migración de etapas del agente (0035).');
             return;
         }
-        if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_BASE));
+        if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_BASE, false));
 
         if (!silencioso) setCargando(false);
         if (err) {
             setError(`No se pudieron cargar los chats: ${err.message}`);
             return;
         }
-        setError(null);
+        setError(errorDeBusqueda);
         setConversaciones((data ?? []) as unknown as Conversacion[]);
     }, [busqueda, soloEscalados, filtroLista]);
 
@@ -618,13 +683,11 @@ const MobileWhatsApp: React.FC = () => {
         setBuscandoEnHilo(false);
         setError(null);
         await cargarMensajes(c.id);
-        // Abrirlo cuenta como leído en los DOS lados: el UPDATE de acá es
-        // el adelanto para que la lista responda al toque, pero el que
-        // manda es el acuse encolado -- el contador de no leídos lo espeja
-        // WhatsApp, así que apagarlo solo en la base dura hasta el
-        // siguiente `chats.update`. Que falle el acuse no puede romper la
-        // apertura del chat, así que no se espera.
+        // Abrirlo manda el acuse de lectura, pero la lista lo conserva como
+        // pendiente hasta que se actualice. Así se puede volver al chat sin
+        // perderlo de "No leídos" a mitad de la atención.
         if (c.unread_count > 0) {
+            actualizarNoLeidoConservado(c.id, true);
             await supabase.from('agent_conversations').update({ unread_count: 0 }).eq('id', c.id);
             setConversaciones((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread_count: 0 } : x)));
         }
@@ -648,6 +711,7 @@ const MobileWhatsApp: React.FC = () => {
     const marcarComoNoLeido = async (c: Conversacion) => {
         try {
             await marcarNoLeido(c.id, userId);
+            actualizarNoLeidoConservado(c.id, true);
             setConversaciones((prev) => prev.map((x) => (x.id === c.id ? { ...x, unread_count: 1 } : x)));
             setAbierta(null);
         } catch (err: any) {
@@ -657,6 +721,7 @@ const MobileWhatsApp: React.FC = () => {
 
     const marcarComoLeido = async (c: Conversacion) => {
         try {
+            actualizarNoLeidoConservado(c.id, false);
             marcarLeidoEnWhatsApp(c.id, userId).catch(() => {});
             const { error: err } = await supabase
                 .from('agent_conversations')
@@ -938,21 +1003,42 @@ const MobileWhatsApp: React.FC = () => {
         } : c)));
     };
 
+    const tienePendienteVisual = useCallback(
+        (conversation: Pick<Conversacion, 'id' | 'unread_count' | 'etapa'>) =>
+            conversation.unread_count > 0 ||
+            conversation.etapa === 'ready_for_sales' ||
+            noLeidosConservados.has(conversation.id),
+        [noLeidosConservados],
+    );
     const sinLeer = useMemo(
-        () => conversaciones.reduce((n, c) => n + (c.unread_count > 0 ? 1 : 0), 0),
+        () => conversaciones.reduce((n, c) => n + (tienePendienteVisual(c) ? 1 : 0), 0),
+        [conversaciones, tienePendienteVisual],
+    );
+    const iaAtendiendo = useMemo(
+        () => conversaciones.filter((c) => c.bot_enabled && c.status === 'bot_active').length,
         [conversaciones],
+    );
+    const respondidos = useMemo(
+        () => conversaciones.filter((c) => c.last_message_direction === 'outbound' && !tienePendienteVisual(c)).length,
+        [conversaciones, tienePendienteVisual],
+    );
+    const porAtender = useMemo(
+        () => conversaciones.filter((c) => tienePendienteVisual(c) || attentionIds.includes(c.id)).length,
+        [conversaciones, attentionIds, tienePendienteVisual],
     );
     const conversacionesVisibles = useMemo(() => {
         let rows = filtroLista === 'archived'
             ? conversaciones.filter((c) => preferencias.archived.includes(c.id))
             : conversaciones.filter((c) => !preferencias.archived.includes(c.id));
-        if (filtroLista === 'unread') rows = rows.filter((c) => c.unread_count > 0);
+        if (filtroLista === 'unread') rows = rows.filter(tienePendienteVisual);
         if (filtroLista === 'ai_ready') rows = rows.filter((c) => c.etapa === 'ready_for_sales');
-        if (filtroLista === 'attention') rows = rows.filter((c) => c.unread_count > 0 || c.etapa === 'ready_for_sales' || attentionIds.includes(c.id));
+        if (filtroLista === 'ai_active') rows = rows.filter((c) => c.bot_enabled && c.status === 'bot_active');
+        if (filtroLista === 'answered') rows = rows.filter((c) => c.last_message_direction === 'outbound' && !tienePendienteVisual(c));
+        if (filtroLista === 'attention') rows = rows.filter((c) => tienePendienteVisual(c) || attentionIds.includes(c.id));
         return [...rows].sort((a, b) =>
             Number(preferencias.pinned.includes(b.id)) - Number(preferencias.pinned.includes(a.id)),
         );
-    }, [conversaciones, filtroLista, preferencias, attentionIds]);
+    }, [conversaciones, filtroLista, preferencias, attentionIds, tienePendienteVisual]);
 
     /* ------------------------------------------------------------------ */
 
@@ -1464,6 +1550,8 @@ const MobileWhatsApp: React.FC = () => {
                     onClose={() => setAvisarAbierto(false)}
                     userId={userId}
                     soloTelefono={abierta.phone_number}
+                    modo={modoAviso}
+                    onAvisado={contarAvisos}
                 />
 
                 <RespuestasRapidasModal
@@ -1527,6 +1615,7 @@ const MobileWhatsApp: React.FC = () => {
                                 }}
                                 onAvisar={() => {
                                     setFicha(false);
+                                    setModoAviso('llego');
                                     setAvisarAbierto(true);
                                 }}
                             />
@@ -1599,8 +1688,8 @@ const MobileWhatsApp: React.FC = () => {
                         type="search"
                         value={busqueda}
                         onChange={(e) => setBusqueda(e.target.value)}
-                        placeholder="Buscar por nombre o teléfono…"
-                        aria-label="Buscar chat"
+                        placeholder="Buscar por nombre, número o mensaje…"
+                        aria-label="Buscar chat por nombre, teléfono o palabras del mensaje"
                         className="min-h-10 w-full rounded-full border-none bg-wa-input pl-11 pr-12 text-[15px] text-wa-text outline-none placeholder:text-wa-meta focus:ring-0"
                     />
                     {busqueda && (
@@ -1616,9 +1705,11 @@ const MobileWhatsApp: React.FC = () => {
                 <div className="mt-2 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
                     {([
                         { id: 'all' as FiltroLista, label: 'Todos', count: null },
-                        { id: 'attention' as FiltroLista, label: 'Por atender', count: null, icon: Clock },
+                        { id: 'attention' as FiltroLista, label: 'Por atender', count: porAtender, icon: Clock },
                         { id: 'unread' as FiltroLista, label: 'No leídos', count: sinLeer },
                         { id: 'ai_ready' as FiltroLista, label: 'IA lista', count: null, icon: Sparkles },
+                        { id: 'ai_active' as FiltroLista, label: 'IA atiende', count: iaAtendiendo, icon: Bot },
+                        { id: 'answered' as FiltroLista, label: 'Respondidos', count: respondidos, icon: CheckCheck },
                         { id: 'archived' as FiltroLista, label: 'Archivados', count: preferencias.archived.length },
                     ]).map((filtro) => {
                         const Icon = 'icon' in filtro ? filtro.icon : null;
@@ -1642,6 +1733,58 @@ const MobileWhatsApp: React.FC = () => {
                         );
                     })}
                 </div>
+            </div>
+
+            {/* Acciones globales que también existen en escritorio. Usan el
+                mismo modal compartido para mantener idénticas las reglas de
+                selección, vista previa, límites y envío. */}
+            <div className="grid shrink-0 grid-cols-[1fr_1fr_44px] gap-2 border-b border-wa-divider bg-wa-panel px-3 py-2">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setModoAviso('llego');
+                        setAvisarAbierto(true);
+                    }}
+                    className={cn(
+                        'flex min-h-[48px] items-center justify-center gap-2 rounded-xl border px-2 text-[13px] font-semibold active:brightness-90',
+                        porAvisar > 0
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                            : 'border-wa-divider bg-wa-header text-wa-text',
+                    )}
+                >
+                    <Bell size={18} aria-hidden="true" />
+                    <span>Por avisar</span>
+                    {porAvisar > 0 && <span className="rounded-full bg-emerald-500/20 px-1.5 tabular-nums">{porAvisar}</span>}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setModoAviso('abono');
+                        setAvisarAbierto(true);
+                    }}
+                    className={cn(
+                        'flex min-h-[48px] items-center justify-center gap-2 rounded-xl border px-2 text-[13px] font-semibold active:brightness-90',
+                        porPedirAbono > 0
+                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                            : 'border-wa-divider bg-wa-header text-wa-text',
+                    )}
+                >
+                    <HandCoins size={18} aria-hidden="true" />
+                    <span>Piden abono</span>
+                    {porPedirAbono > 0 && <span className="rounded-full bg-amber-500/20 px-1.5 tabular-nums">{porPedirAbono}</span>}
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        limpiarNoLeidosConservados();
+                        cargarLista();
+                        contarAvisos();
+                    }}
+                    aria-label="Actualizar chats y avisos"
+                    className="flex h-12 w-11 items-center justify-center rounded-xl border border-wa-divider bg-wa-header text-wa-meta active:bg-wa-hover"
+                >
+                    <RefreshCw size={19} className={cn(cargando && 'animate-spin')} aria-hidden="true" />
+                </button>
             </div>
 
             {(cuantosEscalados > 0 || soloEscalados) && (
@@ -1769,6 +1912,10 @@ const MobileWhatsApp: React.FC = () => {
                                 ? 'No hay conversaciones que requieran atención.'
                               : filtroLista === 'ai_ready'
                                 ? 'La IA todavía no ha dejado conversaciones listas para cotizar.'
+                              : filtroLista === 'ai_active'
+                                ? 'La IA no está atendiendo conversaciones en este momento.'
+                              : filtroLista === 'answered'
+                                ? 'Todavía no hay conversaciones respondidas.'
                               : filtroLista === 'archived'
                                 ? 'No tienes conversaciones archivadas.'
                                 : 'Todavía no hay conversaciones.'}
@@ -1808,7 +1955,7 @@ const MobileWhatsApp: React.FC = () => {
                                 <span
                                     className={cn(
                                         'truncate text-[16px] leading-[21px] text-wa-text',
-                                        c.unread_count > 0 ? 'font-semibold' : 'font-normal',
+                                        tienePendienteVisual(c) ? 'font-semibold' : 'font-normal',
                                     )}
                                 >
                                     {c.customer_name || formatearTelefono(c)}
@@ -1816,7 +1963,7 @@ const MobileWhatsApp: React.FC = () => {
                                 <span
                                     className={cn(
                                         'shrink-0 text-[12px] leading-[16px]',
-                                        c.unread_count > 0 ? 'font-semibold text-wa-accent' : 'text-wa-meta',
+                                        tienePendienteVisual(c) ? 'font-semibold text-wa-accent' : 'text-wa-meta',
                                     )}
                                 >
                                     {c.last_message_at ? horaLista(c.last_message_at) : ''}
@@ -1831,7 +1978,7 @@ const MobileWhatsApp: React.FC = () => {
                                 <span
                                     className={cn(
                                         'min-w-0 flex-1 truncate text-[13.5px] leading-[19px]',
-                                        c.unread_count > 0 ? 'text-wa-text' : 'text-wa-meta',
+                                        tienePendienteVisual(c) ? 'text-wa-text' : 'text-wa-meta',
                                     )}
                                 >
                                     {c.last_message_preview ? (
@@ -1887,6 +2034,7 @@ const MobileWhatsApp: React.FC = () => {
                 const fijada = preferencias.pinned.includes(c.id);
                 const archivada = preferencias.archived.includes(c.id);
                 const silenciada = preferencias.muted.includes(c.id);
+                const noLeidoEnLista = c.unread_count > 0 || noLeidosConservados.has(c.id);
                 const optionClass = 'flex min-h-[48px] w-full touch-manipulation items-center gap-3 px-5 text-left text-[15px] text-wa-text transition-colors active:bg-wa-hover';
                 return (
                     <div className="fixed inset-0 z-[120] flex items-end bg-black/55" onPointerDown={(event) => event.target === event.currentTarget && setAccionesConversacion(null)}>
@@ -1920,9 +2068,9 @@ const MobileWhatsApp: React.FC = () => {
                             </div>
                             <div className="min-h-0 flex-1 overflow-y-auto py-1">
                                 <button className={optionClass} onClick={() => { setAccionesConversacion(null); abrirChat(c); }}><MessageCircle size={19} className="text-wa-meta" /> Abrir conversación</button>
-                                <button className={optionClass} onClick={async () => { setAccionesConversacion(null); c.unread_count > 0 ? await marcarComoLeido(c) : await marcarComoNoLeido(c); }}>
-                                    {c.unread_count > 0 ? <CheckCheck size={19} className="text-wa-meta" /> : <MailQuestion size={19} className="text-wa-meta" />}
-                                    {c.unread_count > 0 ? 'Marcar como leído' : 'Marcar como no leído'}
+                                <button className={optionClass} onClick={async () => { setAccionesConversacion(null); noLeidoEnLista ? await marcarComoLeido(c) : await marcarComoNoLeido(c); }}>
+                                    {noLeidoEnLista ? <CheckCheck size={19} className="text-wa-meta" /> : <MailQuestion size={19} className="text-wa-meta" />}
+                                    {noLeidoEnLista ? 'Marcar como leído' : 'Marcar como no leído'}
                                 </button>
                                 <button className={optionClass} onClick={() => { alternarPreferencia('pinned', c.id); setAccionesConversacion(null); }}><Pin size={19} className="text-wa-meta" /> {fijada ? 'Desfijar conversación' : 'Fijar conversación'}</button>
                                 <button className={optionClass} onClick={() => { alternarPreferencia('muted', c.id); setAccionesConversacion(null); }}>
@@ -1946,6 +2094,14 @@ const MobileWhatsApp: React.FC = () => {
                 isOpen={nuevoChat}
                 onClose={() => setNuevoChat(false)}
                 onAbrir={abrirChatPorId}
+            />
+            <AvisarLlegadaModal
+                isOpen={avisarAbierto}
+                onClose={() => setAvisarAbierto(false)}
+                userId={userId}
+                modo={modoAviso}
+                onAvisado={contarAvisos}
+                onAbrirChat={abrirChatPorId}
             />
         </div>
     );

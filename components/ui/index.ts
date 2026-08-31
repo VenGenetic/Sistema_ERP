@@ -33,4 +33,5 @@ export {
   TableSkeleton,
 } from './Table';
 export type { SortDirection, ThProps, TdProps, TrProps } from './Table';
+export { Tooltip, type TooltipProps } from './Tooltip';
 export { ThemeToggle } from './ThemeToggle';
