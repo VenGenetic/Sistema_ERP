@@ -37,6 +37,7 @@ import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import VoiceRecorder from '../../components/whatsapp/VoiceRecorder';
 import BuscarEnHilo from '../../components/whatsapp/BuscarEnHilo';
+import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { CitaEnComposer } from '../../components/whatsapp/MessageActions';
 import { MediaLightbox, type MediaItem } from '../../components/MediaLightbox';
 import MediaGallery from '../../components/whatsapp/MediaGallery';
@@ -64,7 +65,8 @@ import ProductMessagePanel from '../../components/whatsapp/ProductMessagePanel';
 import ConversationWorkCard from '../../components/whatsapp/ConversationWorkCard';
 import { getDueWorkIds } from '../../utils/whatsappWorkflow';
 import { buscarConversacionesPorTexto } from '../../utils/whatsappConversationSearch';
-import { attributeMessages } from '../../utils/messageAttribution';
+import { attributeMessage, attributeMessages } from '../../utils/messageAttribution';
+import ReenviarModal, { type MensajeAReenviar } from '../../components/whatsapp/ReenviarModal';
 import {
     CLASE_DE_ETAPA,
     ETAPAS_QUE_SE_MARCAN,
@@ -270,6 +272,8 @@ const MobileWhatsApp: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     /** Mensaje que se está citando en la próxima respuesta. */
     const [citando, setCitando] = useState<Mensaje | null>(null);
+    /** Mensaje que se esta por pasar a otro chat. Mismo modal que el escritorio. */
+    const [reenviando, setReenviando] = useState<MensajeAReenviar | null>(null);
     const [buscandoEnHilo, setBuscandoEnHilo] = useState(false);
     const [catalogoAbierto, setCatalogoAbierto] = useState(false);
     const [proformaAbierta, setProformaAbierta] = useState(false);
@@ -748,7 +752,16 @@ const MobileWhatsApp: React.FC = () => {
                 { event: 'INSERT', schema: 'public', table: 'agent_messages', filter: `conversation_id=eq.${abierta.id}` },
                 (payload) => {
                     const nuevo = payload.new as Mensaje;
-                    setMensajes((prev) => (prev.some((m) => m.id === nuevo.id) ? prev : [...prev, nuevo]));
+                    /* Se resuelve la autoría antes de meterlo al hilo: sin
+                       esto, el clic derecho sobre la burbuja recién llegada
+                       decía "Agente IA" aunque la hubiera escrito una
+                       persona, hasta que pasara el repaso de los 8 segundos.
+                       Con la caché puesta cuesta a lo sumo una consulta. */
+                    void attributeMessage(nuevo).then((conAutoria) => {
+                        setMensajes((prev) =>
+                            prev.some((m) => m.id === conAutoria.id) ? prev : [...prev, conAutoria],
+                        );
+                    });
                 },
             )
             // Y los cambios sobre un mensaje que ya está en el hilo: el tilde
@@ -772,24 +785,38 @@ const MobileWhatsApp: React.FC = () => {
     // El hilo arranca abajo del todo, donde está lo último que se dijo.
     useHiloPegadoAbajo(hiloRef, abierta?.id ?? null);
 
-    // Lo mismo para la galería: «atrás» la cierra y deja la lista, en vez de
-    // salirse del modo móvil de un saque.
-    useEffect(() => {
-        if (!galeria) return;
-        window.history.pushState({ galeria: true }, '');
-        const volver = () => setGaleria(false);
-        window.addEventListener('popstate', volver);
-        return () => window.removeEventListener('popstate', volver);
-    }, [galeria]);
+    /* ------------------------------------------------------------------ */
+    /*  EL BOTON «ATRAS» DEL TELEFONO                                      */
+    /* ------------------------------------------------------------------ */
+    /*
+        TODO lo que se pueda cerrar con «atrás» pasa por `useBackDismiss`, y
+        el orden de estas llamadas es el orden en que se apilan las capas:
+        de la de más afuera a la de más adentro.
 
-    // El botón «atrás» del teléfono vuelve a la lista en vez de salirse.
-    useEffect(() => {
-        if (!abierta) return;
-        window.history.pushState({ chat: abierta.id }, '');
-        const volver = () => setAbierta(null);
-        window.addEventListener('popstate', volver);
-        return () => window.removeEventListener('popstate', volver);
-    }, [abierta]);
+        Antes la galería y el chat tenían su propio `pushState` con un
+        `popstate` suelto, y ahí estaba el fallo que se veía en el teléfono:
+        ese listener contestaba a CUALQUIER «atrás», sin enterarse de que
+        podía haber algo encima. Se abría una foto y el «atrás» cerraba la
+        foto (que sí sabe apilarse) y además el chat, porque el listener del
+        chat también se daba por aludido. Se salía de la conversación
+        queriendo salir de la imagen.
+
+        `useBackDismiss` lleva una pila compartida y solo deja contestar a la
+        capa de encima, así que un «atrás» cierra exactamente una cosa. De
+        paso arregla lo otro que molestaba: como depende de un booleano y no
+        del chat abierto, saltar de una conversación a otra ya no deja una
+        entrada de historial por cada salto (antes, después de recorrer cinco
+        chats, hacían falta cinco «atrás» para volver a la lista).
+    */
+    useBackDismiss(!!abierta, () => setAbierta(null));
+    useBackDismiss(galeria, () => setGaleria(false));
+    useBackDismiss(buscandoEnHilo, () => setBuscandoEnHilo(false));
+    useBackDismiss(menuChat, () => setMenuChat(false));
+    useBackDismiss(eligiendoAgente, () => setEligiendoAgente(false));
+    useBackDismiss(!!accionesConversacion, () => setAccionesConversacion(null));
+    useBackDismiss(ficha, () => setFicha(false));
+    useBackDismiss(productoDelMensaje !== null, () => setProductoDelMensaje(null));
+    useBackDismiss(!!menuTelefono, () => setMenuTelefono(null));
 
     /* ------------------------------------------------------------------ */
     /*  Envío                                                              */
@@ -1293,6 +1320,14 @@ const MobileWhatsApp: React.FC = () => {
                         onReaccionar={reaccionar}
                         onBorrar={borrar}
                         onEditar={editar}
+                        onReenviar={(m) =>
+                            setReenviando({
+                                id: m.id,
+                                body: m.body,
+                                media_url: m.media_url,
+                                content_type: m.content_type,
+                            })
+                        }
                         onProducto={setProductoDelMensaje}
                         onTelefono={(numero, ancla) => setMenuTelefono({ numero, ancla })}
                     />
@@ -1559,6 +1594,15 @@ const MobileWhatsApp: React.FC = () => {
                     onClose={() => setGestorRapidas(false)}
                     userId={userId}
                     onCambio={cargarRapidas}
+                />
+
+                {/* Pasar un mensaje a otro chat: el mismo modal que el
+                    escritorio, para que una correccion llegue a los dos. */}
+                <ReenviarModal
+                    mensaje={reenviando}
+                    conversacionActual={abierta.id}
+                    userId={userId}
+                    onClose={() => setReenviando(null)}
                 />
 
                 {/* El menú del teléfono tocado dentro de un mensaje. */}

@@ -5,6 +5,13 @@ import { cn } from '../ui/styles';
 import MessageMedia from './MessageMedia';
 import MessageActions from './MessageActions';
 import { partirPorTelefonos } from '../../utils/telefonosEnTexto';
+import {
+    parsearWhatsApp,
+    textoPlano,
+    tieneFormato,
+    type BloqueTexto,
+    type NodoTexto,
+} from '../../utils/formatoWhatsApp';
 
 /**
  * El hilo de la conversación, con el aspecto de WhatsApp.
@@ -151,6 +158,111 @@ const MEDIA_AL_BORDE = new Set<ContentType>(['image', 'video', 'sticker']);
 
 export const textoDe = (m: Pick<MensajeHilo, 'body' | 'content_type'>): string =>
     m.body || SIN_TEXTO[m.content_type] || '(sin texto)';
+
+/**
+ * El texto del mensaje con el FORMATO de WhatsApp aplicado.
+ *
+ * Antes el hilo mostraba los mensajes crudos: el cliente escribía
+ * `*urgente*` y en la bandeja se leía con los asteriscos puestos. Al revés
+ * era peor: lo que el vendedor mandaba formateado le llegaba bien al
+ * cliente pero quedaba ilegible acá, así que nadie lo usaba y una
+ * cotización de tres repuestos salía como un párrafo corrido.
+ *
+ * Las reglas viven en utils/formatoWhatsApp.ts. Acá solo se dibujan, y con
+ * una condición: los teléfonos tocables siguen funcionando ADENTRO del
+ * formato. Por eso el teléfono se detecta en las hojas de texto y no sobre
+ * el mensaje entero -- un número escrito en negrita tiene que poder
+ * tocarse igual.
+ */
+const Hojas: React.FC<{
+    nodos: NodoTexto[];
+    onTelefono?: (numero: string, ancla: DOMRect) => void;
+}> = ({ nodos, onTelefono }) => (
+    <>
+        {nodos.map((n, i) => {
+            if (n.tipo === 'texto') {
+                return <TextoConTelefonos key={i} texto={n.texto} onTelefono={onTelefono} />;
+            }
+            if (n.tipo === 'codigo') {
+                return (
+                    <code
+                        key={i}
+                        className="rounded bg-wa-inset/[0.10] px-1 py-px font-mono text-[.88em]"
+                    >
+                        {n.texto}
+                    </code>
+                );
+            }
+            const hijos = <Hojas nodos={n.hijos} onTelefono={onTelefono} />;
+            if (n.tipo === 'negrita') return <strong key={i} className="font-semibold">{hijos}</strong>;
+            if (n.tipo === 'cursiva') return <em key={i}>{hijos}</em>;
+            return <s key={i} className="opacity-90">{hijos}</s>;
+        })}
+    </>
+);
+
+const Bloques: React.FC<{
+    bloques: BloqueTexto[];
+    onTelefono?: (numero: string, ancla: DOMRect) => void;
+}> = ({ bloques, onTelefono }) => (
+    <>
+        {bloques.map((b, i) => {
+            if (b.tipo === 'bloqueCodigo') {
+                return (
+                    <span
+                        key={i}
+                        /* `block` y no <pre>: el <pre> dentro de un párrafo con
+                           `white-space: pre-wrap` duplicaba los saltos. */
+                        className="my-1 block overflow-x-auto rounded-md bg-wa-inset/[0.10] px-2 py-1.5 font-mono text-[.86em] leading-[1.5]"
+                    >
+                        {b.texto}
+                    </span>
+                );
+            }
+            if (b.tipo === 'cita') {
+                return (
+                    <span key={i} className="my-1 block border-l-[3px] border-wa-accent/60 pl-2 opacity-90">
+                        <Hojas nodos={b.hijos} onTelefono={onTelefono} />
+                    </span>
+                );
+            }
+            if (b.tipo === 'lista') {
+                return (
+                    <span key={i} className="my-1 block">
+                        {b.items.map((item, j) => (
+                            <span key={j} className="flex gap-1.5">
+                                {/* La viñeta como texto y no como `list-style`:
+                                    dentro de `pre-wrap` una <ul> real se lleva
+                                    puesto el interlineado de la burbuja. */}
+                                <span aria-hidden="true" className="shrink-0 tabular-nums opacity-70">
+                                    {b.ordenada ? `${j + 1}.` : '•'}
+                                </span>
+                                <span className="min-w-0">
+                                    <Hojas nodos={item} onTelefono={onTelefono} />
+                                </span>
+                            </span>
+                        ))}
+                    </span>
+                );
+            }
+            return <Hojas key={i} nodos={b.hijos} onTelefono={onTelefono} />;
+        })}
+    </>
+);
+
+/**
+ * Lo que usa la burbuja. Si el mensaje no tiene ninguna marca -- que es el
+ * caso de casi todos -- se saltea el parseo entero y dibuja igual que
+ * siempre.
+ */
+export const TextoDeMensaje: React.FC<{
+    texto: string;
+    onTelefono?: (numero: string, ancla: DOMRect) => void;
+}> = ({ texto, onTelefono }) => {
+    const bloques = useMemo(() => (tieneFormato(texto) ? parsearWhatsApp(texto) : null), [texto]);
+    if (!bloques) return <TextoConTelefonos texto={texto} onTelefono={onTelefono} />;
+    return <Bloques bloques={bloques} onTelefono={onTelefono} />;
+};
 
 /**
  * El texto del mensaje con los teléfonos convertidos en algo que se puede
@@ -374,7 +486,7 @@ const Citado: React.FC<{ mensaje: MensajeHilo; entrante: boolean }> = ({ mensaje
                 {mensaje.direction === 'inbound' ? 'Cliente' : 'Vos'}
             </p>
             <p className="line-clamp-2 break-words text-[12.5px] leading-[16px] text-wa-meta">
-                {mensaje.deleted_at ? 'Se borró este mensaje' : textoDe(mensaje)}
+                {mensaje.deleted_at ? 'Se borró este mensaje' : textoPlano(textoDe(mensaje))}
             </p>
         </div>
     </div>
@@ -396,6 +508,8 @@ interface BurbujaProps {
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
     onEditar: (m: MensajeHilo) => void;
+    /** Pasa el mensaje a otro chat. Sin esto, la opción no aparece. */
+    onReenviar?: (m: MensajeHilo) => void;
     /** Abre la ficha interna del repuesto asociado al mensaje. */
     onProducto?: (productId: number) => void;
     /** Tocaron un teléfono escrito dentro del mensaje. */
@@ -403,7 +517,7 @@ interface BurbujaProps {
 }
 
 const Burbuja = memo<BurbujaProps>(
-    ({ m, citado, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono }) => {
+    ({ m, citado, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onReenviar, onProducto, onTelefono }) => {
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
         const [autorMenu, setAutorMenu] = useState<{ x: number; y: number } | null>(null);
@@ -523,20 +637,44 @@ const Burbuja = memo<BurbujaProps>(
                                 {borrado ? (
                                     'Se borró este mensaje'
                                 ) : m.product_id && onProducto ? (
-                                    <button
-                                        type="button"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            onProducto(m.product_id!);
-                                        }}
-                                        title="Ver este repuesto en el panel lateral"
-                                        className="cursor-pointer text-left underline decoration-dotted underline-offset-4 transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                                    >
-                                        <TextoConTelefonos texto={textoDe(m)} />
-                                        <span className="ml-1.5 whitespace-nowrap text-[10px] font-semibold text-primary no-underline">Ver repuesto</span>
-                                    </button>
+                                    /*
+                                        El texto va SUELTO y el enlace al repuesto es
+                                        un chip aparte, por dos razones.
+
+                                        La de forma: antes el mensaje entero era un
+                                        <button> con subrayado punteado, así que una
+                                        ficha de catálogo de cuatro renglones se leía
+                                        toda como un enlace -- mucho ruido para una
+                                        acción que es secundaria.
+
+                                        La de fondo: dentro de un <button> no puede
+                                        haber otro, y los teléfonos escritos en el
+                                        mensaje SON botones. Envueltos así quedaban
+                                        muertos justo en las fichas de repuesto, que
+                                        es donde el cliente suele contestar con un
+                                        número.
+                                    */
+                                    <>
+                                        <TextoDeMensaje texto={textoDe(m)} onTelefono={onTelefono} />{' '}
+                                        <button
+                                            type="button"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onProducto(m.product_id!);
+                                            }}
+                                            title="Ver este repuesto en el panel lateral"
+                                            className={cn(
+                                                'ml-0.5 inline-flex items-center whitespace-nowrap rounded-full px-1.5 py-px align-baseline',
+                                                'bg-primary-soft text-[10px] font-semibold text-primary-soft-fg',
+                                                'transition-colors hover:bg-primary hover:text-primary-fg',
+                                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                            )}
+                                        >
+                                            Ver repuesto
+                                        </button>
+                                    </>
                                 ) : (
-                                    <TextoConTelefonos texto={textoDe(m)} onTelefono={onTelefono} />
+                                    <TextoDeMensaje texto={textoDe(m)} onTelefono={onTelefono} />
                                 )}
                             </span>
 
@@ -625,6 +763,7 @@ const Burbuja = memo<BurbujaProps>(
                                         ? () => onEditar(m)
                                         : undefined
                                 }
+                                onReenviar={onReenviar ? () => onReenviar(m) : undefined}
                                 textoCopiable={m.body?.trim() || undefined}
                                 alineacion="derecha"
                                 abrirHacia="abajo"
@@ -668,6 +807,8 @@ interface Props {
     onReaccionar: (m: MensajeHilo, emoji: string) => void;
     onBorrar: (m: MensajeHilo) => void;
     onEditar: (m: MensajeHilo) => void;
+    /** Pasa el mensaje a otro chat. Sin esto, la opción no aparece. */
+    onReenviar?: (m: MensajeHilo) => void;
     /** Solo para la interfaz interna: abre el producto enlazado al mensaje. */
     onProducto?: (productId: number) => void;
     /**
@@ -690,6 +831,7 @@ export const ChatThread: React.FC<Props> = ({
     onBorrar,
     onEditar,
     onProducto,
+    onReenviar,
     onTelefono,
     tactil = false,
 }) => {
@@ -703,8 +845,8 @@ export const ChatThread: React.FC<Props> = ({
      * burbujas se redibujaban igual. La referencia guarda siempre la
      * versión más nueva, así que tampoco se cierra sobre datos viejos.
      */
-    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono });
-    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onProducto, onTelefono };
+    const ultimas = useRef({ onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onReenviar, onProducto, onTelefono });
+    ultimas.current = { onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onReenviar, onProducto, onTelefono };
 
     const acciones = useMemo(
         () => ({
@@ -713,6 +855,7 @@ export const ChatThread: React.FC<Props> = ({
             reaccionar: (m: MensajeHilo, emoji: string) => ultimas.current.onReaccionar(m, emoji),
             borrar: (m: MensajeHilo) => ultimas.current.onBorrar(m),
             editar: (m: MensajeHilo) => ultimas.current.onEditar(m),
+            reenviar: (m: MensajeHilo) => ultimas.current.onReenviar?.(m),
             producto: (productId: number) => ultimas.current.onProducto?.(productId),
             telefono: (numero: string, ancla: DOMRect) => ultimas.current.onTelefono?.(numero, ancla),
         }),
@@ -727,6 +870,9 @@ export const ChatThread: React.FC<Props> = ({
     */
     const alTocarTelefono = onTelefono ? acciones.telefono : undefined;
     const alTocarProducto = onProducto ? acciones.producto : undefined;
+    /* Igual que con el teléfono: `undefined` cuando la pantalla no sabe
+       reenviar, así el menú no ofrece una acción que no hace nada. */
+    const alReenviar = onReenviar ? acciones.reenviar : undefined;
 
     /*
         De qué mensaje habla cada cita. Se arma UNA vez por hilo y no una
@@ -789,6 +935,7 @@ export const ChatThread: React.FC<Props> = ({
                         onReaccionar={acciones.reaccionar}
                         onBorrar={acciones.borrar}
                         onEditar={acciones.editar}
+                        onReenviar={alReenviar}
                         onProducto={alTocarProducto}
                         onTelefono={alTocarTelefono}
                     />

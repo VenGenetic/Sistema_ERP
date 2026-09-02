@@ -25,6 +25,18 @@ let programmaticBacks = 0;
  */
 const openSentinels: number[] = [];
 
+/**
+ * ¿Hay algún overlay abierto ahora mismo?
+ *
+ * Lo necesita quien escucha «atrás» o Escape SIN ser un overlay -- por
+ * ejemplo el modo mostrador de la bandeja, que se cierra con Escape pero
+ * no debe cerrarse cuando lo que la persona quiere es salir de la foto que
+ * tiene abierta encima.
+ */
+export function hayOverlayAbierto(): boolean {
+  return openSentinels.length > 0;
+}
+
 export function useBackDismiss(isOpen: boolean, onClose: () => void): void {
   // El callback suele recrearse en cada render; con la ref evitamos re-suscribir
   // (y, peor, re-empujar la centinela) en cada uno de ellos.
@@ -53,10 +65,29 @@ export function useBackDismiss(isOpen: boolean, onClose: () => void): void {
       onCloseRef.current();
     };
 
+    /*
+      Escape es el «atrás» del escritorio, así que se resuelve con la MISMA
+      pila. Sin esto cada overlay traía su propio listener suelto sobre
+      `window`, y como todos contestaban a la misma tecla, abrir una foto
+      dentro del catálogo y apretar Escape cerraba la foto y el catálogo de
+      un saque -- el mismo fallo que se veía en el teléfono con el botón
+      atrás.
+
+      No consume la entrada del historial: de eso ya se encarga la limpieza
+      del efecto cuando `isOpen` pasa a false.
+    */
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (openSentinels[openSentinels.length - 1] !== sentinelId) return;
+      onCloseRef.current();
+    };
+
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleEscape);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleEscape);
 
       const stackIndex = openSentinels.indexOf(sentinelId);
       if (stackIndex !== -1) openSentinels.splice(stackIndex, 1);

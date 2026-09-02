@@ -163,12 +163,18 @@ export const ProformaBuilder: React.FC<Props> = ({
         return () => clearTimeout(t);
     }, [isOpen]);
 
+    /*
+        Solo en modo PANEL. Como overlay, el Escape lo maneja
+        `useBackDismiss` con la pila compartida -- si no, una foto abierta
+        encima se cerraba junto con la proforma. Acoplada al costado el hook
+        no se registra (no es un overlay), así que ahí sí hace falta.
+    */
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || !enPanel) return;
         const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, onClose]);
+    }, [isOpen, enPanel, onClose]);
 
     // Búsqueda contra la base: se espera a que termine de escribir.
     useEffect(() => {

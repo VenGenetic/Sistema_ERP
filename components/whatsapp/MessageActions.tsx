@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Pencil, Reply, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Copy, Forward, Pencil, Reply, Trash2, X } from 'lucide-react';
 import { cn } from '../ui/styles';
 import { copiarTexto } from '../../utils/portapapeles';
 
@@ -27,6 +27,12 @@ interface Props {
      */
     onBorrar?: () => void;
     onEditar?: () => void;
+    /**
+     * Pasa este mensaje a otro chat. Sin esto había que descargar la foto,
+     * abrir el otro chat y volver a adjuntarla -- y como eso se termina
+     * haciendo desde el celular, la foto quedaba fuera del hilo del ERP.
+     */
+    onReenviar?: () => void;
     /** Texto que se puede llevar al portapapeles. No envia nada. */
     textoCopiable?: string;
     /** Clases del disparador; el móvil manda las suyas para llegar a 44px. */
@@ -48,6 +54,7 @@ export const MessageActions: React.FC<Props> = ({
     onReaccionar,
     onBorrar,
     onEditar,
+    onReenviar,
     textoCopiable,
     claseBoton,
     alineacion = 'derecha',
@@ -163,6 +170,16 @@ export const MessageActions: React.FC<Props> = ({
                     >
                         <Reply size={14} aria-hidden="true" /> Responder citando
                     </button>
+
+                    {onReenviar && (
+                        <button
+                            onClick={cerrarY(onReenviar)}
+                            role="menuitem"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
+                        >
+                            <Forward size={14} aria-hidden="true" /> Reenviar
+                        </button>
+                    )}
 
                     {textoCopiable && (
                         <button

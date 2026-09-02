@@ -52,7 +52,10 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (!isOpen) return;
-            if (e.key === 'Escape') onClose();
+            /* Escape NO se maneja acá: lo resuelve `useBackDismiss`, que sabe
+               si este visor es la capa de encima. Suelto, cerraba también el
+               modal que lo abrió -- se apretaba una vez para salir de la foto
+               y se salía además del catálogo. */
             if (e.key === 'ArrowRight') handleNext();
             if (e.key === 'ArrowLeft') handlePrev();
         };
@@ -152,7 +155,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ isOpen, media, ini
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={onClose}>
+        <div role="dialog" aria-modal="true" aria-label="Visor de imágenes" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={onClose}>
             {/* Download Button */}
             {/* Open in Catalog Button */}
             <button

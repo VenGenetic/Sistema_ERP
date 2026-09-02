@@ -23,6 +23,8 @@ import {
     guardarBorradorWhatsApp,
     leerBorradorWhatsApp,
 } from '../../utils/whatsappDrafts';
+import { alternarMarca, ATAJOS_DE_FORMATO } from '../../utils/formatoWhatsApp';
+import { Bold, Code, Italic, Strikethrough } from 'lucide-react';
 
 /**
  * La caja de escribir del chat: texto, fotos, archivos, respuestas rápidas
@@ -146,6 +148,15 @@ export const ChatComposer: React.FC<Props> = ({
     /** Hay una nota de voz grabándose o grabada sin mandar. */
     const [grabadorOcupado, setGrabadorOcupado] = useState(false);
     /**
+     * Hay texto seleccionado en la caja.
+     *
+     * De eso depende la barra de formato. Aparece solo con una selección y
+     * no fija: los atajos existen pero son invisibles, y una fila de cuatro
+     * botones siempre puesta le robaría alto a una barra que el resto del
+     * componente se esfuerza en mantener en 48px.
+     */
+    const [haySeleccion, setHaySeleccion] = useState(false);
+    /**
      * El administrador de respuestas rápidas y, si se llegó desde «guardar
      * esto», el texto con el que arranca. Se pasa por estado y no por
      * `window.prompt` porque guardar una plantilla sin ver el texto que se
@@ -223,30 +234,62 @@ export const ChatComposer: React.FC<Props> = ({
     /*  Adjuntos                                                         */
     /* ---------------------------------------------------------------- */
 
+    /**
+     * Sube los archivos EN PARALELO.
+     *
+     * Antes iba uno por uno con `await` dentro del bucle: mandar cinco fotos
+     * de un repuesto -- que es lo normal cuando el cliente pide ver la pieza
+     * de todos los ángulos -- tardaba cinco viajes encadenados con el
+     * vendedor esperando el botón de enviar.
+     *
+     * Las miniaturas se agregan TODAS primero y en orden, así que el orden
+     * en pantalla es el que eligió la persona y no el que dicte cuál
+     * termine antes de subir.
+     */
     const agregarArchivos = useCallback(async (files: File[]) => {
         if (files.length === 0) return;
         setError(null);
         const generacion = generacionRef.current;
 
-        for (const file of files) {
-            const key = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-            const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
-            setAdjuntos((prev) => [...prev, { key, nombre: file.name || 'foto', preview, subido: null, error: null }]);
+        const entradas = files.map((file, i) => ({
+            file,
+            // El índice entra en la clave: `Date.now()` es el mismo para
+            // todos los de una misma tanda y sin él dos archivos podían
+            // compartir clave y pisarse en la lista.
+            key: `${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
+            preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+        }));
 
-            try {
-                const subido = await subirAdjunto(file);
-                if (generacion !== generacionRef.current) {
-                    if (preview) URL.revokeObjectURL(preview);
-                    void borrarAdjunto(subido.url);
-                    continue;
+        setAdjuntos((prev) => [
+            ...prev,
+            ...entradas.map((e) => ({
+                key: e.key,
+                nombre: e.file.name || 'foto',
+                preview: e.preview,
+                subido: null,
+                error: null,
+            })),
+        ]);
+
+        await Promise.all(
+            entradas.map(async ({ file, key, preview }) => {
+                try {
+                    const subido = await subirAdjunto(file);
+                    // Cambiaron de conversación mientras subía: el archivo
+                    // ya no pertenece a este chat y se limpia.
+                    if (generacion !== generacionRef.current) {
+                        if (preview) URL.revokeObjectURL(preview);
+                        void borrarAdjunto(subido.url);
+                        return;
+                    }
+                    setAdjuntos((prev) => prev.map((a) => (a.key === key ? { ...a, subido } : a)));
+                } catch (err: any) {
+                    if (generacion !== generacionRef.current) return;
+                    const mensaje = err?.message ?? 'No se pudo subir el archivo.';
+                    setAdjuntos((prev) => prev.map((a) => (a.key === key ? { ...a, error: mensaje } : a)));
                 }
-                setAdjuntos((prev) => prev.map((a) => (a.key === key ? { ...a, subido } : a)));
-            } catch (err: any) {
-                if (generacion !== generacionRef.current) continue;
-                const mensaje = err?.message ?? 'No se pudo subir el archivo.';
-                setAdjuntos((prev) => prev.map((a) => (a.key === key ? { ...a, error: mensaje } : a)));
-            }
-        }
+            }),
+        );
     }, []);
 
     const quitarAdjunto = (key: string) => {
@@ -279,6 +322,47 @@ export const ChatComposer: React.FC<Props> = ({
     };
 
     /* ---------------------------------------------------------------- */
+    /*  Formato                                                          */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Envuelve lo seleccionado con una marca de WhatsApp.
+     *
+     * Se hace sobre el `textarea` de siempre y no con un campo enriquecido:
+     * lo que viaja a WhatsApp ES texto con marcas, así que un editor que
+     * las escondiera obligaría a traducir de ida y de vuelta, y cualquier
+     * diferencia entre las dos traducciones le llega al cliente. Acá se ve
+     * exactamente lo que se manda.
+     *
+     * El foco y la selección se reponen en el cuadro siguiente: React
+     * redibuja el textarea al cambiar su valor y el cursor se iría al final.
+     */
+    const ICONO_DE_MARCA: Record<string, React.ReactNode> = {
+        '*': <Bold size={15} aria-hidden="true" />,
+        _: <Italic size={15} aria-hidden="true" />,
+        '~': <Strikethrough size={15} aria-hidden="true" />,
+        '`': <Code size={15} aria-hidden="true" />,
+    };
+
+    const revisarSeleccion = useCallback(() => {
+        const caja = textareaRef.current;
+        setHaySeleccion(!!caja && caja.selectionStart !== caja.selectionEnd);
+    }, []);
+
+    const aplicarFormato = useCallback((marca: string) => {
+        const caja = textareaRef.current;
+        if (!caja) return;
+        const { selectionStart, selectionEnd } = caja;
+        const cambio = alternarMarca(caja.value, selectionStart, selectionEnd, marca);
+        setBorrador(cambio.texto);
+        requestAnimationFrame(() => {
+            caja.focus();
+            caja.setSelectionRange(cambio.inicio, cambio.fin);
+            setHaySeleccion(cambio.inicio !== cambio.fin);
+        });
+    }, []);
+
+    /* ---------------------------------------------------------------- */
     /*  Envío                                                            */
     /* ---------------------------------------------------------------- */
 
@@ -287,7 +371,18 @@ export const ChatComposer: React.FC<Props> = ({
         () => adjuntos.filter((a): a is AdjuntoLocal & { subido: AdjuntoSubido } => !!a.subido),
         [adjuntos],
     );
-    const puedeEnviar = (borrador.trim().length > 0 || listos.length > 0) && !enviando && !subiendo;
+    /*
+        Con un adjunto fallido NO se envía.
+
+        Antes sí: `setAdjuntos([])` lo borraba junto con los que sí salieron,
+        así que alguien mandaba dos fotos, una fallaba, y se quedaba
+        convencido de que el cliente recibió las dos. Quitarlo a mano es un
+        toque; enterarse tres días después de que faltó la foto de la pieza
+        no tiene arreglo.
+    */
+    const hayFallidos = adjuntos.some((a) => a.error);
+    const puedeEnviar =
+        (borrador.trim().length > 0 || listos.length > 0) && !enviando && !subiendo && !hayFallidos;
 
     const enviar = async () => {
         if (!puedeEnviar || enviandoRef.current) return;
@@ -480,6 +575,35 @@ export const ChatComposer: React.FC<Props> = ({
                 </div>
             )}
 
+            {/* Barra de formato. Sale al seleccionar texto, como el menú
+                contextual de WhatsApp Web: la acción aparece donde y cuando
+                hace falta, en vez de ocupar sitio todo el tiempo. */}
+            {haySeleccion && !menuHerramientas && !menuRapidas && (
+                <div
+                    role="toolbar"
+                    aria-label="Formato del texto"
+                    className="absolute bottom-full left-1/2 z-20 mb-2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-wa-divider bg-wa-panel px-1 py-1 shadow-lg"
+                >
+                    {ATAJOS_DE_FORMATO.map((a) => (
+                        <button
+                            key={a.marca}
+                            type="button"
+                            /* `preventDefault` en mousedown: sin esto el clic
+                               le saca el foco al textarea y con el foco se va
+                               la selección, así que el botón se aplicaría
+                               sobre nada. */
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => aplicarFormato(a.marca)}
+                            title={`${a.nombre} · ${a.hint}`}
+                            aria-label={a.nombre}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-wa-meta transition-colors hover:bg-wa-hover hover:text-wa-text"
+                        >
+                            {ICONO_DE_MARCA[a.marca]}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* El menú del "+" */}
             {menuHerramientas && (
                 <div
@@ -586,10 +710,21 @@ export const ChatComposer: React.FC<Props> = ({
                 </div>
             )}
 
-            {adjuntos.some((a) => a.error) && (
-                <p className="mb-1.5 px-1 text-[11px] text-wa-danger">
-                    {adjuntos.find((a) => a.error)?.error} — quitá el archivo y probá de nuevo.
-                </p>
+            {hayFallidos && (
+                <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
+                    <p className="text-[11px] text-wa-danger">
+                        {adjuntos.find((a) => a.error)?.error} No se puede enviar hasta sacarlo.
+                    </p>
+                    {/* La acción que el aviso pide, al lado del aviso: sin
+                        esto hay que ir a buscar la equis de cada miniatura. */}
+                    <button
+                        type="button"
+                        onClick={() => adjuntos.filter((a) => a.error).forEach((a) => quitarAdjunto(a.key))}
+                        className="text-[11px] font-semibold text-wa-accent-strong underline underline-offset-2 hover:no-underline"
+                    >
+                        Quitar {adjuntos.filter((a) => a.error).length === 1 ? 'el archivo' : 'los archivos'}
+                    </button>
+                </div>
             )}
 
             <input
@@ -641,10 +776,30 @@ export const ChatComposer: React.FC<Props> = ({
                     value={borrador}
                     onChange={(e) => setBorrador(e.target.value)}
                     onPaste={alPegar}
+                    onSelect={revisarSeleccion}
+                    onMouseUp={revisarSeleccion}
+                    onKeyUp={revisarSeleccion}
+                    /* Al salir del campo no queda selección visible, así que
+                       la barra tampoco tiene por qué quedarse. El retardo deja
+                       pasar el clic sobre sus propios botones. */
+                    onBlur={() => setTimeout(() => setHaySeleccion(false), 120)}
                     onKeyDown={(e) => {
                         if (e.key === 'Escape') {
                             setMenuRapidas(false);
                             setMenuHerramientas(false);
+                        }
+                        // Ctrl+B / Ctrl+I / Ctrl+Shift+X / Ctrl+Shift+M, como
+                        // en WhatsApp Web. Se compara en minúscula porque con
+                        // Shift la tecla llega en mayúscula.
+                        if (e.ctrlKey || e.metaKey) {
+                            const atajo = ATAJOS_DE_FORMATO.find(
+                                (a) => a.tecla === e.key.toLowerCase() && a.conShift === e.shiftKey,
+                            );
+                            if (atajo) {
+                                e.preventDefault();
+                                aplicarFormato(atajo.marca);
+                                return;
+                            }
                         }
                         // Enter envía, Shift+Enter hace salto de línea.
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -657,7 +812,7 @@ export const ChatComposer: React.FC<Props> = ({
                     aria-label="Mensaje para el cliente"
                     // Los atajos van en el title y no en el placeholder: el texto
                     // largo se partía en dos renglones y descuadraba la barra.
-                    title="Enter envía · Shift+Enter salta de línea · / abre las respuestas rápidas"
+                    title={`Enter envía · Shift+Enter salta de línea · / abre las respuestas rápidas · ${ATAJOS_DE_FORMATO.map((a) => `${a.hint} ${a.nombre.toLowerCase()}`).join(' · ')}`}
                     className={cn(
                         'wa-scroll min-h-[44px] max-h-40 flex-1 resize-none rounded-lg bg-wa-input px-4 py-3',
                         'text-[14.5px] leading-[19px] text-wa-text placeholder:text-wa-meta',
@@ -670,7 +825,13 @@ export const ChatComposer: React.FC<Props> = ({
                         onClick={enviar}
                         disabled={!puedeEnviar}
                         aria-label="Enviar"
-                        title={subiendo ? 'Esperando a que termine de subir el archivo' : 'Enviar'}
+                        title={
+                            hayFallidos
+                                ? 'Hay un archivo que no se pudo subir: quitalo para poder enviar'
+                                : subiendo
+                                  ? 'Esperando a que termine de subir el archivo'
+                                  : 'Enviar'
+                        }
                         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-wa-accent-strong text-wa-accent-fg hover:brightness-110 disabled:opacity-50"
                     >
                         {enviando || subiendo ? (

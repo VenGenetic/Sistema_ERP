@@ -311,7 +311,15 @@ export const BurbujasEnCola: React.FC<PropsBurbujas> = ({ items, onCancelar, onR
                         </p>
                     )}
 
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-wa-meta-out">
+                    {/* El color del pie sigue al de la burbuja: `text-wa-meta-out`
+                        es el gris de la burbuja VERDE, y sobre el rojo del fallo
+                        quedaba casi ilegible. */}
+                    <div
+                        className={cn(
+                            'mt-1 flex flex-wrap items-center gap-2 text-[11px]',
+                            q.status === 'failed' ? 'text-danger-soft-fg/80' : 'text-wa-meta-out',
+                        )}
+                    >
                         {q.status === 'failed' ? (
                             <>
                                 <span className="font-semibold">No se pudo enviar</span>

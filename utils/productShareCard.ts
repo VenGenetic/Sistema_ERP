@@ -34,7 +34,19 @@ const CENTER = SIZE / 2;
 const FONT = '"Inter", "Helvetica Neue", Arial, sans-serif';
 
 /** Precio tal como se le muestra al cliente (ver `utils/precioCliente.ts`). */
-const customerPriceText = (price?: number | null): string => `$${precioParaCliente(Number(price) || 0)}`;
+/**
+ * El precio para la tarjeta que se le comparte al cliente.
+ *
+ * Un repuesto sin precio cargado NO se anuncia como `$0`: eso en un chat no
+ * es un dato faltante, es una oferta. Se dice que hay que consultarlo, que
+ * es la verdad. Misma regla que en el envío desde el catálogo
+ * (`utils/whatsappOutbox.ts`).
+ */
+const customerPriceText = (price?: number | null): string => {
+    const valor = Number(price);
+    if (!Number.isFinite(valor) || valor <= 0) return 'Consultar';
+    return `$${precioParaCliente(valor)}`;
+};
 
 /**
  * Carga la imagen del repuesto para dibujarla en el canvas.
@@ -355,7 +367,10 @@ export const deliverProductCard = async (
             await navigator.share({
                 files: [file],
                 title: product.name,
-                text: `${product.name} - ${customerPriceText(product.price)}`,
+                text: `${product.name} - ${customerPriceText(product.price)}`.replace(
+                    ' - Consultar',
+                    ' · consultar precio',
+                ),
             });
             return 'shared';
         } catch (err: any) {

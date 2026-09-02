@@ -99,11 +99,9 @@ export const Modal: React.FC<ModalProps> = ({
     if (!isOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && dismissOnEscape) {
-        event.stopPropagation();
-        onClose();
-        return;
-      }
+      /* Escape lo cierra `useBackDismiss` (mismo `dismissOnEscape`), que
+         además sabe si este modal es la capa de encima. Acá se llamaba a
+         `onClose` una segunda vez por la misma pulsación. */
 
       if (event.key !== 'Tab') return;
 

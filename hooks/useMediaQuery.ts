@@ -35,3 +35,14 @@ export function useMediaQuery(query: string): boolean {
 
 /** El ancho a partir del cual la bandeja puede mostrar una tercera columna (Tailwind `xl`). */
 export const CONSULTA_PANTALLA_ANCHA = '(min-width: 1280px)';
+
+/**
+ * El ancho donde entran las CUATRO columnas del modo mostrador: lista,
+ * conversación, cliente y cotización, todas a la vez.
+ *
+ * 1660px sale de sumarlas con el chat todavía usable: 360 + 340 + 420 deja
+ * unos 540 para el hilo, que es donde empieza a incomodar leer. Por debajo
+ * de eso la ficha y la proforma siguen turnándose, que es lo correcto:
+ * cuatro columnas apretadas se leen peor que tres cómodas.
+ */
+export const CONSULTA_MOSTRADOR = '(min-width: 1660px)';

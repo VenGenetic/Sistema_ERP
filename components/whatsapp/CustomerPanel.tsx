@@ -106,18 +106,17 @@ export const CustomerPanel: React.FC<Props> = ({
             // 1) Cliente del ERP. `ilike *cola*` en vez de igualdad: los
             //    teléfonos de `customers` están cargados a mano y vienen con
             //    espacios, guiones, +593 o el 0 adelante.
-            if (local.length >= 7) {
-                const { data, error: errorCliente } = await supabase
-                    .from('customers')
-                    .select('id, name, identification_number, phone, customer_type, discount_percentage')
-                    .ilike('phone', `%${local}%`)
-                    .limit(1);
-                if (errorCliente) throw errorCliente;
-                if (turno !== cargaRef.current) return;
-                setCliente((data?.[0] as ClienteErp) ?? null);
-            } else {
-                setCliente(null);
-            }
+            //
+            //    Sin `if`: arriba ya se sale cuando la cola es más corta que
+            //    7 dígitos, así que la rama `else` no se alcanzaba nunca.
+            const { data, error: errorCliente } = await supabase
+                .from('customers')
+                .select('id, name, identification_number, phone, customer_type, discount_percentage')
+                .ilike('phone', `%${local}%`)
+                .limit(1);
+            if (errorCliente) throw errorCliente;
+            if (turno !== cargaRef.current) return;
+            setCliente((data?.[0] as ClienteErp) ?? null);
 
             // 2) Repuestos que este número dejó pedidos. `product_demands`
             //    guarda el teléfono como lo escribió quien la creó, así que

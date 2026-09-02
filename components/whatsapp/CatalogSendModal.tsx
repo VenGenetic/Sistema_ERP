@@ -147,14 +147,10 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
         return () => clearTimeout(t);
     }, [isOpen]);
 
-    useEffect(() => {
-        if (!isOpen) return;
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, onClose]);
+    /* El Escape lo maneja `useBackDismiss` (arriba), que solo deja cerrar a
+       la capa de encima: con una foto abierta en el visor, la primera
+       pulsación cierra la foto y la segunda este panel. Antes cerraba las
+       dos de un saque. */
 
     // La búsqueda va contra la base (RPC de similitud): se espera a que la
     // persona termine de escribir en vez de consultar por cada tecla.
