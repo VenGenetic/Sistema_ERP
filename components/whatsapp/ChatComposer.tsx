@@ -816,7 +816,7 @@ export const ChatComposer: React.FC<Props> = ({
                     className={cn(
                         'wa-scroll min-h-[44px] max-h-40 flex-1 resize-none rounded-lg bg-wa-input px-4 py-3',
                         'text-[14.5px] leading-[19px] text-wa-text placeholder:text-wa-meta',
-                        'border-none outline-none focus:ring-0',
+                        'border-none outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wa-accent',
                     )}
                 />
 

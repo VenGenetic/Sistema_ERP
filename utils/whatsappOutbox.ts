@@ -556,7 +556,7 @@ export async function buscarEnCatalogo(termino: string, limite = 24): Promise<Pr
  * hay que deducirlo -- y guardar uno equivocado en la cola haría que un
  * .webp le llegue al cliente anunciado como .jpg.
  */
-export function mimeDeUrl(url: string): string {
+export function mimeDeUrl(url: string, fallback = 'image/jpeg'): string {
     const ext = url.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
     const tipos: Record<string, string> = {
         jpg: 'image/jpeg',
@@ -564,8 +564,29 @@ export function mimeDeUrl(url: string): string {
         png: 'image/png',
         webp: 'image/webp',
         gif: 'image/gif',
+        avif: 'image/avif',
+        svg: 'image/svg+xml',
+        mp4: 'video/mp4',
+        webm: 'video/webm',
+        mov: 'video/quicktime',
+        mp3: 'audio/mpeg',
+        m4a: 'audio/mp4',
+        aac: 'audio/aac',
+        wav: 'audio/wav',
+        ogg: 'audio/ogg',
+        opus: 'audio/ogg; codecs=opus',
+        pdf: 'application/pdf',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xls: 'application/vnd.ms-excel',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ppt: 'application/vnd.ms-powerpoint',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        csv: 'text/csv',
+        txt: 'text/plain',
+        zip: 'application/zip',
     };
-    return tipos[ext] ?? 'image/jpeg';
+    return tipos[ext] ?? fallback;
 }
 
 /**

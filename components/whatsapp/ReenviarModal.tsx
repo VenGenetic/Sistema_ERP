@@ -44,6 +44,8 @@ export interface MensajeAReenviar {
     body: string | null;
     media_url: string | null;
     content_type: string;
+    /** Conserva el vínculo interno cuando se reenvía una ficha de catálogo. */
+    product_id?: number | null;
 }
 
 interface Props {
@@ -68,6 +70,25 @@ function tipoDeSalida(contentType: string, tieneMedia: boolean): OutboxKind {
     if (contentType === 'video') return 'video';
     if (contentType === 'audio') return 'audio';
     return 'document';
+}
+
+/** MIME seguro cuando la URL no conserva una extensión reconocible. */
+function mimeFallback(kind: OutboxKind): string {
+    if (kind === 'image') return 'image/jpeg';
+    if (kind === 'video') return 'video/mp4';
+    if (kind === 'audio') return 'audio/ogg; codecs=opus';
+    return 'application/octet-stream';
+}
+
+/** Recupera un nombre útil de la ruta pública de Storage para documentos. */
+function nombreDeMedia(url: string): string {
+    try {
+        const ultimo = decodeURIComponent(url.split('?')[0].split('/').pop() || 'archivo');
+        // Los adjuntos del ERP se guardan como timestamp_azar_nombre-original.
+        return ultimo.replace(/^\d+_[a-z0-9]{6}_/i, '') || 'archivo';
+    } catch {
+        return 'archivo';
+    }
 }
 
 export const ReenviarModal: React.FC<Props> = ({
@@ -171,13 +192,21 @@ export const ReenviarModal: React.FC<Props> = ({
         try {
             const kind = tipoDeSalida(mensaje.content_type, !!mensaje.media_url);
             const cuerpo = mensaje.body?.trim() || null;
+            if (!cuerpo && !mensaje.media_url) {
+                throw new Error('Este mensaje ya no conserva contenido que se pueda reenviar.');
+            }
 
             const mensajes: NuevoMensaje[] = elegidos.map((destino) => ({
                 conversationId: destino.id,
                 body: cuerpo,
                 kind,
                 mediaUrl: mensaje.media_url,
-                mediaMime: mensaje.media_url ? mimeDeUrl(mensaje.media_url) : null,
+                mediaMime: mensaje.media_url ? mimeDeUrl(mensaje.media_url, mimeFallback(kind)) : null,
+                mediaFilename:
+                    mensaje.media_url && kind === 'document'
+                        ? nombreDeMedia(mensaje.media_url)
+                        : null,
+                productId: mensaje.product_id ?? null,
             }));
 
             // Todo en un solo insert: si son cinco destinos, o entran los

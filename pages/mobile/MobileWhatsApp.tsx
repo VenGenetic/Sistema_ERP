@@ -7,6 +7,7 @@ import {
     Bot,
     BotOff,
     ClipboardList,
+    CircleHelp,
     Clock,
     CheckCheck,
     ContactRound,
@@ -67,6 +68,8 @@ import { getDueWorkIds } from '../../utils/whatsappWorkflow';
 import { buscarConversacionesPorTexto } from '../../utils/whatsappConversationSearch';
 import { attributeMessage, attributeMessages } from '../../utils/messageAttribution';
 import ReenviarModal, { type MensajeAReenviar } from '../../components/whatsapp/ReenviarModal';
+import AyudaWhatsAppModal from '../../components/whatsapp/AyudaWhatsAppModal';
+import { bandejaDe } from '../../components/whatsapp/bandejas';
 import {
     CLASE_DE_ETAPA,
     ETAPAS_QUE_SE_MARCAN,
@@ -143,7 +146,7 @@ interface Conversacion {
     etapa?: Etapa;
 }
 
-type FiltroLista = 'all' | 'unread' | 'archived' | 'ai_ready' | 'ai_active' | 'answered' | 'attention';
+type FiltroLista = 'all' | 'unread' | 'archived' | 'ai_ready' | 'ai_active' | 'waiting' | 'closed' | 'attention';
 interface PreferenciasConversacion {
     pinned: number[];
     archived: number[];
@@ -270,6 +273,7 @@ const MobileWhatsApp: React.FC = () => {
     const [archivosPendientes, setArchivosPendientes] = useState<File[]>([]);
     const [enviando, setEnviando] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [avisoAccion, setAvisoAccion] = useState<string | null>(null);
     /** Mensaje que se está citando en la próxima respuesta. */
     const [citando, setCitando] = useState<Mensaje | null>(null);
     /** Mensaje que se esta por pasar a otro chat. Mismo modal que el escritorio. */
@@ -299,6 +303,7 @@ const MobileWhatsApp: React.FC = () => {
     const [porPedirAbono, setPorPedirAbono] = useState(0);
     /** El menú "⋮" de la cabecera del chat. */
     const [menuChat, setMenuChat] = useState(false);
+    const [ayudaAbierta, setAyudaAbierta] = useState(false);
     const [mostrarAgentes, setMostrarAgentes] = useState(false);
     const [attentionIds, setAttentionIds] = useState<number[]>([]);
     /**
@@ -338,6 +343,12 @@ const MobileWhatsApp: React.FC = () => {
     useEffect(() => {
         contarAvisos();
     }, [contarAvisos]);
+
+    useEffect(() => {
+        if (!avisoAccion) return;
+        const timer = window.setTimeout(() => setAvisoAccion(null), 4000);
+        return () => window.clearTimeout(timer);
+    }, [avisoAccion]);
 
     /** Cuántos repuestos tiene a medio armar la proforma de este chat. */
     const itemsEnProforma = useChatProformaStore(
@@ -431,12 +442,31 @@ const MobileWhatsApp: React.FC = () => {
             if (soloEscalados) q = q.eq('status', 'escalated');
             if (filtroLista === 'unread') {
                 const condiciones = ['unread_count.gt.0'];
-                if (incluirEtapa) condiciones.push('etapa.eq.ready_for_sales');
                 const conservados = [...noLeidosConservadosRef.current];
                 if (conservados.length > 0) condiciones.push(`id.in.(${conservados.join(',')})`);
                 q = q.or(condiciones.join(','));
             }
             if (filtroLista === 'ai_ready') q = q.eq('etapa', 'ready_for_sales');
+            if (filtroLista === 'ai_active') q = q.eq('bot_enabled', true).eq('status', 'bot_active');
+            if (filtroLista === 'waiting') {
+                const condiciones = ['last_message_direction.eq.outbound'];
+                if (incluirEtapa) condiciones.push('etapa.eq.waiting_customer_info');
+                q = q.or(condiciones.join(','));
+            }
+            if (filtroLista === 'closed') {
+                const condiciones = ['status.eq.closed'];
+                if (incluirEtapa) condiciones.push('etapa.eq.resolved');
+                q = q.or(condiciones.join(','));
+            }
+            if (filtroLista === 'attention') {
+                const condiciones = [
+                    'unread_count.gt.0',
+                    'last_message_direction.eq.inbound',
+                    'status.eq.escalated',
+                ];
+                if (incluirEtapa) condiciones.push('etapa.eq.ready_for_sales', 'etapa.eq.human_assigned');
+                q = q.or(condiciones.join(','));
+            }
             if (resultadosDeTexto) {
                 q = q.in('id', resultadosDeTexto.conversationIds);
             } else if (texto) {
@@ -1030,42 +1060,78 @@ const MobileWhatsApp: React.FC = () => {
         } : c)));
     };
 
-    const tienePendienteVisual = useCallback(
-        (conversation: Pick<Conversacion, 'id' | 'unread_count' | 'etapa'>) =>
-            conversation.unread_count > 0 ||
-            conversation.etapa === 'ready_for_sales' ||
-            noLeidosConservados.has(conversation.id),
+    const estaSinLeer = useCallback(
+        (conversation: Pick<Conversacion, 'id' | 'unread_count'>) =>
+            conversation.unread_count > 0 || noLeidosConservados.has(conversation.id),
         [noLeidosConservados],
     );
+    const tienePendienteVisual = useCallback(
+        (conversation: Pick<Conversacion, 'id' | 'unread_count' | 'etapa'>) =>
+            estaSinLeer(conversation) || conversation.etapa === 'ready_for_sales',
+        [estaSinLeer],
+    );
     const sinLeer = useMemo(
-        () => conversaciones.reduce((n, c) => n + (tienePendienteVisual(c) ? 1 : 0), 0),
-        [conversaciones, tienePendienteVisual],
+        () => conversaciones.reduce((n, c) => n + (estaSinLeer(c) ? 1 : 0), 0),
+        [conversaciones, estaSinLeer],
     );
     const iaAtendiendo = useMemo(
         () => conversaciones.filter((c) => c.bot_enabled && c.status === 'bot_active').length,
         [conversaciones],
     );
-    const respondidos = useMemo(
-        () => conversaciones.filter((c) => c.last_message_direction === 'outbound' && !tienePendienteVisual(c)).length,
+    const esperando = useMemo(
+        () => conversaciones.filter((c) => bandejaDe(c, tienePendienteVisual(c)) === 'esperando').length,
         [conversaciones, tienePendienteVisual],
     );
     const porAtender = useMemo(
-        () => conversaciones.filter((c) => tienePendienteVisual(c) || attentionIds.includes(c.id)).length,
+        () => conversaciones.filter((c) => {
+            const bandeja = bandejaDe(c, tienePendienteVisual(c));
+            return bandeja === 'responder' || (bandeja !== 'cotizar' && attentionIds.includes(c.id));
+        }).length,
         [conversaciones, attentionIds, tienePendienteVisual],
     );
     const conversacionesVisibles = useMemo(() => {
         let rows = filtroLista === 'archived'
             ? conversaciones.filter((c) => preferencias.archived.includes(c.id))
             : conversaciones.filter((c) => !preferencias.archived.includes(c.id));
-        if (filtroLista === 'unread') rows = rows.filter(tienePendienteVisual);
+        if (filtroLista === 'unread') rows = rows.filter(estaSinLeer);
         if (filtroLista === 'ai_ready') rows = rows.filter((c) => c.etapa === 'ready_for_sales');
         if (filtroLista === 'ai_active') rows = rows.filter((c) => c.bot_enabled && c.status === 'bot_active');
-        if (filtroLista === 'answered') rows = rows.filter((c) => c.last_message_direction === 'outbound' && !tienePendienteVisual(c));
-        if (filtroLista === 'attention') rows = rows.filter((c) => tienePendienteVisual(c) || attentionIds.includes(c.id));
+        if (filtroLista === 'waiting') rows = rows.filter((c) => bandejaDe(c, tienePendienteVisual(c)) === 'esperando');
+        if (filtroLista === 'closed') rows = rows.filter((c) => bandejaDe(c, tienePendienteVisual(c)) === 'cerrados');
+        if (filtroLista === 'attention') rows = rows.filter((c) => {
+            const bandeja = bandejaDe(c, tienePendienteVisual(c));
+            return bandeja === 'responder' || (bandeja !== 'cotizar' && attentionIds.includes(c.id));
+        });
         return [...rows].sort((a, b) =>
             Number(preferencias.pinned.includes(b.id)) - Number(preferencias.pinned.includes(a.id)),
         );
-    }, [conversaciones, filtroLista, preferencias, attentionIds, tienePendienteVisual]);
+    }, [conversaciones, filtroLista, preferencias, attentionIds, tienePendienteVisual, estaSinLeer]);
+
+    /** Cola operativa compartida con la idea del escritorio: lo urgente
+        primero, sin obligar a volver a la lista entre cliente y cliente. */
+    const colaAtencionMovil = useMemo(
+        () => conversaciones.filter((conversation) =>
+            !preferencias.archived.includes(conversation.id) &&
+            (() => {
+                const bandeja = bandejaDe(conversation, tienePendienteVisual(conversation));
+                return bandeja === 'cotizar' || bandeja === 'responder' || attentionIds.includes(conversation.id);
+            })(),
+        ),
+        [conversaciones, preferencias.archived, attentionIds, tienePendienteVisual],
+    );
+    const pendientesDistintosAlActual = colaAtencionMovil.filter((conversation) => conversation.id !== abierta?.id);
+
+    const abrirSiguientePendiente = () => {
+        const siguiente = pendientesDistintosAlActual[0];
+        if (!siguiente) return;
+        setMenuChat(false);
+        setFiltroLista(
+            bandejaDe(siguiente, tienePendienteVisual(siguiente)) === 'cotizar'
+                ? 'ai_ready'
+                : 'attention',
+        );
+        void abrirChat(siguiente);
+    };
 
     /* ------------------------------------------------------------------ */
 
@@ -1217,6 +1283,20 @@ const MobileWhatsApp: React.FC = () => {
                                     </button>
                                     <button
                                         role="menuitem"
+                                        onClick={abrirSiguientePendiente}
+                                        disabled={pendientesDistintosAlActual.length === 0}
+                                        className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover disabled:opacity-40"
+                                    >
+                                        <Headset size={19} className="text-wa-meta" aria-hidden="true" />
+                                        <span className="min-w-0 flex-1">Siguiente por atender</span>
+                                        {pendientesDistintosAlActual.length > 0 && (
+                                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-wa-accent-strong px-1.5 text-[11px] font-bold text-wa-accent-fg">
+                                                {pendientesDistintosAlActual.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button
+                                        role="menuitem"
                                         onClick={() => {
                                             setMenuChat(false);
                                             setFicha(true);
@@ -1251,6 +1331,17 @@ const MobileWhatsApp: React.FC = () => {
                                             <RefreshCw size={19} className="text-wa-meta" aria-hidden="true" />
                                         )}
                                         Actualizar el chat
+                                    </button>
+                                    <button
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setMenuChat(false);
+                                            setAyudaAbierta(true);
+                                        }}
+                                        className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-wa-text active:bg-wa-hover"
+                                    >
+                                        <CircleHelp size={19} className="text-wa-meta" aria-hidden="true" />
+                                        Cómo usar este WhatsApp
                                     </button>
                                 </div>
                             </>
@@ -1292,6 +1383,23 @@ const MobileWhatsApp: React.FC = () => {
                     </div>
                 )}
 
+                {avisoAccion && (
+                    <div
+                        role="status"
+                        className="flex shrink-0 items-center justify-between gap-3 border-b border-success/30 bg-success-soft px-3 py-2"
+                    >
+                        <p className="text-[12px] font-medium text-success-soft-fg">{avisoAccion}</p>
+                        <button
+                            type="button"
+                            onClick={() => setAvisoAccion(null)}
+                            aria-label="Cerrar confirmación"
+                            className="shrink-0 rounded-md p-1 text-success-soft-fg/70 active:bg-success/10"
+                        >
+                            <X size={15} aria-hidden="true" />
+                        </button>
+                    </div>
+                )}
+
                 {/* ----------------------------- Hilo ----------------------------- */}
                 <div ref={hiloRef} className="wa-wallpaper wa-scroll flex min-h-0 flex-1 flex-col overflow-y-auto [overflow-anchor:none] py-2">
                     {/* Los mensajes se apoyan ABAJO cuando son pocos, como en el
@@ -1326,6 +1434,7 @@ const MobileWhatsApp: React.FC = () => {
                                 body: m.body,
                                 media_url: m.media_url,
                                 content_type: m.content_type,
+                                product_id: m.product_id,
                             })
                         }
                         onProducto={setProductoDelMensaje}
@@ -1596,6 +1705,11 @@ const MobileWhatsApp: React.FC = () => {
                     onCambio={cargarRapidas}
                 />
 
+                <AyudaWhatsAppModal
+                    isOpen={ayudaAbierta}
+                    onClose={() => setAyudaAbierta(false)}
+                />
+
                 {/* Pasar un mensaje a otro chat: el mismo modal que el
                     escritorio, para que una correccion llegue a los dos. */}
                 <ReenviarModal
@@ -1603,6 +1717,11 @@ const MobileWhatsApp: React.FC = () => {
                     conversacionActual={abierta.id}
                     userId={userId}
                     onClose={() => setReenviando(null)}
+                    onEnviado={(destinos) =>
+                        setAvisoAccion(
+                            `Reenviado a ${destinos} ${destinos === 1 ? 'chat' : 'chats'}. Sale por la cola en unos segundos.`,
+                        )
+                    }
                 />
 
                 {/* El menú del teléfono tocado dentro de un mensaje. */}
@@ -1699,6 +1818,13 @@ const MobileWhatsApp: React.FC = () => {
                                 {sinLeer} sin leer
                             </span>
                         )}
+                        <button
+                            onClick={() => setAyudaAbierta(true)}
+                            aria-label="Abrir guía de WhatsApp"
+                            className="flex h-10 w-10 items-center justify-center rounded-full text-wa-meta active:bg-wa-inset/10"
+                        >
+                            <CircleHelp size={21} aria-hidden="true" />
+                        </button>
                         {/* Escribirle a alguien que todavía no escribió: el
                             número que dio por teléfono o el que está anotado
                             en un papel. */}
@@ -1749,11 +1875,12 @@ const MobileWhatsApp: React.FC = () => {
                 <div className="mt-2 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
                     {([
                         { id: 'all' as FiltroLista, label: 'Todos', count: null },
-                        { id: 'attention' as FiltroLista, label: 'Por atender', count: porAtender, icon: Clock },
                         { id: 'unread' as FiltroLista, label: 'No leídos', count: sinLeer },
-                        { id: 'ai_ready' as FiltroLista, label: 'IA lista', count: null, icon: Sparkles },
-                        { id: 'ai_active' as FiltroLista, label: 'IA atiende', count: iaAtendiendo, icon: Bot },
-                        { id: 'answered' as FiltroLista, label: 'Respondidos', count: respondidos, icon: CheckCheck },
+                        { id: 'attention' as FiltroLista, label: 'Pendientes', count: porAtender, icon: Clock },
+                        { id: 'ai_ready' as FiltroLista, label: 'Por cotizar', count: null, icon: Sparkles },
+                        { id: 'ai_active' as FiltroLista, label: 'Atendiendo IA', count: iaAtendiendo, icon: Bot },
+                        { id: 'waiting' as FiltroLista, label: 'Esperando', count: esperando, icon: Clock },
+                        { id: 'closed' as FiltroLista, label: 'Cerrados', count: null, icon: CheckCheck },
                         { id: 'archived' as FiltroLista, label: 'Archivados', count: preferencias.archived.length },
                     ]).map((filtro) => {
                         const Icon = 'icon' in filtro ? filtro.icon : null;
@@ -1958,8 +2085,10 @@ const MobileWhatsApp: React.FC = () => {
                                 ? 'La IA todavía no ha dejado conversaciones listas para cotizar.'
                               : filtroLista === 'ai_active'
                                 ? 'La IA no está atendiendo conversaciones en este momento.'
-                              : filtroLista === 'answered'
-                                ? 'Todavía no hay conversaciones respondidas.'
+                              : filtroLista === 'waiting'
+                                ? 'No hay conversaciones esperando respuesta del cliente.'
+                              : filtroLista === 'closed'
+                                ? 'Todavía no hay conversaciones cerradas.'
                               : filtroLista === 'archived'
                                 ? 'No tienes conversaciones archivadas.'
                                 : 'Todavía no hay conversaciones.'}
@@ -2146,6 +2275,10 @@ const MobileWhatsApp: React.FC = () => {
                 modo={modoAviso}
                 onAvisado={contarAvisos}
                 onAbrirChat={abrirChatPorId}
+            />
+            <AyudaWhatsAppModal
+                isOpen={ayudaAbierta}
+                onClose={() => setAyudaAbierta(false)}
             />
         </div>
     );

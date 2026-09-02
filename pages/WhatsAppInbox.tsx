@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
     Archive, ArrowLeft, ArrowRight, Bell, BellOff, BellRing, Bot, BotOff, CheckCheck, ChevronLeft, Clock, Copy, FileText, HandCoins,
-    Headset, Images, Inbox, MailQuestion, Maximize2, MessageSquarePlus, Minimize2, Pin, RefreshCw, RotateCw, Search,
+    CircleHelp, Headset, Images, Inbox, MailQuestion, Maximize2, MessageSquarePlus, Minimize2, Pin, RefreshCw, RotateCw, Search, Sparkles,
     User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
@@ -55,6 +55,7 @@ import { buscarConversacionesPorTexto } from '../utils/whatsappConversationSearc
 import { attributeMessage, attributeMessages } from '../utils/messageAttribution';
 import { textoPlano } from '../utils/formatoWhatsApp';
 import ReenviarModal, { type MensajeAReenviar } from '../components/whatsapp/ReenviarModal';
+import AyudaWhatsAppModal from '../components/whatsapp/AyudaWhatsAppModal';
 import { useNotificacionesEscritorio } from '../hooks/useNotificacionesEscritorio';
 import { hayOverlayAbierto } from '../hooks/useBackDismiss';
 import {
@@ -469,6 +470,8 @@ const WhatsAppInbox: React.FC = () => {
      * qué cae en cada una vive en components/whatsapp/bandejas.ts.
      */
     const [bandeja, setBandeja] = useState<Bandeja | null>(null);
+    /** Vista transversal: un chat puede estar sin leer aunque ya lo atienda la IA. */
+    const [soloNoLeidos, setSoloNoLeidos] = useState(false);
     /** null = la migración 0035 todavía no corrió; distinto de 0. */
     const [listasParaVendedor, setListasParaVendedor] = useState<number | null>(null);
     /**
@@ -483,6 +486,7 @@ const WhatsAppInbox: React.FC = () => {
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [messagesConversationId, setMessagesConversationId] = useState<number | null>(null);
     const cacheMensajesRef = useRef(new Map<number, AgentMessage[]>());
+    const buscadorChatsRef = useRef<HTMLInputElement>(null);
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [eligiendoAgente, setEligiendoAgente] = useState<SelectedContext | null>(null);
@@ -526,6 +530,8 @@ const WhatsAppInbox: React.FC = () => {
     const [buscandoEnHilo, setBuscandoEnHilo] = useState(false);
     /** Mensaje que se está por pasar a otro chat. */
     const [reenviando, setReenviando] = useState<MensajeAReenviar | null>(null);
+    /** Guía breve y, en escritorio, acciones ejecutables de teclado. */
+    const [ayudaAbierta, setAyudaAbierta] = useState(false);
 
     /**
      * Pone una reacción. Se pinta al instante y se corrige si falla: es
@@ -742,6 +748,8 @@ const WhatsAppInbox: React.FC = () => {
     /** Ídem para la bandeja: la consulta se arma desde callbacks estables. */
     const bandejaRef = useRef(bandeja);
     bandejaRef.current = bandeja;
+    const soloNoLeidosRef = useRef(soloNoLeidos);
+    soloNoLeidosRef.current = soloNoLeidos;
 
     /** Contenedor del hilo, para dejarlo scrolleado en el último mensaje. */
     const hiloRef = useRef<HTMLDivElement | null>(null);
@@ -837,7 +845,12 @@ const WhatsAppInbox: React.FC = () => {
                 PostgREST las volvería ilegibles.
             */
             const def = BANDEJAS.find((b) => b.id === bandejaRef.current);
-            if (def?.sql && (incluirEtapa || !def.usaEtapa)) {
+            if (soloNoLeidosRef.current) {
+                const condiciones = ['unread_count.gt.0'];
+                const conservados = [...noLeidosConservadosRef.current];
+                if (conservados.length > 0) condiciones.push(`id.in.(${conservados.join(',')})`);
+                q = q.or(condiciones.join(','));
+            } else if (def?.sql && (incluirEtapa || !def.usaEtapa)) {
                 const condiciones = [def.sql];
                 // Los que alguien marcó sin leer a mano todavía no se
                 // reflejan en la columna: sin esto desaparecían justo de la
@@ -884,7 +897,12 @@ const WhatsAppInbox: React.FC = () => {
         // filtros agregan reglas propias, así que su conteo sigue saliendo de
         // la consulta final para no mostrar una cifra engañosa.
         setTotalConversaciones(
-            tabRef.current === 'all' && resultadosDeTexto ? resultadosDeTexto.total : count ?? null,
+            tabRef.current === 'all' &&
+            bandejaRef.current === null &&
+            !soloNoLeidosRef.current &&
+            resultadosDeTexto
+                ? resultadosDeTexto.total
+                : count ?? null,
         );
     }, []);
 
@@ -1042,7 +1060,7 @@ const WhatsAppInbox: React.FC = () => {
                 // Con una bandeja puesta, este UPDATE puede sacar o meter la
                 // conversación: se vuelve a pedir la lista en vez de parchear
                 // una fila que quizá ya no pertenece acá.
-                if (bandejaRef.current !== null) {
+                if (bandejaRef.current !== null || soloNoLeidosRef.current) {
                     clearTimeout(conversationsTimer);
                     conversationsTimer = setTimeout(() => fetchConversations(true), AGRUPAR_MS);
                     return;
@@ -1099,7 +1117,7 @@ const WhatsAppInbox: React.FC = () => {
     useEffect(() => {
         const t = setTimeout(() => fetchConversations(), 350);
         return () => clearTimeout(t);
-    }, [search, tab, fetchConversations]);
+    }, [search, tab, bandeja, soloNoLeidos, fetchConversations]);
 
     /**
      * Deja el hilo abajo del todo: al abrir un chat con historial se
@@ -1157,12 +1175,16 @@ const WhatsAppInbox: React.FC = () => {
      * incluye el contador real, los datos que la IA ya dejó listos para el
      * vendedor y los chats recién abiertos que se conservan hasta refrescar.
      */
+    const estaSinLeer = useCallback(
+        (conversation: Pick<Conversation, 'id' | 'unread_count'>) =>
+            conversation.unread_count > 0 || noLeidosConservados.has(conversation.id),
+        [noLeidosConservados],
+    );
+
     const tienePendienteVisual = useCallback(
         (conversation: Pick<Conversation, 'id' | 'unread_count' | 'etapa'>) =>
-            conversation.unread_count > 0 ||
-            conversation.etapa === 'ready_for_sales' ||
-            noLeidosConservados.has(conversation.id),
-        [noLeidosConservados],
+            estaSinLeer(conversation) || conversation.etapa === 'ready_for_sales',
+        [estaSinLeer],
     );
 
     /**
@@ -1182,6 +1204,10 @@ const WhatsAppInbox: React.FC = () => {
         () => contarPorBandeja(sinArchivar, tienePendienteVisual),
         [sinArchivar, tienePendienteVisual],
     );
+    const cuentaSinLeer = useMemo(
+        () => sinArchivar.filter(estaSinLeer).length,
+        [sinArchivar, estaSinLeer],
+    );
 
     const filteredConversations = useMemo(() => {
         let rows = tab === 'archived'
@@ -1190,13 +1216,14 @@ const WhatsAppInbox: React.FC = () => {
         /* La misma regla de prioridad que usan los contadores: cada
            conversación cae en UNA bandeja, así que lo que se ve acá y el
            número de la pastilla no pueden discrepar. */
-        if (bandeja) rows = rows.filter((c) => bandejaDe(c, tienePendienteVisual(c)) === bandeja);
+        if (soloNoLeidos) rows = rows.filter(estaSinLeer);
+        else if (bandeja) rows = rows.filter((c) => bandejaDe(c, tienePendienteVisual(c)) === bandeja);
         return [...rows].sort((a, b) => {
             const aPinned = conversationPreferences.pinned.includes(a.id) ? 1 : 0;
             const bPinned = conversationPreferences.pinned.includes(b.id) ? 1 : 0;
             return bPinned - aPinned;
         });
-    }, [conversations, sinArchivar, bandeja, tab, conversationPreferences, tienePendienteVisual]);
+    }, [conversations, sinArchivar, bandeja, soloNoLeidos, tab, conversationPreferences, tienePendienteVisual, estaSinLeer]);
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
@@ -1209,14 +1236,14 @@ const WhatsAppInbox: React.FC = () => {
      */
     const metricas = useMemo(() => {
         const activos = conversations.filter((c) => c.bot_enabled).length;
-        const sinLeer = conversations.filter(tienePendienteVisual).length;
+        const sinLeer = conversations.filter(estaSinLeer).length;
         const hoy = new Date().toISOString().slice(0, 10);
         const escaladosHoy = escalations.filter((e) => e.created_at.slice(0, 10) === hoy).length;
         // El total sale del `count` de la consulta; el resto se calcula
         // sobre lo cargado y por eso se aclara en pantalla que es "de las
         // recientes" cuando hay más de las que entran en una página.
         return { activos, sinLeer, escaladosHoy, total: totalConversaciones ?? conversations.length };
-    }, [conversations, escalations, totalConversaciones, tienePendienteVisual]);
+    }, [conversations, escalations, totalConversaciones, estaSinLeer]);
 
     /** Hay más conversaciones que las traídas en esta página. */
     const hayMas = totalConversaciones !== null && totalConversaciones > conversations.length;
@@ -1283,10 +1310,11 @@ const WhatsAppInbox: React.FC = () => {
         };
     }, [tab, conversations, selectedConversationId, selectedConversationCache, selectedEscalation]);
 
-    const colaDeAtencion = useMemo(() => conversations.filter((conversation) =>
-        !conversationPreferences.archived.includes(conversation.id) &&
-        (tienePendienteVisual(conversation) || attentionIds.includes(conversation.id)),
-    ), [conversations, conversationPreferences.archived, attentionIds, tienePendienteVisual]);
+    const colaDeAtencion = useMemo(() => conversations.filter((conversation) => {
+        if (conversationPreferences.archived.includes(conversation.id)) return false;
+        const destino = bandejaDe(conversation, tienePendienteVisual(conversation));
+        return destino === 'cotizar' || destino === 'responder' || attentionIds.includes(conversation.id);
+    }), [conversations, conversationPreferences.archived, attentionIds, tienePendienteVisual]);
 
     const abrirSiguientePendiente = useCallback(() => {
         if (colaDeAtencion.length === 0) return;
@@ -1297,13 +1325,72 @@ const WhatsAppInbox: React.FC = () => {
         // Ir al siguiente pendiente lleva a su bandeja: si no, el chat se
         // abre y la lista de al lado sigue mostrando otra cosa.
         setTab('all');
+        setSoloNoLeidos(false);
         setBandeja('responder');
     }, [colaDeAtencion, selectedConversationId]);
 
+    /** Recorre exactamente la lista que la persona está mirando. */
+    const moverConversacionVisible = useCallback((direccion: -1 | 1) => {
+        if (TABS_DE_CONVERSACION.has(tab)) {
+            if (filteredConversations.length === 0) return;
+            const actual = filteredConversations.findIndex((conversation) => conversation.id === selectedConversationId);
+            const base = actual === -1 ? (direccion === 1 ? -1 : 0) : actual;
+            const siguiente = filteredConversations[
+                (base + direccion + filteredConversations.length) % filteredConversations.length
+            ];
+            setSelectedId(null);
+            setSelectedConversationId(siguiente.id);
+            return;
+        }
+
+        if (filtered.length === 0) return;
+        const actual = filtered.findIndex((escalation) => escalation.id === selectedId);
+        const base = actual === -1 ? (direccion === 1 ? -1 : 0) : actual;
+        const siguiente = filtered[(base + direccion + filtered.length) % filtered.length];
+        setSelectedConversationId(null);
+        setSelectedId(siguiente.id);
+    }, [tab, filteredConversations, filtered, selectedConversationId, selectedId]);
+
+    const enfocarBusquedaDeChats = useCallback(() => {
+        setGaleria(false);
+        // En ancho móvil la lista está físicamente oculta detrás del chat.
+        if (!window.matchMedia('(min-width: 1024px)').matches) {
+            setSelectedId(null);
+            setSelectedConversationId(null);
+        }
+        requestAnimationFrame(() => {
+            buscadorChatsRef.current?.focus();
+            buscadorChatsRef.current?.select();
+        });
+    }, []);
+
+    const enfocarRespuesta = useCallback(() => {
+        document.querySelector<HTMLTextAreaElement>('[aria-label="Mensaje para el cliente"]')?.focus();
+    }, []);
+
+    const abrirProformaRapida = useCallback(() => {
+        if (!selected || !hayAnchoParaPanel) return;
+        setProductoDelMensaje(null);
+        if (cuatroColumnas) setPanelCotizacion(true);
+        else setProformaAbierta(true);
+    }, [selected, hayAnchoParaPanel, cuatroColumnas]);
+
     useEffect(() => {
         const onShortcut = (event: KeyboardEvent) => {
+            if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+
             const target = event.target as HTMLElement | null;
             const editing = target?.matches('input, textarea, select, [contenteditable="true"]');
+            const key = event.key.toLowerCase();
+
+            // Ctrl/Cmd+K funciona incluso desde el compositor: es el gesto
+            // universal de "quiero encontrar otra cosa" y no inserta texto.
+            if ((event.ctrlKey || event.metaKey) && key === 'k') {
+                event.preventDefault();
+                enfocarBusquedaDeChats();
+                return;
+            }
+
             if (editing || event.ctrlKey || event.metaKey || event.altKey) return;
             /*
                 Con un modal abierto los atajos NO corren. El catálogo, la
@@ -1313,25 +1400,34 @@ const WhatsAppInbox: React.FC = () => {
                 se escribía saltaba de conversación o abría un panel DETRÁS
                 del modal -- sin que nada en pantalla lo explicara.
             */
-            if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
-            if (event.key.toLowerCase() === 'n') { event.preventDefault(); abrirSiguientePendiente(); }
-            if (event.key.toLowerCase() === 'r' && selected) {
+            const ejecutar = (accion: () => void) => {
                 event.preventDefault();
-                document.querySelector<HTMLTextAreaElement>('[aria-label="Mensaje para el cliente"]')?.focus();
-            }
-            if (event.key.toLowerCase() === 'p' && selected && hayAnchoParaPanel) {
-                event.preventDefault();
-                setProductoDelMensaje(null);
-                // Con las cuatro columnas la proforma ya esta acoplada: lo
-                // unico que puede hacer el atajo es desplegarla si la
-                // plegaron.
-                if (cuatroColumnas) setPanelCotizacion(true);
-                else setProformaAbierta(true);
+                accion();
+            };
+
+            if (key === '?' || (key === '/' && event.shiftKey)) ejecutar(() => setAyudaAbierta(true));
+            else if (key === 'n') ejecutar(abrirSiguientePendiente);
+            else if (key === 'j') ejecutar(() => moverConversacionVisible(1));
+            else if (key === 'k') ejecutar(() => moverConversacionVisible(-1));
+            else if (key === 'c') ejecutar(() => setNuevoChat(true));
+            else if (key === 'g') ejecutar(() => setGaleria((actual) => !actual));
+            else if (key === 'f' && selected) ejecutar(() => setBuscandoEnHilo(true));
+            else if (key === 'r' && selected) ejecutar(enfocarRespuesta);
+            else if (key === 'p' && selected && hayAnchoParaPanel) {
+                ejecutar(abrirProformaRapida);
             }
         };
         window.addEventListener('keydown', onShortcut);
         return () => window.removeEventListener('keydown', onShortcut);
-    }, [abrirSiguientePendiente, selected, hayAnchoParaPanel, cuatroColumnas]);
+    }, [
+        abrirSiguientePendiente,
+        moverConversacionVisible,
+        enfocarBusquedaDeChats,
+        enfocarRespuesta,
+        abrirProformaRapida,
+        selected,
+        hayAnchoParaPanel,
+    ]);
 
     // La cola de salida vive en components/whatsapp/ColaDeSalida.tsx: el modo
     // móvil usa el MISMO hook y las mismas burbujas. Va acá y no más arriba
@@ -2154,6 +2250,15 @@ const WhatsAppInbox: React.FC = () => {
                 </button>
 
                 <button
+                    onClick={() => setAyudaAbierta(true)}
+                    aria-label="Abrir guía de WhatsApp y acciones rápidas"
+                    title="Guía de WhatsApp y acciones rápidas (?)"
+                    className={cn(button.base, button.variant.secondary, button.icon.md)}
+                >
+                    <CircleHelp size={16} aria-hidden="true" />
+                </button>
+
+                <button
                     onClick={() => {
                         limpiarNoLeidosConservados();
                         fetchEscalations();
@@ -2252,12 +2357,13 @@ const WhatsAppInbox: React.FC = () => {
                                 aria-hidden="true"
                             />
                             <input
+                                ref={buscadorChatsRef}
                                 type="search"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Buscar por nombre, número o mensaje"
                                 aria-label="Buscar chat por nombre, teléfono o palabras del mensaje"
-                                className="h-9 w-full rounded-lg border-none bg-wa-input pl-9 pr-9 text-[13.5px] text-wa-text outline-none placeholder:text-wa-meta focus:ring-0"
+                                className="h-9 w-full rounded-lg border-none bg-wa-input pl-9 pr-9 text-[13.5px] text-wa-text outline-none placeholder:text-wa-meta focus:ring-0 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wa-accent"
                             />
                             {search && (
                                 <button
@@ -2317,22 +2423,38 @@ const WhatsAppInbox: React.FC = () => {
                             "los no leídos que atiende la IA" ni siquiera se podía
                             pedir, porque había que elegir una sola.
 
-                            Ahora cada conversación cae en UNA bandeja (la regla
-                            vive en components/whatsapp/bandejas.ts), así que la
-                            suma de los contadores es el total y nadie tiene que
-                            preguntarse si algo quedó escondido en otra pestaña.
+                            La IA mueve cada conversación a UN destino de trabajo
+                            (la regla vive en components/whatsapp/bandejas.ts).
+                            «No leídos» es una vista transversal: puede incluir un
+                            chat que también esté siendo atendido por la IA.
 
                             En columna y no en fila: son cinco destinos fijos que se
                             leen de un vistazo, y el número tiene que quedar
                             alineado a la derecha para poder compararlos.
                         */}
-                        <div role="tablist" aria-label="Bandejas de trabajo" className="mt-2 flex flex-col gap-px">
-                            {[{ id: null, texto: 'Todas', ayuda: 'Todas las conversaciones, sin filtrar.', pideAccion: false }, ...BANDEJAS].map((b) => {
+                        <p className="mt-2 flex items-center gap-1.5 px-2 text-[11px] font-medium text-wa-meta">
+                            <Sparkles size={12} aria-hidden="true" />
+                            Organización automática
+                        </p>
+                        <div role="tablist" aria-label="Bandejas de trabajo" className="mt-1 flex flex-col gap-px">
+                            {[
+                                { id: null, texto: 'Todos', ayuda: 'Todas las conversaciones, sin filtrar.', pideAccion: false },
+                                { id: 'no_leidos' as const, texto: 'No leídos', ayuda: 'Mensajes que todavía no abrió una persona.', pideAccion: true },
+                                ...BANDEJAS,
+                            ].map((b) => {
                                 /* Estando en Archivados o en Escalados no se mira
                                    ninguna bandeja: sin esto «Todas» quedaba marcada
                                    mostrando otra lista. */
-                                const activa = tab === 'all' && bandeja === b.id;
-                                const cuenta = b.id === null ? sinArchivar.length : cuentasDeBandeja[b.id];
+                                const activa = tab === 'all' && (
+                                    b.id === 'no_leidos'
+                                        ? soloNoLeidos
+                                        : !soloNoLeidos && bandeja === b.id
+                                );
+                                const cuenta = b.id === null
+                                    ? sinArchivar.length
+                                    : b.id === 'no_leidos'
+                                      ? cuentaSinLeer
+                                      : cuentasDeBandeja[b.id];
                                 return (
                                     <button
                                         key={b.id ?? 'todas'}
@@ -2340,7 +2462,13 @@ const WhatsAppInbox: React.FC = () => {
                                         aria-selected={activa}
                                         onClick={() => {
                                             setTab('all');
-                                            setBandeja(b.id as Bandeja | null);
+                                            if (b.id === 'no_leidos') {
+                                                setSoloNoLeidos(true);
+                                                setBandeja(null);
+                                            } else {
+                                                setSoloNoLeidos(false);
+                                                setBandeja(b.id as Bandeja | null);
+                                            }
                                         }}
                                         title={b.ayuda}
                                         className={cn(
@@ -2395,6 +2523,7 @@ const WhatsAppInbox: React.FC = () => {
                                     key={t.id}
                                     onClick={() => {
                                         setTab(t.id);
+                                        setSoloNoLeidos(false);
                                         setBandeja(null);
                                     }}
                                     aria-pressed={tab === t.id}
@@ -2854,6 +2983,7 @@ const WhatsAppInbox: React.FC = () => {
                                                 body: m.body,
                                                 media_url: m.media_url,
                                                 content_type: m.content_type,
+                                                product_id: m.product_id,
                                             })
                                         }
                                         onProducto={(productId) => {
@@ -3254,6 +3384,95 @@ const WhatsAppInbox: React.FC = () => {
                 // que dejó un pedido hace tres meses puede no estar cargado
                 // -- seleccionar su id dejaría la pantalla en blanco.
                 onAbrirChat={abrirConversacionPorId}
+            />
+
+            <AyudaWhatsAppModal
+                isOpen={ayudaAbierta}
+                onClose={() => setAyudaAbierta(false)}
+                acciones={[
+                    {
+                        id: 'buscar-chats',
+                        titulo: 'Buscar chats',
+                        detalle: 'Busca por cliente, número o palabras del mensaje.',
+                        teclas: ['Ctrl', 'K'],
+                        icono: Search,
+                        onEjecutar: enfocarBusquedaDeChats,
+                    },
+                    {
+                        id: 'chat-anterior',
+                        titulo: 'Chat anterior',
+                        detalle: 'Recorre la lista o bandeja que está visible.',
+                        teclas: ['K'],
+                        icono: ArrowLeft,
+                        onEjecutar: () => moverConversacionVisible(-1),
+                        disabled: TABS_DE_CONVERSACION.has(tab)
+                            ? filteredConversations.length === 0
+                            : filtered.length === 0,
+                    },
+                    {
+                        id: 'chat-siguiente',
+                        titulo: 'Chat siguiente',
+                        detalle: 'Avanza sin volver a la lista ni usar el mouse.',
+                        teclas: ['J'],
+                        icono: ArrowRight,
+                        onEjecutar: () => moverConversacionVisible(1),
+                        disabled: TABS_DE_CONVERSACION.has(tab)
+                            ? filteredConversations.length === 0
+                            : filtered.length === 0,
+                    },
+                    {
+                        id: 'siguiente-pendiente',
+                        titulo: 'Siguiente por atender',
+                        detalle: 'Salta al próximo cliente que espera respuesta.',
+                        teclas: ['N'],
+                        icono: Headset,
+                        onEjecutar: abrirSiguientePendiente,
+                        disabled: colaDeAtencion.length === 0,
+                    },
+                    {
+                        id: 'responder',
+                        titulo: 'Responder',
+                        detalle: 'Pone el cursor directamente en el mensaje.',
+                        teclas: ['R'],
+                        icono: CheckCheck,
+                        onEjecutar: enfocarRespuesta,
+                        disabled: !selected,
+                    },
+                    {
+                        id: 'buscar-en-chat',
+                        titulo: 'Buscar en este chat',
+                        detalle: 'Encuentra texto dentro de la conversación abierta.',
+                        teclas: ['F'],
+                        icono: Search,
+                        onEjecutar: () => setBuscandoEnHilo(true),
+                        disabled: !selected,
+                    },
+                    {
+                        id: 'proforma',
+                        titulo: 'Abrir proforma',
+                        detalle: 'Cotiza sin abandonar lo que dijo el cliente.',
+                        teclas: ['P'],
+                        icono: FileText,
+                        onEjecutar: abrirProformaRapida,
+                        disabled: !selected || !hayAnchoParaPanel,
+                    },
+                    {
+                        id: 'galeria',
+                        titulo: 'Fotos de clientes',
+                        detalle: 'Busca comprobantes y piezas entre todos los chats.',
+                        teclas: ['G'],
+                        icono: Images,
+                        onEjecutar: () => setGaleria(true),
+                    },
+                    {
+                        id: 'chat-nuevo',
+                        titulo: 'Chat nuevo',
+                        detalle: 'Escribe a un cliente aunque todavía no haya hablado.',
+                        teclas: ['C'],
+                        icono: MessageSquarePlus,
+                        onEjecutar: () => setNuevoChat(true),
+                    },
+                ]}
             />
 
             {/* Pasar un mensaje a otro chat: la foto de la pieza rota al del

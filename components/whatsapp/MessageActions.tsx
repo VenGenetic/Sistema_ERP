@@ -18,8 +18,8 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
 interface Props {
     /** Cita este mensaje en la próxima respuesta. */
-    onResponder: () => void;
-    onReaccionar: (emoji: string) => void;
+    onResponder?: () => void;
+    onReaccionar?: (emoji: string) => void;
     /**
      * Solo se puede borrar para todos lo PROPIO, y WhatsApp además tiene un
      * plazo. Si no se puede, la opción no aparece en vez de ofrecer algo
@@ -76,14 +76,18 @@ export const MessageActions: React.FC<Props> = ({
         const disparador = contenedorRef.current;
         if (!disparador) return;
 
-        const ALTO_MENU = 200;
         const limite = disparador.closest('.wa-scroll')?.getBoundingClientRect();
         const arribaDe = limite?.top ?? 0;
         const abajoDe = limite?.bottom ?? window.innerHeight;
         const r = disparador.getBoundingClientRect();
+        // El alto cambia según las acciones disponibles (un mensaje
+        // histórico puede tener solo Copiar y Reenviar). Medirlo evita que
+        // el menú completo se corte contra el compositor del chat.
+        const altoMenu =
+            disparador.querySelector<HTMLElement>('[role="menu"]')?.getBoundingClientRect().height ?? 200;
 
-        const cabeAbajo = abajoDe - r.bottom >= ALTO_MENU;
-        const cabeArriba = r.top - arribaDe >= ALTO_MENU;
+        const cabeAbajo = abajoDe - r.bottom >= altoMenu;
+        const cabeArriba = r.top - arribaDe >= altoMenu;
 
         let abajo = abrirHacia === 'abajo';
         if (abajo && !cabeAbajo && cabeArriba) abajo = false;
@@ -128,9 +132,11 @@ export const MessageActions: React.FC<Props> = ({
     return (
         <div className="relative inline-block" ref={contenedorRef}>
             <button
+                type="button"
                 onClick={() => setAbierto((v) => !v)}
                 aria-label="Acciones del mensaje"
                 aria-expanded={abierto}
+                title="Acciones del mensaje"
                 className={claseBoton ?? 'rounded p-1 text-wa-meta hover:bg-wa-inset/10 hover:text-wa-text'}
             >
                 {/* El galoncito hacia abajo: el mismo gesto que WhatsApp Web
@@ -150,32 +156,39 @@ export const MessageActions: React.FC<Props> = ({
                 >
                     {/* Los emoji van arriba y en fila: es la acción más
                         frecuente y la que menos merece un menú. */}
-                    <div className="flex items-center justify-between border-b border-wa-divider px-2 py-1.5">
-                        {EMOJIS.map((e) => (
-                            <button
-                                key={e}
-                                onClick={cerrarY(() => onReaccionar(e))}
-                                aria-label={`Reaccionar con ${e}`}
-                                className="h-8 min-w-[32px] rounded-lg text-base hover:bg-wa-hover active:bg-wa-hover"
-                            >
-                                {e}
-                            </button>
-                        ))}
-                    </div>
+                    {onReaccionar && (
+                        <div className="flex items-center justify-between border-b border-wa-divider px-2 py-1.5">
+                            {EMOJIS.map((e) => (
+                                <button
+                                    type="button"
+                                    key={e}
+                                    onClick={cerrarY(() => onReaccionar(e))}
+                                    aria-label={`Reaccionar con ${e}`}
+                                    className="h-8 min-w-[32px] rounded-lg text-base hover:bg-wa-hover active:bg-wa-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wa-accent"
+                                >
+                                    {e}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
-                    <button
-                        onClick={cerrarY(onResponder)}
-                        role="menuitem"
-                        className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
-                    >
-                        <Reply size={14} aria-hidden="true" /> Responder citando
-                    </button>
+                    {onResponder && (
+                        <button
+                            type="button"
+                            onClick={cerrarY(onResponder)}
+                            role="menuitem"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover focus-visible:outline-none focus-visible:bg-wa-hover"
+                        >
+                            <Reply size={14} aria-hidden="true" /> Responder citando
+                        </button>
+                    )}
 
                     {onReenviar && (
                         <button
+                            type="button"
                             onClick={cerrarY(onReenviar)}
                             role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover focus-visible:outline-none focus-visible:bg-wa-hover"
                         >
                             <Forward size={14} aria-hidden="true" /> Reenviar
                         </button>
@@ -183,9 +196,10 @@ export const MessageActions: React.FC<Props> = ({
 
                     {textoCopiable && (
                         <button
+                            type="button"
                             onClick={() => void copiar()}
                             role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover focus-visible:outline-none focus-visible:bg-wa-hover"
                         >
                             {copiado ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                             {copiado ? 'Copiado' : falloCopia ? 'No se pudo copiar' : 'Copiar mensaje'}
@@ -194,9 +208,10 @@ export const MessageActions: React.FC<Props> = ({
 
                     {onEditar && (
                         <button
+                            type="button"
                             onClick={cerrarY(onEditar)}
                             role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-text hover:bg-wa-hover focus-visible:outline-none focus-visible:bg-wa-hover"
                         >
                             <Pencil size={14} aria-hidden="true" /> Editar mensaje
                         </button>
@@ -204,9 +219,10 @@ export const MessageActions: React.FC<Props> = ({
 
                     {onBorrar && (
                         <button
+                            type="button"
                             onClick={cerrarY(onBorrar)}
                             role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-danger hover:bg-wa-hover"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-xs text-wa-danger hover:bg-wa-hover focus-visible:outline-none focus-visible:bg-wa-hover"
                         >
                             <Trash2 size={14} aria-hidden="true" /> Borrar para todos
                         </button>

@@ -84,39 +84,46 @@ export const BANDEJAS: ReadonlyArray<DefinicionDeBandeja> = [
         usaEtapa: true,
     },
     {
+        id: 'ia',
+        texto: 'Atendiendo IA',
+        ayuda: 'El agente está conversando con el cliente ahora mismo. No hace falta hacer nada.',
+        pideAccion: false,
+        // Tiene prioridad sobre "Pendientes": WhatsApp puede conservar el
+        // contador sin leer mientras el agente ya está respondiendo. Mostrar
+        // ese chat como trabajo humano haría que dos personas lo atiendan.
+        cumple: (c) => c.bot_enabled && c.status === 'bot_active',
+        sql: 'and(bot_enabled.is.true,status.eq.bot_active)',
+        usaEtapa: false,
+    },
+    {
         id: 'responder',
-        texto: 'Necesitan respuesta',
-        ayuda: 'El cliente escribió y todavía no le contestamos. Incluye los que volvieron a escribir a un chat que ya estaba cerrado.',
+        texto: 'Pendientes',
+        ayuda: 'Hace falta una respuesta o revisión humana. Incluye los chats escalados por la IA y los que volvieron a activarse.',
         pideAccion: true,
         /*
-            Sin leer, o el último que habló fue el cliente. Lo segundo importa
+            Sin leer, escalado, asignado a una persona, o el último que habló fue el cliente. Lo segundo importa
             tanto como lo primero: un mensaje leído al pasar y nunca
             contestado desaparecía de todas las listas.
 
             Va por encima de "cerrados" a propósito -- un cliente que vuelve a
             escribir a un chat cerrado es una venta nueva, no un archivo.
         */
-        cumple: (c, sinLeer) => sinLeer || c.last_message_direction === 'inbound',
-        sql: 'unread_count.gt.0,last_message_direction.eq.inbound',
+        cumple: (c, sinLeer) =>
+            sinLeer ||
+            c.last_message_direction === 'inbound' ||
+            c.status === 'escalated' ||
+            c.etapa === 'human_assigned',
+        sql: 'unread_count.gt.0,last_message_direction.eq.inbound,status.eq.escalated',
         usaEtapa: false,
     },
     {
         id: 'cerrados',
         texto: 'Cerrados',
-        ayuda: 'Terminados y sin nada pendiente. Vuelven solos a «Necesitan respuesta» si el cliente escribe.',
+        ayuda: 'Terminados y sin nada pendiente. Vuelven solos a «Pendientes» si el cliente escribe.',
         pideAccion: false,
         cumple: (c) => cerrada(c),
         sql: 'status.eq.closed,etapa.eq.resolved',
         usaEtapa: true,
-    },
-    {
-        id: 'ia',
-        texto: 'IA atendiendo',
-        ayuda: 'El agente está conversando con el cliente ahora mismo. No hace falta hacer nada.',
-        pideAccion: false,
-        cumple: (c) => c.bot_enabled && c.status === 'bot_active',
-        sql: 'and(bot_enabled.is.true,status.eq.bot_active)',
-        usaEtapa: false,
     },
     {
         id: 'esperando',

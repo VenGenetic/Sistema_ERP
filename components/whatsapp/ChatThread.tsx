@@ -520,6 +520,17 @@ const Burbuja = memo<BurbujaProps>(
     ({ m, citado, primeraDelGrupo, tactil, onAbrirFoto, onResponder, onReaccionar, onBorrar, onEditar, onReenviar, onProducto, onTelefono }) => {
         const entrante = m.direction === 'inbound';
         const borrado = !!m.deleted_at;
+        /* Reenviar y copiar no necesitan el ID remoto de WhatsApp. Esto es
+           importante para mensajes históricos/importados: aunque no se
+           puedan citar ni reaccionar, su contenido sigue siendo útil. */
+        const textoCopiable = m.body?.trim() || undefined;
+        const reenviable =
+            !borrado &&
+            m.content_type !== 'system' &&
+            (!!textoCopiable || !!m.media_url);
+        const tieneAcciones =
+            !borrado &&
+            (!!m.whatsapp_message_id || !!textoCopiable || (reenviable && !!onReenviar));
         const [autorMenu, setAutorMenu] = useState<{ x: number; y: number } | null>(null);
 
         useEffect(() => {
@@ -724,12 +735,13 @@ const Burbuja = memo<BurbujaProps>(
                         </span>
                     )}
 
-                    {/* Citar, reaccionar, borrar. Aparece al pasar el mouse: un
+                    {/* Citar, reenviar, copiar, reaccionar, editar o borrar.
+                        Aparece al pasar el mouse: un
                         disparador fijo en cien mensajes es ruido constante.
                         Sigue siendo alcanzable por teclado (focus-within) y en
                         el teléfono queda tenue pero visible, porque ahí no hay
                         hover que lo revele. */}
-                    {m.whatsapp_message_id && !borrado && (
+                    {tieneAcciones && (
                         <div
                             className={cn(
                                 /* Lleva algo detrás: si no, el galoncito queda
@@ -751,9 +763,9 @@ const Burbuja = memo<BurbujaProps>(
                             )}
                         >
                             <MessageActions
-                                onResponder={() => onResponder(m)}
-                                onReaccionar={(emoji) => onReaccionar(m, emoji)}
-                                onBorrar={m.direction === 'outbound' ? () => onBorrar(m) : undefined}
+                                onResponder={m.whatsapp_message_id ? () => onResponder(m) : undefined}
+                                onReaccionar={m.whatsapp_message_id ? (emoji) => onReaccionar(m, emoji) : undefined}
+                                onBorrar={m.direction === 'outbound' && m.whatsapp_message_id ? () => onBorrar(m) : undefined}
                                 onEditar={
                                     m.direction === 'outbound' &&
                                     m.content_type === 'text' &&
@@ -763,8 +775,8 @@ const Burbuja = memo<BurbujaProps>(
                                         ? () => onEditar(m)
                                         : undefined
                                 }
-                                onReenviar={onReenviar ? () => onReenviar(m) : undefined}
-                                textoCopiable={m.body?.trim() || undefined}
+                                onReenviar={reenviable && onReenviar ? () => onReenviar(m) : undefined}
+                                textoCopiable={textoCopiable}
                                 alineacion="derecha"
                                 abrirHacia="abajo"
                                 claseBoton={cn(
