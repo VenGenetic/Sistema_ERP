@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { badge, button, card, cn } from '../ui/styles';
 import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
+import RegistrarClienteModal from './RegistrarClienteModal';
 
 /**
  * Quién es el cliente que está del otro lado, sin salir del chat.
@@ -87,6 +88,7 @@ export const CustomerPanel: React.FC<Props> = ({
     const [demandas, setDemandas] = useState<Demanda[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [registrando, setRegistrando] = useState(false);
     const cargaRef = useRef(0);
 
     const cargar = useCallback(async () => {
@@ -226,12 +228,23 @@ export const CustomerPanel: React.FC<Props> = ({
                                 <UserPlus size={13} className="shrink-0" aria-hidden="true" />
                                 {customerName ? `"${customerName}" no` : 'Este número no'} está registrado como cliente.
                             </p>
-                            <Link
-                                to="/customers"
-                                className="text-2xs text-primary hover:underline mt-1 inline-block"
-                            >
-                                Registrarlo en Clientes →
-                            </Link>
+                            {/* Se registra ACÁ y no en la otra pantalla: salir del
+                                chat para cargar un teléfono que el sistema ya tiene
+                                es lo que hace que nadie lo registre, y sin ficha la
+                                venta termina yendo a consumidor final. */}
+                            <div className="mt-1.5 flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setRegistrando(true)}
+                                    className={cn(button.base, button.variant.primary, button.size.xs)}
+                                >
+                                    <UserPlus size={13} aria-hidden="true" />
+                                    Registrarlo acá
+                                </button>
+                                <Link to="/customers" className="text-2xs text-fg-muted hover:text-primary hover:underline">
+                                    Abrir Clientes →
+                                </Link>
+                            </div>
                         </div>
                     )
                 )}
@@ -326,6 +339,14 @@ export const CustomerPanel: React.FC<Props> = ({
                     </Link>
                 </div>
             </div>
+
+            <RegistrarClienteModal
+                isOpen={registrando}
+                phoneNumber={phoneNumber}
+                nombreSugerido={customerName}
+                onClose={() => setRegistrando(false)}
+                onRegistrado={() => void cargar()}
+            />
         </div>
     );
 };

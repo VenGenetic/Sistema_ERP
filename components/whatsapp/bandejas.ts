@@ -23,6 +23,7 @@ import type { Etapa } from './etapas';
  */
 
 export type Bandeja = 'cotizar' | 'responder' | 'ia' | 'esperando' | 'cerrados';
+export type BandejaManual = Exclude<Bandeja, 'ia'>;
 
 /** Lo que la clasificación necesita saber de una conversación. */
 export interface ConversacionClasificable {
@@ -32,6 +33,8 @@ export interface ConversacionClasificable {
     unread_count: number;
     etapa?: Etapa;
     last_message_direction: string | null;
+    /** Ubicación elegida por una persona; la actividad nueva la libera. */
+    manual_bandeja?: BandejaManual | null;
 }
 
 export interface DefinicionDeBandeja {
@@ -138,12 +141,23 @@ export const BANDEJAS: ReadonlyArray<DefinicionDeBandeja> = [
     },
 ];
 
-/** En qué bandeja cae esta conversación. Siempre devuelve una. */
-export function bandejaDe(c: ConversacionClasificable, sinLeer: boolean): Bandeja {
+/** La regla automática, sin tomar en cuenta una decisión manual. */
+export function bandejaAutomaticaDe(c: ConversacionClasificable, sinLeer: boolean): Bandeja {
     for (const b of BANDEJAS) {
         if (b.cumple(c, sinLeer)) return b.id;
     }
     return 'esperando';
+}
+
+/** En qué bandeja cae esta conversación. Siempre devuelve una. */
+export function bandejaDe(c: ConversacionClasificable, sinLeer: boolean): Bandeja {
+    /* Un agente activo siempre se muestra por su estado real. Ocultarlo en
+       una bandeja manual haría que una persona pudiera contestar encima de
+       la IA sin darse cuenta. */
+    if (!(c.bot_enabled && c.status === 'bot_active') && c.manual_bandeja) {
+        return c.manual_bandeja;
+    }
+    return bandejaAutomaticaDe(c, sinLeer);
 }
 
 /** Cuántas hay en cada bandeja. Una sola pasada por la lista. */

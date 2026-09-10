@@ -3,8 +3,8 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
-    Archive, ArrowLeft, ArrowRight, Bell, BellOff, BellRing, Bot, BotOff, CheckCheck, ChevronLeft, Clock, Copy, FileText, HandCoins,
-    CircleHelp, Headset, Images, Inbox, MailQuestion, Maximize2, MessageSquarePlus, Minimize2, Pin, RefreshCw, RotateCw, Search, Sparkles,
+    AlertTriangle, Archive, ArrowLeft, ArrowRight, Bell, BellOff, BellRing, Bot, BotOff, CheckCheck, ChevronLeft, ChevronRight, Clock, Copy, FileText, HandCoins,
+    CircleHelp, FolderInput, Headset, Truck, UserPen, Images, Inbox, MailQuestion, Maximize2, MessageSquarePlus, Minimize2, Pin, RefreshCw, RotateCw, Search, Sparkles,
     User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
@@ -31,6 +31,7 @@ import {
     bandejaDe,
     contarPorBandeja,
     type Bandeja,
+    type BandejaManual,
 } from '../components/whatsapp/bandejas';
 import {
     CLASE_DE_ETAPA,
@@ -41,9 +42,11 @@ import {
     type Etapa,
 } from '../components/whatsapp/etapas';
 import { fusionarMensajes, useRepasoDelHilo } from '../components/whatsapp/hiloEnVivo';
+import { useHistorialDelHilo } from '../components/whatsapp/historialDelHilo';
 import { CitaEnComposer } from '../components/whatsapp/MessageActions';
 import ChatThread, {
     horaLista,
+    MensajesAnteriores,
     PildoraChat,
     textoDe,
     useHiloPegadoAbajo,
@@ -56,12 +59,19 @@ import { attributeMessage, attributeMessages } from '../utils/messageAttribution
 import { textoPlano } from '../utils/formatoWhatsApp';
 import ReenviarModal, { type MensajeAReenviar } from '../components/whatsapp/ReenviarModal';
 import AyudaWhatsAppModal from '../components/whatsapp/AyudaWhatsAppModal';
+import MoverChatModal from '../components/whatsapp/MoverChatModal';
+import EditarMensajeModal from '../components/whatsapp/EditarMensajeModal';
+import RenombrarContactoModal from '../components/whatsapp/RenombrarContactoModal';
+import GuiasPorEnviarModal from '../components/whatsapp/GuiasPorEnviarModal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useNotificacionesEscritorio } from '../hooks/useNotificacionesEscritorio';
+import { useIntervaloVisible } from '../hooks/useIntervaloVisible';
 import { hayOverlayAbierto } from '../hooks/useBackDismiss';
 import {
     borrarMensaje,
     editarMensaje,
     CAMPOS_CONV_BASE,
+    CAMPOS_CONV_ORGANIZADA,
     CAMPOS_CONV_PREVIEW,
     encolarMensajes,
     faltaColumna,
@@ -187,6 +197,11 @@ interface Conversation {
      */
     last_message_preview: string | null;
     last_message_direction: string | null;
+    /** Ubicación temporal elegida por una persona (migración de bandeja manual). */
+    manual_bandeja?: BandejaManual | null;
+    possible_gap?: boolean;
+    sync_confidence?: 'synced' | 'live_evidence' | 'history_partial' | 'uncertain';
+    sync_uncertain_reason?: string | null;
 }
 
 /**
@@ -287,6 +302,24 @@ function readConversationPreferences(userId: string | null): ConversationPrefere
 }
 
 /** Tope de mensajes que se traen de una conversación (los más recientes). */
+/**
+ * El chat por donde entran las guías del transportista.
+ *
+ * Es configurable porque el número cambió una vez ya: Servientrega escribe
+ * desde un número que este WhatsApp no recibe, así que hoy alguien reenvía
+ * las guías a mano a este otro. Se guarda por usuario para poder cambiarlo
+ * sin tocar el código.
+ */
+const TELEFONO_GUIAS_POR_DEFECTO = '593963111187';
+
+function telefonoDeGuias(): string {
+    try {
+        return localStorage.getItem('wa-telefono-guias') || TELEFONO_GUIAS_POR_DEFECTO;
+    } catch {
+        return TELEFONO_GUIAS_POR_DEFECTO;
+    }
+}
+
 const MENSAJES_VISIBLES = 100;
 
 /**
@@ -334,6 +367,8 @@ interface SelectedContext {
     lid: string | null;
     unreadCount: number;
     escalation: Escalation | null;
+    possibleGap: boolean;
+    syncConfidence: 'synced' | 'live_evidence' | 'history_partial' | 'uncertain';
 }
 
 const WhatsAppInbox: React.FC = () => {
@@ -408,6 +443,7 @@ const WhatsAppInbox: React.FC = () => {
         x: number;
         y: number;
     } | null>(null);
+    const [moverChat, setMoverChat] = useState<Conversation | null>(null);
     const [messagePreview, setMessagePreview] = useState<{
         name: string;
         phone: string;
@@ -470,6 +506,26 @@ const WhatsAppInbox: React.FC = () => {
      * qué cae en cada una vive en components/whatsapp/bandejas.ts.
      */
     const [bandeja, setBandeja] = useState<Bandeja | null>(null);
+    /**
+     * Si la lista de bandejas se ve entera o recogida.
+     *
+     * Son siete destinos más la fila de archivados: unos 200px pegados
+     * debajo del buscador que en un portátil se comen la mitad de la lista
+     * de chats, y que casi siempre dicen lo mismo -- se trabaja el día
+     * entero desde la misma bandeja. Recogida, la fila de arriba sigue
+     * diciendo DÓNDE está parado uno y cuánto falta por atender, que es lo
+     * único que se mira seguido.
+     *
+     * Arranca recogida y se recuerda: quien las cambia a menudo la abre una
+     * vez y se queda abierta.
+     */
+    const [organizacionAbierta, setOrganizacionAbierta] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('wa-organizacion') === 'abierta';
+        } catch {
+            return false;
+        }
+    });
     /** Vista transversal: un chat puede estar sin leer aunque ya lo atienda la IA. */
     const [soloNoLeidos, setSoloNoLeidos] = useState(false);
     /** null = la migración 0035 todavía no corrió; distinto de 0. */
@@ -482,6 +538,7 @@ const WhatsAppInbox: React.FC = () => {
      * foto. Con 3.500 conversaciones, abrirlas de a una es imposible.
      */
     const [galeria, setGaleria] = useState(false);
+    const [guiasAbierto, setGuiasAbierto] = useState(false);
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [messagesConversationId, setMessagesConversationId] = useState<number | null>(null);
@@ -550,33 +607,73 @@ const WhatsAppInbox: React.FC = () => {
     };
 
     /**
-     * Borra para todos. Se confirma porque no tiene vuelta atrás, y
-     * NO se pinta al instante: hasta que WhatsApp lo acepte, el cliente lo
-     * sigue teniendo en el teléfono, y tacharlo antes sería mentir sobre
-     * algo que todavía está a la vista del otro lado.
+     * Borrar y corregir se piden con un diálogo del sistema, no con
+     * `window.confirm`/`window.prompt`.
+     *
+     * El motivo no es estético: esas cajas BLOQUEAN el hilo del navegador,
+     * así que mientras están abiertas no corre el repaso del hilo ni entra
+     * un mensaje por realtime -- una confirmación olvidada dejaba la
+     * bandeja congelada. Y el prompt mostraba una cotización de varias
+     * líneas como un solo renglón, que es justo el mensaje que más se
+     * corrige.
+     *
+     * El estado de cada uno vive acá porque la acción se ejecuta con el
+     * diálogo abierto: si WhatsApp la rechaza (plazo vencido), el error se
+     * muestra adentro en vez de cerrarse y dejar la duda.
      */
-    const borrar = async (m: AgentMessage) => {
+    const [borrandoMensaje, setBorrandoMensaje] = useState<AgentMessage | null>(null);
+    const [borrandoEnCurso, setBorrandoEnCurso] = useState(false);
+    const [errorBorrado, setErrorBorrado] = useState<string | null>(null);
+    const [editandoMensaje, setEditandoMensaje] = useState<AgentMessage | null>(null);
+    const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+    const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
+
+    const borrar = (m: AgentMessage) => {
         if (!selected || !m.whatsapp_message_id) return;
-        if (!window.confirm('¿Borrar este mensaje para el cliente también?')) return;
+        setErrorBorrado(null);
+        setBorrandoMensaje(m);
+    };
+
+    /**
+     * Confirma el borrado. NO se tacha al instante: hasta que WhatsApp lo
+     * acepte, el cliente lo sigue teniendo en el teléfono, y tacharlo antes
+     * sería mentir sobre algo que todavía está a la vista del otro lado.
+     */
+    const confirmarBorrado = async () => {
+        const m = borrandoMensaje;
+        if (!selected || !m?.whatsapp_message_id) return;
+        setBorrandoEnCurso(true);
+        setErrorBorrado(null);
         try {
-            await borrarMensaje(selected.conversationId, m.whatsapp_message_id, userId);
+            await borrarMensaje(selected.conversationId, m.whatsapp_message_id, userId, m.created_at);
+            setBorrandoMensaje(null);
+            setAvisoAccion('Se pidió borrar el mensaje. Desaparece del teléfono del cliente en unos segundos.');
         } catch (err: any) {
-            setErrorAccion(`No se pudo borrar: ${err?.message ?? err}`);
+            setErrorBorrado(err?.message ?? 'No se pudo borrar el mensaje.');
+        } finally {
+            setBorrandoEnCurso(false);
         }
     };
 
-    const editar = async (m: AgentMessage) => {
+    const editar = (m: AgentMessage) => {
         if (!selected || !m.whatsapp_message_id || !m.body) return;
-        const nuevo = window.prompt('Corregir mensaje:', m.body);
-        if (nuevo === null || nuevo.trim() === m.body.trim()) return;
-        if (!nuevo.trim()) {
-            setErrorAccion('El mensaje corregido no puede quedar vacio.');
-            return;
-        }
+        setErrorEdicion(null);
+        setEditandoMensaje(m);
+    };
+
+    const guardarEdicion = async (texto: string) => {
+        const m = editandoMensaje;
+        if (!selected || !m?.whatsapp_message_id) return;
+        setGuardandoEdicion(true);
+        setErrorEdicion(null);
         try {
-            await editarMensaje(selected.conversationId, m.whatsapp_message_id, nuevo, userId);
+            await editarMensaje(selected.conversationId, m.whatsapp_message_id, texto, userId, m.created_at);
+            setEditandoMensaje(null);
+            setAvisoAccion('Corrección enviada. El cliente la verá marcada como «editado».');
         } catch (err: any) {
-            setErrorAccion(`No se pudo editar: ${err?.message ?? err}`);
+            setErrorEdicion(err?.message ?? 'No se pudo corregir el mensaje.');
+        } finally {
+            setGuardandoEdicion(false);
         }
     };
 
@@ -654,6 +751,27 @@ const WhatsAppInbox: React.FC = () => {
      */
     const noLeidosConservadosRef = useRef<Set<number>>(new Set());
     const [noLeidosConservados, setNoLeidosConservados] = useState<Set<number>>(() => new Set());
+    const aplicarBandejaManual = useCallback((conversationId: number, destino: BandejaManual | null) => {
+        const parchear = (conversation: Conversation) =>
+            conversation.id === conversationId ? { ...conversation, manual_bandeja: destino } : conversation;
+        setConversations((prev) => prev.map(parchear));
+        setSelectedConversationCache((prev) => (prev ? parchear(prev) : prev));
+        const nombre = destino ? BANDEJAS.find((item) => item.id === destino)?.texto : 'clasificación automática';
+        setAvisoAccion(destino ? `Chat movido a «${nombre}».` : 'El chat volvió a clasificación automática.');
+    }, []);
+    const [renombrando, setRenombrando] = useState<Conversation | null>(null);
+    /**
+     * El nombre nuevo se refleja al instante en la lista, en el chat abierto
+     * y en el menú contextual. Sin esto había que recargar para ver el
+     * cambio, que es justo lo que hace dudar de si se guardó.
+     */
+    const aplicarNombreContacto = useCallback((conversationId: number, nombre: string | null) => {
+        const parchear = (conversation: Conversation) =>
+            conversation.id === conversationId ? { ...conversation, customer_name: nombre } : conversation;
+        setConversations((prev) => prev.map(parchear));
+        setSelectedConversationCache((prev) => (prev ? parchear(prev) : prev));
+        setAvisoAccion(nombre ? `Ahora este chat se llama «${nombre}».` : 'El chat volvió al nombre de WhatsApp.');
+    }, []);
     const actualizarNoLeidoConservado = useCallback((conversationId: number, conservar: boolean) => {
         const siguiente = new Set(noLeidosConservadosRef.current);
         if (conservar) siguiente.add(conversationId);
@@ -675,6 +793,11 @@ const WhatsAppInbox: React.FC = () => {
             localStorage.setItem('wa-modo-mostrador', modoAmplio ? 'on' : 'off');
         } catch { /* el navegador puede tener el almacenamiento bloqueado */ }
     }, [modoAmplio]);
+    useEffect(() => {
+        try {
+            localStorage.setItem('wa-organizacion', organizacionAbierta ? 'abierta' : 'recogida');
+        } catch { /* ídem: el almacenamiento puede estar bloqueado */ }
+    }, [organizacionAbierta]);
 
     /*
         Salir con Escape. Solo si no hay nada más abierto encima: con un
@@ -727,13 +850,14 @@ const WhatsAppInbox: React.FC = () => {
         const t = setTimeout(() => setAvisoAccion(null), 4000);
         return () => clearTimeout(t);
     }, [avisoAccion]);
-    useEffect(() => {
-        let active = true;
-        const refresh = () => getDueWorkIds().then((ids) => active && setAttentionIds(ids)).catch(() => {});
-        void refresh();
-        const timer = window.setInterval(refresh, 60_000);
-        return () => { active = false; window.clearInterval(timer); };
+    const refrescarPendientes = useCallback(async () => {
+        setAttentionIds(await getDueWorkIds());
     }, []);
+    useIntervaloVisible(true, refrescarPendientes, 60_000, {
+        inmediato: true,
+        alVolver: true,
+        etiqueta: 'pendientes de WhatsApp',
+    });
 
     /**
      * La búsqueda vigente, legible desde los callbacks sin recrearlos. Los
@@ -817,7 +941,7 @@ const WhatsAppInbox: React.FC = () => {
             return;
         }
 
-        const consulta = (campos: string, incluirEtapa = true) => {
+        const consulta = (campos: string, incluirEtapa = true, incluirManual = true) => {
             let q = supabase
                 .from('agent_conversations')
                 // `count: 'exact'` da el total REAL de la tabla (o de la
@@ -852,6 +976,7 @@ const WhatsAppInbox: React.FC = () => {
                 q = q.or(condiciones.join(','));
             } else if (def?.sql && (incluirEtapa || !def.usaEtapa)) {
                 const condiciones = [def.sql];
+                if (incluirManual && def.id !== 'ia') condiciones.push(`manual_bandeja.eq.${def.id}`);
                 // Los que alguien marcó sin leer a mano todavía no se
                 // reflejan en la columna: sin esto desaparecían justo de la
                 // bandeja donde se los acaba de poner.
@@ -867,7 +992,8 @@ const WhatsAppInbox: React.FC = () => {
         // Con la vista previa si la migración 0032 está aplicada; sin ella
         // si no. Pedirla a secas dejaría la bandeja SIN LISTA, no sin vista
         // previa (ver CAMPOS_CONV_PREVIEW).
-        let { data, error, count } = await consulta(CAMPOS_CONV_PREVIEW);
+        let { data, error, count } = await consulta(CAMPOS_CONV_ORGANIZADA);
+        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_PREVIEW, true, false));
         if (bandejaRef.current === 'cotizar' && faltaColumna(error)) {
             if (!silencioso) setConversationsLoading(false);
             setConversations([]);
@@ -875,7 +1001,7 @@ const WhatsAppInbox: React.FC = () => {
             setErrorCarga('Para usar «IA lista, por cotizar» falta aplicar la migración de etapas del agente (0035).');
             return;
         }
-        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE, false));
+        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE, false, false));
 
         if (!silencioso) setConversationsLoading(false);
         if (error) {
@@ -915,17 +1041,41 @@ const WhatsAppInbox: React.FC = () => {
      * maestro, que se lee de la misma tabla.
      */
     const fetchEstadoAgente = useCallback(async () => {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('agent_settings')
-            .select('agent_last_seen_at, agent_connection, agent_outbound_mode')
+            .select('agent_last_seen_at, agent_connection, agent_outbound_mode, whatsapp_sync_state, whatsapp_last_sync_at, whatsapp_sync_error')
             .eq('id', 1)
             .maybeSingle();
+        if (error?.code === '42703') {
+            ({ data, error } = await supabase
+                .from('agent_settings')
+                .select('agent_last_seen_at, agent_connection, agent_outbound_mode')
+                .eq('id', 1)
+                .maybeSingle());
+        }
         if (error) {
             setEstadoAgente(null);
             return;
         }
-        setEstadoAgente((data ?? null) as EstadoAgente | null);
+        const [{ count: gaps }, { count: uncertain }] = await Promise.all([
+            supabase.from('agent_conversations').select('id', { count: 'exact', head: true }).eq('possible_gap', true),
+            supabase.from('agent_conversations').select('id', { count: 'exact', head: true }).eq('sync_confidence', 'uncertain'),
+        ]);
+        setEstadoAgente(data ? {
+            ...(data as unknown as EstadoAgente),
+            whatsapp_sync_state: (data as { whatsapp_sync_state?: EstadoAgente['whatsapp_sync_state'] }).whatsapp_sync_state ?? null,
+            whatsapp_last_sync_at: (data as { whatsapp_last_sync_at?: string | null }).whatsapp_last_sync_at ?? null,
+            whatsapp_sync_error: (data as { whatsapp_sync_error?: string | null }).whatsapp_sync_error ?? null,
+            possible_gap_count: gaps ?? 0,
+            sync_uncertain_count: uncertain ?? 0,
+        } : null);
     }, []);
+
+    useIntervaloVisible(true, fetchEstadoAgente, 30_000, {
+        inmediato: true,
+        alVolver: true,
+        etiqueta: 'latido del agente de WhatsApp',
+    });
 
     const fetchSettings = useCallback(async () => {
         const { data, error } = await supabase
@@ -984,13 +1134,8 @@ const WhatsAppInbox: React.FC = () => {
         // búsqueda de más abajo, que corre también en el montaje. Llamarlo
         // en los dos lados duplicaba la consulta en cada carga.
         fetchSettings();
-        fetchEstadoAgente();
         contarAvisos();
         contarListas();
-
-        // El latido se relee solo: si el agente se cae con la pantalla
-        // abierta, el aviso tiene que aparecer sin que nadie recargue.
-        const latido = setInterval(() => fetchEstadoAgente(), 30000);
 
         /**
          * Los eventos de realtime llegan en ráfaga: una importación de
@@ -1105,10 +1250,9 @@ const WhatsAppInbox: React.FC = () => {
         return () => {
             clearTimeout(escalationsTimer);
             clearTimeout(conversationsTimer);
-            clearInterval(latido);
             channel.unsubscribe();
         };
-    }, [fetchEscalations, fetchConversations, fetchSettings, fetchEstadoAgente, contarAvisos, contarListas]);
+    }, [fetchEscalations, fetchConversations, fetchSettings, contarAvisos, contarListas]);
 
     /**
      * La búsqueda de conversaciones va contra la base, así que se espera a
@@ -1227,6 +1371,30 @@ const WhatsAppInbox: React.FC = () => {
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
+    /**
+     * Lo que dice la fila de organización cuando está recogida: en qué
+     * bandeja está parado uno y cuántos chats tiene delante. Sin esto,
+     * recogerla dejaba la lista filtrada sin ninguna señal de por qué.
+     */
+    const vistaActual = useMemo((): { texto: string; cuenta: number | null } => {
+        if (tab === 'archived') return { texto: 'Archivados', cuenta: conversationPreferences.archived.length };
+        if (tab === 'pending') return { texto: 'Escalados', cuenta: pendingCount };
+        if (tab === 'resolved') return { texto: 'Resueltos', cuenta: null };
+        if (soloNoLeidos) return { texto: 'No leídos', cuenta: cuentaSinLeer };
+        if (bandeja) return { texto: BANDEJAS.find((b) => b.id === bandeja)?.texto ?? 'Todos', cuenta: cuentasDeBandeja[bandeja] };
+        return { texto: 'Todos', cuenta: sinArchivar.length };
+    }, [tab, soloNoLeidos, bandeja, conversationPreferences.archived.length, pendingCount, cuentaSinLeer, cuentasDeBandeja, sinArchivar.length]);
+
+    /**
+     * Cuánto trabajo pide acción en total (cotizar + responder). Es el
+     * número que justifica abrir la lista estando en otra bandeja: sin él,
+     * recoger la organización escondería que hay gente esperando.
+     */
+    const pendientesDeAccion = useMemo(
+        () => BANDEJAS.filter((b) => b.pideAccion).reduce((total, b) => total + (cuentasDeBandeja[b.id] ?? 0), 0),
+        [cuentasDeBandeja],
+    );
+
 
     /**
      * Métricas del día, calculadas sobre lo ya cargado (sin consultas
@@ -1293,6 +1461,8 @@ const WhatsAppInbox: React.FC = () => {
                 lid: conv.lid,
                 unreadCount: conv.unread_count,
                 escalation: null,
+                possibleGap: Boolean(conv.possible_gap),
+                syncConfidence: conv.sync_confidence ?? 'uncertain',
             };
         }
         if (!selectedEscalation) return null;
@@ -1307,13 +1477,21 @@ const WhatsAppInbox: React.FC = () => {
             lid: conv?.lid ?? null,
             unreadCount: conv?.unread_count ?? 0,
             escalation: selectedEscalation,
+            possibleGap: Boolean(conv?.possible_gap),
+            syncConfidence: conv?.sync_confidence ?? 'uncertain',
         };
     }, [tab, conversations, selectedConversationId, selectedConversationCache, selectedEscalation]);
+
+    const selectedConversationForMove = useMemo(() => {
+        if (!selected) return null;
+        return conversations.find((conversation) => conversation.id === selected.conversationId)
+            ?? (selectedConversationCache?.id === selected.conversationId ? selectedConversationCache : null);
+    }, [conversations, selected, selectedConversationCache]);
 
     const colaDeAtencion = useMemo(() => conversations.filter((conversation) => {
         if (conversationPreferences.archived.includes(conversation.id)) return false;
         const destino = bandejaDe(conversation, tienePendienteVisual(conversation));
-        return destino === 'cotizar' || destino === 'responder' || attentionIds.includes(conversation.id);
+        return destino === 'cotizar' || destino === 'responder' || (!conversation.manual_bandeja && attentionIds.includes(conversation.id));
     }), [conversations, conversationPreferences.archived, attentionIds, tienePendienteVisual]);
 
     const abrirSiguientePendiente = useCallback(() => {
@@ -1494,6 +1672,43 @@ const WhatsAppInbox: React.FC = () => {
     }, []);
 
     useRepasoDelHilo(!!selected, repasarHilo);
+
+    /**
+     * El resto de la conversación, hacia atrás.
+     *
+     * Sin esto el hilo terminaba en los últimos 100 mensajes y no había
+     * cómo llegar a lo de antes -- ni mirándolo ni buscándolo, porque el
+     * buscador del hilo solo ve lo que está cargado.
+     */
+    const traerAnteriores = useCallback(async (anteriorA: string, limite: number) => {
+        const id = conversacionAbiertaRef.current;
+        if (!id) return null;
+        const { data, error } = await supabase
+            .from('agent_messages')
+            .select(CAMPOS_MENSAJE)
+            .eq('conversation_id', id)
+            .lt('created_at', anteriorA)
+            .order('created_at', { ascending: false })
+            .limit(limite);
+        if (error) throw new Error(error.message);
+        if (!data) return null;
+        // Cambiaron de chat mientras viajaba la consulta.
+        if (conversacionAbiertaRef.current !== id) return null;
+        return attributeMessages((data as AgentMessage[]).slice().reverse());
+    }, []);
+
+    const aplicarAnteriores = useCallback((viejos: AgentMessage[]) => {
+        setMessages((prev) => fusionarMensajes(prev, viejos));
+    }, []);
+
+    const historial = useHistorialDelHilo<AgentMessage>({
+        conversationId: selected?.conversationId ?? null,
+        mensajes: mensajesVisibles,
+        contenedorRef: hiloRef,
+        traer: traerAnteriores,
+        aplicar: aplicarAnteriores,
+        porTanda: MENSAJES_VISIBLES,
+    });
 
     /**
      * Y la red de abajo de la LISTA, que no tenía ninguna.
@@ -1783,7 +1998,8 @@ const WhatsAppInbox: React.FC = () => {
 
             const traer = (campos: string) =>
                 supabase.from('agent_conversations').select(campos).eq('id', id).maybeSingle();
-            let { data, error } = await traer(CAMPOS_CONV_PREVIEW);
+            let { data, error } = await traer(CAMPOS_CONV_ORGANIZADA);
+            if (faltaColumna(error)) ({ data, error } = await traer(CAMPOS_CONV_PREVIEW));
             if (faltaColumna(error)) ({ data, error } = await traer(CAMPOS_CONV_BASE));
 
             if (error || !data) {
@@ -1981,12 +2197,15 @@ const WhatsAppInbox: React.FC = () => {
                     >
                         Bandeja de WhatsApp
                     </h1>
-                    {!modoAmplio && (
-                        <p className="text-xs text-fg-muted">
-                            Lo que mandes desde acá queda guardado en la conversación. Lo que escribas
-                            desde el teléfono, no.
-                        </p>
-                    )}
+                    <p aria-live="polite" className="truncate text-2xs text-fg-muted">
+                        WhatsApp {estadoAgente?.agent_connection === 'connected' ? 'conectado' : 'sin conexión'}
+                        {' · Sincronización '}
+                        {estadoAgente?.whatsapp_sync_state === 'synced'
+                            ? 'al día'
+                            : estadoAgente?.whatsapp_sync_state === 'syncing' || estadoAgente?.whatsapp_sync_state === 'reconciling'
+                              ? 'reconciliando…'
+                              : 'incierta'}
+                    </p>
                 </div>
 
                 {/* Entrar y salir del modo mostrador. Va primero entre las
@@ -2312,7 +2531,7 @@ const WhatsAppInbox: React.FC = () => {
             {/* Lo que se encole ahora no va a salir. Se avisa arriba de todo y no
                 en la caja de escribir: hay que verlo ANTES de escribir. */}
             {avisoDeEnvio && (
-                <div className="flex shrink-0 items-start gap-2.5 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2">
+                <div role="status" aria-live="polite" className="flex shrink-0 items-start gap-2.5 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2">
                     <RotateCw size={15} className="mt-0.5 shrink-0 text-warning-soft-fg" aria-hidden="true" />
                     <div className="min-w-0">
                         <p className="text-sm font-semibold text-warning-soft-fg">{avisoDeEnvio.titulo}</p>
@@ -2381,6 +2600,18 @@ const WhatsAppInbox: React.FC = () => {
                             cliente no aparece: uno lo busca, no está, y le
                             abre el chat sin cambiar de pantalla. */}
                         <button
+                            onClick={() => setGuiasAbierto(true)}
+                            aria-label="Guías de envío de hoy"
+                            title="Guías de envío de hoy: ver de qué cliente es cada una y reenviarla"
+                            className={cn(
+                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-wa-meta transition-colors hover:bg-wa-inset/10',
+                                focusRing,
+                            )}
+                        >
+                            <Truck size={19} aria-hidden="true" />
+                        </button>
+
+                        <button
                             onClick={() => setNuevoChat(true)}
                             aria-label="Empezar un chat nuevo"
                             title="Escribirle a un número que todavía no está en la lista"
@@ -2432,10 +2663,71 @@ const WhatsAppInbox: React.FC = () => {
                             leen de un vistazo, y el número tiene que quedar
                             alineado a la derecha para poder compararlos.
                         */}
-                        <p className="mt-2 flex items-center gap-1.5 px-2 text-[11px] font-medium text-wa-meta">
-                            <Sparkles size={12} aria-hidden="true" />
-                            Organización automática
-                        </p>
+                        {/*
+                            El titulito es el mando para plegar. Recogida, esta
+                            misma fila deja de ser un rótulo y pasa a ser el
+                            estado: dice qué bandeja se está mirando, cuántos
+                            chats tiene y cuánto queda por atender afuera. Es
+                            la única forma de ganar el alto sin que la lista
+                            quede filtrada sin explicación a la vista.
+                        */}
+                        <button
+                            type="button"
+                            onClick={() => setOrganizacionAbierta((v) => !v)}
+                            aria-expanded={organizacionAbierta}
+                            aria-controls="wa-organizacion"
+                            title={organizacionAbierta
+                                ? 'Recoger la organización y darle el alto a la lista de chats'
+                                : 'Desplegar las bandejas de trabajo para cambiar de vista'}
+                            className={cn(
+                                focusRing,
+                                'mt-2 flex min-h-[30px] w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-[11.5px] text-wa-meta transition-colors hover:bg-wa-hover',
+                            )}
+                        >
+                            <ChevronRight
+                                size={13}
+                                aria-hidden="true"
+                                className={cn('shrink-0 transition-transform', organizacionAbierta && 'rotate-90')}
+                            />
+                            {organizacionAbierta ? (
+                                <>
+                                    <Sparkles size={12} aria-hidden="true" />
+                                    <span className="font-medium">Organización automática</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-wa-text">
+                                        {vistaActual.texto}
+                                    </span>
+                                    {/* Lo que espera afuera de esta vista. En ámbar
+                                        porque es lo único de la fila que pide ir a
+                                        mirar otra cosa. */}
+                                    {pendientesDeAccion > 0 && (
+                                        <span className="shrink-0 rounded-full bg-wa-accent-strong/[0.14] px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums text-wa-accent-strong">
+                                            {pendientesDeAccion} por atender
+                                        </span>
+                                    )}
+                                    {vistaActual.cuenta !== null && vistaActual.cuenta > 0 && (
+                                        <span className="shrink-0 tabular-nums text-[12px]">{vistaActual.cuenta}</span>
+                                    )}
+                                </>
+                            )}
+                        </button>
+
+                        {/* Se pliega con grid-template-rows y no con altura fija:
+                            la lista de bandejas mide distinto según los
+                            contadores, y una altura a ojo la cortaría. Cerrada
+                            queda `inert`, o el tabulador seguía entrando en
+                            botones que nadie ve. */}
+                        <div
+                            id="wa-organizacion"
+                            inert={!organizacionAbierta}
+                            className={cn(
+                                'grid transition-[grid-template-rows] duration-200 ease-out',
+                                organizacionAbierta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                            )}
+                        >
+                        <div className="min-h-0 overflow-hidden">
                         <div role="tablist" aria-label="Bandejas de trabajo" className="mt-1 flex flex-col gap-px">
                             {[
                                 { id: null, texto: 'Todos', ayuda: 'Todas las conversaciones, sin filtrar.', pideAccion: false },
@@ -2541,6 +2833,8 @@ const WhatsAppInbox: React.FC = () => {
                                     )}
                                 </button>
                             ))}
+                        </div>
+                        </div>
                         </div>
                     </div>
 
@@ -2660,6 +2954,14 @@ const WhatsAppInbox: React.FC = () => {
                                                 )}
                                             </p>
 
+                                            {(c.possible_gap || c.sync_confidence === 'uncertain') && (
+                                                <AlertTriangle
+                                                    size={15}
+                                                    className="shrink-0 text-warning-soft-fg"
+                                                    aria-label="Sincronización incierta: la IA está bloqueada en este chat"
+                                                />
+                                            )}
+
                                             {/* "Agente apagado" es el estado por defecto de casi
                                                 todos: repetirlo en cada fila es ruido que tapa lo
                                                 que sí distingue una de otra. Solo se marca lo
@@ -2686,6 +2988,14 @@ const WhatsAppInbox: React.FC = () => {
                                                 >
                                                     {NOMBRE_DE_ETAPA[c.etapa]}
                                                 </span>
+                                            )}
+
+                                            {c.manual_bandeja && (
+                                                <FolderInput
+                                                    size={13}
+                                                    className="shrink-0 text-wa-accent-strong"
+                                                    aria-label={`Ubicación manual: ${BANDEJAS.find((item) => item.id === c.manual_bandeja)?.texto ?? c.manual_bandeja}`}
+                                                />
                                             )}
 
                                             {conversationPreferences.muted.includes(c.id) && (
@@ -2841,6 +3151,16 @@ const WhatsAppInbox: React.FC = () => {
                                     </p>
                                 </div>
 
+                                {(selected.possibleGap || selected.syncConfidence === 'uncertain') && (
+                                    <span
+                                        title="No se pudo demostrar que este chat esté completo; la IA no responderá"
+                                        className="flex shrink-0 items-center gap-1 rounded-full border border-warning/40 bg-warning-soft px-2 py-1 text-xs font-semibold text-warning-soft-fg"
+                                    >
+                                        <AlertTriangle size={14} aria-hidden="true" />
+                                        <span className="hidden xl:inline">Sync incierta</span>
+                                    </span>
+                                )}
+
                                 {selected.escalation && (
                                     <span className={cn(badge.base, badge.size.md, badge.tone[REASON_TONE[selected.escalation.reason]])}>
                                         {REASON_LABEL[selected.escalation.reason]}
@@ -2888,6 +3208,37 @@ const WhatsAppInbox: React.FC = () => {
                                     </div>
                                 )}
 
+                                {selectedConversationForMove && (
+                                    <button
+                                        onClick={() => setRenombrando(selectedConversationForMove)}
+                                        disabled={actionLoading}
+                                        aria-label="Poner nombre al contacto"
+                                        title="Poner nombre al contacto"
+                                        className={cn(
+                                            focusRing,
+                                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-wa-meta hover:bg-wa-inset/10',
+                                        )}
+                                    >
+                                        <UserPen size={18} aria-hidden="true" />
+                                    </button>
+                                )}
+
+                                {selectedConversationForMove && (
+                                    <button
+                                        onClick={() => setMoverChat(selectedConversationForMove)}
+                                        disabled={actionLoading}
+                                        aria-label="Mover el chat a otra bandeja"
+                                        title="Mover el chat a otra bandeja"
+                                        className={cn(
+                                            focusRing,
+                                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-wa-inset/10',
+                                            selectedConversationForMove.manual_bandeja ? 'text-wa-accent-strong' : 'text-wa-meta',
+                                        )}
+                                    >
+                                        <FolderInput size={18} aria-hidden="true" />
+                                    </button>
+                                )}
+
                                 <button
                                     onClick={() => marcarComoNoLeido(selected.conversationId)}
                                     disabled={actionLoading}
@@ -2929,7 +3280,13 @@ const WhatsAppInbox: React.FC = () => {
                             </div>
 
                             {buscandoEnHilo && (
-                                <BuscarEnHilo mensajes={mensajesVisibles} onCerrar={() => setBuscandoEnHilo(false)} />
+                                <BuscarEnHilo
+                                    mensajes={mensajesVisibles}
+                                    onCerrar={() => setBuscandoEnHilo(false)}
+                                    hayMasHistorial={historial.hayMas}
+                                    cargandoHistorial={historial.cargando}
+                                    onCargarMas={historial.cargar}
+                                />
                             )}
 
                             {/* Si el agente sigue habilitado en este chat, puede contestar
@@ -2959,10 +3316,13 @@ const WhatsAppInbox: React.FC = () => {
                                     conversación. Lo que escribas desde el teléfono, no.
                                 </PildoraChat>
 
-                                {mensajesVisibles.length >= MENSAJES_VISIBLES && (
-                                    <PildoraChat>
-                                        Mostrando los últimos {MENSAJES_VISIBLES} mensajes de esta conversación.
-                                    </PildoraChat>
+                                {!messagesLoading && mensajesVisibles.length > 0 && (
+                                    <MensajesAnteriores
+                                        hayMas={historial.hayMas}
+                                        cargando={historial.cargando}
+                                        error={historial.error}
+                                        onCargar={historial.cargar}
+                                    />
                                 )}
 
                                 {messagesLoading ? (
@@ -3319,6 +3679,30 @@ const WhatsAppInbox: React.FC = () => {
                         <button
                             role="menuitem"
                             className={itemClass}
+                            onClick={() => {
+                                setRenombrando(c);
+                                setConversationMenu(null);
+                            }}
+                        >
+                            <UserPen size={17} aria-hidden="true" /> Poner nombre al contacto
+                        </button>
+                        <button
+                            role="menuitem"
+                            className={itemClass}
+                            onClick={() => {
+                                setMoverChat(c);
+                                setConversationMenu(null);
+                            }}
+                        >
+                            <FolderInput size={17} aria-hidden="true" />
+                            Mover a otra bandeja
+                            {c.manual_bandeja && (
+                                <span className="ml-auto text-[11px] text-wa-accent-strong">Manual</span>
+                            )}
+                        </button>
+                        <button
+                            role="menuitem"
+                            className={itemClass}
                             disabled={actionLoading}
                             onClick={async () => {
                                 setConversationMenu(null);
@@ -3357,6 +3741,64 @@ const WhatsAppInbox: React.FC = () => {
                     </div>
                 );
             })()}
+
+            <GuiasPorEnviarModal
+                isOpen={guiasAbierto}
+                onClose={() => setGuiasAbierto(false)}
+                telefonoOrigen={telefonoDeGuias()}
+                userId={userId}
+            />
+
+            <RenombrarContactoModal
+                isOpen={!!renombrando}
+                conversationId={renombrando?.id ?? null}
+                nombreActual={renombrando?.customer_name ?? null}
+                telefono={renombrando ? formatPhone(renombrando) : ''}
+                onClose={() => setRenombrando(null)}
+                onRenombrado={aplicarNombreContacto}
+            />
+
+            <MoverChatModal
+                isOpen={!!moverChat}
+                conversationId={moverChat?.id ?? null}
+                nombre={moverChat?.customer_name || (moverChat ? formatPhone(moverChat) : '')}
+                bandejaActual={moverChat ? bandejaDe(moverChat, tienePendienteVisual(moverChat)) : null}
+                bandejaManual={moverChat?.manual_bandeja ?? null}
+                iaActiva={!!moverChat?.bot_enabled && moverChat.status === 'bot_active'}
+                userId={userId}
+                onClose={() => setMoverChat(null)}
+                onMoved={aplicarBandejaManual}
+            />
+
+            <EditarMensajeModal
+                isOpen={!!editandoMensaje}
+                original={editandoMensaje?.body ?? ''}
+                enviadoEn={editandoMensaje?.created_at ?? ''}
+                guardando={guardandoEdicion}
+                error={errorEdicion}
+                onGuardar={guardarEdicion}
+                onClose={() => {
+                    if (guardandoEdicion) return;
+                    setEditandoMensaje(null);
+                    setErrorEdicion(null);
+                }}
+            />
+
+            <ConfirmDialog
+                isOpen={!!borrandoMensaje}
+                title="Borrar el mensaje para todos"
+                description="Desaparece también del teléfono del cliente y queda en su lugar «Se eliminó este mensaje». No se puede deshacer."
+                cita={borrandoMensaje ? textoPlano(borrandoMensaje.body) || 'Archivo adjunto' : null}
+                confirmLabel="Borrar para todos"
+                loading={borrandoEnCurso}
+                error={errorBorrado}
+                onConfirm={confirmarBorrado}
+                onClose={() => {
+                    if (borrandoEnCurso) return;
+                    setBorrandoMensaje(null);
+                    setErrorBorrado(null);
+                }}
+            />
 
             {/* Visor de fotos del hilo: la foto del repuesto se mira en
                 grande sin salir de la conversación. */}

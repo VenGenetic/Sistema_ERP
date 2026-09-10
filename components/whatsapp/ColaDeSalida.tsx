@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Ban, Clock3, FileText, Mic, RotateCw } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
+import { useIntervaloVisible } from '../../hooks/useIntervaloVisible';
 import { cn } from '../ui/styles';
 import {
     CAMPOS_COLA,
@@ -147,11 +148,10 @@ export function useColaDeSalida(conversationId: number | null, { onError, onYaHa
      * mientras hay pendientes, así que en un chat quieto no consulta nada.
      */
     const hayPendientes = hayAccionesPendientes || enCola.some((q) => q.status === 'pending');
-    useEffect(() => {
-        if (!hayPendientes) return;
-        const t = setInterval(() => recargar(), REPASO_MS);
-        return () => clearInterval(t);
-    }, [hayPendientes, recargar]);
+    useIntervaloVisible(hayPendientes, recargar, REPASO_MS, {
+        alVolver: true,
+        etiqueta: 'cola de salida de WhatsApp',
+    });
 
     const cancelar = useCallback(
         async (item: MensajeEnCola) => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Search, X } from 'lucide-react';
 import type { MensajeHilo } from './ChatThread';
 import { cn } from '../ui/styles';
 
@@ -7,13 +7,33 @@ interface Props {
     mensajes: MensajeHilo[];
     onCerrar: () => void;
     tactil?: boolean;
+    /**
+     * Queda conversación sin cargar más arriba.
+     *
+     * Sin esto el buscador MENTÍA: solo mira los mensajes que están en
+     * pantalla (los últimos 100, o 40 en el teléfono), así que buscar
+     * «Dmax» en un chat largo decía «0» aunque la palabra estuviera diez
+     * veces más atrás -- y un «0» se lee como «no está», no como «no lo
+     * busqué». Ahora, mientras quede historial, el contador lo dice y
+     * ofrece traer más sin cerrar la búsqueda.
+     */
+    hayMasHistorial?: boolean;
+    cargandoHistorial?: boolean;
+    onCargarMas?: () => void;
 }
 
 function normalizar(texto: string): string {
     return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-export const BuscarEnHilo: React.FC<Props> = ({ mensajes, onCerrar, tactil = false }) => {
+export const BuscarEnHilo: React.FC<Props> = ({
+    mensajes,
+    onCerrar,
+    tactil = false,
+    hayMasHistorial = false,
+    cargandoHistorial = false,
+    onCargarMas,
+}) => {
     const [termino, setTermino] = useState('');
     const [indice, setIndice] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -69,8 +89,12 @@ export const BuscarEnHilo: React.FC<Props> = ({ mensajes, onCerrar, tactil = fal
         resaltar(coincidencias[siguiente]);
     };
 
+    const puedeTraerMas = hayMasHistorial && !!onCargarMas;
+    const buscando = termino.trim().length > 0;
+
     return (
-        <div className="flex shrink-0 items-center gap-1.5 border-b border-wa-divider bg-wa-panel px-2 py-2">
+        <div className="shrink-0 border-b border-wa-divider bg-wa-panel">
+        <div className="flex items-center gap-1.5 px-2 py-2">
             <Search size={17} className="shrink-0 text-wa-meta" aria-hidden="true" />
             <input
                 ref={inputRef}
@@ -97,6 +121,32 @@ export const BuscarEnHilo: React.FC<Props> = ({ mensajes, onCerrar, tactil = fal
             <button onClick={onCerrar} aria-label="Cerrar búsqueda" className="flex h-9 w-9 items-center justify-center rounded-full text-wa-meta hover:bg-wa-hover">
                 <X size={18} aria-hidden="true" />
             </button>
+        </div>
+
+        {/* El alcance real de la búsqueda, dicho solo cuando cambia algo:
+            con la conversación entera cargada no hay nada que aclarar. */}
+        {buscando && puedeTraerMas && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pb-2 text-[11.5px] leading-4 text-wa-meta">
+                <span>
+                    Se buscó en los {mensajes.length} mensajes cargados. Más atrás hay conversación sin
+                    revisar.
+                </span>
+                <button
+                    type="button"
+                    onClick={onCargarMas}
+                    disabled={cargandoHistorial}
+                    className={cn(
+                        'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold text-wa-accent',
+                        'hover:bg-wa-hover disabled:opacity-60',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wa-accent',
+                        tactil && 'min-h-[32px]',
+                    )}
+                >
+                    {cargandoHistorial && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}
+                    {cargandoHistorial ? 'Trayendo…' : 'Traer más y volver a buscar'}
+                </button>
+            </div>
+        )}
         </div>
     );
 };

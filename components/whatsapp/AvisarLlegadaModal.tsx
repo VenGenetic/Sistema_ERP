@@ -15,6 +15,7 @@ import { supabase } from '../../supabaseClient';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { badge, button, cn, input, modal } from '../ui/styles';
 import { Tooltip } from '../ui/Tooltip';
+import Modal from '../ui/Modal';
 import { FotoRepuesto } from '../FotoRepuesto';
 import { avisoDeEnvio, haceCuanto, type EstadoAgente } from './agente';
 import { formatearPrecio, precioParaCliente, stockUtil } from '../../utils/whatsappOutbox';
@@ -291,37 +292,56 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
      * puso de verdad. Se propone el sugerido para no tener que escribirlo
      * en el caso normal.
      */
-    const marcarAbonado = async (d: DemandaPorAvisar) => {
+    /*
+        Se pregunta en un formulario del sistema y no con `window.prompt`.
+
+        Acá el prompt era además peligroso: es una caja de texto libre sobre
+        un DINERO que después se contabiliza. Escribir "20,50" con coma, o
+        "$20", daba `NaN` y el abono se rechazaba con un error genérico
+        recién DESPUÉS de haberlo escrito; y el prompt bloquea el navegador,
+        así que la lista de por avisar dejaba de actualizarse detrás.
+
+        El formulario muestra el repuesto, su precio y el abono sugerido, y
+        valida mientras se escribe.
+    */
+    const [cobrando, setCobrando] = useState<DemandaPorAvisar | null>(null);
+    const [montoAbono, setMontoAbono] = useState('');
+    /* Un error del cobro va DENTRO del diálogo. Escribirlo en el `error` de
+       la pantalla lo dejaba detrás del modal abierto: la persona veía el
+       botón volver de "Registrando…" a "Registrar abono" y ningún motivo. */
+    const [errorCobro, setErrorCobro] = useState<string | null>(null);
+
+    const abrirCobro = (d: DemandaPorAvisar) => {
         if (enviandoRef.current) return;
         const precio = d.product?.price != null ? precioParaCliente(d.product.price) : null;
         const sugerido = precio != null ? abonoSugerido(precio) : 0;
-        const escrito = window.prompt(
-            `¿Cuánto abonó ${d.customer_name?.trim() || d.phone_number} por "${d.product?.name ?? 'el repuesto'}"?`,
-            String(sugerido || ''),
-        );
-        // Cancelar el diálogo no es cobrar cero: no se hace nada.
-        if (escrito === null) return;
-        const monto = Number(escrito.replace(',', '.'));
-        if (!Number.isFinite(monto) || monto <= 0) {
-            setError('El monto del abono tiene que ser un número mayor que cero.');
-            return;
-        }
+        setMontoAbono(sugerido ? String(sugerido) : '');
+        setErrorCobro(null);
+        setCobrando(d);
+    };
 
+    const marcarAbonado = async (d: DemandaPorAvisar, monto: number) => {
+        if (enviandoRef.current) return;
         enviandoRef.current = true;
         setEnviando(true);
         setError(null);
+        setErrorCobro(null);
         try {
             const resultado = await registrarAbonoPagado({ demanda: d, monto, userId });
-            // `detalle` viene también cuando salió bien: dice si el grupo se
-            // enteró o si hay que avisarle a mano.
-            if (resultado.detalle) setError(resultado.detalle);
             if (resultado.ok) {
                 // Ya está encargado: sale de la lista de abonos pendientes.
+                // `detalle` viene también cuando salió bien: dice si el grupo
+                // de compras se enteró o si hay que avisarle a mano. Va a la
+                // pantalla, que es la que queda a la vista al cerrarse esto.
+                if (resultado.detalle) setError(resultado.detalle);
                 quitarDeLaLista(d.id);
+                setCobrando(null);
                 onAvisado?.();
+            } else {
+                setErrorCobro(resultado.detalle ?? 'No se pudo registrar el abono.');
             }
         } catch (err: any) {
-            setError(err?.message ?? 'No se pudo registrar el abono.');
+            setErrorCobro(err?.message ?? 'No se pudo registrar el abono.');
         } finally {
             enviandoRef.current = false;
             setEnviando(false);
@@ -736,7 +756,7 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                                                     día siguiente es hostigar. */}
                                                 {esAbono && d.deposit_requested_at && (
                                                     <button
-                                                        onClick={() => marcarAbonado(d)}
+                                                        onClick={() => abrirCobro(d)}
                                                         disabled={enviando}
                                                         title={`Se le pidió ${esperandoDesde(d.deposit_requested_at)}`}
                                                         className={cn(
@@ -826,7 +846,152 @@ export const AvisarLlegadaModal: React.FC<Props> = ({
                     )}
                 </div>
             </div>
+
+            <CobroDeAbono
+                demanda={cobrando}
+                monto={montoAbono}
+                onMonto={setMontoAbono}
+                enviando={enviando}
+                error={errorCobro}
+                onClose={() => setCobrando(null)}
+                onConfirmar={(d, monto) => void marcarAbonado(d, monto)}
+            />
         </div>
+    );
+};
+
+/**
+ * Cuánto abonó el cliente, preguntado como se pregunta un monto: con el
+ * repuesto y su precio a la vista, el sugerido ya escrito y la validación
+ * corriendo mientras se teclea.
+ *
+ * Acepta coma o punto decimal -- en Ecuador se escriben las dos -- porque
+ * lo contrario es rechazar un cobro válido por cómo se tipeó.
+ */
+const CobroDeAbono: React.FC<{
+    demanda: DemandaPorAvisar | null;
+    monto: string;
+    onMonto: (v: string) => void;
+    enviando: boolean;
+    error: string | null;
+    onClose: () => void;
+    onConfirmar: (d: DemandaPorAvisar, monto: number) => void;
+}> = ({ demanda, monto, onMonto, enviando, error, onClose, onConfirmar }) => {
+    const precio = demanda?.product?.price != null ? precioParaCliente(demanda.product.price) : null;
+    const sugerido = precio != null ? abonoSugerido(precio) : null;
+    const valor = Number(monto.replace(',', '.'));
+    const valido = Number.isFinite(valor) && valor > 0;
+    /* Cobrar MÁS que el repuesto entero casi siempre es un dedazo (un cero
+       de más). No se bloquea -- a veces se cobra todo por adelantado -- pero
+       se avisa antes de confirmar, no después de contabilizarlo. */
+    const sospechoso = valido && precio != null && valor > precio;
+
+    return (
+        <Modal
+            isOpen={!!demanda}
+            onClose={enviando ? () => {} : onClose}
+            width="sm"
+            title="Registrar el abono"
+            subtitle={demanda?.customer_name?.trim() || demanda?.phone_number}
+            dismissOnOverlay={!enviando}
+            dismissOnEscape={!enviando}
+            footer={
+                <>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={enviando}
+                        className={cn(button.base, button.variant.secondary, button.size.md)}
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => demanda && valido && onConfirmar(demanda, valor)}
+                        disabled={enviando || !valido}
+                        className={cn(button.base, button.variant.success, button.size.md)}
+                    >
+                        {enviando ? (
+                            <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                        ) : (
+                            <HandCoins size={15} aria-hidden="true" />
+                        )}
+                        Registrar abono
+                    </button>
+                </>
+            }
+        >
+            {demanda && (
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        if (valido) onConfirmar(demanda, valor);
+                    }}
+                    className="space-y-3"
+                >
+                    <div className="rounded-xl border border-subtle bg-surface-2 px-3 py-2.5">
+                        <p className="text-sm font-semibold text-fg">
+                            {demanda.product?.name ?? 'Repuesto sin nombre'}
+                        </p>
+                        <p className="mt-0.5 text-xs text-fg-muted">
+                            {precio != null
+                                ? `Precio al cliente ${formatearPrecio(precio)}`
+                                : 'Sin precio cargado en el catálogo.'}
+                            {sugerido != null && ` · abono sugerido ${formatearPrecio(sugerido)}`}
+                        </p>
+                    </div>
+
+                    <div>
+                        <label htmlFor="monto-abono" className="mb-1 block text-sm font-medium text-fg">
+                            ¿Cuánto abonó?
+                        </label>
+                        <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-fg-subtle">
+                                $
+                            </span>
+                            <input
+                                id="monto-abono"
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                value={monto}
+                                onChange={(e) => onMonto(e.target.value)}
+                                disabled={enviando}
+                                className={cn(
+                                    input.base,
+                                    input.size.lg,
+                                    input.numeric,
+                                    'pl-7',
+                                    monto.trim() !== '' && !valido && input.invalid,
+                                )}
+                                placeholder="0.00"
+                            />
+                        </div>
+                        {monto.trim() !== '' && !valido && (
+                            <p role="alert" className="mt-1 text-xs text-danger">
+                                Escribí un número mayor que cero. Se acepta punto o coma.
+                            </p>
+                        )}
+                        {sospechoso && (
+                            <p className="mt-1 text-xs text-warning-soft-fg">
+                                Es más que el precio del repuesto ({formatearPrecio(precio!)}). Revisá que no
+                                sobre un cero.
+                            </p>
+                        )}
+                    </div>
+
+                    <p className="text-xs leading-4 text-fg-muted">
+                        Al registrarlo, el pedido queda encargado y el grupo de compras se entera solo.
+                    </p>
+
+                    {error && (
+                        <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-soft-fg">
+                            {error}
+                        </p>
+                    )}
+                </form>
+            )}
+        </Modal>
     );
 };
 

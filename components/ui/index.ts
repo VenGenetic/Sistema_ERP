@@ -20,6 +20,7 @@ export type { CardProps, StatCardProps } from './Card';
 export { Badge, StockBadge } from './Badge';
 export type { BadgeProps, StockBadgeProps } from './Badge';
 export { Modal, type ModalProps } from './Modal';
+export { ConfirmDialog, type ConfirmDialogProps, type TonoConfirmacion } from './ConfirmDialog';
 export {
   Table,
   TableWrapper,

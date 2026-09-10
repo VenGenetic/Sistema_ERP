@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { supabase } from '../../supabaseClient';
+import { useIntervaloVisible } from '../../hooks/useIntervaloVisible';
 
 /**
  * El estado del proceso del agente, y qué significa para quien está por
@@ -17,6 +18,19 @@ export interface EstadoAgente {
     agent_last_seen_at: string | null;
     agent_connection: 'connected' | 'connecting' | 'disconnected' | null;
     agent_outbound_mode: 'blocked' | 'erp_only' | 'full' | null;
+    whatsapp_sync_state:
+        | 'disconnected'
+        | 'connected'
+        | 'syncing'
+        | 'reconciling'
+        | 'synced'
+        | 'uncertain'
+        | 'gap_detected'
+        | null;
+    whatsapp_last_sync_at: string | null;
+    whatsapp_sync_error: string | null;
+    possible_gap_count?: number;
+    sync_uncertain_count?: number;
 }
 
 /**
@@ -68,6 +82,25 @@ export function avisoDeEnvio(
             detalle: 'Está intentando reconectar. Los mensajes quedan en cola y salen cuando la sesión vuelva.',
         };
     }
+    if (estado.whatsapp_sync_state === 'syncing' || estado.whatsapp_sync_state === 'reconciling') {
+        return {
+            titulo: 'WhatsApp está reconciliando el historial',
+            detalle:
+                'La IA permanece pausada hasta comprobar los chats. Los mensajes escritos manualmente desde el ERP sí pueden enviarse.',
+        };
+    }
+    const inseguros = Math.max(estado.possible_gap_count ?? 0, estado.sync_uncertain_count ?? 0);
+    if (
+        estado.whatsapp_sync_state === 'uncertain' ||
+        estado.whatsapp_sync_state === 'gap_detected' ||
+        inseguros > 0
+    ) {
+        return {
+            titulo: inseguros > 0 ? `${inseguros} chat${inseguros === 1 ? '' : 's'} con sincronización incierta` : 'Sincronización incierta',
+            detalle:
+                'La IA no responderá esos chats hasta tener evidencia suficiente o una revisión humana. WhatsApp puede seguir conectado.',
+        };
+    }
     if (estado.agent_outbound_mode === 'blocked') {
         return {
             titulo: 'La salida a clientes está bloqueada en el servidor',
@@ -105,22 +138,40 @@ export function useAgente(userId: string | null) {
     const [agentes, setAgentes] = useState<{ recepcion: boolean; ventas: boolean } | null>(null);
 
     const leer = useCallback(async () => {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('agent_settings')
             .select(
-                'agent_last_seen_at, agent_connection, agent_outbound_mode, bot_auto_reply_enabled, intake_agent_enabled, sales_agent_enabled',
+                'agent_last_seen_at, agent_connection, agent_outbound_mode, bot_auto_reply_enabled, intake_agent_enabled, sales_agent_enabled, whatsapp_sync_state, whatsapp_last_sync_at, whatsapp_sync_error',
             )
             .eq('id', 1)
             .maybeSingle();
+        if (error?.code === '42703') {
+            ({ data, error } = await supabase
+                .from('agent_settings')
+                .select(
+                    'agent_last_seen_at, agent_connection, agent_outbound_mode, bot_auto_reply_enabled, intake_agent_enabled, sales_agent_enabled',
+                )
+                .eq('id', 1)
+                .maybeSingle());
+        }
         if (error || !data) {
             setEstado(null);
             return;
         }
-        const fila = data as EstadoAgente & { bot_auto_reply_enabled?: boolean };
+        const [{ count: gaps }, { count: uncertain }] = await Promise.all([
+            supabase.from('agent_conversations').select('id', { count: 'exact', head: true }).eq('possible_gap', true),
+            supabase.from('agent_conversations').select('id', { count: 'exact', head: true }).eq('sync_confidence', 'uncertain'),
+        ]);
+        const fila = data as Partial<EstadoAgente> & { bot_auto_reply_enabled?: boolean };
         setEstado({
-            agent_last_seen_at: fila.agent_last_seen_at,
-            agent_connection: fila.agent_connection,
-            agent_outbound_mode: fila.agent_outbound_mode,
+            agent_last_seen_at: fila.agent_last_seen_at ?? null,
+            agent_connection: fila.agent_connection ?? null,
+            agent_outbound_mode: fila.agent_outbound_mode ?? null,
+            whatsapp_sync_state: fila.whatsapp_sync_state ?? null,
+            whatsapp_last_sync_at: fila.whatsapp_last_sync_at ?? null,
+            whatsapp_sync_error: fila.whatsapp_sync_error ?? null,
+            possible_gap_count: gaps ?? 0,
+            sync_uncertain_count: uncertain ?? 0,
         });
         setGlobalEncendido(Boolean(fila.bot_auto_reply_enabled));
         // Si la migración 0035 no corrió, las columnas no vienen: queda en
@@ -137,11 +188,11 @@ export function useAgente(userId: string | null) {
         );
     }, []);
 
-    useEffect(() => {
-        leer();
-        const t = setInterval(leer, CADA_MS);
-        return () => clearInterval(t);
-    }, [leer]);
+    useIntervaloVisible(true, leer, CADA_MS, {
+        inmediato: true,
+        alVolver: true,
+        etiqueta: 'estado del agente de WhatsApp',
+    });
 
     /**
      * Interruptor MAESTRO. Apagado, el agente no le contesta a nadie aunque

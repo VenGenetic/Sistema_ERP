@@ -36,6 +36,8 @@ export const CHAT_MEDIA_BUCKET = 'agent_chat_media';
 export const CAMPOS_CONV_BASE =
     'id, phone_number, customer_name, status, bot_enabled, selected_agent, last_message_at, unread_count, lid';
 export const CAMPOS_CONV_PREVIEW = `${CAMPOS_CONV_BASE}, last_message_preview, last_message_direction, etapa`;
+/** Incluye la ubicación manual de la migración de bandejas. */
+export const CAMPOS_CONV_ORGANIZADA = `${CAMPOS_CONV_PREVIEW}, manual_bandeja, possible_gap, sync_confidence, sync_uncertain_reason`;
 
 /** true cuando el error de PostgREST es "esa columna no existe". */
 export function faltaColumna(error: { code?: string } | null | undefined): boolean {
@@ -290,6 +292,62 @@ async function encolarAccion(fila: Record<string, unknown>, userId: string | nul
     }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  LOS PLAZOS DE WHATSAPP                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Cuánto tiempo deja WhatsApp corregir o borrar un mensaje ya enviado.
+ *
+ * Son reglas del servidor de WhatsApp, no nuestras: pasado el plazo el
+ * mensaje de protocolo se manda igual y se DESCARTA en silencio -- no
+ * vuelve un error que la cola pueda marcar como fallido. Por eso el plazo
+ * se controla acá, antes de encolar: sin esto el ERP mostraba el mensaje
+ * como corregido mientras el cliente seguía viendo el texto viejo, que es
+ * la peor forma de equivocarse en un precio.
+ *
+ * Se descuentan unos segundos de margen contra el reloj de la PC: el plazo
+ * lo mide el servidor con la hora en que RECIBIÓ el mensaje, y ofrecer la
+ * corrección en el último segundo la pierde.
+ */
+export const VENTANA_EDICION_MS = 15 * 60 * 1000;
+export const VENTANA_BORRADO_MS = 48 * 60 * 60 * 1000;
+const MARGEN_MS = 20 * 1000;
+
+/** Milisegundos que le quedan a un plazo, o 0 si ya venció. */
+function restante(enviadoEn: string | null | undefined, ventanaMs: number): number {
+    if (!enviadoEn) return 0;
+    const enviado = new Date(enviadoEn).getTime();
+    if (!Number.isFinite(enviado)) return 0;
+    return Math.max(0, enviado + ventanaMs - MARGEN_MS - Date.now());
+}
+
+/** Lo que le queda al plazo de corrección. 0 = ya no se puede. */
+export function restanteParaEditar(enviadoEn: string | null | undefined): number {
+    return restante(enviadoEn, VENTANA_EDICION_MS);
+}
+
+/** Lo que le queda al plazo de "borrar para todos". */
+export function restanteParaBorrar(enviadoEn: string | null | undefined): number {
+    return restante(enviadoEn, VENTANA_BORRADO_MS);
+}
+
+export function sePuedeEditar(enviadoEn: string | null | undefined): boolean {
+    return restanteParaEditar(enviadoEn) > 0;
+}
+
+export function sePuedeBorrar(enviadoEn: string | null | undefined): boolean {
+    return restanteParaBorrar(enviadoEn) > 0;
+}
+
+/** "12:40" a partir de los milisegundos que quedan. Para el contador. */
+export function cuentaRegresiva(ms: number): string {
+    const total = Math.max(0, Math.round(ms / 1000));
+    const min = Math.floor(total / 60);
+    const seg = total % 60;
+    return `${min}:${String(seg).padStart(2, '0')}`;
+}
+
 /**
  * Borra un mensaje para todos ("eliminar para todos").
  *
@@ -305,7 +363,13 @@ export async function borrarMensaje(
     conversationId: number,
     whatsappMessageId: string,
     userId: string | null,
+    enviadoEn?: string | null,
 ): Promise<void> {
+    // `enviadoEn` es opcional para no romper llamadas viejas, pero cuando
+    // viene se respeta: encolar un borrado vencido solo ensucia la cola.
+    if (enviadoEn !== undefined && !sePuedeBorrar(enviadoEn)) {
+        throw new Error('WhatsApp ya no permite borrar este mensaje: pasaron más de 48 horas desde que se envió.');
+    }
     await encolarAccion(
         { conversation_id: conversationId, kind: 'delete', target_wa_id: whatsappMessageId },
         userId,
@@ -318,9 +382,13 @@ export async function editarMensaje(
     whatsappMessageId: string,
     body: string,
     userId: string | null,
+    enviadoEn?: string | null,
 ): Promise<void> {
     const texto = body.trim();
     if (!texto) throw new Error('El mensaje corregido no puede quedar vacio.');
+    if (enviadoEn !== undefined && !sePuedeEditar(enviadoEn)) {
+        throw new Error('WhatsApp ya no permite corregir este mensaje: pasaron más de 15 minutos desde que se envió.');
+    }
     await encolarAccion(
         { conversation_id: conversationId, kind: 'edit', target_wa_id: whatsappMessageId, body: texto },
         userId,

@@ -1,10 +1,11 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, Bot, Check, CheckCheck, Clock3, UserRound } from 'lucide-react';
+import { AlertCircle, Bot, Check, CheckCheck, ChevronUp, Clock3, Loader2, UserRound } from 'lucide-react';
 import { cn } from '../ui/styles';
 import MessageMedia from './MessageMedia';
 import MessageActions from './MessageActions';
 import { partirPorTelefonos } from '../../utils/telefonosEnTexto';
+import { sePuedeBorrar, sePuedeEditar } from '../../utils/whatsappOutbox';
 import {
     parsearWhatsApp,
     textoPlano,
@@ -135,6 +136,60 @@ export const PildoraChat: React.FC<{ children: React.ReactNode; tono?: 'normal' 
         </span>
     </div>
 );
+
+/**
+ * El control de «ver mensajes anteriores», arriba del hilo.
+ *
+ * Va con la forma de una píldora del chat y no de un botón del ERP: vive
+ * dentro del hilo, entre las pastillas de fecha, y un botón con borde y
+ * sombra ahí adentro se lee como un error de maquetación.
+ *
+ * Los tres estados son distintos a propósito. «Cargando» no puede ser el
+ * mismo texto en gris que «ya no hay más»: uno pide esperar y el otro dice
+ * que se llegó al principio, y confundirlos hace que alguien siga
+ * apretando una píldora muerta.
+ */
+export const MensajesAnteriores: React.FC<{
+    hayMas: boolean;
+    cargando: boolean;
+    error?: string | null;
+    onCargar: () => void;
+    tactil?: boolean;
+}> = ({ hayMas, cargando, error, onCargar, tactil = false }) => {
+    if (!hayMas && !error) {
+        return <PildoraChat>Este es el principio de la conversación.</PildoraChat>;
+    }
+
+    return (
+        <div className="flex flex-col items-center gap-1 px-3 py-1.5">
+            <button
+                type="button"
+                onClick={onCargar}
+                disabled={cargando}
+                className={cn(
+                    'flex items-center gap-1.5 rounded-lg bg-wa-pill px-3 text-[12.5px] font-medium text-wa-pill-text shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]',
+                    'transition-colors hover:brightness-105 disabled:opacity-70',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wa-accent',
+                    // 44px en el teléfono: es la medida mínima táctil del
+                    // design system del modo móvil.
+                    tactil ? 'min-h-[44px] py-2' : 'min-h-[30px] py-1.5',
+                )}
+            >
+                {cargando ? (
+                    <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                ) : (
+                    <ChevronUp size={14} aria-hidden="true" />
+                )}
+                {cargando ? 'Trayendo mensajes anteriores…' : 'Ver mensajes anteriores'}
+            </button>
+            {error && (
+                <span role="alert" className="text-[11.5px] text-wa-danger">
+                    {error}
+                </span>
+            )}
+        </div>
+    );
+};
 
 const SIN_TEXTO: Partial<Record<ContentType, string>> = {
     image: 'Foto',
@@ -765,13 +820,27 @@ const Burbuja = memo<BurbujaProps>(
                             <MessageActions
                                 onResponder={m.whatsapp_message_id ? () => onResponder(m) : undefined}
                                 onReaccionar={m.whatsapp_message_id ? (emoji) => onReaccionar(m, emoji) : undefined}
-                                onBorrar={m.direction === 'outbound' && m.whatsapp_message_id ? () => onBorrar(m) : undefined}
+                                onBorrar={
+                                    /* Los plazos de WhatsApp se miran ACÁ, no al
+                                       confirmar: vencidos, el servidor descarta la
+                                       acción sin avisar y el ERP quedaría diciendo
+                                       que el mensaje se corrigió mientras el cliente
+                                       sigue viendo el viejo. Ver VENTANA_EDICION_MS
+                                       en utils/whatsappOutbox.ts. */
+                                    m.direction === 'outbound' &&
+                                    !!m.whatsapp_message_id &&
+                                    !m.deleted_at &&
+                                    sePuedeBorrar(m.created_at)
+                                        ? () => onBorrar(m)
+                                        : undefined
+                                }
                                 onEditar={
                                     m.direction === 'outbound' &&
                                     m.content_type === 'text' &&
                                     !!m.body &&
                                     !!m.whatsapp_message_id &&
-                                    !m.deleted_at
+                                    !m.deleted_at &&
+                                    sePuedeEditar(m.created_at)
                                         ? () => onEditar(m)
                                         : undefined
                                 }

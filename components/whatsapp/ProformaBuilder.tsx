@@ -5,6 +5,7 @@ import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { convertProformaToPosCart } from '../../utils/proformaToCart';
 import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
 import { Tooltip } from '../ui/Tooltip';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import { FotoRepuesto } from '../FotoRepuesto';
 import { fetchProformaStockInfo, type ProformaStockInfo } from '../../utils/proformaStock';
 import {
@@ -327,11 +328,16 @@ export const ProformaBuilder: React.FC<Props> = ({
         }
     };
 
+    /* La confirmación va en un diálogo del sistema y no en `window.confirm`:
+       esa caja bloquea el hilo del navegador, así que mientras está abierta
+       el chat de al lado deja de recibir mensajes. Además acá importa decir
+       CUÁNTOS repuestos se pierden -- vaciar una proforma de ocho líneas
+       armada durante media hora no es lo mismo que vaciar una de una. */
+    const [confirmandoVaciar, setConfirmandoVaciar] = useState(false);
     const vaciar = useCallback(() => {
         if (proforma.items.length === 0) return;
-        if (!window.confirm('¿Vaciar la proforma de este cliente?')) return;
-        limpiar(conversationId);
-    }, [proforma.items.length, limpiar, conversationId]);
+        setConfirmandoVaciar(true);
+    }, [proforma.items.length]);
 
     const enProforma = useMemo(
         () => new Set(proforma.items.map((i) => i.productId)),
@@ -737,6 +743,25 @@ export const ProformaBuilder: React.FC<Props> = ({
                     clienteNombre={clienteNombre}
                 />
             </div>
+
+            <ConfirmDialog
+                isOpen={confirmandoVaciar}
+                title="Vaciar la proforma"
+                description={
+                    <>
+                        Se quitan los <strong>{proforma.items.length}</strong>{' '}
+                        {proforma.items.length === 1 ? 'repuesto' : 'repuestos'} de esta cotización.
+                        No afecta lo que ya se le envió al cliente.
+                    </>
+                }
+                confirmLabel="Vaciar"
+                tono="warning"
+                onConfirm={() => {
+                    limpiar(conversationId);
+                    setConfirmandoVaciar(false);
+                }}
+                onClose={() => setConfirmandoVaciar(false)}
+            />
         </div>
     );
 };

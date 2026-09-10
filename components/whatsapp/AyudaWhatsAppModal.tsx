@@ -8,9 +8,11 @@ import {
     Forward,
     Keyboard,
     MessageSquareReply,
+    Pencil,
     Plus,
     ShieldCheck,
     Sparkles,
+    UserPen,
     type LucideIcon,
 } from 'lucide-react';
 import Modal from '../ui/Modal';
@@ -175,6 +177,8 @@ export const AyudaWhatsAppModal: React.FC<Props> = ({ isOpen, onClose, acciones 
                                 { icono: CheckCheck, texto: 'Un check indica enviado; el doble muestra entrega o lectura.' },
                                 { icono: Forward, texto: 'La flecha de cada mensaje permite citarlo o reenviarlo a otro cliente.' },
                                 { icono: MessageSquareReply, texto: 'En cola: el agente todavía está despachando; podés cancelar o reintentar.' },
+                                { icono: Pencil, texto: 'Corregir un mensaje solo se puede dentro de los 15 minutos: pasado ese plazo WhatsApp lo ignora y la opción desaparece.' },
+                                { icono: UserPen, texto: 'Al chat le podés poner nombre («Taller Vélez · Dmax blanca») para encontrarlo después buscando.' },
                             ].map((senal) => {
                                 const Icono = senal.icono;
                                 return (

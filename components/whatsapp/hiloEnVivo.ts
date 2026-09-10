@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useIntervaloVisible } from '../../hooks/useIntervaloVisible';
 
 /**
  * Que el chat se mantenga al día sin que nadie toque "Actualizar".
@@ -23,45 +23,15 @@ import { useEffect, useRef } from 'react';
  */
 const REPASO_MS = 8000;
 
-export function useRepasoDelHilo(activo: boolean, recargar: () => void, ms: number = REPASO_MS): void {
-    // Por referencia: la pantalla arma su función de recarga en cada render
-    // y no queremos reiniciar el intervalo por eso.
-    const ultima = useRef(recargar);
-    ultima.current = recargar;
-
-    useEffect(() => {
-        if (!activo) return;
-
-        let timer: ReturnType<typeof setInterval> | undefined;
-
-        const arrancar = () => {
-            if (timer) return;
-            timer = setInterval(() => ultima.current(), ms);
-        };
-        const parar = () => {
-            clearInterval(timer);
-            timer = undefined;
-        };
-
-        const alCambiarVisibilidad = () => {
-            if (document.visibilityState === 'visible') {
-                // Ponerse al día YA, sin esperar el siguiente turno: es el
-                // momento en que la persona vuelve a mirar la pantalla.
-                ultima.current();
-                arrancar();
-            } else {
-                parar();
-            }
-        };
-
-        if (document.visibilityState === 'visible') arrancar();
-        document.addEventListener('visibilitychange', alCambiarVisibilidad);
-
-        return () => {
-            parar();
-            document.removeEventListener('visibilitychange', alCambiarVisibilidad);
-        };
-    }, [activo, ms]);
+export function useRepasoDelHilo(
+    activo: boolean,
+    recargar: () => void | Promise<void>,
+    ms: number = REPASO_MS,
+): void {
+    useIntervaloVisible(activo, recargar, ms, {
+        alVolver: true,
+        etiqueta: 'repaso del hilo de WhatsApp',
+    });
 }
 
 /**
