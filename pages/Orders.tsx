@@ -7,6 +7,10 @@ import { isTransitionAllowed } from '../utils/orderStateMachine';
 import { reprintOrderReceipt } from '../utils/thermalReceipt';
 import OrderShipments from './OrderShipments';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
+import {
+    paymentReceiptPath as extractPaymentReceiptPath,
+    signedPaymentReceiptUrl,
+} from '../utils/paymentReceiptStorage';
 
 // Interfaces
 interface OrderItem { id: string; product: { name: string; sku: string }; quantity: number; unitPrice: number; subtotal: number; }
@@ -17,7 +21,8 @@ interface Order {
     status: 'Borrador' | 'Sourcing_Pendiente' | 'Confirmado_Proveedor' | 'Pendiente_Pago' | 'Listo_Cumplimiento' | 'Alerta_Margen' | 'En_Transito' | 'Entregado' | 'RMA_Pendiente' | 'Cancelado' | 'Reembolsado';
     total: number;
     date: string;
-    paymentReceiptUrl?: string;
+    /** Ruta interna de un objeto privado en el bucket payment_receipts. */
+    paymentReceiptPath?: string;
     bankRef?: string;
     shippingAddress?: string;
     shippingCost?: number;
@@ -43,6 +48,7 @@ const OrdersPipeline: React.FC = () => {
     const [shippingAddress, setShippingAddress] = useState('');
     const [shippingCost, setShippingCost] = useState(0);
     const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+    const [receiptStoragePath, setReceiptStoragePath] = useState<string | null>(null);
     /** El comprobante a pantalla completa: en 160px de alto no se lee un monto ni un número de referencia. */
     const [comprobante, setComprobante] = useState<MediaItem[]>([]);
     const [uploading, setUploading] = useState(false);
@@ -116,7 +122,7 @@ const OrdersPipeline: React.FC = () => {
                     shippingCost: o.shipping_cost || 0,
                     shippingAddress: o.shipping_address || '',
                     bankRef: o.bank_reference_code || '',
-                    paymentReceiptUrl: o.payment_receipt_url || '',
+                    paymentReceiptPath: extractPaymentReceiptPath(o.payment_receipt_url) || undefined,
                     date: new Date(o.created_at).toLocaleDateString(),
                     items: o.order_items?.map((item: any) => ({
                         id: item.id,
@@ -160,13 +166,20 @@ const OrdersPipeline: React.FC = () => {
     };
 
     // Load an order into modal
-    const handleViewOrder = (order: Order) => {
+    const handleViewOrder = async (order: Order) => {
         setSelectedOrder(order);
         setBankRef(order.bankRef || '');
         setShippingAddress(order.shippingAddress || '');
         setShippingCost(order.shippingCost || 0);
-        setReceiptPreview(order.paymentReceiptUrl || null);
+        const storedPath = extractPaymentReceiptPath(order.paymentReceiptPath);
+        setReceiptStoragePath(storedPath);
+        setReceiptPreview(null);
         setIsModalOpen(true);
+
+        if (storedPath) {
+            const signedUrl = await signedPaymentReceiptUrl(storedPath);
+            setReceiptPreview(signedUrl);
+        }
     };
 
     const handleNewOrder = () => {
@@ -178,31 +191,53 @@ const OrdersPipeline: React.FC = () => {
         if (!canConvert || !e.target.files || e.target.files.length === 0 || !selectedOrder) return;
         const file = e.target.files[0];
         setUploading(true);
+        let uploadedPath: string | null = null;
+        let localPreview: string | null = null;
 
         try {
-            setReceiptPreview(URL.createObjectURL(file));
+            if (!file.type.startsWith('image/')) {
+                throw new Error('El comprobante debe ser una imagen.');
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                throw new Error('El comprobante no puede superar 10 MB.');
+            }
+
+            localPreview = URL.createObjectURL(file);
+            setReceiptPreview(localPreview);
 
             const fileExt = file.name.split('.').pop();
             const fileName = `order_${selectedOrder.id}_${Math.random()}.${fileExt}`;
-            const { data, error } = await supabase.storage.from('payment_receipts').upload(fileName, file);
+            const { error } = await supabase.storage.from('payment_receipts').upload(fileName, file, {
+                cacheControl: '3600',
+                upsert: false,
+            });
 
             if (error) throw error;
+            uploadedPath = fileName;
 
-            const { data: { publicUrl } } = supabase.storage.from('payment_receipts').getPublicUrl(fileName);
-            setReceiptPreview(publicUrl);
-        } catch (error) {
+            const signedUrl = await signedPaymentReceiptUrl(fileName);
+            if (!signedUrl) throw new Error('No se pudo abrir el comprobante privado después de subirlo.');
+            setReceiptStoragePath(fileName);
+            setReceiptPreview(signedUrl);
+        } catch (error: any) {
+            if (uploadedPath) {
+                await supabase.storage.from('payment_receipts').remove([uploadedPath]);
+            }
             console.error('Error uploading receipt:', error);
-            alert("Error al subir el comprobante");
+            alert(`Error al subir el comprobante: ${error?.message ?? error}`);
+            setReceiptStoragePath(null);
             setReceiptPreview(null);
         } finally {
+            if (localPreview) URL.revokeObjectURL(localPreview);
             setUploading(false);
+            e.target.value = '';
         }
     };
 
     // Convert Draft to "Pending Verification" (Officially Submit)
     const handleProcessSale = async () => {
         if (!selectedOrder) return;
-        if (!bankRef || !receiptPreview) {
+        if (!bankRef || !receiptStoragePath) {
             alert("Debe proveer número de comprobante/banco y capturar/subir el recibo.");
             return;
         }
@@ -213,7 +248,7 @@ const OrdersPipeline: React.FC = () => {
                 .update({
                     status: 'Listo_Cumplimiento',
                     bank_reference_code: bankRef,
-                    payment_receipt_url: receiptPreview,
+                    payment_receipt_url: receiptStoragePath,
                     shipping_address: shippingAddress,
                     shipping_cost: shippingCost
                 })
@@ -549,7 +584,7 @@ const OrdersPipeline: React.FC = () => {
                                         {canConvert && (
                                             <button
                                                 onClick={handleProcessSale}
-                                                disabled={selectedOrder.items.length === 0 || !bankRef || !receiptPreview || isProcessing}
+                                                disabled={selectedOrder.items.length === 0 || !bankRef || !receiptStoragePath || isProcessing}
                                                 className="w-full bg-primary hover:bg-primary disabled:bg-primary text-white py-3 rounded-lg font-bold shadow-md flex items-center justify-center gap-2 transition-colors mt-2"
                                             >
                                                 <span>🔒 Cliente Aprobó (A Despacho)</span>

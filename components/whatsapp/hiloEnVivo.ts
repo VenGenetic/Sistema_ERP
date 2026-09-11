@@ -21,7 +21,10 @@ import { useIntervaloVisible } from '../../hooks/useIntervaloVisible';
  * ERP que queda abierto todo el día, un repaso cada pocos segundos contra
  * una pestaña que nadie está mirando es factura de Supabase al pepe.
  */
-const REPASO_MS = 8000;
+// Realtime sigue siendo el camino principal. Treinta segundos conserva una
+// red de seguridad razonable cuando el socket se cae sin volver a descargar
+// el mismo hilo 450 veces por hora y por pestaña.
+const REPASO_MS = 30_000;
 
 export function useRepasoDelHilo(
     activo: boolean,
