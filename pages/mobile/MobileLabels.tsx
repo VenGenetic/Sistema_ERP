@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from 'react';
 import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
 import { addToPrintHistory, getPrintHistory, PrintHistoryItem } from '../../utils/mobilePrintHistory';
@@ -10,7 +10,19 @@ import {
     clearQueue, getQueueTotalLabels,
     PrintQueueItem
 } from '../../utils/mobilePrintQueue';
-import { PrintQueuePreviewModal } from '../../components/PrintQueuePreviewModal';
+/*
+    La vista previa de la cola llega sólo cuando se abre.
+
+    Arrastra el dibujante de etiquetas (jsbarcode) y el selector de impresora
+    térmica (qz-tray): ~107 kB que el teléfono se descargaba al entrar en
+    Etiquetas aunque, en este flujo, el teléfono ni siquiera imprime — arma la
+    cola y quien imprime es la computadora. El modal ya hace `if (!isOpen)
+    return null` y todos sus efectos abortan estando cerrado, así que montarlo
+    sólo al abrirlo no cambia su comportamiento.
+*/
+const PrintQueuePreviewModal = lazy(() =>
+    import('../../components/PrintQueuePreviewModal').then(m => ({ default: m.PrintQueuePreviewModal }))
+);
 
 /**
  * Cantidades de un toque.
@@ -853,12 +865,16 @@ const MobileLabels: React.FC = () => {
                     </>
                 )}
 
-                <PrintQueuePreviewModal
-                    isOpen={isPreviewModalOpen}
-                    onClose={() => setIsPreviewModalOpen(false)}
-                    onQueueUpdated={(updated) => setQueue(updated)}
-                    isMobile={true}
-                />
+                {isPreviewModalOpen && (
+                    <Suspense fallback={null}>
+                        <PrintQueuePreviewModal
+                            isOpen={isPreviewModalOpen}
+                            onClose={() => setIsPreviewModalOpen(false)}
+                            onQueueUpdated={(updated) => setQueue(updated)}
+                            isMobile={true}
+                        />
+                    </Suspense>
+                )}
             </div>
         </div>
     );

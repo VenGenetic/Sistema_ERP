@@ -103,32 +103,47 @@ export const expandirTerminos = (terminos: string[]): string[] => {
 // ─────────────────────────────────────────────────────────────
 // 3. HELPER: FUZZY MATCHING RÁPIDO (Tolerancia a "dedos gordos")
 // ─────────────────────────────────────────────────────────────
+/** Parte un texto en palabras. Se usa UNA vez por producto, no por pulsacion. */
+const partirPalabras = (text: string): string[] => text.split(/[\s\-_/]+/);
+
+/**
+ * Igual que `isFuzzyMatch`, pero recibe las palabras YA partidas.
+ *
+ * Partir el texto era el gasto mas caro de toda la busqueda: `text.split(regex)`
+ * se ejecutaba una vez por producto Y por sinonimo, o sea ~50.000 veces por
+ * pulsacion (5.900 repuestos x ~9 sinonimos por termino), cada una estrenando
+ * un array que luego habia que recoger. Ahora las palabras se parten una sola
+ * vez por producto y viven en la cache normalizada (ver `getNormalized`).
+ */
+export const fuzzyMatchWords = (words: string[], term: string): boolean => {
+    for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        if (Math.abs(w.length - term.length) > 1) continue;
+
+        let mismatches = 0;
+        let a = 0, b = 0;
+        while (a < term.length && b < w.length) {
+            if (term[a] !== w[b]) {
+                mismatches++;
+                if (mismatches > 1) break;
+                if (term[a + 1] === w[b]) a++;
+                else if (term[a] === w[b + 1]) b++;
+                else { a++; b++; }
+            } else {
+                a++; b++;
+            }
+        }
+        mismatches += (term.length - a) + (w.length - b);
+        if (mismatches <= 1) return true;
+    }
+    return false;
+};
+
 export const isFuzzyMatch = (text: string, term: string): boolean => {
     if (!text || !term) return false;
     if (text.includes(term)) return true;
     if (term.length <= 3) return false;
-
-    const words = text.split(/[\s\-_/]+/);
-    for (const w of words) {
-        if (Math.abs(w.length - term.length) <= 1) {
-            let mismatches = 0;
-            let i = 0, j = 0;
-            while (i < term.length && j < w.length) {
-                if (term[i] !== w[j]) {
-                    mismatches++;
-                    if (mismatches > 1) break;
-                    if (term[i + 1] === w[j]) i++;
-                    else if (term[i] === w[j + 1]) j++;
-                    else { i++; j++; }
-                } else {
-                    i++; j++;
-                }
-            }
-            mismatches += (term.length - i) + (w.length - j);
-            if (mismatches <= 1) return true;
-        }
-    }
-    return false;
+    return fuzzyMatchWords(partirPalabras(text), term);
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -143,6 +158,9 @@ interface NormalizedProduct {
     descripcion: string;
     tagsTexto: string;
     textoGlobal: string;
+    /** `nombre` y `codigo` ya partidos en palabras, para el emparejado difuso. */
+    nombrePalabras: string[];
+    codigoPalabras: string[];
     hasStock: boolean;
 }
 
@@ -175,6 +193,8 @@ function getNormalized(producto: any): NormalizedProduct {
         descripcion,
         tagsTexto,
         textoGlobal: `${nombre} ${codigo} ${marca} ${categoria} ${tagsTexto} ${descripcion}`,
+        nombrePalabras: partirPalabras(nombre),
+        codigoPalabras: partirPalabras(codigo),
         hasStock: globalStock > 0
     };
 
@@ -183,10 +203,11 @@ function getNormalized(producto: any): NormalizedProduct {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 4. ALGORITMO DE CÁLCULO DE RELEVANCIA (OPTIMIZADO)
-//    - No crea RegExp por cada expansión
+// 4. ALGORITMO DE CALCULO DE RELEVANCIA (OPTIMIZADO)
+//    - No crea RegExp por cada expansion
 //    - Usa campos pre-normalizados (WeakMap)
 //    - Early exit para SKU exacto
+//    - Los sinonimos se expanden UNA vez por consulta, no por producto
 // ─────────────────────────────────────────────────────────────
 // Fast word-boundary match without creating a RegExp object
 function isWordBoundaryMatch(text: string, word: string): boolean {
@@ -201,55 +222,102 @@ function isWordBoundaryMatch(text: string, word: string): boolean {
     }
 }
 
-export const calcularRelevancia = (producto: any, terminos: string[]): number => {
-    if (!terminos || terminos.length === 0) return 0;
+/**
+ * Consulta ya masticada: terminos, texto completo y sinonimos de cada termino.
+ *
+ * `expandirTerminos` se llamaba DENTRO del bucle de productos, asi que cada
+ * pulsacion reconstruia el mismo Set de sinonimos 5.900 veces por termino. Se
+ * calcula una sola vez aqui y se reparte a todos los productos.
+ */
+export interface QueryPlan {
+    terminos: string[];
+    queryCompleta: string;
+    /** `expansiones[i]` son los sinonimos de `terminos[i]`. */
+    expansiones: string[][];
+}
+
+export const planificarBusqueda = (query: string): QueryPlan | null => {
+    const terminos = limpiarTexto(query)
+        .split(' ')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+
+    if (terminos.length === 0) return null;
+
+    return {
+        terminos,
+        queryCompleta: terminos.join(' '),
+        expansiones: terminos.map(t => expandirTerminos([t])),
+    };
+};
+
+export const calcularRelevancia = (producto: any, plan: QueryPlan): number => {
+    const { terminos, queryCompleta, expansiones } = plan;
+    if (terminos.length === 0) return 0;
 
     const norm = getNormalized(producto);
-    const { nombre, codigo, marca, categoria, descripcion, tagsTexto } = norm;
+    const { nombre, codigo, marca, categoria, descripcion, tagsTexto, textoGlobal } = norm;
 
     let puntuacion = 0;
     let terminosEncontrados = 0;
 
     // SKU exacto -> maxima prioridad (early exit)
-    const queryCompleta = terminos.join(' ');
     if (codigo === queryCompleta) return 2000;
     if (codigo.startsWith(queryCompleta)) puntuacion += 500;
     else if (codigo.includes(queryCompleta)) puntuacion += 300;
     if (nombre.includes(queryCompleta)) puntuacion += 250;
 
-    for (const term of terminos) {
-        const termLower = term.toLowerCase();
-        const expansions = expandirTerminos([termLower]);
+    for (let t = 0; t < terminos.length; t++) {
+        const termLower = terminos[t];
+        const expansions = expansiones[t];
         let maxTermScore = 0;
         let termFound = false;
 
-        for (const exp of expansions) {
+        for (let e = 0; e < expansions.length; e++) {
+            const exp = expansions[e];
             const isOriginal = exp === termLower;
             let currentScore = 0;
             let matchedInExp = false;
 
-            // SKU
-            if (codigo === exp) { currentScore += 250; matchedInExp = true; }
-            else if (codigo.includes(exp)) { currentScore += 120; matchedInExp = true; }
-            else if (exp.length > 3 && isFuzzyMatch(codigo, exp)) { currentScore += 90; matchedInExp = true; }
-
-            // Nombre (sin RegExp)
-            if (!matchedInExp || currentScore < 180) {
-                if (nombre === exp) { currentScore += 180; matchedInExp = true; }
-                else if (isWordBoundaryMatch(nombre, exp)) {
-                    currentScore += nombre.startsWith(exp) ? 120 : 90;
-                    matchedInExp = true;
+            if (!textoGlobal.includes(exp)) {
+                /*
+                    `textoGlobal` es la concatenacion de todos los campos, asi
+                    que si el no contiene `exp`, ninguno de ellos puede
+                    contenerlo: todas las comparaciones por subcadena darian
+                    false. Lo unico que queda es el emparejado difuso, que exige
+                    mas de 3 letras. Saltarse el resto ahorra ~10 barridos de
+                    texto por producto y por sinonimo, que es ademas el caso
+                    comun: la mayor parte del catalogo no tiene nada que ver con
+                    lo que se esta buscando.
+                */
+                if (exp.length > 3) {
+                    if (fuzzyMatchWords(norm.codigoPalabras, exp)) { currentScore += 90; matchedInExp = true; }
+                    if (fuzzyMatchWords(norm.nombrePalabras, exp)) { currentScore += 30; matchedInExp = true; }
                 }
-                else if (nombre.startsWith(exp)) { currentScore += 70; matchedInExp = true; }
-                else if (nombre.includes(exp)) { currentScore += 45; matchedInExp = true; }
-                else if (exp.length > 3 && isFuzzyMatch(nombre, exp)) { currentScore += 30; matchedInExp = true; }
-            }
+            } else {
+                // SKU
+                if (codigo === exp) { currentScore += 250; matchedInExp = true; }
+                else if (codigo.includes(exp)) { currentScore += 120; matchedInExp = true; }
+                else if (exp.length > 3 && fuzzyMatchWords(norm.codigoPalabras, exp)) { currentScore += 90; matchedInExp = true; }
 
-            // Marca, categoría, tags, descripción
-            if (marca.includes(exp)) { currentScore += 40; matchedInExp = true; }
-            if (categoria.includes(exp)) { currentScore += 25; matchedInExp = true; }
-            if (tagsTexto.includes(exp)) { currentScore += 35; matchedInExp = true; }
-            if (descripcion.includes(exp)) { currentScore += 15; matchedInExp = true; }
+                // Nombre (sin RegExp)
+                if (!matchedInExp || currentScore < 180) {
+                    if (nombre === exp) { currentScore += 180; matchedInExp = true; }
+                    else if (isWordBoundaryMatch(nombre, exp)) {
+                        currentScore += nombre.startsWith(exp) ? 120 : 90;
+                        matchedInExp = true;
+                    }
+                    else if (nombre.startsWith(exp)) { currentScore += 70; matchedInExp = true; }
+                    else if (nombre.includes(exp)) { currentScore += 45; matchedInExp = true; }
+                    else if (exp.length > 3 && fuzzyMatchWords(norm.nombrePalabras, exp)) { currentScore += 30; matchedInExp = true; }
+                }
+
+                // Marca, categoria, tags, descripcion
+                if (marca.includes(exp)) { currentScore += 40; matchedInExp = true; }
+                if (categoria.includes(exp)) { currentScore += 25; matchedInExp = true; }
+                if (tagsTexto.includes(exp)) { currentScore += 35; matchedInExp = true; }
+                if (descripcion.includes(exp)) { currentScore += 15; matchedInExp = true; }
+            }
 
             if (matchedInExp && isOriginal) currentScore += 60;
 
@@ -277,27 +345,24 @@ export const calcularRelevancia = (producto: any, terminos: string[]): number =>
 };
 
 // ─────────────────────────────────────────────────────────────
-// 5. EJECUTAR BÚSQUEDA (OPTIMIZADA)
+// 5. EJECUTAR BUSQUEDA (OPTIMIZADA)
 //    - Avoids spreading every product (major GC savings)
 //    - Uses pre-normalized cache
+//    - Un solo plan de consulta para todo el catalogo
 // ─────────────────────────────────────────────────────────────
 export const searchProducts = (products: any[], query: string, minScore = 5): any[] => {
     if (!query || !query.trim()) {
         return products;
     }
 
-    const terminos = limpiarTexto(query)
-        .split(' ')
-        .map(t => t.trim())
-        .filter(t => t.length > 0);
-
-    if (terminos.length === 0) return products;
+    const plan = planificarBusqueda(query);
+    if (!plan) return products;
 
     const results: Array<[any, number]> = [];
 
     for (let i = 0; i < products.length; i++) {
         const p = products[i];
-        const score = calcularRelevancia(p, terminos);
+        const score = calcularRelevancia(p, plan);
         if (score >= minScore) {
             results.push([p, score]);
         }

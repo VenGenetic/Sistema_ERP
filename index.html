@@ -3,27 +3,21 @@
 
 <head>
   <meta charset="utf-8" />
-  <script>
-    // MutationObserver to prevent browser translation tools from breaking Material Symbols icons
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === 1) { // Node.ELEMENT_NODE
-            if (node.classList.contains('material-symbols-outlined')) {
-              node.setAttribute('translate', 'no');
-              node.classList.add('notranslate');
-            }
-            const children = node.getElementsByClassName('material-symbols-outlined');
-            for (let i = 0; i < children.length; i++) {
-              children[i].setAttribute('translate', 'no');
-              children[i].classList.add('notranslate');
-            }
-          }
-        }
-      }
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-  </script>
+  <!--
+    Aquí vivía un MutationObserver sobre TODO el documento (childList + subtree)
+    que marcaba los iconos de Material Symbols como «no traducir», para que los
+    traductores del navegador no los rompieran.
+
+    Se ha retirado junto con la fuente: los Material Symbols ya no se usan en
+    ninguna pantalla — el sistema pasó a lucide-react en los rediseños, y de
+    aquellos iconos sólo quedaban la hoja de estilos, dos reglas CSS y este
+    observador. El observador seguía despertando en CADA cambio del DOM y
+    recorriendo con getElementsByClassName cada nodo insertado, buscando algo
+    que ya no existe. En el catálogo móvil, que monta tarjetas de 20 en 20 al
+    bajar, eso era trabajo constante a cambio de nada.
+
+    Si algún día vuelven los Material Symbols, esto vuelve con ellos.
+  -->
 
   <!--
     Theme bootstrap. Runs before first paint to avoid a flash of the wrong theme.
@@ -59,9 +53,11 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-    rel="stylesheet" />
+  <!-- La hoja de Material Symbols se retiró: ninguna pantalla usa ya esos
+       iconos (el sistema usa lucide-react). Era una segunda petición a
+       fonts.googleapis.com que BLOQUEA el primer pintado, y en un teléfono con
+       datos móviles ese viaje de ida y vuelta se paga entero antes de que se
+       vea nada. -->
 
   <!--
     ============================================================================
@@ -752,14 +748,6 @@
       background-color: rgb(var(--fg-subtle));
     }
 
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-    }
-
-    .filled-icon {
-      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-    }
-
     /*
        Medidas de la barra de navegación móvil, en un solo sitio.
 
@@ -776,6 +764,32 @@
     :root {
       --mobile-nav-h: calc(84px + env(safe-area-inset-bottom));
       --mobile-nav-peak: calc(104px + env(safe-area-inset-bottom));
+    }
+
+    /*
+       Listas largas del modo móvil: lo que no se ve, no se pinta.
+
+       El catálogo va añadiendo repuestos de 20 en 20 al bajar, así que tras un
+       rato de scroll hay 200-300 tarjetas vivas en el DOM y el navegador
+       recalcula estilo, distribución y pintado de TODAS en cada pulsación,
+       aunque sólo se vean seis. En un teléfono modesto eso es la diferencia
+       entre una lista que fluye y una que se arrastra.
+
+       `content-visibility: auto` le permite saltarse ese trabajo en las
+       tarjetas que quedan fuera del área visible. `contain-intrinsic-size` le
+       da mientras tanto un alto aproximado para que la barra de scroll no pegue
+       saltos, y la palabra `auto` hace que recuerde el alto REAL de cada
+       tarjeta una vez pintada: así las tarjetas desplegadas, que son más altas,
+       tampoco descuadran el recorrido.
+
+       Va en CSS plano y no en el bloque `text/tailwindcss` de arriba a
+       propósito: ese lo compila el CDN de Tailwind ya dentro del navegador, y
+       esto tiene que estar disponible en el primer pintado, que es justo el
+       momento que se quiere abaratar.
+    */
+    .lista-contenida>* {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 92px;
     }
 
     /*

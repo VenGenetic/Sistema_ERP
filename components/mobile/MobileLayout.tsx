@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Boxes, ChevronRight, Download, FileText, Grid3X3, House, MessageCircle,
@@ -69,7 +69,21 @@ const MobileLayout: React.FC = () => {
     const queue = await getPrintQueue();
     setQueueCount(queue.reduce((total, item) => total + item.quantity, 0));
   }, []);
-  const refreshUnread = useCallback(async () => {
+  /*
+    Chats sin leer. La consulta se limita a una cada 30 s.
+
+    Se lanzaba en CADA cambio de pantalla (el efecto de abajo depende de
+    `location.pathname`), así que un vendedor saltando entre Catálogo,
+    Etiquetas e Inventario para localizar un repuesto disparaba una consulta de
+    conteo a Supabase por cada toque de la barra inferior — con su latencia de
+    red y su gasto de datos, para un número que no cambia por navegar. El
+    intervalo de 2 minutos y el aviso al volver a la app ya lo mantienen al día;
+    `forzar` deja que esos dos salten el límite.
+  */
+  const ultimoConteoSinLeer = useRef(0);
+  const refreshUnread = useCallback(async (forzar = false) => {
+    if (!forzar && Date.now() - ultimoConteoSinLeer.current < 30_000) return;
+    ultimoConteoSinLeer.current = Date.now();
     const { count, error } = await supabase.from('agent_conversations').select('id', { count: 'exact', head: true }).gt('unread_count', 0);
     if (!error) setSinLeer(count ?? 0);
   }, []);
@@ -79,7 +93,7 @@ const MobileLayout: React.FC = () => {
     refreshUnread();
   }, [location.pathname, refreshQueue, refreshUnread]);
   useEffect(() => {
-    const interval = window.setInterval(refreshUnread, 120_000);
+    const interval = window.setInterval(() => refreshUnread(true), 120_000);
     const onQueue = () => refreshQueue();
     const goOnline = () => setOnline(true);
     const goOffline = () => setOnline(false);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue, Suspense, lazy } from 'react';
 import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
 import { isProductDiscontinued } from '../../utils/discontinuedHelper';
@@ -6,20 +6,37 @@ import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngin
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 
-// Modals
-import { ProductModal } from '../../components/ProductModal';
-import { ProductGroupModal } from '../../components/ProductGroupModal';
-import { MediaLightbox } from '../../components/MediaLightbox';
-import { QuickTagAssignModal } from '../../components/QuickTagAssignModal';
-import { ProductLabelModal } from '../../components/ProductLabelModal';
-import { ProductDemandModal } from '../../components/ProductDemandModal';
-import { SourcingQuickEditModal } from '../../components/SourcingQuickEditModal';
-import { BulkEditModal } from '../../components/BulkEditModal';
-import { InventoryGroupSelectModal } from '../../components/InventoryGroupSelectModal';
+/*
+    Modales compartidos con el escritorio: cada uno en su propio paquete.
+
+    Se importaban de forma estática, así que abrir el catálogo descargaba los
+    nueve —formulario completo de repuesto, edición masiva, grupos, etiquetas,
+    visor de medios…— aunque el usuario sólo quisiera mirar precios, que es lo
+    que hace el 90% de las veces. Sumaban más que la propia pantalla.
+
+    Con `lazy` cada modal se descarga la primera vez que se abre. Son todos
+    exportaciones con nombre, de ahí el `.then` que las convierte en la
+    exportación por defecto que `lazy` espera.
+*/
+const ProductModal = lazy(() => import('../../components/ProductModal').then(m => ({ default: m.ProductModal })));
+const ProductGroupModal = lazy(() => import('../../components/ProductGroupModal').then(m => ({ default: m.ProductGroupModal })));
+const MediaLightbox = lazy(() => import('../../components/MediaLightbox').then(m => ({ default: m.MediaLightbox })));
+const QuickTagAssignModal = lazy(() => import('../../components/QuickTagAssignModal').then(m => ({ default: m.QuickTagAssignModal })));
+const ProductLabelModal = lazy(() => import('../../components/ProductLabelModal').then(m => ({ default: m.ProductLabelModal })));
+const ProductDemandModal = lazy(() => import('../../components/ProductDemandModal').then(m => ({ default: m.ProductDemandModal })));
+const SourcingQuickEditModal = lazy(() => import('../../components/SourcingQuickEditModal').then(m => ({ default: m.SourcingQuickEditModal })));
+const BulkEditModal = lazy(() => import('../../components/BulkEditModal').then(m => ({ default: m.BulkEditModal })));
+const InventoryGroupSelectModal = lazy(() => import('../../components/InventoryGroupSelectModal').then(m => ({ default: m.InventoryGroupSelectModal })));
 
 import { addToPrintHistory } from '../../utils/mobilePrintHistory';
 import { addToQueue } from '../../utils/mobilePrintQueue';
-import { deliverProductCard, renderProductCard } from '../../utils/productShareCard';
+/*
+    `productShareCard` se importa con `import()` allí donde se usa.
+
+    Son ~70 kB —el dibujo de la ficha, las fuentes y el logo de la marca— para
+    una acción que se usa al compartir un repuesto por WhatsApp, no al abrir el
+    catálogo. Estático, lo pagaba cada apertura de la pantalla.
+*/
 import { compressImageForUpload } from '../../utils/imageCompression';
 import { useProformaStore } from '../../store/useProformaStore';
 import { money } from '../../utils/moneda';
@@ -84,6 +101,18 @@ const SORT_OPTIONS = [
 ] as const;
 
 type SortKey = typeof SORT_OPTIONS[number]['key'];
+
+/**
+ * Comparador de texto en español, construido UNA vez.
+ *
+ * `a.localeCompare(b, 'es')` construye un colador nuevo en cada llamada, y
+ * ordenar 5.892 repuestos son ~70.000 llamadas: era el segundo gasto más caro
+ * de la pantalla, por detrás de la búsqueda. `Intl.Collator` con las mismas
+ * opciones por defecto da exactamente el mismo orden, pero reutiliza el
+ * colador. No se le pasan opciones a propósito: cambiar `sensitivity` o
+ * `numeric` cambiaría el orden que ya ve el usuario.
+ */
+const COLADOR_ES = new Intl.Collator('es');
 
 /**
  * Filtros rápidos como grupos de fichas, no como <select> nativos.
@@ -737,7 +766,8 @@ const MobileCatalog: React.FC = () => {
         let cancelled = false;
         setShareCardRendering(true);
         setShareCardError(null);
-        renderProductCard(shareCardProduct)
+        import('../../utils/productShareCard')
+            .then(({ renderProductCard }) => renderProductCard(shareCardProduct))
             .then((canvas) => {
                 if (cancelled) return;
                 setShareCardCanvas(canvas);
@@ -777,6 +807,27 @@ const MobileCatalog: React.FC = () => {
 
     const buzz = (ms = 40) => { if (navigator.vibrate) navigator.vibrate(ms); };
 
+    /*
+        Stock global de cada repuesto, sumado UNA vez por carga del catálogo.
+
+        `inventory_levels.reduce(...)` se recalculaba dentro del predicado del
+        filtro, otra vez dentro del comparador de orden —que el motor de
+        ordenación llama del orden de n·log n veces— y una tercera al pintar
+        cada tarjeta. Con 5.892 repuestos eso son decenas de miles de `reduce`
+        por cada tecla pulsada, todos dando el mismo resultado. Se calcula aquí
+        y lo leen los tres.
+
+        La clave es `allProducts`: cuando el catálogo se refresca llegan objetos
+        nuevos, el memo se rehace y no quedan sumas caducadas.
+    */
+    const stockGlobalPorId = useMemo(() => {
+        const mapa = new Map<any, number>();
+        for (const p of allProducts) {
+            mapa.set(p.id, p.inventory_levels?.reduce((acc: number, l: any) => acc + (l.current_stock || 0), 0) || 0);
+        }
+        return mapa;
+    }, [allProducts]);
+
     /* ── Filtrado, búsqueda y orden ── */
     const filteredAllProducts = useMemo(() => {
         let list = allProducts;
@@ -784,61 +835,77 @@ const MobileCatalog: React.FC = () => {
         const term = deferredSearch.trim();
         if (term) list = searchProducts(list, term, 2);
 
+        /*
+            Un solo barrido para los cuatro filtros.
+
+            Encadenar cuatro `.filter()` recorría el catálogo cuatro veces y
+            dejaba tres arrays intermedios de hasta 5.892 elementos para el
+            recolector de basura, en una pantalla donde esto se repite en cada
+            pulsación. Las condiciones son las mismas, sólo cambia que se
+            evalúan juntas.
+        */
         const f = deferredFilters;
-        if (f.imageStatus === 'con_imagen') list = list.filter(p => !!p.image_url);
-        else if (f.imageStatus === 'sin_imagen') list = list.filter(p => !p.image_url);
-
-        if (f.videoStatus === 'con_video') {
-            list = list.filter(p => Array.isArray(p.gallery) && p.gallery.some((g: any) => g.type === 'video'));
-        } else if (f.videoStatus === 'sin_video') {
-            list = list.filter(p => !p.gallery || !Array.isArray(p.gallery) || !p.gallery.some((g: any) => g.type === 'video'));
-        }
-
-        if (f.stockStatus) {
+        if (f.imageStatus || f.videoStatus || f.stockStatus || f.discontinuedStatus) {
             list = list.filter(p => {
-                const lStock = parseInt(p.local_stock || 0);
-                const iStock = parseInt(p.importer_stock || 0);
-                const gStock = p.inventory_levels?.reduce((acc: number, l: any) => acc + (l.current_stock || 0), 0) || 0;
-                if (f.stockStatus === 'disponibles_importadora') return iStock > 0;
-                if (f.stockStatus === 'solo_local') return (lStock > 0 || gStock > 0) && iStock <= 0;
-                if (f.stockStatus === 'disponibles_local') return lStock > 0 || gStock > 0;
-                if (f.stockStatus === 'solo_importadora') return iStock > 0 && lStock <= 0 && gStock <= 0;
-                if (f.stockStatus === 'disponibles_cualquiera') return lStock > 0 || iStock > 0 || gStock > 0;
-                if (f.stockStatus === 'agotados') return lStock <= 0 && iStock <= 0 && gStock <= 0;
+                if (f.imageStatus === 'con_imagen' && !p.image_url) return false;
+                if (f.imageStatus === 'sin_imagen' && p.image_url) return false;
+
+                if (f.videoStatus) {
+                    const tieneVideo = Array.isArray(p.gallery) && p.gallery.some((g: any) => g.type === 'video');
+                    if (f.videoStatus === 'con_video' && !tieneVideo) return false;
+                    if (f.videoStatus === 'sin_video' && tieneVideo) return false;
+                }
+
+                if (f.stockStatus) {
+                    const lStock = parseInt(p.local_stock || 0);
+                    const iStock = parseInt(p.importer_stock || 0);
+                    const gStock = stockGlobalPorId.get(p.id) || 0;
+                    if (f.stockStatus === 'disponibles_importadora') { if (!(iStock > 0)) return false; }
+                    else if (f.stockStatus === 'solo_local') { if (!((lStock > 0 || gStock > 0) && iStock <= 0)) return false; }
+                    else if (f.stockStatus === 'disponibles_local') { if (!(lStock > 0 || gStock > 0)) return false; }
+                    else if (f.stockStatus === 'solo_importadora') { if (!(iStock > 0 && lStock <= 0 && gStock <= 0)) return false; }
+                    else if (f.stockStatus === 'disponibles_cualquiera') { if (!(lStock > 0 || iStock > 0 || gStock > 0)) return false; }
+                    else if (f.stockStatus === 'agotados') { if (!(lStock <= 0 && iStock <= 0 && gStock <= 0)) return false; }
+                }
+
+                /*
+                    Mismo criterio que la insignia «Desc.» de la tarjeta.
+
+                    El filtro miraba `is_discontinued` a secas mientras la
+                    tarjeta usa `isProductDiscontinued`, que además comprueba si
+                    la fecha de `discontinued_until` ya pasó. Un repuesto
+                    descontinuado sólo hasta una fecha vencida se veía SIN
+                    insignia (correcto, ya volvió) pero «Solo activos» lo
+                    escondía y «Descontinuados» lo mostraba.
+                */
+                if (f.discontinuedStatus) {
+                    const desc = isProductDiscontinued(p);
+                    if (f.discontinuedStatus === 'descontinuados' && !desc) return false;
+                    if (f.discontinuedStatus === 'activos' && desc) return false;
+                }
+
                 return true;
             });
         }
 
-        /*
-            Mismo criterio que la insignia «Desc.» de la tarjeta.
-
-            El filtro miraba `is_discontinued` a secas mientras la tarjeta usa
-            `isProductDiscontinued`, que además comprueba si la fecha de
-            `discontinued_until` ya pasó. Un repuesto descontinuado sólo hasta
-            una fecha vencida se veía SIN insignia (correcto, ya volvió) pero
-            «Solo activos» lo escondía y «Descontinuados» lo mostraba.
-        */
-        if (f.discontinuedStatus === 'descontinuados') list = list.filter(p => isProductDiscontinued(p));
-        else if (f.discontinuedStatus === 'activos') list = list.filter(p => !isProductDiscontinued(p));
-
         // El orden por relevancia del buscador manda: reordenar por nombre
         // destruiría el ranking del motor de búsqueda.
         if (sortKey !== 'name-asc' || !term) {
-            const stockOf = (p: any) => p.inventory_levels?.reduce((a: number, l: any) => a + (l.current_stock || 0), 0) || 0;
+            const stockOf = (p: any) => stockGlobalPorId.get(p.id) || 0;
             const sorted = [...list];
             switch (sortKey) {
-                case 'name-desc': sorted.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'es')); break;
+                case 'name-desc': sorted.sort((a, b) => COLADOR_ES.compare(b.name || '', a.name || '')); break;
                 case 'price-asc': sorted.sort((a, b) => (a.price || 0) - (b.price || 0)); break;
                 case 'price-desc': sorted.sort((a, b) => (b.price || 0) - (a.price || 0)); break;
                 case 'stock-asc': sorted.sort((a, b) => stockOf(a) - stockOf(b)); break;
                 case 'stock-desc': sorted.sort((a, b) => stockOf(b) - stockOf(a)); break;
-                default: if (!term) sorted.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+                default: if (!term) sorted.sort((a, b) => COLADOR_ES.compare(a.name || '', b.name || ''));
             }
             list = sorted;
         }
 
         return list;
-    }, [allProducts, deferredSearch, deferredFilters, sortKey]);
+    }, [allProducts, deferredSearch, deferredFilters, sortKey, stockGlobalPorId]);
 
     const visibleProducts = useMemo(
         () => filteredAllProducts.slice(0, page * pageSize),
@@ -868,11 +935,24 @@ const MobileCatalog: React.FC = () => {
     useEffect(() => () => observer.current?.disconnect(), []);
 
     /* ── Scroll: cabecera compacta + volver arriba ── */
+    /*
+        El navegador dispara `scroll` muchas más veces de las que llega a
+        pintar, y leer `scrollTop` dentro del evento le obliga a recalcular la
+        distribución en ese mismo instante. Con un `requestAnimationFrame` de
+        por medio la lectura ocurre una sola vez por fotograma, y justo cuando
+        el navegador iba a pintar de todas formas.
+    */
+    const rafScroll = useRef(0);
     const handleScroll = useCallback(() => {
-        const top = scrollRef.current?.scrollTop ?? 0;
-        setHeaderCompact(top > 56);
-        setShowScrollTop(top > 900);
+        if (rafScroll.current) return;
+        rafScroll.current = requestAnimationFrame(() => {
+            rafScroll.current = 0;
+            const top = scrollRef.current?.scrollTop ?? 0;
+            setHeaderCompact(top > 56);
+            setShowScrollTop(top > 900);
+        });
     }, []);
+    useEffect(() => () => { if (rafScroll.current) cancelAnimationFrame(rafScroll.current); }, []);
 
     const scrollToTop = () => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -1148,6 +1228,7 @@ const MobileCatalog: React.FC = () => {
         if (!shareCardCanvas || !shareCardProduct) return;
         setShareCardDelivering(true);
         try {
+            const { deliverProductCard } = await import('../../utils/productShareCard');
             const outcome = await deliverProductCard(shareCardCanvas, shareCardProduct);
             if (outcome !== 'cancelled') {
                 notify(
@@ -1449,7 +1530,7 @@ const MobileCatalog: React.FC = () => {
                     )}
                 </div>
 
-                <div className={`flex flex-col gap-2.5 pt-3 transition-opacity ${isStale ? 'opacity-60' : 'opacity-100'}`}>
+                <div className={`lista-contenida flex flex-col gap-2.5 pt-3 transition-opacity ${isStale ? 'opacity-60' : 'opacity-100'}`}>
                     {visibleProducts.map((prod, index) => (
                         <div key={prod.id} ref={index === visibleProducts.length - 1 ? lastElementRef : null}>
                             <ProductCard
@@ -1844,6 +1925,14 @@ const MobileCatalog: React.FC = () => {
             </Sheet>
 
             {/* ── MODALES COMPARTIDOS CON ESCRITORIO ── */}
+            {/*
+                Un solo límite de Suspense para los nueve: cada uno llega en su
+                propio paquete y sólo cuando se abre. `fallback={null}` porque
+                el modal se pide al tocar un botón que ya da su propia señal
+                (el velo de «cargando» de la pantalla), y un segundo indicador
+                superpuesto sólo haría parpadear la interfaz.
+            */}
+            <Suspense fallback={null}>
             {isModalOpen && <ProductModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={refreshInPlace} productToEdit={productToEdit} />}
             {isGroupModalOpen && groupModalProduct && (
                 <ProductGroupModal
@@ -1902,6 +1991,7 @@ const MobileCatalog: React.FC = () => {
                     selectedIds={selectedIds}
                 />
             )}
+            </Suspense>
         </div>
     );
 };

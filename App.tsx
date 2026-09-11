@@ -1,8 +1,18 @@
 import React, { Suspense } from 'react';
 import { HashRouter, Navigate, Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from '@/contexts/AuthContext';
+
+/*
+  El armazón de escritorio va aparte, como las páginas.
+
+  Se importaba de forma estática, así que entraba en el paquete de arranque:
+  todo teléfono descargaba y ejecutaba la barra lateral del escritorio, su
+  cuenta de cabecera, el conmutador de tema y los iconos de los ~20 apartados
+  del menú… para acabar montando `MobileLayout` y no usar nada de eso. Es el
+  armazón de UNA de las dos interfaces; que lo pague quien lo abre.
+*/
+const Layout = React.lazy(() => import('./components/Layout'));
 
 // Lazy load pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));

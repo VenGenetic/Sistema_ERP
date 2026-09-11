@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import html2canvas from 'html2canvas';
 import { useProformaStore } from '../store/useProformaStore';
 import { ProformaStockInfo, STOCK_STATUS_LABELS } from '../utils/proformaStock';
 import {
@@ -48,6 +47,14 @@ export const ProformaPreviewModal: React.FC<ProformaPreviewModalProps> = ({ isOp
     // outer modal shell instead (see the scrollable wrapper below).
     const captureCanvas = async () => {
         if (!printRef.current) return null;
+        /*
+            `html2canvas` se carga con import() dinámico, el mismo criterio que
+            ya seguía utils/proformaImage.ts: pesa ~200 kB y sólo hace falta al
+            pulsar «Copiar imagen» o «Descargar». Importado arriba entraba en la
+            descarga inicial de la pantalla de Proforma del móvil —y del POS—
+            aunque el vendedor sólo quisiera repasar las líneas de la cotización.
+        */
+        const { default: html2canvas } = await import('html2canvas');
         return html2canvas(printRef.current, {
             useCORS: true,
             scale: 4, // Super high resolution

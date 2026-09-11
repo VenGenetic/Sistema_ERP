@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react';
 import {
     AlertTriangle,
     Archive,
@@ -50,7 +50,21 @@ import CustomerPanel from '../../components/whatsapp/CustomerPanel';
 import MenuTelefono from '../../components/whatsapp/MenuTelefono';
 import NuevoChatModal from '../../components/whatsapp/NuevoChatModal';
 import RespuestasRapidasModal from '../../components/whatsapp/RespuestasRapidasModal';
-import AvisarLlegadaModal from '../../components/whatsapp/AvisarLlegadaModal';
+/*
+    Modales aplazados: llegan al abrirse, no al entrar al chat.
+
+    Se importaban de forma estatica, asi que abrir WhatsApp en el telefono
+    descargaba tambien el avisador de llegadas, el envio de catalogo, el
+    registro de pedido, el editor de mensajes, el movedor de chats y el
+    renombrado de contacto -- miles de lineas para acciones puntuales.
+
+    Solo se aplazan los que ya hacian `if (!isOpen) return null`: montarlos
+    unicamente cuando se abren no cambia nada de lo que hacian, porque estando
+    cerrados no pintaban ni ejecutaban efectos. Los que delegan su cierre en un
+    componente de hoja compartido se han dejado como estaban, para no perder su
+    animacion de salida.
+*/
+const AvisarLlegadaModal = lazy(() => import('../../components/whatsapp/AvisarLlegadaModal'));
 import { contarPorAvisar, type ModoAviso } from '../../components/whatsapp/avisarLlegada';
 import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
 import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/agente';
@@ -66,8 +80,8 @@ import ChatThread, {
     type MensajeHilo,
 } from '../../components/whatsapp/ChatThread';
 import { cn } from '../../components/ui/styles';
-import CatalogSendModal from '../../components/whatsapp/CatalogSendModal';
-import ProformaBuilder from '../../components/whatsapp/ProformaBuilder';
+const CatalogSendModal = lazy(() => import('../../components/whatsapp/CatalogSendModal'));
+const ProformaBuilder = lazy(() => import('../../components/whatsapp/ProformaBuilder'));
 import ProductMessagePanel from '../../components/whatsapp/ProductMessagePanel';
 import ConversationWorkCard from '../../components/whatsapp/ConversationWorkCard';
 import { getDueWorkIds } from '../../utils/whatsappWorkflow';
@@ -75,9 +89,9 @@ import { buscarConversacionesPorTexto } from '../../utils/whatsappConversationSe
 import { attributeMessage, attributeMessages } from '../../utils/messageAttribution';
 import ReenviarModal, { type MensajeAReenviar } from '../../components/whatsapp/ReenviarModal';
 import AyudaWhatsAppModal from '../../components/whatsapp/AyudaWhatsAppModal';
-import MoverChatModal from '../../components/whatsapp/MoverChatModal';
-import EditarMensajeModal from '../../components/whatsapp/EditarMensajeModal';
-import RenombrarContactoModal from '../../components/whatsapp/RenombrarContactoModal';
+const MoverChatModal = lazy(() => import('../../components/whatsapp/MoverChatModal'));
+const EditarMensajeModal = lazy(() => import('../../components/whatsapp/EditarMensajeModal'));
+const RenombrarContactoModal = lazy(() => import('../../components/whatsapp/RenombrarContactoModal'));
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { textoPlano } from '../../utils/formatoWhatsApp';
 import { BANDEJAS, bandejaDe, type BandejaManual } from '../../components/whatsapp/bandejas';
@@ -87,7 +101,7 @@ import {
     NOMBRE_DE_ETAPA,
     type Etapa,
 } from '../../components/whatsapp/etapas';
-import RegistrarPedidoModal from '../../components/whatsapp/RegistrarPedidoModal';
+const RegistrarPedidoModal = lazy(() => import('../../components/whatsapp/RegistrarPedidoModal'));
 import {
     borrarMensaje,
     editarMensaje,
@@ -1799,22 +1813,30 @@ const MobileWhatsApp: React.FC = () => {
                 {/* Los tres modales del vendedor. Antes estaban importados pero sin
                     dibujar: los botones de catálogo, proforma y pedido prendían un
                     estado que no abría nada. */}
-                <CatalogSendModal
-                    isOpen={catalogoAbierto}
-                    onClose={() => setCatalogoAbierto(false)}
-                    conversationId={abierta.id}
-                    clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
-                    onEnviar={enviar}
-                />
+                {catalogoAbierto && (
+                    <Suspense fallback={null}>
+                        <CatalogSendModal
+                            isOpen={catalogoAbierto}
+                            onClose={() => setCatalogoAbierto(false)}
+                            conversationId={abierta.id}
+                            clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
+                            onEnviar={enviar}
+                        />
+                    </Suspense>
+                )}
 
-                <ProformaBuilder
-                    isOpen={proformaAbierta}
-                    onClose={() => setProformaAbierta(false)}
-                    conversationId={abierta.id}
-                    clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
-                    clienteNombre={abierta.customer_name}
-                    onEnviar={enviar}
-                />
+                {proformaAbierta && (
+                    <Suspense fallback={null}>
+                        <ProformaBuilder
+                            isOpen={proformaAbierta}
+                            onClose={() => setProformaAbierta(false)}
+                            conversationId={abierta.id}
+                            clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
+                            clienteNombre={abierta.customer_name}
+                            onEnviar={enviar}
+                        />
+                    </Suspense>
+                )}
 
                 {productoDelMensaje !== null && (
                     <div className="fixed inset-0 z-[115] flex items-end bg-black/60" onPointerDown={(event) => event.target === event.currentTarget && setProductoDelMensaje(null)}>
@@ -1835,14 +1857,18 @@ const MobileWhatsApp: React.FC = () => {
                     </div>
                 )}
 
-                <RegistrarPedidoModal
-                    isOpen={pedidoAbierto}
-                    onClose={() => setPedidoAbierto(false)}
-                    phoneNumber={abierta.phone_number}
-                    customerName={abierta.customer_name}
-                    userId={userId}
-                    onRegistrado={() => {}}
-                />
+                {pedidoAbierto && (
+                    <Suspense fallback={null}>
+                        <RegistrarPedidoModal
+                            isOpen={pedidoAbierto}
+                            onClose={() => setPedidoAbierto(false)}
+                            phoneNumber={abierta.phone_number}
+                            customerName={abierta.customer_name}
+                            userId={userId}
+                            onRegistrado={() => {}}
+                        />
+                    </Suspense>
+                )}
 
                 <MediaLightbox
                     isOpen={!!visor}
@@ -1851,14 +1877,18 @@ const MobileWhatsApp: React.FC = () => {
                     onClose={() => setVisor(null)}
                 />
 
-                <AvisarLlegadaModal
-                    isOpen={avisarAbierto}
-                    onClose={() => setAvisarAbierto(false)}
-                    userId={userId}
-                    soloTelefono={abierta.phone_number}
-                    modo={modoAviso}
-                    onAvisado={contarAvisos}
-                />
+                {avisarAbierto && (
+                    <Suspense fallback={null}>
+                        <AvisarLlegadaModal
+                            isOpen={avisarAbierto}
+                            onClose={() => setAvisarAbierto(false)}
+                            userId={userId}
+                            soloTelefono={abierta.phone_number}
+                            modo={modoAviso}
+                            onAvisado={contarAvisos}
+                        />
+                    </Suspense>
+                )}
 
                 <RespuestasRapidasModal
                     isOpen={gestorRapidas}
@@ -2448,19 +2478,23 @@ const MobileWhatsApp: React.FC = () => {
                 );
             })()}
 
-            <EditarMensajeModal
-                isOpen={!!editandoMensaje}
-                original={editandoMensaje?.body ?? ''}
-                enviadoEn={editandoMensaje?.created_at ?? ''}
-                guardando={guardandoEdicion}
-                error={errorEdicion}
-                onGuardar={guardarEdicion}
-                onClose={() => {
-                    if (guardandoEdicion) return;
-                    setEditandoMensaje(null);
-                    setErrorEdicion(null);
-                }}
-            />
+            {editandoMensaje && (
+                <Suspense fallback={null}>
+                    <EditarMensajeModal
+                        isOpen={!!editandoMensaje}
+                        original={editandoMensaje?.body ?? ''}
+                        enviadoEn={editandoMensaje?.created_at ?? ''}
+                        guardando={guardandoEdicion}
+                        error={errorEdicion}
+                        onGuardar={guardarEdicion}
+                        onClose={() => {
+                            if (guardandoEdicion) return;
+                            setEditandoMensaje(null);
+                            setErrorEdicion(null);
+                        }}
+                    />
+                </Suspense>
+            )}
 
             <ConfirmDialog
                 isOpen={!!borrandoMensaje}
@@ -2478,40 +2512,52 @@ const MobileWhatsApp: React.FC = () => {
                 }}
             />
 
-            <RenombrarContactoModal
-                isOpen={!!renombrando}
-                conversationId={renombrando?.id ?? null}
-                nombreActual={renombrando?.customer_name ?? null}
-                telefono={renombrando ? formatearTelefono(renombrando) : ''}
-                onClose={() => setRenombrando(null)}
-                onRenombrado={aplicarNombreContacto}
-            />
+            {renombrando && (
+                <Suspense fallback={null}>
+                    <RenombrarContactoModal
+                        isOpen={!!renombrando}
+                        conversationId={renombrando?.id ?? null}
+                        nombreActual={renombrando?.customer_name ?? null}
+                        telefono={renombrando ? formatearTelefono(renombrando) : ''}
+                        onClose={() => setRenombrando(null)}
+                        onRenombrado={aplicarNombreContacto}
+                    />
+                </Suspense>
+            )}
 
-            <MoverChatModal
-                isOpen={!!moverChat}
-                conversationId={moverChat?.id ?? null}
-                nombre={moverChat?.customer_name || (moverChat ? formatearTelefono(moverChat) : '')}
-                bandejaActual={moverChat ? bandejaDe(moverChat, tienePendienteVisual(moverChat)) : null}
-                bandejaManual={moverChat?.manual_bandeja ?? null}
-                iaActiva={!!moverChat?.bot_enabled && moverChat.status === 'bot_active'}
-                userId={userId}
-                onClose={() => setMoverChat(null)}
-                onMoved={aplicarBandejaManual}
-            />
+            {moverChat && (
+                <Suspense fallback={null}>
+                    <MoverChatModal
+                        isOpen={!!moverChat}
+                        conversationId={moverChat?.id ?? null}
+                        nombre={moverChat?.customer_name || (moverChat ? formatearTelefono(moverChat) : '')}
+                        bandejaActual={moverChat ? bandejaDe(moverChat, tienePendienteVisual(moverChat)) : null}
+                        bandejaManual={moverChat?.manual_bandeja ?? null}
+                        iaActiva={!!moverChat?.bot_enabled && moverChat.status === 'bot_active'}
+                        userId={userId}
+                        onClose={() => setMoverChat(null)}
+                        onMoved={aplicarBandejaManual}
+                    />
+                </Suspense>
+            )}
 
             <NuevoChatModal
                 isOpen={nuevoChat}
                 onClose={() => setNuevoChat(false)}
                 onAbrir={abrirChatPorId}
             />
-            <AvisarLlegadaModal
-                isOpen={avisarAbierto}
-                onClose={() => setAvisarAbierto(false)}
-                userId={userId}
-                modo={modoAviso}
-                onAvisado={contarAvisos}
-                onAbrirChat={abrirChatPorId}
-            />
+            {avisarAbierto && (
+                <Suspense fallback={null}>
+                    <AvisarLlegadaModal
+                        isOpen={avisarAbierto}
+                        onClose={() => setAvisarAbierto(false)}
+                        userId={userId}
+                        modo={modoAviso}
+                        onAvisado={contarAvisos}
+                        onAbrirChat={abrirChatPorId}
+                    />
+                </Suspense>
+            )}
             <AyudaWhatsAppModal
                 isOpen={ayudaAbierta}
                 onClose={() => setAyudaAbierta(false)}
