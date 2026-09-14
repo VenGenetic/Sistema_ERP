@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { FileText, Loader2, Minus, Plus, Search, Send, ShoppingCart, Store, Trash2, X } from 'lucide-react';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { convertProformaToPosCart } from '../../utils/proformaToCart';
+import { compradorDeConversacion } from '../../utils/compradorDeChat';
+import { useBusquedaCatalogo } from '../../utils/catalogoRapido';
+import { MenuRepuesto, usarGestoMenu, type MenuAbierto } from './MenuRepuesto';
+import { EditarRepuestoDesdeChat } from './EditarRepuestoDesdeChat';
 import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
 import { Tooltip } from '../ui/Tooltip';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -18,7 +22,6 @@ import { capturarProformaComoArchivo, resumenDeProforma } from '../../utils/prof
 import { registerProformaAnalytics } from '../../utils/whatsappWorkflow';
 import { ProformaDocument, PROFORMA_WIDTH } from './ProformaDocument';
 import {
-    buscarEnCatalogo,
     borrarAdjunto,
     formatearPrecio,
     precioParaCliente,
@@ -60,7 +63,89 @@ interface Props {
     clienteLabel: string;
     clienteNombre: string | null;
     onEnviar: (mensajes: NuevoMensaje[]) => Promise<void>;
+    /**
+     * Anotar el repuesto como pedido de este cliente.
+     *
+     * Lo resuelve quien monta la proforma: anotar un pedido necesita el
+     * teléfono y el usuario que lo registra, que acá no llegan.
+     */
+    onAnotarPedido?: (producto: ProductoCatalogo) => void;
 }
+
+/**
+ * Un repuesto en la lista de resultados de la proforma.
+ *
+ * Componente aparte y no JSX dentro del `map` porque el gesto que abre el
+ * menú (`usarGestoMenu`) lleva su propio temporizador por fila, y un hook no
+ * se puede llamar dentro de un bucle.
+ */
+const FilaResultado: React.FC<{
+    producto: ProductoCatalogo;
+    puesto: boolean;
+    onAgregar: () => void;
+    onMenu: (x: number, y: number) => void;
+}> = ({ producto: p, puesto, onAgregar, onMenu }) => {
+    const { pulsacionLarga, props: gesto } = usarGestoMenu(onMenu);
+    const stock = stockUtil(p);
+
+    return (
+        <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+                // Tras mantener pulsado el navegador manda ademas un clic: sin
+                // este freno, abrir el menu meteria el repuesto en la proforma.
+                if (pulsacionLarga.current) {
+                    pulsacionLarga.current = false;
+                    return;
+                }
+                onAgregar();
+            }}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onAgregar();
+                }
+            }}
+            {...gesto}
+            className={cn(
+                focusRing,
+                'w-full cursor-pointer touch-manipulation text-left px-4 py-2.5 flex items-center gap-3 hover:bg-surface-hover',
+            )}
+        >
+            <FotoRepuesto
+                url={p.image_url}
+                sku={p.sku}
+                nombre={p.name}
+                gallery={p.gallery}
+                className="w-11 h-11 rounded-lg"
+            />
+            <div className="min-w-0 flex-1">
+                <Tooltip texto={p.name}>
+                    <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                </Tooltip>
+                <p className="text-2xs text-fg-subtle truncate">{p.sku}</p>
+            </div>
+            <div className="text-right shrink-0">
+                <p className="text-sm font-semibold text-fg tnum">
+                    {p.price != null ? formatearPrecio(precioParaCliente(p.price)) : '—'}
+                </p>
+                <span
+                    className={cn(
+                        badge.base,
+                        badge.size.sm,
+                        stock.local > 0 ? badge.tone.success : stock.hay ? badge.tone.warning : badge.tone.danger,
+                    )}
+                >
+                    {stock.local > 0 ? `${stock.local}` : stock.hay ? 'pedido' : 'sin stock'}
+                </span>
+            </div>
+            <span className={cn('shrink-0 p-1.5 rounded-lg', puesto ? 'text-success' : 'text-fg-subtle')}>
+                <Plus size={16} aria-hidden="true" />
+            </span>
+        </div>
+    );
+};
 
 export const ProformaBuilder: React.FC<Props> = ({
     isOpen,
@@ -70,6 +155,7 @@ export const ProformaBuilder: React.FC<Props> = ({
     clienteLabel,
     clienteNombre,
     onEnviar,
+    onAnotarPedido,
 }) => {
     const proforma: ChatProforma = useChatProformaStore((s) => s.obtener(conversationId));
     const agregar = useChatProformaStore((s) => s.agregar);
@@ -81,8 +167,10 @@ export const ProformaBuilder: React.FC<Props> = ({
     const limpiar = useChatProformaStore((s) => s.limpiar);
 
     const [termino, setTermino] = useState('');
-    const [resultados, setResultados] = useState<ProductoCatalogo[]>([]);
-    const [buscando, setBuscando] = useState(false);
+    /** Acciones del repuesto: clic derecho o mantener pulsado sobre un resultado. */
+    const [menu, setMenu] = useState<MenuAbierto | null>(null);
+    /** Repuesto que se está corrigiendo en su ficha completa. */
+    const [editando, setEditando] = useState<number | null>(null);
     const [stockInfo, setStockInfo] = useState<Record<number, ProformaStockInfo>>({});
     const [incluirTexto, setIncluirTexto] = useState(true);
     const [enviando, setEnviando] = useState(false);
@@ -159,7 +247,8 @@ export const ProformaBuilder: React.FC<Props> = ({
         if (!isOpen) return;
         setError(null);
         setTermino('');
-        setResultados([]);
+        setMenu(null);
+        setEditando(null);
         const t = setTimeout(() => buscadorRef.current?.focus(), 50);
         return () => clearTimeout(t);
     }, [isOpen]);
@@ -177,31 +266,28 @@ export const ProformaBuilder: React.FC<Props> = ({
         return () => window.removeEventListener('keydown', onKey);
     }, [isOpen, enPanel, onClose]);
 
-    // Búsqueda contra la base: se espera a que termine de escribir.
+    /* Búsqueda local instantánea; el RPC sólo si hace falta. Ver
+       `utils/catalogoRapido.ts`. */
+    /** El último error que vino del buscador, para saber si el que se ve es suyo. */
+    const errorBusquedaPrevio = useRef<string | null>(null);
+    const { resultados, buscando, error: errorBusqueda } = useBusquedaCatalogo(termino, {
+        activo: isOpen,
+        limite: 12,
+    });
+    /*
+        El error del buscador se copia al estado local para que se vea con el
+        resto, pero hay que LIMPIARLO cuando desaparece: sin el `else`, un
+        fallo suelto del RPC quedaba escrito hasta cerrar la proforma, incluso
+        con la lista llena de resultados debajo.
+
+        Sólo se pisa el error si el que hay es el del buscador: un error de
+        guardado o de envío no puede borrarse porque alguien siga tecleando.
+    */
     useEffect(() => {
-        if (!isOpen) return;
-        const texto = termino.trim();
-        if (texto.length < 2) {
-            setResultados([]);
-            return;
-        }
-        let cancelado = false;
-        setBuscando(true);
-        const t = setTimeout(async () => {
-            try {
-                const filas = await buscarEnCatalogo(texto, 12);
-                if (!cancelado) setResultados(filas);
-            } catch (err: any) {
-                if (!cancelado) setError(err?.message ?? 'No se pudo buscar en el catálogo.');
-            } finally {
-                if (!cancelado) setBuscando(false);
-            }
-        }, 300);
-        return () => {
-            cancelado = true;
-            clearTimeout(t);
-        };
-    }, [termino, isOpen]);
+        if (errorBusqueda) setError(errorBusqueda);
+        else setError((actual) => (actual && actual === errorBusquedaPrevio.current ? null : actual));
+        errorBusquedaPrevio.current = errorBusqueda;
+    }, [errorBusqueda]);
 
     /**
      * Disponibilidad real de lo que está en la proforma. Es la misma
@@ -303,7 +389,11 @@ export const ProformaBuilder: React.FC<Props> = ({
         setConvirtiendo(true);
         setError(null);
         try {
-            const { unresolved, lowStock } = await convertProformaToPosCart(proforma.items);
+            // La venta se lleva al comprador consigo. Si esto no va, la orden
+            // termina contra CONSUMIDOR FINAL y no hay forma de saber despues
+            // que anuncio la produjo: el telefono solo se conoce aca.
+            const comprador = await compradorDeConversacion(conversationId);
+            const { unresolved, lowStock } = await convertProformaToPosCart(proforma.items, { ...comprador, conversationId });
             const problemas: string[] = [];
             if (unresolved.length > 0) {
                 problemas.push(`No se cargaron (nunca estuvieron en una bodega): ${unresolved.join(', ')}.`);
@@ -420,59 +510,27 @@ export const ProformaBuilder: React.FC<Props> = ({
                                     Buscá el primer repuesto para cotizar.
                                 </div>
                             )}
-                            {resultados.map((p) => {
-                                const stock = stockUtil(p);
-                                const puesto = enProforma.has(p.product_id);
-                                return (
-                                    <div
-                                        key={p.product_id}
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => agregar(conversationId, p)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                agregar(conversationId, p);
-                                            }
-                                        }}
-                                        className={cn(
-                                            focusRing,
-                                            'w-full cursor-pointer text-left px-4 py-2.5 flex items-center gap-3 hover:bg-surface-hover',
-                                        )}
-                                    >
-                                        <FotoRepuesto
-                                            url={p.image_url}
-                                            sku={p.sku}
-                                            nombre={p.name}
-                                            gallery={p.gallery}
-                                            className="w-11 h-11 rounded-lg"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <Tooltip texto={p.name}>
-                                                <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
-                                            </Tooltip>
-                                            <p className="text-2xs text-fg-subtle truncate">{p.sku}</p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-sm font-semibold text-fg tnum">
-                                                {p.price != null ? formatearPrecio(precioParaCliente(p.price)) : '—'}
-                                            </p>
-                                            <span
-                                                className={cn(
-                                                    badge.base,
-                                                    badge.size.sm,
-                                                    stock.local > 0 ? badge.tone.success : stock.hay ? badge.tone.warning : badge.tone.danger,
-                                                )}
-                                            >
-                                                {stock.local > 0 ? `${stock.local}` : stock.hay ? 'pedido' : 'sin stock'}
-                                            </span>
-                                        </div>
-                                        <span className={cn('shrink-0 p-1.5 rounded-lg', puesto ? 'text-success' : 'text-fg-subtle')}>
-                                            <Plus size={16} aria-hidden="true" />
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                            {resultados.map((p) => (
+                                <FilaResultado
+                                    key={p.product_id}
+                                    producto={p}
+                                    puesto={enProforma.has(p.product_id)}
+                                    onAgregar={() => agregar(conversationId, p)}
+                                    onMenu={(x, y) =>
+                                        setMenu({
+                                            producto: p,
+                                            x,
+                                            y,
+                                            onEnviar: () => agregar(conversationId, p),
+                                            onEditar: () => setEditando(p.product_id),
+                                            // `undefined` y no `() => onAnotarPedido?.(p)`: una flecha
+                                                // siempre es una función, así que la opción se
+                                                // habría dibujado igual y no haría nada al tocarla.
+                                                onPedido: onAnotarPedido ? () => onAnotarPedido(p) : undefined,
+                                        })
+                                    }
+                                />
+                            ))}
                         </div>
                     </div>
 
@@ -761,6 +819,17 @@ export const ProformaBuilder: React.FC<Props> = ({
                     setConfirmandoVaciar(false);
                 }}
                 onClose={() => setConfirmandoVaciar(false)}
+            />
+
+            <MenuRepuesto menu={menu} onCerrar={() => setMenu(null)} clienteLabel={clienteLabel} />
+
+            {/* Al guardar, `actualizarEnIndice` avisa a los buscadores montados
+                (ver `catalogoRapido`): la lista se rehace sola con el precio
+                nuevo, sin volver a teclear la búsqueda. */}
+            <EditarRepuestoDesdeChat
+                productId={editando}
+                onClose={() => setEditando(null)}
+                onGuardado={() => setEditando(null)}
             />
         </div>
     );

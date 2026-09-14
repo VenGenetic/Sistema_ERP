@@ -10,12 +10,28 @@ import { supabase } from '../supabaseClient';
 import { useCartStore } from '../store/cartStore';
 import { ProformaItem } from '../store/useProformaStore';
 import { readDefaultWarehouseId, resolveWarehouseForLine } from './warehouseResolution';
+import { buscarOCrearComprador, vincularConversacionConCliente } from './compradorDeChat';
 
 export interface ProformaConversionResult {
     /** SKUs que no se pudieron cargar por no tener bodega asignable. */
     unresolved: string[];
     /** SKUs cargados pero sin stock suficiente en la bodega elegida. */
     lowStock: string[];
+}
+
+/**
+ * De quién es la venta, cuando se sabe.
+ *
+ * Lo pasa el panel de WhatsApp, que es el único lugar donde el teléfono ya se
+ * conoce sin preguntarlo. Sin esto la orden termina contra CONSUMIDOR FINAL y la
+ * venta queda para siempre sin poder atribuirse a ningún anuncio -- que es lo
+ * que venía pasando con las 312 ventas del ERP.
+ */
+export interface CompradorConocido {
+    telefono?: string | null;
+    nombre?: string | null;
+    /** Para dejar anotado en la conversacion a que cliente corresponde. */
+    conversationId?: number | null;
 }
 
 /**
@@ -28,7 +44,8 @@ export interface ProformaConversionResult {
  * si tampoco hay, se omite y se informa en vez de adivinar.
  */
 export const convertProformaToPosCart = async (
-    items: ProformaItem[]
+    items: ProformaItem[],
+    comprador?: CompradorConocido
 ): Promise<ProformaConversionResult> => {
     const productIds = items.map((i) => i.productId);
 
@@ -52,8 +69,21 @@ export const convertProformaToPosCart = async (
     const unresolved: string[] = [];
     const lowStock: string[] = [];
 
-    const { clearCart, addToCart, updateQuantity, updateUnitPrice } = useCartStore.getState();
+    const { clearCart, addToCart, updateQuantity, updateUnitPrice, setCustomer } = useCartStore.getState();
     clearCart();
+
+    // clearCart() deja el carrito con CONSUMIDOR FINAL. Si la venta viene de un
+    // chat, el teléfono ya se conoce: se ata acá o se pierde para siempre, porque
+    // en la caja nadie lo vuelve a pedir.
+    if (comprador?.telefono) {
+        const cliente = await buscarOCrearComprador(comprador.telefono, comprador.nombre);
+        if (cliente) {
+            setCustomer(cliente);
+            if (comprador.conversationId) {
+                await vincularConversacionConCliente(comprador.conversationId, cliente.id);
+            }
+        }
+    }
 
     for (const item of items) {
         const prod = products?.find((p: any) => p.id === item.productId);

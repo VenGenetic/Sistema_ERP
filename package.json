@@ -10,7 +10,13 @@
     "sync-products": "node scripts/sync-odoo-products.js",
     "sync-importer-stock": "node scripts/sync-importer-stock.js",
     "check-contrast": "node scripts/check-contrast.mjs",
-    "feed:meta": "node scripts/generate-meta-feed.js"
+    "feed:meta": "node scripts/generate-meta-feed.js",
+    "meta:feed": "node scripts/meta/generar-feed-v2.js",
+    "meta:audiencias": "node scripts/meta/exportar-audiencias.js",
+    "meta:conversiones": "node scripts/meta/enviar-conversiones.js",
+    "meta:rescate": "node scripts/meta/lista-rescate.js",
+    "google:conversiones": "node scripts/google/enviar-conversiones.js",
+    "google:crear-acciones": "node scripts/google/enviar-conversiones.js --crear-accion"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

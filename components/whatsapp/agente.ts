@@ -40,6 +40,22 @@ export interface EstadoAgente {
  */
 export const LATIDO_MAXIMO_MS = 2 * 60 * 1000;
 
+/**
+ * Cuánto puede tardar el latido para que todavía tenga sentido ofrecer
+ * revincular WhatsApp desde el ERP.
+ *
+ * Más estricto que `LATIDO_MAXIMO_MS` (90s contra 2 min) y a propósito: el
+ * aviso de "los mensajes quedan en cola" sólo informa, así que puede
+ * tolerar un par de latidos perdidos; el botón de revincular, en cambio,
+ * le pide al proceso que HAGA algo ahora mismo. Ofrecerlo cuando ya no hay
+ * nadie del otro lado es prometer una acción que nunca va a ocurrir.
+ *
+ * Es el mismo número que exige `solicitar_vinculacion_whatsapp()` en la
+ * base (migración 0079 del agente). Si los dos no coinciden, el botón
+ * aparece y la llamada lo rechaza -- que se ve como un sistema roto.
+ */
+export const LATIDO_PARA_REVINCULAR_MS = 90 * 1000;
+
 /** "recién" / "hace 5 min" / "hace 3 h" / "hace 2 d". */
 export function haceCuanto(iso: string): string {
     const minutos = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -235,4 +251,28 @@ export function useAgente(userId: string | null) {
     );
 
     return { estado, globalEncendido, agentes, recargar: leer, alternarGlobal, alternarAgente };
+}
+
+/**
+ * ¿Tiene sentido ofrecer «volver a vincular WhatsApp» ahora mismo?
+ *
+ * Sólo en un caso, que es justo el que más se repite: el proceso del
+ * agente está VIVO y lo único caído es la sesión de WhatsApp. Ahí hay
+ * alguien del otro lado capaz de apartar la sesión muerta y sacar un QR
+ * nuevo sin que nadie camine hasta la máquina.
+ *
+ * Si el agente entero está caído, esto devuelve false y la pantalla lo
+ * dice con todas las letras: ninguna página web puede levantar un proceso
+ * que no está corriendo, y un botón que no hace nada es peor que ninguno.
+ *
+ * Es sólo la mitad de la regla. La otra mitad -- que quien lo pide sea
+ * administrador -- vive en la base, porque el QR es una credencial y
+ * esconder un botón no protege nada: eso se saltea desde la consola del
+ * navegador.
+ */
+export function sePuedeRevincular(estado: EstadoAgente | null): boolean {
+    if (!estado) return false;
+    const ultimo = estado.agent_last_seen_at ? new Date(estado.agent_last_seen_at).getTime() : 0;
+    if (!ultimo || Date.now() - ultimo > LATIDO_PARA_REVINCULAR_MS) return false;
+    return estado.agent_connection !== 'connected';
 }

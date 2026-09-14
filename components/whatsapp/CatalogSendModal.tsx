@@ -5,7 +5,6 @@ import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
 import { Tooltip } from '../ui/Tooltip';
 import { MediaLightbox, type MediaItem } from '../MediaLightbox';
 import {
-    buscarEnCatalogo,
     formatearPrecio,
     fotosDe,
     mimeDeUrl,
@@ -15,6 +14,9 @@ import {
     type NuevoMensaje,
     type ProductoCatalogo,
 } from '../../utils/whatsappOutbox';
+import { traerGalerias, useBusquedaCatalogo } from '../../utils/catalogoRapido';
+import { MenuRepuesto, usarGestoMenu, type MenuAbierto } from './MenuRepuesto';
+import { EditarRepuestoDesdeChat } from './EditarRepuestoDesdeChat';
 
 /**
  * Buscar un repuesto en el catálogo y mandárselo al cliente por WhatsApp,
@@ -40,6 +42,15 @@ interface Props {
     clienteLabel: string;
     /** Se llama con los mensajes ya armados; el que abre decide cómo encolarlos. */
     onEnviar: (mensajes: NuevoMensaje[]) => Promise<void>;
+    /**
+     * Anotar el repuesto como pedido de este cliente.
+     *
+     * Lo resuelve quien abre el modal y no este componente: anotar un pedido
+     * necesita el teléfono y el usuario que lo registra, que acá no llegan --
+     * y duplicarlos en las props sería tener el mismo dato en dos sitios,
+     * listos para desincronizarse.
+     */
+    onAnotarPedido?: (producto: ProductoCatalogo) => void;
 }
 
 /** Un producto elegido, con lo que se le va a mandar al cliente. */
@@ -93,15 +104,120 @@ const Miniatura: React.FC<{ url: string | null; alt: string; className?: string 
     return <img src={url} alt={alt} loading="lazy" onError={() => setFalló(true)} className={cn('object-cover bg-surface-3', className)} />;
 };
 
-export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversationId, clienteLabel, onEnviar }) => {
+/**
+ * Un repuesto en la grilla de resultados.
+ *
+ * Es un componente propio, y no JSX dentro del `map`, porque el gesto que
+ * abre el menú (`usarGestoMenu`) necesita su propio temporizador por tarjeta
+ * -- y un hook no se puede llamar dentro de un bucle.
+ */
+const TarjetaResultado: React.FC<{
+    producto: ProductoCatalogo;
+    elegido: boolean;
+    onAlternar: () => void;
+    onVerFoto: () => void;
+    onMenu: (x: number, y: number) => void;
+}> = ({ producto: p, elegido, onAlternar, onVerFoto, onMenu }) => {
+    const { pulsacionLarga, props: gesto } = usarGestoMenu(onMenu);
+    const stock = stockUtil(p);
+
+    return (
+        <div
+            role="button"
+            tabIndex={0}
+            aria-pressed={elegido}
+            onClick={() => {
+                // Al soltar tras mantener pulsado, el navegador manda además un
+                // clic. Sin este freno, abrir el menú en el teléfono agregaría
+                // el repuesto a lo que se le va a enviar al cliente.
+                if (pulsacionLarga.current) {
+                    pulsacionLarga.current = false;
+                    return;
+                }
+                onAlternar();
+            }}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onAlternar();
+                }
+            }}
+            {...gesto}
+            className={cn(
+                focusRing,
+                'cursor-pointer touch-manipulation text-left rounded-xl border overflow-hidden transition-colors',
+                elegido
+                    ? 'border-primary bg-primary-soft/50'
+                    : 'border-subtle bg-surface hover:border-strong hover:bg-surface-hover',
+            )}
+        >
+            <div className="relative">
+                <Miniatura url={p.image_url} alt={p.name} className="w-full h-28" />
+                {p.image_url && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onVerFoto();
+                        }}
+                        title="Ver la foto en grande"
+                        aria-label={`Ver la foto de ${p.name} en grande`}
+                        className={cn(
+                            focusRing,
+                            'absolute top-1.5 left-1.5 rounded-full bg-black/55 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/75',
+                        )}
+                    >
+                        <ZoomIn size={12} aria-hidden="true" />
+                    </button>
+                )}
+                {elegido && (
+                    <span className="absolute top-1.5 right-1.5 rounded-full bg-primary text-primary-fg p-1">
+                        <Check size={12} aria-hidden="true" />
+                    </span>
+                )}
+            </div>
+            <div className="p-2.5">
+                <Tooltip texto={p.name}>
+                    <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
+                </Tooltip>
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-fg tnum">
+                        {p.price != null ? formatearPrecio(precioParaCliente(p.price)) : 'sin precio'}
+                    </span>
+                    <span
+                        className={cn(
+                            badge.base,
+                            badge.size.sm,
+                            stock.local > 0 ? badge.tone.success : stock.hay ? badge.tone.warning : badge.tone.danger,
+                        )}
+                    >
+                        {stock.local > 0 ? `${stock.local} en local` : stock.hay ? 'con importador' : 'sin stock'}
+                    </span>
+                </div>
+                <Tooltip texto={p.sku}>
+                    <p className="text-2xs text-fg-subtle mt-1 truncate">{p.sku}</p>
+                </Tooltip>
+            </div>
+        </div>
+    );
+};
+
+export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversationId, clienteLabel, onEnviar, onAnotarPedido }) => {
     const [termino, setTermino] = useState('');
-    const [resultados, setResultados] = useState<ProductoCatalogo[]>([]);
-    const [buscando, setBuscando] = useState(false);
-    const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
-    const [buscado, setBuscado] = useState(false);
     const [armados, setArmados] = useState<Armado[]>([]);
     const [enviando, setEnviando] = useState(false);
     const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+
+    /* La búsqueda: local e instantánea, con el RPC de respaldo. Ver
+       `utils/catalogoRapido.ts` para por qué y cuándo entra cada uno. */
+    const { resultados, buscando, respondido, error: errorBusqueda, preparando } = useBusquedaCatalogo(termino, {
+        activo: isOpen,
+    });
+
+    /** Acciones de un repuesto: clic derecho en el escritorio, mantener pulsado en el móvil. */
+    const [menu, setMenu] = useState<MenuAbierto | null>(null);
+    /** Repuesto que se está corrigiendo en su ficha completa. */
+    const [editando, setEditando] = useState<number | null>(null);
 
     /**
      * La foto del repuesto en grande.
@@ -112,15 +228,25 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
      */
     const [foto, setFoto] = useState<MediaItem[]>([]);
 
-    const verFoto = useCallback((p: ProductoCatalogo) => {
+    const verFoto = useCallback(async (p: ProductoCatalogo) => {
         if (!p.image_url) return;
         const título = `${p.sku} - ${p.name}`;
-        setFoto([
-            { type: 'image', url: p.image_url, title: título },
-            ...(p.gallery ?? [])
-                .filter((m) => m?.url && m.url !== p.image_url)
-                .map((m) => ({ type: m.type, url: m.url, title: título })),
-        ]);
+        const principal: MediaItem = { type: 'image', url: p.image_url, title: título };
+
+        // El visor se abre YA con la foto principal. Los demás ángulos se
+        // piden por detrás (una consulta, sólo de este repuesto, cacheada) y
+        // se añaden cuando lleguen: esperarlos dejaría la lupa muerta medio
+        // segundo, y la mayoría de los repuestos ni siquiera tiene galería.
+        setFoto([principal]);
+
+        const extras = p.gallery ?? (await traerGalerias([p.product_id]).then((g) => g.get(p.product_id) ?? []));
+        const resto = (extras ?? [])
+            .filter((m) => m?.url && m.url !== p.image_url)
+            .map((m) => ({ type: m.type, url: m.url, title: título }));
+        if (resto.length === 0) return;
+        // Sólo si el visor sigue mostrando ESTE repuesto: entre la consulta y
+        // la respuesta se puede haber abierto otro, o cerrado el visor.
+        setFoto((actual) => (actual.length === 1 && actual[0].url === p.image_url ? [principal, ...resto] : actual));
     }, []);
 
     const inputRef = useRef<HTMLInputElement>(null);
@@ -134,11 +260,10 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
     useEffect(() => {
         if (!isOpen) return;
         setTermino('');
-        setResultados([]);
         setArmados([]);
-        setBuscado(false);
-        setErrorBusqueda(null);
         setErrorEnvio(null);
+        setMenu(null);
+        setEditando(null);
         // También el visor: el componente no se desmonta al cerrar el modal,
         // así que una foto que quedó abierta reaparecía a pantalla completa
         // -- la del cliente anterior -- apenas se volvía a abrir el catálogo.
@@ -152,47 +277,43 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
        pulsación cierra la foto y la segunda este panel. Antes cerraba las
        dos de un saque. */
 
-    // La búsqueda va contra la base (RPC de similitud): se espera a que la
-    // persona termine de escribir en vez de consultar por cada tecla.
-    useEffect(() => {
-        if (!isOpen) return;
-        const texto = termino.trim();
-        if (texto.length < 2) {
-            setResultados([]);
-            setBuscado(false);
-            return;
-        }
-        let cancelado = false;
-        setBuscando(true);
-        const t = setTimeout(async () => {
-            try {
-                const filas = await buscarEnCatalogo(texto);
-                if (cancelado) return;
-                setResultados(filas);
-                setErrorBusqueda(null);
-            } catch (err: any) {
-                if (cancelado) return;
-                setErrorBusqueda(err?.message ?? 'No se pudo buscar en el catálogo.');
-                setResultados([]);
-            } finally {
-                if (!cancelado) {
-                    setBuscando(false);
-                    setBuscado(true);
-                }
-            }
-        }, 300);
-        return () => {
-            cancelado = true;
-            clearTimeout(t);
-        };
-    }, [termino, isOpen]);
 
     const yaElegido = useCallback(
         (id: number) => armados.some((a) => a.producto.product_id === id),
         [armados],
     );
 
+    /**
+     * Las fotos extra del repuesto, pedidas al elegirlo y no al buscarlo.
+     *
+     * Antes cada búsqueda traía la galería de sus 24 resultados: una consulta
+     * entera a `products` por fotos que en 23 de esos casos nadie iba a
+     * mirar. Se piden ahora, del repuesto que sí se va a mandar, y quedan
+     * cacheadas. Si la consulta falla o tarda, el armado ya está en pantalla
+     * con la foto principal -- la galería sólo añade ángulos.
+     */
+    const completarGaleria = useCallback(async (producto: ProductoCatalogo) => {
+        if (producto.gallery != null) return;
+        try {
+            const galerias = await traerGalerias([producto.product_id]);
+            const fotos = galerias.get(producto.product_id) ?? [];
+            if (fotos.length === 0) return;
+            setArmados((prev) =>
+                prev.map((a) =>
+                    a.producto.product_id === producto.product_id
+                        ? { ...a, producto: { ...a.producto, gallery: fotos } }
+                        : a,
+                ),
+            );
+        } catch {
+            /* Sin galería se manda la foto principal, que es lo habitual. */
+        }
+    }, []);
+
     const alternarProducto = (producto: ProductoCatalogo) => {
+        if (!armados.some((a) => a.producto.product_id === producto.product_id)) {
+            completarGaleria(producto);
+        }
         setArmados((prev) =>
             prev.some((a) => a.producto.product_id === producto.product_id)
                 ? prev.filter((a) => a.producto.product_id !== producto.product_id)
@@ -333,10 +454,19 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                 <div className="py-14 text-center text-sm text-fg-muted flex flex-col items-center gap-2">
                                     <Package size={22} className="text-fg-subtle" aria-hidden="true" />
                                     Escribí el nombre del repuesto para buscarlo.
+                                    {/* Sólo la primera vez de la sesión, y sólo si de
+                                        verdad no hay con qué buscar todavía. Después el
+                                        catálogo está en el navegador y no se vuelve a ver. */}
+                                    {preparando && (
+                                        <span className="flex items-center gap-1.5 text-2xs text-fg-subtle">
+                                            <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                                            Preparando el catálogo para buscar sin esperas…
+                                        </span>
+                                    )}
                                 </div>
                             )}
 
-                            {!errorBusqueda && buscado && !buscando && resultados.length === 0 && termino.trim().length >= 2 && (
+                            {!errorBusqueda && respondido && !buscando && resultados.length === 0 && termino.trim().length >= 2 && (
                                 <div className="py-14 text-center text-sm text-fg-muted">
                                     Ningún repuesto coincide con “{termino.trim()}”.
                                     <br />
@@ -347,88 +477,28 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                             )}
 
                             <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                                {resultados.map((p) => {
-                                    const elegido = yaElegido(p.product_id);
-                                    const stock = stockUtil(p);
-                                    return (
-                                        <div
-                                            key={p.product_id}
-                                            role="button"
-                                            tabIndex={0}
-                                            aria-pressed={elegido}
-                                            onClick={() => alternarProducto(p)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    e.preventDefault();
-                                                    alternarProducto(p);
-                                                }
-                                            }}
-                                            className={cn(
-                                                focusRing,
-                                                'cursor-pointer text-left rounded-xl border overflow-hidden transition-colors',
-                                                elegido
-                                                    ? 'border-primary bg-primary-soft/50'
-                                                    : 'border-subtle bg-surface hover:border-strong hover:bg-surface-hover',
-                                            )}
-                                        >
-                                            <div className="relative">
-                                                <Miniatura url={p.image_url} alt={p.name} className="w-full h-28" />
-                                                {p.image_url && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            verFoto(p);
-                                                        }}
-                                                        title="Ver la foto en grande"
-                                                        aria-label={`Ver la foto de ${p.name} en grande`}
-                                                        className={cn(
-                                                            focusRing,
-                                                            'absolute top-1.5 left-1.5 rounded-full bg-black/55 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/75',
-                                                        )}
-                                                    >
-                                                        <ZoomIn size={12} aria-hidden="true" />
-                                                    </button>
-                                                )}
-                                                {elegido && (
-                                                    <span className="absolute top-1.5 right-1.5 rounded-full bg-primary text-primary-fg p-1">
-                                                        <Check size={12} aria-hidden="true" />
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="p-2.5">
-                                                <Tooltip texto={p.name}>
-                                                    <p className="text-xs font-medium text-fg line-clamp-2 leading-snug">{p.name}</p>
-                                                </Tooltip>
-                                                <div className="mt-1.5 flex items-center justify-between gap-2">
-                                                    <span className="text-sm font-semibold text-fg tnum">
-                                                        {p.price != null ? formatearPrecio(precioParaCliente(p.price)) : 'sin precio'}
-                                                    </span>
-                                                    <span
-                                                        className={cn(
-                                                            badge.base,
-                                                            badge.size.sm,
-                                                            stock.local > 0
-                                                                ? badge.tone.success
-                                                                : stock.hay
-                                                                  ? badge.tone.warning
-                                                                  : badge.tone.danger,
-                                                        )}
-                                                    >
-                                                        {stock.local > 0
-                                                            ? `${stock.local} en local`
-                                                            : stock.hay
-                                                              ? 'con importador'
-                                                              : 'sin stock'}
-                                                    </span>
-                                                </div>
-                                                <Tooltip texto={p.sku}>
-                                                    <p className="text-2xs text-fg-subtle mt-1 truncate">{p.sku}</p>
-                                                </Tooltip>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                {resultados.map((p) => (
+                                    <TarjetaResultado
+                                        key={p.product_id}
+                                        producto={p}
+                                        elegido={yaElegido(p.product_id)}
+                                        onAlternar={() => alternarProducto(p)}
+                                        onVerFoto={() => verFoto(p)}
+                                        onMenu={(x, y) =>
+                                            setMenu({
+                                                producto: p,
+                                                x,
+                                                y,
+                                                onEnviar: yaElegido(p.product_id) ? undefined : () => alternarProducto(p),
+                                                onEditar: () => setEditando(p.product_id),
+                                                // `undefined` y no `() => onAnotarPedido?.(p)`: una flecha
+                                                // siempre es una función, así que la opción se
+                                                // habría dibujado igual y no haría nada al tocarla.
+                                                onPedido: onAnotarPedido ? () => onAnotarPedido(p) : undefined,
+                                            })
+                                        }
+                                    />
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -632,6 +702,19 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
             </div>
 
             <MediaLightbox isOpen={foto.length > 0} media={foto} onClose={() => setFoto([])} />
+
+            <MenuRepuesto menu={menu} onCerrar={() => setMenu(null)} clienteLabel={clienteLabel} />
+
+            {/* La ficha se monta sobre el catálogo, no en su lugar: al guardar
+                se vuelve a la misma búsqueda, con el repuesto ya corregido. */}
+            <EditarRepuestoDesdeChat
+                productId={editando}
+                onClose={() => setEditando(null)}
+                // La lista se rehace sola: al guardar, `actualizarEnIndice`
+                // avisa a los buscadores montados (ver `catalogoRapido`), así
+                // que el precio nuevo aparece sin volver a teclear nada.
+                onGuardado={() => setEditando(null)}
+            />
         </div>
     );
 };

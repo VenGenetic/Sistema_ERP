@@ -3,6 +3,22 @@ import { ChevronRight, Clock, History, Mic, MicOff, ScanLine, Search, TrendingUp
 import { getSuggestions } from '../../utils/mobileSearchEngine';
 import { getSearchHistory, rememberSearch } from '../../utils/mobileSearchHistory';
 
+/**
+ * Retardo antes de lanzar la búsqueda.
+ *
+ * Eran 250 ms porque cada pulsación recorría los 5.892 repuestos EN EL HILO
+ * PRINCIPAL: había que espaciar las búsquedas o el teclado se trababa. Desde
+ * que ese trabajo vive en un Web Worker (utils/mobileSearchWorker.ts) eso ya no
+ * ocurre, y el retardo sólo cumple una función: no disparar una búsqueda por
+ * cada letra mientras alguien teclea de corrido.
+ *
+ * 90 ms cubre esa función y devuelve 160 ms de espera en CADA búsqueda. Sigue
+ * siendo muy superior al intervalo entre caracteres de un lector de códigos
+ * físico, que teclea a ráfagas de pocos milisegundos, así que un código
+ * escaneado sigue llegando entero en una sola búsqueda.
+ */
+const RETARDO_BUSQUEDA_MS = 90;
+
 declare global {
     interface Window {
         SpeechRecognition: any;
@@ -50,7 +66,7 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
         Último valor que este componente le mandó al padre.
 
         El campo se sincronizaba con `searchTerm` en cada cambio, y `searchTerm`
-        llega con 250 ms de retardo: si una pulsación caía justo después de que
+        llega con retardo: si una pulsación caía justo después de que
         disparara el temporizador, el efecto devolvía al campo el valor anterior
         y borraba lo último tecleado. Con un lector de código —que teclea a
         ráfagas— era fácil dar con esa ventana y perder un carácter del código.
@@ -73,21 +89,21 @@ const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
         setSearchTerm(val);
     }, [setSearchTerm]);
 
-    // Debounced search: update parent after 250ms of no typing
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setLocalValue(val); // instant local update for responsive typing
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
-            commit(val); // trigger expensive search after pause
-        }, 250);
+            commit(val);
+        }, RETARDO_BUSQUEDA_MS);
     }, [commit]);
 
     /*
         El lector físico cierra el código con Enter, y no había nada escuchando:
-        aunque el código llegara entero había que esperar igual los 250 ms del
-        retardo. Enter confirma en el acto, guarda el término y cierra el teclado.
+        aunque el código llegara entero había que esperar igual el retardo
+        (`RETARDO_BUSQUEDA_MS`). Enter confirma en el acto, guarda el término y
+        cierra el teclado.
     */
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key !== 'Enter') return;

@@ -5,7 +5,8 @@ import { supabase } from '../../supabaseClient';
 import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
 import { Tooltip } from '../ui/Tooltip';
 import { FotoRepuesto } from '../FotoRepuesto';
-import { buscarEnCatalogo, formatearPrecio, precioParaCliente, stockUtil, type ProductoCatalogo } from '../../utils/whatsappOutbox';
+import { formatearPrecio, precioParaCliente, stockUtil, type ProductoCatalogo } from '../../utils/whatsappOutbox';
+import { useBusquedaCatalogo } from '../../utils/catalogoRapido';
 
 /**
  * Anota que este cliente está esperando un repuesto que hoy no hay
@@ -25,6 +26,14 @@ interface Props {
     customerName: string | null;
     userId: string | null;
     onRegistrado: () => void;
+    /**
+     * Repuesto ya elegido: se abre directamente en el paso de confirmar.
+     *
+     * Lo manda el menú contextual de la búsqueda ("Agregar a pedido"). Quien
+     * acaba de encontrar la pieza y ve que no hay stock no tiene por qué
+     * volver a escribir el mismo término en otro buscador.
+     */
+    productoInicial?: ProductoCatalogo | null;
 }
 
 export const RegistrarPedidoModal: React.FC<Props> = ({
@@ -34,10 +43,9 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
     customerName,
     userId,
     onRegistrado,
+    productoInicial = null,
 }) => {
     const [termino, setTermino] = useState('');
-    const [resultados, setResultados] = useState<ProductoCatalogo[]>([]);
-    const [buscando, setBuscando] = useState(false);
     const [elegido, setElegido] = useState<ProductoCatalogo | null>(null);
     const [notas, setNotas] = useState('');
     const [guardando, setGuardando] = useState(false);
@@ -51,39 +59,23 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
     useEffect(() => {
         if (!isOpen) return;
         setTermino('');
-        setResultados([]);
-        setElegido(null);
+        setElegido(productoInicial);
         setNotas('');
         setError(null);
         setAviso(null);
+        // Con el repuesto ya elegido no hay buscador al que llevar el foco: se
+        // abre directamente en las notas del pedido.
+        if (productoInicial) return;
         const t = setTimeout(() => buscadorRef.current?.focus(), 50);
         return () => clearTimeout(t);
-    }, [isOpen]);
+    }, [isOpen, productoInicial]);
 
-    useEffect(() => {
-        if (!isOpen || elegido) return;
-        const texto = termino.trim();
-        if (texto.length < 2) {
-            setResultados([]);
-            return;
-        }
-        let cancelado = false;
-        setBuscando(true);
-        const t = setTimeout(async () => {
-            try {
-                const filas = await buscarEnCatalogo(texto, 12);
-                if (!cancelado) setResultados(filas);
-            } catch (err: any) {
-                if (!cancelado) setError(err?.message ?? 'No se pudo buscar.');
-            } finally {
-                if (!cancelado) setBuscando(false);
-            }
-        }, 300);
-        return () => {
-            cancelado = true;
-            clearTimeout(t);
-        };
-    }, [termino, isOpen, elegido]);
+    /* La búsqueda es local e instantánea; el RPC sólo entra si hace falta.
+       Ver `utils/catalogoRapido.ts`. */
+    const { resultados, buscando, error: errorBusqueda } = useBusquedaCatalogo(termino, {
+        activo: isOpen && !elegido,
+        limite: 12,
+    });
 
     const guardar = async () => {
         if (!elegido || guardandoRef.current) return;
@@ -265,7 +257,9 @@ export const RegistrarPedidoModal: React.FC<Props> = ({
                         </>
                     )}
 
-                    {error && <p className="mt-3 text-xs text-danger">{error}</p>}
+                    {(error || errorBusqueda) && (
+                        <p className="mt-3 text-xs text-danger">{error ?? errorBusqueda}</p>
+                    )}
                     {aviso && <p className="mt-3 text-xs text-warning-soft-fg">{aviso}</p>}
                 </div>
 

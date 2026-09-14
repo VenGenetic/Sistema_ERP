@@ -14,11 +14,16 @@ import MediaGallery from '../components/whatsapp/MediaGallery';
 import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../components/whatsapp/ColaDeSalida';
 import {
     avisoDeEnvio as avisoDelAgente,
+    sePuedeRevincular,
     haceCuanto as timeAgo,
     type EstadoAgente,
 } from '../components/whatsapp/agente';
 import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import ProformaBuilder from '../components/whatsapp/ProformaBuilder';
+import RegistrarPedidoModal from '../components/whatsapp/RegistrarPedidoModal';
+import VincularWhatsAppModal from '../components/whatsapp/VincularWhatsAppModal';
+import { precalentarCatalogo } from '../utils/catalogoRapido';
+import type { ProductoCatalogo } from '../utils/whatsappOutbox';
 import ProductMessagePanel from '../components/whatsapp/ProductMessagePanel';
 import ConversationWorkCard from '../components/whatsapp/ConversationWorkCard';
 import { CONSULTA_MOSTRADOR, CONSULTA_PANTALLA_ANCHA, useMediaQuery } from '../hooks/useMediaQuery';
@@ -202,6 +207,17 @@ interface Conversation {
     possible_gap?: boolean;
     sync_confidence?: 'synced' | 'live_evidence' | 'history_partial' | 'uncertain';
     sync_uncertain_reason?: string | null;
+    /**
+     * Un GRUPO de WhatsApp, no un cliente. Lo marca `runGroupsJob` del
+     * agente, que los guarda como conversaciones para poder escribirles.
+     * Opcional por lo mismo que `etapa`: depende de una migración.
+     */
+    is_group?: boolean | null;
+    /**
+     * La dirección real del chat en WhatsApp. En un grupo es lo único con
+     * lo que se le puede escribir: no hay teléfono del que deducirla.
+     */
+    chat_jid?: string | null;
 }
 
 /**
@@ -212,6 +228,11 @@ interface Conversation {
  * el teléfono) se muestra como tal en vez de fingir que es un número --
  * son 14-15 dígitos y no arrancan con código de país.
  */
+/** Un grupo de trabajo, no un cliente. */
+function esGrupo(conv: Pick<Conversation, 'is_group'>): boolean {
+    return conv.is_group === true;
+}
+
 function formatPhone(conv: Pick<Conversation, 'phone_number' | 'lid'>): string {
     const digits = conv.phone_number ?? '';
     const looksLikeLid = conv.lid === digits || digits.length > 13;
@@ -221,6 +242,18 @@ function formatPhone(conv: Pick<Conversation, 'phone_number' | 'lid'>): string {
         return `+593 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`.trim();
     }
     return `+${digits}`;
+}
+
+/**
+ * Lo que va donde iría el teléfono.
+ *
+ * Un grupo no tiene número. `runGroupsJob` guarda los dígitos del JID
+ * (`120363…`) porque la columna es NOT NULL UNIQUE, y `formatPhone` los
+ * leía como un LID: en la lista salía «ID interno 120363…», que no le
+ * dice nada a nadie.
+ */
+function etiquetaDeChat(conv: Pick<Conversation, 'phone_number' | 'lid' | 'is_group'>): string {
+    return esGrupo(conv) ? 'Grupo de WhatsApp' : formatPhone(conv);
 }
 
 /**
@@ -273,10 +306,18 @@ const Avatar: React.FC<{ nombre: string | null; telefono: string; tam?: 'sm' | '
  * y por eso no se podían combinar: elegir "no leídos" obligaba a soltar
  * "IA atiende".
  */
-type Tab = 'all' | 'archived' | 'pending' | 'resolved';
+/**
+ * Qué lista se está mirando.
+ *
+ * `grupos` es una lista aparte y no una bandeja de trabajo: las bandejas
+ * reparten los chats de CLIENTES entre destinos excluyentes, y un grupo no
+ * es trabajo de nadie en particular. Va con Archivados y Escalados, que
+ * son lo mismo -- otra fuente, no otro destino.
+ */
+type Tab = 'all' | 'archived' | 'pending' | 'resolved' | 'grupos';
 
 /** Las conversaciones se leen de `agent_conversations`; las otras dos, de escalamientos. */
-const TABS_DE_CONVERSACION: ReadonlySet<Tab> = new Set<Tab>(['all', 'archived']);
+const TABS_DE_CONVERSACION: ReadonlySet<Tab> = new Set<Tab>(['all', 'archived', 'grupos']);
 
 interface ConversationPreferences {
     pinned: number[];
@@ -369,6 +410,8 @@ interface SelectedContext {
     escalation: Escalation | null;
     possibleGap: boolean;
     syncConfidence: 'synced' | 'live_evidence' | 'history_partial' | 'uncertain';
+    /** Un grupo se lee igual, pero no se le cotiza ni se le abre ficha. */
+    esGrupo: boolean;
 }
 
 const WhatsAppInbox: React.FC = () => {
@@ -558,6 +601,16 @@ const WhatsAppInbox: React.FC = () => {
     const [menuTelefono, setMenuTelefono] = useState<{ numero: string; ancla: DOMRect } | null>(null);
     const [nuevoChat, setNuevoChat] = useState(false);
     const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
+
+    /*
+        Abrir un chat es el aviso de que en breve se va a buscar un repuesto.
+        Se deja el índice del catálogo listo desde ya, para que también la
+        primera búsqueda del día salga sin esperar. Es idempotente y no hace
+        nada si ya está cargado o si lo está el catálogo móvil.
+    */
+    useEffect(() => {
+        if (selectedConversationId != null) precalentarCatalogo();
+    }, [selectedConversationId]);
     // El chat abierto no depende de que siga dentro del filtro visible.
     const [selectedConversationCache, setSelectedConversationCache] = useState<Conversation | null>(null);
     const [globalBotEnabled, setGlobalBotEnabled] = useState<boolean | null>(null);
@@ -724,6 +777,15 @@ const WhatsAppInbox: React.FC = () => {
     /** La cuarta columna se puede plegar sin salir del modo mostrador. */
     const [panelCotizacion, setPanelCotizacion] = useState(true);
     const [proformaAbierta, setProformaAbierta] = useState(false);
+    /**
+     * Repuesto elegido desde el menú de un resultado de la proforma EN PANEL,
+     * para anotarlo como pedido del cliente.
+     *
+     * El panel es hermano del compositor, no hijo, así que no puede usar el
+     * `RegistrarPedidoModal` que aquél monta: se monta uno acá, y sólo
+     * mientras hay un repuesto que anotar.
+     */
+    const [repuestoParaPedido, setRepuestoParaPedido] = useState<ProductoCatalogo | null>(null);
     const [productoDelMensaje, setProductoDelMensaje] = useState<number | null>(null);
     /* Con las cuatro columnas la proforma vive SIEMPRE acoplada: es el
        sentido del modo mostrador -- nada se turna, todo está a la vista. */
@@ -941,7 +1003,7 @@ const WhatsAppInbox: React.FC = () => {
             return;
         }
 
-        const consulta = (campos: string, incluirEtapa = true, incluirManual = true) => {
+        const consulta = (campos: string, incluirEtapa = true, incluirManual = true, incluirGrupo = true) => {
             let q = supabase
                 .from('agent_conversations')
                 // `count: 'exact'` da el total REAL de la tabla (o de la
@@ -951,6 +1013,23 @@ const WhatsAppInbox: React.FC = () => {
                 .select(campos, { count: 'exact' })
                 .order('last_message_at', { ascending: false, nullsFirst: false })
                 .limit(CONVERSACIONES_POR_PAGINA);
+            /*
+                Los grupos van en SU lista.
+
+                Fuera de ella hay que excluirlos explícitamente: no es que
+                molesten hoy -- sin mensajes, su `last_message_at` es null y
+                quedan al final de 3.000 conversaciones, o sea nunca dentro
+                de las 200 que se piden --, es que el día que el agente
+                empiece a guardar lo que se dice en un grupo, treinta y
+                cinco grupos activos taparían a los clientes que esperan.
+
+                `.not(...is.true)` y no `.eq(false)`: en las filas anteriores
+                a la migración del agente la columna es null, y `eq(false)`
+                las dejaría a todas afuera.
+            */
+            if (incluirGrupo) {
+                q = tabRef.current === 'grupos' ? q.eq('is_group', true) : q.not('is_group', 'is', true);
+            }
             if (resultadosDeTexto) {
                 q = q.in('id', resultadosDeTexto.conversationIds);
             } else {
@@ -993,7 +1072,17 @@ const WhatsAppInbox: React.FC = () => {
         // si no. Pedirla a secas dejaría la bandeja SIN LISTA, no sin vista
         // previa (ver CAMPOS_CONV_PREVIEW).
         let { data, error, count } = await consulta(CAMPOS_CONV_ORGANIZADA);
-        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_PREVIEW, true, false));
+        /* Sin la columna no hay lista de grupos que valga: caer al escalón
+           siguiente devolvería la lista de clientes bajo el rótulo
+           equivocado, que es peor que no mostrar nada. */
+        if (tabRef.current === 'grupos' && faltaColumna(error)) {
+            if (!silencioso) setConversationsLoading(false);
+            setConversations([]);
+            setTotalConversaciones(0);
+            setErrorCarga('Para ver los grupos falta la migración del agente que agrega «is_group» a las conversaciones.');
+            return;
+        }
+        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_PREVIEW, true, false, false));
         if (bandejaRef.current === 'cotizar' && faltaColumna(error)) {
             if (!silencioso) setConversationsLoading(false);
             setConversations([]);
@@ -1001,7 +1090,7 @@ const WhatsAppInbox: React.FC = () => {
             setErrorCarga('Para usar «IA lista, por cotizar» falta aplicar la migración de etapas del agente (0035).');
             return;
         }
-        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE, false, false));
+        if (faltaColumna(error)) ({ data, error, count } = await consulta(CAMPOS_CONV_BASE, false, false, false));
 
         if (!silencioso) setConversationsLoading(false);
         if (error) {
@@ -1339,9 +1428,19 @@ const WhatsAppInbox: React.FC = () => {
      * contadores de trabajo pendiente.
      */
     const sinArchivar = useMemo(
-        () => conversations.filter((c) => !conversationPreferences.archived.includes(c.id)),
+        () => conversations.filter((c) => !esGrupo(c) && !conversationPreferences.archived.includes(c.id)),
         [conversations, conversationPreferences.archived],
     );
+
+    /**
+     * La otra lista: los grupos de trabajo.
+     *
+     * Se separan acá también, y no solo en la consulta, porque realtime
+     * parchea `conversations` con lo que llega del servidor: sin este
+     * filtro, un UPDATE sobre un grupo lo metería en los contadores de las
+     * bandejas de clientes hasta el próximo refresco.
+     */
+    const grupos = useMemo(() => conversations.filter(esGrupo), [conversations]);
 
     /** Cuántas hay en cada bandeja. Una sola pasada por la lista cargada. */
     const cuentasDeBandeja = useMemo(
@@ -1354,9 +1453,11 @@ const WhatsAppInbox: React.FC = () => {
     );
 
     const filteredConversations = useMemo(() => {
-        let rows = tab === 'archived'
-            ? conversations.filter((c) => conversationPreferences.archived.includes(c.id))
-            : sinArchivar;
+        let rows = tab === 'grupos'
+            ? grupos
+            : tab === 'archived'
+              ? conversations.filter((c) => !esGrupo(c) && conversationPreferences.archived.includes(c.id))
+              : sinArchivar;
         /* La misma regla de prioridad que usan los contadores: cada
            conversación cae en UNA bandeja, así que lo que se ve acá y el
            número de la pastilla no pueden discrepar. */
@@ -1367,7 +1468,7 @@ const WhatsAppInbox: React.FC = () => {
             const bPinned = conversationPreferences.pinned.includes(b.id) ? 1 : 0;
             return bPinned - aPinned;
         });
-    }, [conversations, sinArchivar, bandeja, soloNoLeidos, tab, conversationPreferences, tienePendienteVisual, estaSinLeer]);
+    }, [conversations, sinArchivar, grupos, bandeja, soloNoLeidos, tab, conversationPreferences, tienePendienteVisual, estaSinLeer]);
 
     const pendingCount = useMemo(() => escalations.filter((e) => e.status !== 'resolved').length, [escalations]);
 
@@ -1377,13 +1478,14 @@ const WhatsAppInbox: React.FC = () => {
      * recogerla dejaba la lista filtrada sin ninguna señal de por qué.
      */
     const vistaActual = useMemo((): { texto: string; cuenta: number | null } => {
+        if (tab === 'grupos') return { texto: 'Grupos', cuenta: grupos.length };
         if (tab === 'archived') return { texto: 'Archivados', cuenta: conversationPreferences.archived.length };
         if (tab === 'pending') return { texto: 'Escalados', cuenta: pendingCount };
         if (tab === 'resolved') return { texto: 'Resueltos', cuenta: null };
         if (soloNoLeidos) return { texto: 'No leídos', cuenta: cuentaSinLeer };
         if (bandeja) return { texto: BANDEJAS.find((b) => b.id === bandeja)?.texto ?? 'Todos', cuenta: cuentasDeBandeja[bandeja] };
         return { texto: 'Todos', cuenta: sinArchivar.length };
-    }, [tab, soloNoLeidos, bandeja, conversationPreferences.archived.length, pendingCount, cuentaSinLeer, cuentasDeBandeja, sinArchivar.length]);
+    }, [tab, soloNoLeidos, bandeja, conversationPreferences.archived.length, pendingCount, cuentaSinLeer, cuentasDeBandeja, sinArchivar.length, grupos.length]);
 
     /**
      * Cuánto trabajo pide acción en total (cotizar + responder). Es el
@@ -1429,6 +1531,15 @@ const WhatsAppInbox: React.FC = () => {
     // significaba que un día una avisa y la otra no.
     const avisoDeEnvio = useMemo(() => avisoDelAgente(estadoAgente, timeAgo), [estadoAgente]);
 
+    /*
+        El botón de revincular sólo aparece cuando puede servir de algo: el
+        agente vivo y WhatsApp caído. Con el agente entero caído no se
+        ofrece nada -- ninguna pantalla web levanta un proceso apagado, y
+        un botón que no hace nada es peor que ninguno.
+    */
+    const puedeRevincular = useMemo(() => sePuedeRevincular(estadoAgente), [estadoAgente]);
+    const [vinculando, setVinculando] = useState(false);
+
     const selectedEscalation = escalations.find((e) => e.id === selectedId) ?? null;
 
     useEffect(() => {
@@ -1463,6 +1574,7 @@ const WhatsAppInbox: React.FC = () => {
                 escalation: null,
                 possibleGap: Boolean(conv.possible_gap),
                 syncConfidence: conv.sync_confidence ?? 'uncertain',
+                esGrupo: esGrupo(conv),
             };
         }
         if (!selectedEscalation) return null;
@@ -1479,6 +1591,8 @@ const WhatsAppInbox: React.FC = () => {
             escalation: selectedEscalation,
             possibleGap: Boolean(conv?.possible_gap),
             syncConfidence: conv?.sync_confidence ?? 'uncertain',
+            // Un escalamiento siempre nace de un chat de cliente.
+            esGrupo: false,
         };
     }, [tab, conversations, selectedConversationId, selectedConversationCache, selectedEscalation]);
 
@@ -1489,6 +1603,8 @@ const WhatsAppInbox: React.FC = () => {
     }, [conversations, selected, selectedConversationCache]);
 
     const colaDeAtencion = useMemo(() => conversations.filter((conversation) => {
+        // Atender es cosa de clientes: un grupo no espera respuesta de nadie.
+        if (esGrupo(conversation)) return false;
         if (conversationPreferences.archived.includes(conversation.id)) return false;
         const destino = bandejaDe(conversation, tienePendienteVisual(conversation));
         return destino === 'cotizar' || destino === 'responder' || (!conversation.manual_bandeja && attentionIds.includes(conversation.id));
@@ -2533,12 +2649,29 @@ const WhatsAppInbox: React.FC = () => {
             {avisoDeEnvio && (
                 <div role="status" aria-live="polite" className="flex shrink-0 items-start gap-2.5 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2">
                     <RotateCw size={15} className="mt-0.5 shrink-0 text-warning-soft-fg" aria-hidden="true" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-warning-soft-fg">{avisoDeEnvio.titulo}</p>
                         <p className="mt-0.5 text-xs text-warning-soft-fg/90">{avisoDeEnvio.detalle}</p>
                     </div>
+                    {/* La salida del aviso, no sólo la noticia. Va acá y no en un
+                        menú porque el momento en que alguien lee "no está
+                        conectado" es exactamente el momento en que quiere
+                        arreglarlo. */}
+                    {puedeRevincular && (
+                        <button
+                            onClick={() => setVinculando(true)}
+                            className={cn(
+                                focusRing,
+                                'shrink-0 self-center rounded-lg border border-warning/40 bg-surface px-2.5 py-1.5 text-xs font-semibold text-warning-soft-fg hover:bg-surface-hover',
+                            )}
+                        >
+                            Vincular WhatsApp
+                        </button>
+                    )}
                 </div>
             )}
+            <VincularWhatsAppModal isOpen={vinculando} onClose={() => setVinculando(false)} />
+
             {/* WhatsApp Web en una sola lámina: la lista, la conversación y la
                 ficha del cliente pegadas, con altura fija y cada columna con su
                 propio desplazamiento.
@@ -2728,6 +2861,21 @@ const WhatsAppInbox: React.FC = () => {
                             )}
                         >
                         <div className="min-h-0 overflow-hidden">
+                        {/* En la lista de grupos no se cargan los chats de clientes,
+                            así que los contadores de las bandejas no dirían la
+                            verdad: se dice qué pasó en vez de mostrar cinco ceros. */}
+                        {tab === 'grupos' ? (
+                            <p className="mt-1 px-2.5 py-1.5 text-[12.5px] leading-[17px] text-wa-meta">
+                                Las bandejas ordenan los chats de clientes.{' '}
+                                <button
+                                    type="button"
+                                    onClick={() => setTab('all')}
+                                    className={cn(focusRing, 'rounded font-semibold text-wa-accent-strong hover:underline')}
+                                >
+                                    Volver a los clientes
+                                </button>
+                            </p>
+                        ) : (
                         <div role="tablist" aria-label="Bandejas de trabajo" className="mt-1 flex flex-col gap-px">
                             {[
                                 { id: null, texto: 'Todos', ayuda: 'Todas las conversaciones, sin filtrar.', pideAccion: false },
@@ -2801,12 +2949,18 @@ const WhatsAppInbox: React.FC = () => {
                                 );
                             })}
                         </div>
+                        )}
 
-                        {/* Lo que no es trabajo del día: organización personal y la
-                            cola de escalamientos del agente. Van aparte y en chico
-                            porque no se miran todos los días. */}
+                        {/* Lo que no es trabajo del día: los grupos, la organización
+                            personal y la cola de escalamientos del agente. Van aparte
+                            y en chico porque no se miran todos los días.
+
+                            Los grupos van acá y no arriba con las bandejas a
+                            propósito: no son un destino de trabajo que compita con
+                            «Pendientes», son otra lista. */}
                         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-wa-divider pt-2 text-[11.5px]">
                             {([
+                                { id: 'grupos' as Tab, texto: 'Grupos', cuenta: grupos.length },
                                 { id: 'archived' as Tab, texto: 'Archivados', cuenta: conversationPreferences.archived.length },
                                 { id: 'pending' as Tab, texto: 'Escalados', cuenta: pendingCount },
                                 { id: 'resolved' as Tab, texto: 'Resueltos', cuenta: null },
@@ -2849,8 +3003,12 @@ const WhatsAppInbox: React.FC = () => {
                             <div className="p-10 text-center text-sm text-wa-meta flex flex-col items-center gap-2">
                                 <Inbox size={22} aria-hidden="true" />
                                 {search.trim()
-                                    ? `Ningún cliente coincide con "${search.trim()}".`
-                                    : tab === 'archived'
+                                    ? tab === 'grupos'
+                                      ? `Ningún grupo se llama así: "${search.trim()}".`
+                                      : `Ningún cliente coincide con "${search.trim()}".`
+                                    : tab === 'grupos'
+                                      ? 'Todavía no hay grupos. El agente los descubre solo cuando se conecta a WhatsApp.'
+                                      : tab === 'archived'
                                       ? 'No tenés conversaciones archivadas.'
                                       : bandeja === 'responder'
                                         ? 'Nadie está esperando respuesta. Todo contestado.'
@@ -2874,8 +3032,8 @@ const WhatsAppInbox: React.FC = () => {
                                         if (!c.last_message_preview) return;
                                         const rect = event.currentTarget.getBoundingClientRect();
                                         setMessagePreview({
-                                            name: c.customer_name || formatPhone(c),
-                                            phone: formatPhone(c),
+                                            name: c.customer_name || etiquetaDeChat(c),
+                                            phone: etiquetaDeChat(c),
                                             text: textoPlano(c.last_message_preview),
                                             outbound: c.last_message_direction === 'outbound',
                                             time: c.last_message_at,
@@ -2918,7 +3076,7 @@ const WhatsAppInbox: React.FC = () => {
                                                     tienePendienteVisual(c) ? 'font-semibold' : 'font-normal',
                                                 )}
                                             >
-                                                {c.customer_name || formatPhone(c)}
+                                                {c.customer_name || etiquetaDeChat(c)}
                                             </span>
                                             {c.last_message_at && (
                                                 <span
@@ -2950,7 +3108,7 @@ const WhatsAppInbox: React.FC = () => {
                                                         {textoPlano(c.last_message_preview)}
                                                     </>
                                                 ) : (
-                                                    formatPhone(c)
+                                                    etiquetaDeChat(c)
                                                 )}
                                             </p>
 
@@ -3132,12 +3290,16 @@ const WhatsAppInbox: React.FC = () => {
                                 <div className="min-w-0 flex-1">
                                     <h2 className="truncate text-[16px] font-medium leading-[21px] text-wa-text">
                                         {selected.customerName ||
-                                            formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })}
+                                            etiquetaDeChat({ phone_number: selected.phoneNumber, lid: selected.lid, is_group: selected.esGrupo })}
                                     </h2>
                                     {/* La línea de abajo es la de "en línea" de WhatsApp. Acá
                                         dice lo que de verdad importa saber sin abrir nada: el
                                         número, y si el agente está contestando en este chat. */}
                                     <p className="truncate text-[12.5px] leading-[17px] text-wa-meta">
+                                        {/* En un grupo no hay número que mostrar ni agente
+                                            que anunciar: el agente no atiende grupos, y
+                                            decirlo acá evita que alguien lo busque. */}
+                                        {selected.esGrupo ? 'Grupo de WhatsApp · el agente no contesta acá' : (<>
                                         {selected.customerName &&
                                             formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })}
                                         {selected.customerName && ' · '}
@@ -3148,6 +3310,7 @@ const WhatsAppInbox: React.FC = () => {
                                                     ? 'atención completa activa'
                                                     : 'agente de información activo'
                                             : 'contesta el vendedor'}
+                                        </>)}
                                     </p>
                                 </div>
 
@@ -3170,6 +3333,9 @@ const WhatsAppInbox: React.FC = () => {
                                 {/* Las acciones del chat van acá arriba, como los iconos de
                                     WhatsApp: antes vivían en una barra al pie que empujaba la
                                     caja de escribir hacia abajo. */}
+                                {/* Encender el agente dentro de un grupo de trabajo sería
+                                    muy visible y difícil de deshacer: el botón no está. */}
+                                {!selected.esGrupo && (
                                 <button
                                     onClick={() => handleToggleBot(selected)}
                                     disabled={actionLoading}
@@ -3187,6 +3353,7 @@ const WhatsAppInbox: React.FC = () => {
                                 >
                                     {selected.botEnabled && selected.conversationStatus === 'bot_active' ? <Bot size={19} aria-hidden="true" /> : <BotOff size={19} aria-hidden="true" />}
                                 </button>
+                                )}
 
                                 {eligiendoAgente?.conversationId === selected.conversationId && (
                                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="elegir-agente-titulo">
@@ -3386,6 +3553,7 @@ const WhatsAppInbox: React.FC = () => {
                                     clienteNombre={selected.customerName}
                                     phoneNumber={selected.phoneNumber}
                                     userId={userId}
+                                    esGrupo={selected.esGrupo}
                                     onEnviar={enviarMensajes}
                                     onPedidoRegistrado={() => setRecargarFicha((n) => n + 1)}
                                     // Sin ancho para la columna, el compositor
@@ -3458,7 +3626,7 @@ const WhatsAppInbox: React.FC = () => {
                     siempre, con las tres columnas turnandose: cuatro columnas
                     apretadas se leen peor que tres comodas.
                 */}
-                {cuatroColumnas && selected ? (
+                {cuatroColumnas && selected && !selected.esGrupo ? (
                     <>
                         {/* --- Cliente: siempre visible --- */}
                         <div className="hidden w-[340px] shrink-0 overflow-y-auto wa-scroll border-l border-wa-divider bg-surface p-3 xl:block">
@@ -3514,6 +3682,7 @@ const WhatsAppInbox: React.FC = () => {
                                         }
                                         clienteNombre={selected.customerName}
                                         onEnviar={enviarMensajes}
+                                        onAnotarPedido={setRepuestoParaPedido}
                                     />
                                 </div>
                             </div>
@@ -3569,7 +3738,7 @@ const WhatsAppInbox: React.FC = () => {
                     </div>
                 )}
 
-                {selected && productoDelMensaje === null && proformaEnPanel && (
+                {selected && !selected.esGrupo && productoDelMensaje === null && proformaEnPanel && (
                     <div className="hidden w-[420px] shrink-0 flex-col border-l border-wa-divider bg-surface xl:flex 2xl:w-[460px]">
                         <ProformaBuilder
                             // Al cambiar de chat se remonta: el buscador y la
@@ -3586,11 +3755,27 @@ const WhatsAppInbox: React.FC = () => {
                             }
                             clienteNombre={selected.customerName}
                             onEnviar={enviarMensajes}
+                            onAnotarPedido={setRepuestoParaPedido}
                         />
                     </div>
                 )}
 
-                {selected && productoDelMensaje === null && !proformaEnPanel && (
+                {/* El pedido de un repuesto elegido en la proforma del panel.
+                    Se monta sólo cuando hay uno: así no compite con el que
+                    monta el compositor para el menú de herramientas. */}
+                {selected && repuestoParaPedido && (
+                    <RegistrarPedidoModal
+                        isOpen
+                        onClose={() => setRepuestoParaPedido(null)}
+                        phoneNumber={selected.phoneNumber}
+                        customerName={selected.customerName}
+                        userId={userId}
+                        productoInicial={repuestoParaPedido}
+                        onRegistrado={() => setRecargarFicha((n) => n + 1)}
+                    />
+                )}
+
+                {selected && !selected.esGrupo && productoDelMensaje === null && !proformaEnPanel && (
                     <div className="hidden w-[320px] shrink-0 overflow-y-auto wa-scroll border-l border-wa-divider bg-surface p-3 xl:block">
                         <ConversationWorkCard
                             conversationId={selected.conversationId}

@@ -71,6 +71,8 @@ import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/a
 import { fusionarMensajes, useRepasoDelHilo } from '../../components/whatsapp/hiloEnVivo';
 import { useHistorialDelHilo } from '../../components/whatsapp/historialDelHilo';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
+import type { ProductoCatalogo } from '../../utils/whatsappOutbox';
+import { precalentarCatalogo } from '../../utils/catalogoRapido';
 import ChatThread, {
     horaLista,
     MensajesAnteriores,
@@ -157,6 +159,11 @@ interface Conversacion {
     last_message_at: string | null;
     unread_count: number;
     lid: string | null;
+    /**
+     * Un GRUPO de trabajo, no un cliente. Lo marca `runGroupsJob` del agente.
+     * Opcional porque depende de una migración suya.
+     */
+    is_group?: boolean | null;
     /** De qué habla el chat, sin abrirlo (migración 0032). */
     last_message_preview: string | null;
     last_message_direction: string | null;
@@ -315,6 +322,27 @@ const MobileWhatsApp: React.FC = () => {
     const [proformaAbierta, setProformaAbierta] = useState(false);
     const [productoDelMensaje, setProductoDelMensaje] = useState<number | null>(null);
     const [pedidoAbierto, setPedidoAbierto] = useState(false);
+    /**
+     * Repuesto que llega ya elegido desde el menú de un resultado (mantener
+     * pulsado → «Agregar a pedido»). `null` = se abrió desde el menú «+» y
+     * hay que buscarlo.
+     */
+    const [repuestoParaPedido, setRepuestoParaPedido] = useState<ProductoCatalogo | null>(null);
+
+    /** Anotar un repuesto como pedido del cliente de ESTE chat. */
+    const anotarPedidoDe = useCallback((producto: ProductoCatalogo) => {
+        setRepuestoParaPedido(producto);
+        setPedidoAbierto(true);
+    }, []);
+
+    /**
+     * El chat abierto es un GRUPO de trabajo, no un cliente.
+     *
+     * La lista ya los excluye, pero se puede llegar a uno por otro camino
+     * (una notificación, un enlace directo a `abrirChatPorId`), y entonces
+     * todo lo que crea fichas de cliente tiene que seguir apagado.
+     */
+    const esGrupoAbierto = abierta?.is_group === true;
     /** Textos que el equipo repite todo el dia (tabla agent_quick_replies). */
     const [rapidas, setRapidas] = useState<Array<{ id: number; label: string; body: string }>>([]);
     const [menuRapidas, setMenuRapidas] = useState(false);
@@ -485,12 +513,24 @@ const MobileWhatsApp: React.FC = () => {
             return;
         }
 
-        const consulta = (campos: string, incluirEtapa = true, incluirManual = true) => {
+        const consulta = (campos: string, incluirEtapa = true, incluirManual = true, incluirGrupo = true) => {
             let q = supabase
                 .from('agent_conversations')
                 .select(campos)
                 .order('last_message_at', { ascending: false, nullsFirst: false })
                 .limit(POR_PAGINA);
+            /*
+                Fuera los grupos. Esta pantalla atiende CLIENTES: un grupo no
+                espera respuesta de nadie, no tiene teléfono -- `formatearTelefono`
+                le sacaba un "ID 222829" que no le dice nada a nadie -- y todo lo
+                que abre fichas de cliente (proforma, pedido) quedaría contra los
+                dígitos de su JID.
+
+                `.not(...is.true)` y no `.eq(false)`: en las filas anteriores a la
+                migración del agente la columna puede venir nula, y `eq(false)`
+                las dejaría a todas afuera.
+            */
+            if (incluirGrupo) q = q.not('is_group', 'is', true);
             if (soloEscalados) q = q.eq('status', 'escalated');
             if (filtroLista === 'unread') {
                 const condiciones = ['unread_count.gt.0'];
@@ -540,14 +580,14 @@ const MobileWhatsApp: React.FC = () => {
         // Con la vista previa si está la migración 0032, sin ella si no.
         // Pedirla a secas dejaría la pantalla SIN LISTA, no sin vista previa.
         let { data, error: err } = await consulta(CAMPOS_CONV_ORGANIZADA);
-        if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_PREVIEW, true, false));
+        if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_PREVIEW, true, false, false));
         if (filtroLista === 'ai_ready' && faltaColumna(err)) {
             if (!silencioso) setCargando(false);
             setConversaciones([]);
             setError('Para usar “IA lista” falta aplicar la migración de etapas del agente (0035).');
             return;
         }
-        if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_BASE, false, false));
+        if (faltaColumna(err)) ({ data, error: err } = await consulta(CAMPOS_CONV_BASE, false, false, false));
 
         if (!silencioso) setCargando(false);
         if (err) {
@@ -795,6 +835,9 @@ const MobileWhatsApp: React.FC = () => {
         // Se adelanta a React para que la consulta que arranca abajo sepa
         // desde ya cual es el chat vigente.
         abiertaRef.current = c.id;
+        // En breve se va a buscar un repuesto: el índice del catálogo se deja
+        // listo ya. Idempotente; no hace nada si ya está cargado.
+        precalentarCatalogo();
         setAbierta(c);
         setMensajes(cacheMensajesRef.current.get(c.id) ?? []);
         setBorrador(leerBorradorWhatsApp(c.id, userId));
@@ -1652,11 +1695,25 @@ const MobileWhatsApp: React.FC = () => {
                             {opcionMenu(<Package size={20} aria-hidden="true" />, 'Repuesto del catálogo', 0, () =>
                                 setCatalogoAbierto(true),
                             )}
-                            {opcionMenu(<FileText size={20} aria-hidden="true" />, 'Proforma', itemsEnProforma, () =>
-                                setProformaAbierta(true),
-                            )}
-                            {opcionMenu(<ClipboardList size={20} aria-hidden="true" />, 'Anotar un pedido', 0, () =>
-                                setPedidoAbierto(true),
+                            {/* En un GRUPO no: una proforma y un pedido se guardan
+                                contra el teléfono del chat, y el de un grupo son los
+                                dígitos de su JID -- quedaría un cliente fantasma con
+                                el nombre del grupo. Misma regla que en el escritorio
+                                (ver `esGrupo` en ChatComposer). */}
+                            {!esGrupoAbierto && (
+                                <>
+                                    {opcionMenu(<FileText size={20} aria-hidden="true" />, 'Proforma', itemsEnProforma, () =>
+                                        setProformaAbierta(true),
+                                    )}
+                                    {opcionMenu(<ClipboardList size={20} aria-hidden="true" />, 'Anotar un pedido', 0, () => {
+                                        // Sin repuesto: el modal abre su buscador. Si
+                                        // quedara el del último menú contextual, se
+                                        // anotaría una pieza que nadie pidió.
+                                        setRepuestoParaPedido(null);
+                                        setPedidoAbierto(true);
+                                    },
+                                    )}
+                                </>
                             )}
                             {/* Sin el `rapidas.length > 0` de antes: con la lista
                                 vacía el renglón desaparecía y no había forma de
@@ -1821,6 +1878,7 @@ const MobileWhatsApp: React.FC = () => {
                             conversationId={abierta.id}
                             clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
                             onEnviar={enviar}
+                            onAnotarPedido={esGrupoAbierto ? undefined : anotarPedidoDe}
                         />
                     </Suspense>
                 )}
@@ -1834,6 +1892,7 @@ const MobileWhatsApp: React.FC = () => {
                             clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
                             clienteNombre={abierta.customer_name}
                             onEnviar={enviar}
+                            onAnotarPedido={esGrupoAbierto ? undefined : anotarPedidoDe}
                         />
                     </Suspense>
                 )}
@@ -1861,10 +1920,14 @@ const MobileWhatsApp: React.FC = () => {
                     <Suspense fallback={null}>
                         <RegistrarPedidoModal
                             isOpen={pedidoAbierto}
-                            onClose={() => setPedidoAbierto(false)}
+                            onClose={() => {
+                                setPedidoAbierto(false);
+                                setRepuestoParaPedido(null);
+                            }}
                             phoneNumber={abierta.phone_number}
                             customerName={abierta.customer_name}
                             userId={userId}
+                            productoInicial={repuestoParaPedido}
                             onRegistrado={() => {}}
                         />
                     </Suspense>

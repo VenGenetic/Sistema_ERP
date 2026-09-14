@@ -17,6 +17,7 @@ import {
     subirAdjunto,
     type AdjuntoSubido,
     type NuevoMensaje,
+    type ProductoCatalogo,
 } from '../../utils/whatsappOutbox';
 import {
     borrarBorradorWhatsApp,
@@ -54,6 +55,15 @@ interface Props {
     /** Teléfono en dígitos, para anotar pedidos. */
     phoneNumber: string;
     userId: string | null;
+    /**
+     * El chat es un GRUPO de trabajo, no un cliente.
+     *
+     * Se escribe igual, pero lo que crea fichas de cliente no corresponde:
+     * una proforma y un pedido anotado se guardan contra el teléfono del
+     * chat, y el de un grupo son los dígitos de su JID -- quedaría un
+     * cliente fantasma con el nombre del grupo.
+     */
+    esGrupo?: boolean;
     /** Encola los mensajes. La página decide cómo (y refresca el hilo). */
     onEnviar: (mensajes: NuevoMensaje[]) => Promise<void>;
     /** Se llama al anotar un pedido, para refrescar la ficha del cliente. */
@@ -116,6 +126,7 @@ export const ChatComposer: React.FC<Props> = ({
     userId,
     onEnviar,
     onPedidoRegistrado,
+    esGrupo = false,
     onAbrirProforma,
 }) => {
     const [borrador, setBorrador] = useState('');
@@ -126,6 +137,25 @@ export const ChatComposer: React.FC<Props> = ({
     const [catalogoAbierto, setCatalogoAbierto] = useState(false);
     const [proformaAbierta, setProformaAbierta] = useState(false);
     const [pedidoAbierto, setPedidoAbierto] = useState(false);
+    /**
+     * Repuesto que llega ya elegido desde el menú de un resultado ("Agregar a
+     * pedido"), para no hacer buscar dos veces lo mismo. `null` = se abrió el
+     * pedido desde el menú de herramientas y hay que buscarlo.
+     */
+    const [repuestoParaPedido, setRepuestoParaPedido] = useState<ProductoCatalogo | null>(null);
+
+    /**
+     * Anotar un repuesto como pedido de ESTE cliente.
+     *
+     * Vive acá y no en el buscador porque el pedido se guarda contra el
+     * teléfono de la conversación, que es un dato del compositor. Así también
+     * hay un solo `RegistrarPedidoModal` montado, se llegue desde donde se
+     * llegue.
+     */
+    const anotarPedidoDe = useCallback((producto: ProductoCatalogo) => {
+        setRepuestoParaPedido(producto);
+        setPedidoAbierto(true);
+    }, []);
 
     /**
      * Cuántos repuestos tiene la proforma de ESTE chat. Se muestra en el
@@ -626,24 +656,32 @@ export const ChatComposer: React.FC<Props> = ({
                             setCatalogoAbierto(true);
                         }}
                     />
-                    <Herramienta
-                        icono={<FileText size={19} aria-hidden="true" />}
-                        texto="Proforma"
-                        cuenta={itemsEnProforma}
-                        onClick={() => {
-                            setMenuHerramientas(false);
-                            if (onAbrirProforma) onAbrirProforma();
-                            else setProformaAbierta(true);
-                        }}
-                    />
-                    <Herramienta
-                        icono={<ClipboardList size={19} aria-hidden="true" />}
-                        texto="Anotar un pedido"
-                        onClick={() => {
-                            setMenuHerramientas(false);
-                            setPedidoAbierto(true);
-                        }}
-                    />
+                    {!esGrupo && (
+                        <>
+                            <Herramienta
+                                icono={<FileText size={19} aria-hidden="true" />}
+                                texto="Proforma"
+                                cuenta={itemsEnProforma}
+                                onClick={() => {
+                                    setMenuHerramientas(false);
+                                    if (onAbrirProforma) onAbrirProforma();
+                                    else setProformaAbierta(true);
+                                }}
+                            />
+                            <Herramienta
+                                icono={<ClipboardList size={19} aria-hidden="true" />}
+                                texto="Anotar un pedido"
+                                onClick={() => {
+                                    setMenuHerramientas(false);
+                                    // Desde el menú se empieza sin repuesto: el modal
+                                    // abre su buscador. Si quedara el del último menú
+                                    // contextual, se anotaría una pieza que nadie pidió.
+                                    setRepuestoParaPedido(null);
+                                    setPedidoAbierto(true);
+                                }}
+                            />
+                        </>
+                    )}
                     <Herramienta
                         icono={<Zap size={19} aria-hidden="true" />}
                         texto="Respuestas rápidas"
@@ -868,6 +906,15 @@ export const ChatComposer: React.FC<Props> = ({
                 conversationId={conversationId}
                 clienteLabel={clienteLabel}
                 onEnviar={onEnviar}
+                /*
+                    En un grupo, NINGUNA. Esconder la herramienta del menú "+"
+                    no alcanzaba: desde el catálogo se llega igual al menú del
+                    repuesto, y "Agregar a pedido" guardaba un `product_demands`
+                    contra los dígitos del JID del grupo -- el cliente fantasma
+                    que `esGrupo` vino a evitar. Sin la prop, la opción no se
+                    dibuja (ver MenuRepuesto).
+                */
+                onAnotarPedido={esGrupo ? undefined : anotarPedidoDe}
             />
 
             {/* Solo cuando la página no la muestra al costado: dos
@@ -881,15 +928,20 @@ export const ChatComposer: React.FC<Props> = ({
                     clienteLabel={clienteLabel}
                     clienteNombre={clienteNombre}
                     onEnviar={onEnviar}
+                    onAnotarPedido={esGrupo ? undefined : anotarPedidoDe}
                 />
             )}
 
             <RegistrarPedidoModal
                 isOpen={pedidoAbierto}
-                onClose={() => setPedidoAbierto(false)}
+                onClose={() => {
+                    setPedidoAbierto(false);
+                    setRepuestoParaPedido(null);
+                }}
                 phoneNumber={phoneNumber}
                 customerName={clienteNombre}
                 userId={userId}
+                productoInicial={repuestoParaPedido}
                 onRegistrado={() => onPedidoRegistrado?.()}
             />
 

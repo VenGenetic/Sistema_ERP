@@ -37,3 +37,13 @@ supabase/.temp/
 *.tsbuildinfo
 __pycache__/
 *.pyc
+
+# Audiencias para Meta Ads (scripts/meta/exportar-audiencias.js). Aunque los
+# teléfonos van hasheados en SHA-256, un hash de un número de 12 dígitos se
+# revierte por fuerza bruta en minutos: es una lista de clientes, no un secreto
+# roto. Este repo es público, así que no entra.
+feeds/audiencias-meta/
+
+# Lista de rescate (scripts/meta/lista-rescate.js): teléfonos y nombres de
+# clientes en claro para trabajarla desde la bandeja. No va al repo.
+feeds/lista-rescate.csv

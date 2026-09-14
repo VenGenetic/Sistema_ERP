@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredVa
 import { supabase } from '../../supabaseClient';
 import { getThumbnailUrl } from '../../utils/image';
 import { isProductDiscontinued } from '../../utils/discontinuedHelper';
-import { useMobileProducts, searchProducts } from '../../utils/mobileSearchEngine';
+import { useMobileProducts } from '../../utils/mobileSearchEngine';
+import { useBusquedaProductos } from '../../utils/useBusquedaProductos';
 import MobileSearchBar from '../../components/mobile/MobileSearchBar';
 import { useBackDismiss } from '../../hooks/useBackDismiss';
 
@@ -713,7 +714,20 @@ const MobileCatalog: React.FC = () => {
     */
     const deferredSearch = useDeferredValue(searchTerm);
     const deferredFilters = useDeferredValue(filters);
-    const isStale = deferredSearch !== searchTerm;
+    /*
+        La búsqueda ocurre en un Web Worker (ver utils/useBusquedaProductos.ts).
+
+        Antes recorría los 5.892 repuestos aquí mismo, en el hilo principal: el
+        `useDeferredValue` evitaba que el teclado se trabara, pero el trabajo
+        seguía compitiendo con el pintado. Ahora el hilo principal sólo recibe
+        una lista ya ordenada. Si no hay worker, el hook busca igual pero de
+        forma síncrona, así que esta pantalla nunca se queda sin resultados.
+    */
+    const { resultados: resultadosBusqueda, buscando } = useBusquedaProductos(allProducts, deferredSearch, 2);
+
+    /** Hay consulta escrita pero todavía no ha llegado la PRIMERA respuesta. */
+    const primeraBusquedaEnVuelo = deferredSearch.trim().length > 0 && resultadosBusqueda === null;
+    const isStale = deferredSearch !== searchTerm || buscando;
 
     // Estados de interfaz
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -830,10 +844,10 @@ const MobileCatalog: React.FC = () => {
 
     /* ── Filtrado, búsqueda y orden ── */
     const filteredAllProducts = useMemo(() => {
-        let list = allProducts;
-
         const term = deferredSearch.trim();
-        if (term) list = searchProducts(list, term, 2);
+        // Con consulta escrita, la lista de partida es la que devolvió el worker
+        // (ya ordenada por relevancia). Sin consulta, el catálogo entero.
+        let list = term ? (resultadosBusqueda ?? []) : allProducts;
 
         /*
             Un solo barrido para los cuatro filtros.
@@ -905,7 +919,7 @@ const MobileCatalog: React.FC = () => {
         }
 
         return list;
-    }, [allProducts, deferredSearch, deferredFilters, sortKey, stockGlobalPorId]);
+    }, [allProducts, resultadosBusqueda, deferredSearch, deferredFilters, sortKey, stockGlobalPorId]);
 
     const visibleProducts = useMemo(
         () => filteredAllProducts.slice(0, page * pageSize),
@@ -1553,8 +1567,11 @@ const MobileCatalog: React.FC = () => {
                     ))}
                 </div>
 
-                {/* Cargando el catálogo completo */}
-                {catalogLoading && allProducts.length === 0 && (
+                {/* Cargando el catálogo completo, o esperando la primera
+                    respuesta del worker: en ambos casos todavía no hay nada que
+                    enseñar, y un esqueleto se lee mucho mejor que un «ningún
+                    repuesto coincide» que además sería mentira. */}
+                {((catalogLoading && allProducts.length === 0) || primeraBusquedaEnVuelo) && (
                     <div className="flex flex-col gap-2.5 pt-3">
                         {Array.from({ length: 6 }).map((_, i) => (
                             <div key={i} className="h-[92px] rounded-2xl bg-slate-900 border border-slate-800 animate-pulse" />
@@ -1571,7 +1588,7 @@ const MobileCatalog: React.FC = () => {
                 )}
 
                 {/* Sin resultados */}
-                {visibleProducts.length === 0 && !catalogLoading && (
+                {visibleProducts.length === 0 && !catalogLoading && !primeraBusquedaEnVuelo && (
                     <div className="flex flex-col items-center gap-3 py-16 px-6 text-center">
                         <div className="rounded-full bg-slate-900 border border-slate-800 p-4">
                             <SearchX size={30} className="text-slate-600" aria-hidden="true" />
