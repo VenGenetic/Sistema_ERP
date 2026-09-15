@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { LayoutDashboard, Trash2, Edit2, RotateCcw, Plus, Search, Clock, Calendar, ShieldCheck, AlertCircle, Target } from 'lucide-react';
+import { LayoutDashboard, Trash2, Edit2, RotateCcw, Plus, Search, Clock, Calendar, ShieldCheck, AlertCircle, Target, ArrowUp, ArrowDown, Layers } from 'lucide-react';
 import { RotationClass, ROTATION_CLASSES, ROTATION_CLASS_BOUNDS, midpointOfClass } from '../utils/rotationClass';
 
 interface GroupData {
@@ -16,12 +16,49 @@ interface GroupData {
     inventory_group_items?: { count: number }[];
 }
 
+type NextCountInfo = {
+    status: 'Al día' | 'Por inventariar';
+    nextDate: Date | null;
+    nextDateFormatted: string;
+};
+
+type EnrichedGroup = GroupData & { nextCountInfo: NextCountInfo };
+
+type SortKey = 'nextDate' | 'lastCounted' | 'status' | 'accuracy' | 'name';
+type SortDir = 'asc' | 'desc';
+
+// Cada clave trae su propia dirección "natural" al seleccionarla — la más
+// útil por defecto para ese criterio, no necesariamente A-Z/ascendente.
+const SORT_OPTIONS: { key: SortKey; label: string; defaultDir: SortDir }[] = [
+    { key: 'nextDate', label: 'Fecha límite', defaultDir: 'asc' },
+    { key: 'lastCounted', label: 'Última vez aplicado', defaultDir: 'desc' },
+    { key: 'status', label: 'Estado', defaultDir: 'asc' },
+    { key: 'accuracy', label: 'Precisión histórica', defaultDir: 'asc' },
+    { key: 'name', label: 'Nombre', defaultDir: 'asc' },
+];
+
+const SORT_DIR_LABEL: Record<SortKey, Record<SortDir, string>> = {
+    nextDate: { asc: 'Urgente primero', desc: 'Lejano primero' },
+    lastCounted: { asc: 'Antiguo primero', desc: 'Reciente primero' },
+    status: { asc: 'Pendientes primero', desc: 'Al día primero' },
+    accuracy: { asc: 'Peor primero', desc: 'Mejor primero' },
+    name: { asc: 'A-Z', desc: 'Z-A' },
+};
+
 export const InventoryMode: React.FC = () => {
     const navigate = useNavigate();
     const [groups, setGroups] = useState<GroupData[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [sortKey, setSortKey] = useState<SortKey>('nextDate');
+    const [sortDir, setSortDir] = useState<SortDir>('asc'); // default: fecha límite, más urgente primero
+    const [groupByClass, setGroupByClass] = useState(false);
+
+    const handleSortKeyChange = (key: SortKey) => {
+        setSortKey(key);
+        setSortDir(SORT_OPTIONS.find(o => o.key === key)?.defaultDir ?? 'asc');
+    };
 
     const fetchGroups = async () => {
         setLoading(true);
@@ -208,7 +245,73 @@ export const InventoryMode: React.FC = () => {
         };
     };
 
-    const filteredGroups = groups.filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const enrichedGroups: EnrichedGroup[] = useMemo(() => {
+        return groups
+            .filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()))
+            .map(g => ({
+                ...g,
+                nextCountInfo: calculateNextCountInfo(g.last_counted_at, g.interval_days ?? 0)
+            }));
+    }, [groups, searchTerm]);
+
+    const sortedGroups: EnrichedGroup[] = useMemo(() => {
+        const list = [...enrichedGroups];
+        list.sort((a, b) => {
+            // "Sin precisión registrada" (nunca contado) siempre va al final,
+            // sin importar la dirección elegida — no es ni el mejor ni el peor.
+            if (sortKey === 'accuracy') {
+                const aHas = typeof a.last_accuracy_score === 'number';
+                const bHas = typeof b.last_accuracy_score === 'number';
+                if (aHas !== bHas) return aHas ? -1 : 1;
+            }
+
+            let cmp = 0;
+            switch (sortKey) {
+                case 'nextDate': {
+                    const aVal = a.nextCountInfo.nextDate ? a.nextCountInfo.nextDate.getTime() : -Infinity;
+                    const bVal = b.nextCountInfo.nextDate ? b.nextCountInfo.nextDate.getTime() : -Infinity;
+                    cmp = aVal - bVal;
+                    break;
+                }
+                case 'lastCounted': {
+                    const aVal = a.last_counted_at ? new Date(a.last_counted_at).getTime() : -Infinity;
+                    const bVal = b.last_counted_at ? new Date(b.last_counted_at).getTime() : -Infinity;
+                    cmp = aVal - bVal;
+                    break;
+                }
+                case 'status': {
+                    const aVal = a.nextCountInfo.status === 'Por inventariar' ? 0 : 1;
+                    const bVal = b.nextCountInfo.status === 'Por inventariar' ? 0 : 1;
+                    cmp = aVal - bVal;
+                    if (cmp === 0) {
+                        // Dentro del mismo estado, ordena por fecha límite para que no quede al azar.
+                        const aD = a.nextCountInfo.nextDate ? a.nextCountInfo.nextDate.getTime() : -Infinity;
+                        const bD = b.nextCountInfo.nextDate ? b.nextCountInfo.nextDate.getTime() : -Infinity;
+                        cmp = aD - bD;
+                    }
+                    break;
+                }
+                case 'accuracy': {
+                    cmp = (a.last_accuracy_score ?? 0) - (b.last_accuracy_score ?? 0);
+                    break;
+                }
+                case 'name':
+                    cmp = a.name.localeCompare(b.name, 'es');
+                    break;
+            }
+            return sortDir === 'asc' ? cmp : -cmp;
+        });
+        return list;
+    }, [enrichedGroups, sortKey, sortDir]);
+
+    const groupedSections: Record<RotationClass, EnrichedGroup[]> | null = useMemo(() => {
+        if (!groupByClass) return null;
+        const buckets: Record<RotationClass, EnrichedGroup[]> = { high: [], medium: [], low: [] };
+        sortedGroups.forEach(g => {
+            buckets[(g.rotation_class ?? 'medium') as RotationClass].push(g);
+        });
+        return buckets;
+    }, [sortedGroups, groupByClass]);
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto">
@@ -233,7 +336,7 @@ export const InventoryMode: React.FC = () => {
             </div>
 
             <div className="bg-surface rounded-2xl shadow-sm border border-subtle overflow-hidden mb-8">
-                <div className="p-4 border-b border-subtle flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30">
+                <div className="p-4 border-b border-subtle flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-slate-50/50 dark:bg-slate-900/30">
                     <div className="relative max-w-md w-full">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-subtle" />
                         <input
@@ -244,9 +347,44 @@ export const InventoryMode: React.FC = () => {
                             className="w-full pl-10 pr-4 py-2.5 bg-surface border border-subtle rounded-xl focus:ring-2 focus:ring-primary/50 outline-none transition-all dark:text-white text-sm"
                         />
                     </div>
-                    <span className="text-xs font-semibold text-fg-muted hidden sm:inline-block">
-                        Total Grupos: <strong className="text-primary">{filteredGroups.length}</strong>
-                    </span>
+
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="flex items-center gap-1 bg-surface border border-subtle rounded-xl p-1">
+                            <select
+                                value={sortKey}
+                                onChange={(e) => handleSortKeyChange(e.target.value as SortKey)}
+                                className="pl-2.5 pr-1 py-1.5 bg-transparent text-xs font-bold text-fg outline-none cursor-pointer"
+                            >
+                                {SORT_OPTIONS.map(opt => (
+                                    <option key={opt.key} value={opt.key}>Ordenar: {opt.label}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-fg-muted hover:bg-surface-2 hover:text-fg transition-colors"
+                                title="Invertir dirección del orden"
+                            >
+                                {sortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                                {SORT_DIR_LABEL[sortKey][sortDir]}
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => setGroupByClass(v => !v)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${groupByClass
+                                ? 'bg-primary-soft text-primary border-primary/30'
+                                : 'bg-surface text-fg-muted border-subtle hover:bg-surface-2'
+                            }`}
+                            title="Agrupar la lista por clase de rotación"
+                        >
+                            <Layers className="w-3.5 h-3.5" />
+                            Agrupar por clase
+                        </button>
+
+                        <span className="text-xs font-semibold text-fg-muted hidden sm:inline-block">
+                            Total Grupos: <strong className="text-primary">{sortedGroups.length}</strong>
+                        </span>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -254,7 +392,7 @@ export const InventoryMode: React.FC = () => {
                         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
                         <span className="text-sm font-medium">Cargando grupos y estados...</span>
                     </div>
-                ) : filteredGroups.length === 0 ? (
+                ) : sortedGroups.length === 0 ? (
                     <div className="p-12 text-center text-fg-muted">
                         No se encontraron grupos de inventario que coincidan con la búsqueda.
                     </div>
@@ -272,14 +410,12 @@ export const InventoryMode: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-subtle text-sm">
-                                {filteredGroups.map(group => {
-                                    const nextCountInfo = calculateNextCountInfo(
-                                        group.last_counted_at,
-                                        group.interval_days ?? 0
-                                    );
+                                {(() => {
+                                    const renderRow = (group: EnrichedGroup) => {
+                                    const nextCountInfo = group.nextCountInfo;
                                     const rotationClass = group.rotation_class ?? 'medium';
                                     const classBounds = ROTATION_CLASS_BOUNDS[rotationClass];
-                                    
+
                                     return (
                                         <tr 
                                             key={group.id} 
@@ -387,7 +523,28 @@ export const InventoryMode: React.FC = () => {
                                             </td>
                                         </tr>
                                     );
-                                })}
+                                    };
+
+                                    if (groupByClass && groupedSections) {
+                                        return ROTATION_CLASSES.map(rc => {
+                                            const rows = groupedSections[rc];
+                                            if (rows.length === 0) return null;
+                                            const bounds = ROTATION_CLASS_BOUNDS[rc];
+                                            return (
+                                                <React.Fragment key={rc}>
+                                                    <tr className="bg-surface-2/70">
+                                                        <td colSpan={6} className="px-4 py-2 text-xs font-bold text-fg-muted uppercase tracking-wider border-y border-subtle">
+                                                            Rotación {bounds.label} · {rows.length} {rows.length === 1 ? 'grupo' : 'grupos'} · {bounds.min}-{bounds.max}d
+                                                        </td>
+                                                    </tr>
+                                                    {rows.map(renderRow)}
+                                                </React.Fragment>
+                                            );
+                                        });
+                                    }
+
+                                    return sortedGroups.map(renderRow);
+                                })()}
                             </tbody>
                         </table>
                     </div>
