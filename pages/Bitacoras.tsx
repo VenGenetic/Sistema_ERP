@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Bitacora, BitacoraPatch } from '../types/bitacora';
-import { Button, ConfirmDialog, Input, Modal, Select } from '../components/ui';
+import { Button, ConfirmDialog, Input, Modal, Select, Tooltip } from '../components/ui';
+import { parseBullets } from '../utils/bitacoraResumen';
 import { cn, page } from '../components/ui/styles';
 import { Table, TableWrapper, Thead, Tbody, Tr, Th, Td, TableEmpty, TableSkeleton, type SortDirection } from '../components/ui/Table';
 import { BitacoraDetail } from '../components/bitacoras/BitacoraDetail';
@@ -27,6 +28,40 @@ const SORT_FIELDS: { value: SortField; label: string }[] = [
   { value: 'updated_at', label: 'Última edición' },
 ];
 
+/** Tope por punto en la tabla; el texto completo va en el globo al pasar por encima. */
+const MAX_BULLET_CHARS = 50;
+
+/**
+ * Los puntos del resumen en la fila de la tabla. Cada uno se recorta a 50
+ * caracteres y solo los recortados llevan globo: `soloSiRecortado` mide el
+ * desbordamiento por CSS y acá el recorte se hace cortando el texto.
+ */
+const ResumenBullets: React.FC<{ resumen: string }> = ({ resumen }) => {
+  const bullets = parseBullets(resumen);
+  if (!bullets.length) return <span className="italic text-fg-subtle">Sin resumen</span>;
+
+  return (
+    <ul className="space-y-0.5">
+      {bullets.map((bullet, index) => {
+        const recortado = bullet.length > MAX_BULLET_CHARS;
+        const linea = (
+          <li className="flex gap-1.5 text-sm leading-snug">
+            <span className="select-none text-fg-subtle" aria-hidden="true">•</span>
+            <span>{recortado ? `${bullet.slice(0, MAX_BULLET_CHARS).trimEnd()}…` : bullet}</span>
+          </li>
+        );
+
+        if (!recortado) return <React.Fragment key={index}>{linea}</React.Fragment>;
+        return (
+          <Tooltip key={index} texto={bullet} soloSiRecortado={false}>
+            {linea}
+          </Tooltip>
+        );
+      })}
+    </ul>
+  );
+};
+
 const todayLocal = (): string => {
   const now = new Date();
   const localMs = now.getTime() - 5 * 60 * 60 * 1000; // Ecuador, UTC-5
@@ -38,6 +73,31 @@ const formatDate = (dateStr: string) =>
 
 const formatDateTime = (iso: string) =>
   new Date(iso).toLocaleString('es-EC', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/** Sin mayúsculas ni tildes: buscar "atencion" tiene que encontrar "Atención". */
+const normalize = (value: string) =>
+  value.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/**
+ * Todo lo que se ve de una bitácora, en un solo texto: el resumen, la fecha
+ * ISO y las tres fechas tal como se muestran. Así "sept", "15/09", "2026" o
+ * un trozo de un punto del resumen encuentran la misma fila.
+ */
+const searchHaystack = (b: Bitacora) => {
+  // El locale es-EC rinde "15 sept 2026", así que sin estas dos formas
+  // escribir "15/09" (como se teclea una fecha acá) no encontraría nada.
+  const [year, month, day] = b.bitacora_date.split('-');
+
+  return normalize([
+    b.resumen.replace(/\n/g, ' '),
+    b.bitacora_date,
+    `${day}/${month}/${year}`,
+    `${Number(day)}/${Number(month)}/${year}`,
+    formatDate(b.bitacora_date),
+    formatDateTime(b.created_at),
+    formatDateTime(b.updated_at),
+  ].join(' '));
+};
 
 const Bitacoras: React.FC = () => {
   const navigate = useNavigate();
@@ -76,11 +136,12 @@ const Bitacoras: React.FC = () => {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const filteredBitacoras = useMemo(() => {
-    const query = searchQuery.trim().toLocaleLowerCase('es');
-    const rows = query
-      ? bitacoras.filter(b =>
-          b.resumen.toLocaleLowerCase('es').includes(query) || b.bitacora_date.includes(query),
-        )
+    const terms = normalize(searchQuery).split(/\s+/).filter(Boolean);
+    const rows = terms.length
+      ? bitacoras.filter(b => {
+          const haystack = searchHaystack(b);
+          return terms.every(term => haystack.includes(term));
+        })
       : [...bitacoras];
 
     // Las tres fechas llegan en formato ISO (YYYY-MM-DD…), así que ordenan
@@ -192,7 +253,7 @@ const Bitacoras: React.FC = () => {
           leadingIcon={<Search size={15} aria-hidden="true" />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Buscar por resumen o fecha..."
+          placeholder="Buscar: texto del resumen, «sept», «2026», «15/09»..."
           aria-label="Buscar bitácoras por resumen o fecha"
           wrapperClassName="min-w-[240px] flex-1 max-w-sm"
         />
@@ -275,8 +336,8 @@ const Bitacoras: React.FC = () => {
                 onClick={() => setSelectedId(b.id)}
               >
                 <Td primary className="whitespace-nowrap">{formatDate(b.bitacora_date)}</Td>
-                <Td muted className="max-w-sm truncate">
-                  {b.resumen || <span className="italic text-fg-subtle">Sin resumen</span>}
+                <Td muted className="max-w-md">
+                  <ResumenBullets resumen={b.resumen} />
                 </Td>
                 <Td muted>{profilesMap.get(b.created_by || '') || 'Desconocido'}</Td>
                 <Td muted className="whitespace-nowrap">{formatDateTime(b.created_at)}</Td>

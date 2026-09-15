@@ -1,6 +1,7 @@
 import React from 'react';
-import { CalendarDays, Check, Loader2, Maximize2, Trash2, TriangleAlert, User, X } from 'lucide-react';
+import { CalendarDays, Check, Loader2, Maximize2, Plus, Trash2, TriangleAlert, User, X } from 'lucide-react';
 import { Bitacora, BitacoraPatch } from '../../types/bitacora';
+import { parseBullets, serializeBullets } from '../../utils/bitacoraResumen';
 import { Button } from '../ui';
 import { cn } from '../ui/styles';
 import { BitacoraRichTextEditor } from './BitacoraRichTextEditor';
@@ -62,11 +63,18 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
   onOpenFullView,
   onClose,
 }) => {
-  const [resumen, setResumen] = React.useState(bitacora.resumen);
+  // Siempre queda al menos un punto, aunque esté vacío: si no, no habría
+  // dónde escribir al abrir una bitácora sin resumen.
+  const [bullets, setBullets] = React.useState<string[]>(() => {
+    const parsed = parseBullets(bitacora.resumen);
+    return parsed.length ? parsed : [''];
+  });
   const [bitacoraDate, setBitacoraDate] = React.useState(bitacora.bitacora_date);
   const [content, setContent] = React.useState(bitacora.content);
   const [saveStatus, setSaveStatus] = React.useState<SaveStatus>('idle');
+  const [focusIndex, setFocusIndex] = React.useState<number | null>(null);
 
+  const bulletRefs = React.useRef<(HTMLInputElement | null)[]>([]);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstRender = React.useRef(true);
   const latestPatch = React.useRef<BitacoraPatch>({});
@@ -93,9 +101,9 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
       isFirstRender.current = false;
       return;
     }
-    scheduleSave({ resumen });
+    scheduleSave({ resumen: serializeBullets(bullets) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resumen]);
+  }, [bullets]);
 
   React.useEffect(() => {
     if (isFirstRender.current) return;
@@ -107,9 +115,43 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
   }, []);
 
+  // El foco se pide por índice y se aplica ya renderizada la lista nueva:
+  // al insertar o borrar un punto el input destino todavía no existe.
+  React.useEffect(() => {
+    if (focusIndex === null) return;
+    bulletRefs.current[focusIndex]?.focus();
+    setFocusIndex(null);
+  }, [focusIndex]);
+
   const handleContentChange = (html: string) => {
     setContent(html);
     scheduleSave({ content: html });
+  };
+
+  const updateBullet = (index: number, value: string) =>
+    setBullets(prev => prev.map((bullet, i) => (i === index ? value : bullet)));
+
+  const addBulletAfter = (index: number) => {
+    setBullets(prev => [...prev.slice(0, index + 1), '', ...prev.slice(index + 1)]);
+    setFocusIndex(index + 1);
+  };
+
+  const removeBullet = (index: number) => {
+    setBullets(prev => (prev.length === 1 ? [''] : prev.filter((_, i) => i !== index)));
+    setFocusIndex(Math.max(0, index - 1));
+  };
+
+  const handleBulletKeyDown = (event: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addBulletAfter(index);
+      return;
+    }
+    // Backspace en un punto vacío lo elimina, como en cualquier lista.
+    if (event.key === 'Backspace' && bullets[index] === '' && bullets.length > 1) {
+      event.preventDefault();
+      removeBullet(index);
+    }
   };
 
   return (
@@ -154,13 +196,42 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
         </div>
       </div>
 
-      <input
-        value={resumen}
-        onChange={(e) => setResumen(e.target.value)}
-        placeholder="Resumen: ¿de qué trata esta bitácora?"
-        aria-label="Resumen de la bitácora"
-        className="w-full border-b border-subtle bg-transparent pb-3 text-sm font-medium text-fg outline-none placeholder:font-normal placeholder:text-fg-subtle"
-      />
+      <div className="border-b border-subtle pb-3">
+        <span className="text-xs font-semibold text-fg-muted">Resumen</span>
+        <ul className="mt-1.5 space-y-1">
+          {bullets.map((bullet, index) => (
+            <li key={index} className="group flex items-center gap-2">
+              <span className="select-none text-fg-subtle" aria-hidden="true">•</span>
+              <input
+                ref={(el) => { bulletRefs.current[index] = el; }}
+                value={bullet}
+                onChange={(e) => updateBullet(index, e.target.value)}
+                onKeyDown={(e) => handleBulletKeyDown(e, index)}
+                placeholder={index === 0 ? '¿De qué trata esta bitácora?' : 'Otro punto…'}
+                aria-label={`Punto ${index + 1} del resumen`}
+                className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-subtle"
+              />
+              <button
+                type="button"
+                onClick={() => removeBullet(index)}
+                aria-label={`Eliminar punto ${index + 1}`}
+                title="Eliminar punto"
+                className="shrink-0 rounded p-1 text-fg-subtle opacity-0 transition-opacity hover:bg-danger-soft hover:text-danger focus:opacity-100 group-hover:opacity-100"
+              >
+                <X size={13} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => addBulletAfter(bullets.length - 1)}
+          className="mt-1.5 inline-flex items-center gap-1 rounded px-1 text-xs font-semibold text-primary hover:underline"
+        >
+          <Plus size={13} aria-hidden="true" />
+          Añadir punto
+        </button>
+      </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-subtle py-2.5 text-xs text-fg-muted">
         <span className="inline-flex items-center gap-1.5">
