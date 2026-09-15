@@ -65,7 +65,9 @@ const Bitacoras: React.FC = () => {
   const filteredBitacoras = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase('es');
     if (!query) return bitacoras;
-    return bitacoras.filter(b => b.title.toLocaleLowerCase('es').includes(query));
+    return bitacoras.filter(b =>
+      b.resumen.toLocaleLowerCase('es').includes(query) || b.bitacora_date.includes(query),
+    );
   }, [bitacoras, searchQuery]);
 
   const selectedBitacora = useMemo(
@@ -80,7 +82,7 @@ const Bitacoras: React.FC = () => {
       const { data, error: insertErr } = await supabase
         .from('bitacoras')
         .insert({
-          title: 'Sin título',
+          resumen: '',
           content: '',
           bitacora_date: todayLocal(),
           created_by: session?.user?.id ?? null,
@@ -157,8 +159,8 @@ const Bitacoras: React.FC = () => {
           leadingIcon={<Search size={15} aria-hidden="true" />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Buscar por título..."
-          aria-label="Buscar bitácoras por título"
+          placeholder="Buscar por resumen o fecha..."
+          aria-label="Buscar bitácoras por resumen o fecha"
           wrapperClassName="min-w-[240px] flex-1 max-w-sm"
         />
         <span className="text-xs text-fg-muted">
@@ -176,8 +178,8 @@ const Bitacoras: React.FC = () => {
         <Table>
           <Thead>
             <Tr>
-              <Th>Título</Th>
-              <Th>Fecha de bitácora</Th>
+              <Th>Bitácora</Th>
+              <Th>Resumen</Th>
               <Th>Creado por</Th>
               <Th>Creado el</Th>
               <Th>Última edición</Th>
@@ -200,8 +202,10 @@ const Bitacoras: React.FC = () => {
                 className="cursor-pointer"
                 onClick={() => setSelectedId(b.id)}
               >
-                <Td primary className="max-w-xs truncate">{b.title || 'Sin título'}</Td>
-                <Td muted>{formatDate(b.bitacora_date)}</Td>
+                <Td primary className="whitespace-nowrap">{formatDate(b.bitacora_date)}</Td>
+                <Td muted className="max-w-sm truncate">
+                  {b.resumen || <span className="italic text-fg-subtle">Sin resumen</span>}
+                </Td>
                 <Td muted>{profilesMap.get(b.created_by || '') || 'Desconocido'}</Td>
                 <Td muted className="whitespace-nowrap">{formatDateTime(b.created_at)}</Td>
                 <Td muted className="whitespace-nowrap">
@@ -213,7 +217,7 @@ const Bitacoras: React.FC = () => {
                     onClick={(e) => { e.stopPropagation(); setPendingDelete(b); }}
                     className="rounded p-1.5 text-fg-subtle transition-colors hover:bg-danger-soft hover:text-danger"
                     title="Eliminar bitácora"
-                    aria-label={`Eliminar bitácora ${b.title}`}
+                    aria-label={`Eliminar bitácora del ${formatDate(b.bitacora_date)}`}
                   >
                     <Trash2 size={15} aria-hidden="true" />
                   </button>
@@ -250,7 +254,7 @@ const Bitacoras: React.FC = () => {
         isOpen={Boolean(pendingDelete)}
         title="Eliminar bitácora"
         description="Esta acción no se puede deshacer. Se eliminará el registro y todo su contenido."
-        cita={pendingDelete?.title}
+        cita={pendingDelete ? `${formatDate(pendingDelete.bitacora_date)}${pendingDelete.resumen ? ` — ${pendingDelete.resumen}` : ''}` : null}
         confirmLabel="Eliminar"
         tono="danger"
         loading={deleting}

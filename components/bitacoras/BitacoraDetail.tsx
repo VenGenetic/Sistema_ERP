@@ -62,7 +62,7 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
   onOpenFullView,
   onClose,
 }) => {
-  const [title, setTitle] = React.useState(bitacora.title);
+  const [resumen, setResumen] = React.useState(bitacora.resumen);
   const [bitacoraDate, setBitacoraDate] = React.useState(bitacora.bitacora_date);
   const [content, setContent] = React.useState(bitacora.content);
   const [saveStatus, setSaveStatus] = React.useState<SaveStatus>('idle');
@@ -93,9 +93,9 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
       isFirstRender.current = false;
       return;
     }
-    scheduleSave({ title });
+    scheduleSave({ resumen });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title]);
+  }, [resumen]);
 
   React.useEffect(() => {
     if (isFirstRender.current) return;
@@ -114,14 +114,18 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-start justify-between gap-3 border-b border-subtle pb-3">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Título de la bitácora"
-          aria-label="Título de la bitácora"
-          className="w-full flex-1 bg-transparent text-lg font-bold text-fg outline-none placeholder:text-fg-subtle placeholder:font-normal"
-        />
+      {/* La fecha ES el título de la bitácora, y sigue siendo editable. */}
+      <div className="flex items-start justify-between gap-3 pb-1">
+        <label className="inline-flex min-w-0 items-center gap-2">
+          <CalendarDays size={18} className="shrink-0 text-primary" aria-hidden="true" />
+          <span className="sr-only">Fecha de la bitácora</span>
+          <input
+            type="date"
+            value={bitacoraDate}
+            onChange={(e) => setBitacoraDate(e.target.value)}
+            className="bg-transparent text-lg font-bold text-fg outline-none focus:underline focus:decoration-primary focus:underline-offset-4"
+          />
+        </label>
         <div className="flex shrink-0 items-center gap-1.5">
           <SaveStatusIndicator status={saveStatus} />
           {variant === 'peek' && onOpenFullView && (
@@ -137,18 +141,15 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
         </div>
       </div>
 
+      <input
+        value={resumen}
+        onChange={(e) => setResumen(e.target.value)}
+        placeholder="Resumen: ¿de qué trata esta bitácora?"
+        aria-label="Resumen de la bitácora"
+        className="w-full border-b border-subtle bg-transparent pb-3 text-sm font-medium text-fg outline-none placeholder:font-normal placeholder:text-fg-subtle"
+      />
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-subtle py-2.5 text-xs text-fg-muted">
-        <label className="inline-flex items-center gap-1.5">
-          <CalendarDays size={13} className="text-fg-subtle" aria-hidden="true" />
-          Fecha:
-          <input
-            type="date"
-            value={bitacoraDate}
-            onChange={(e) => setBitacoraDate(e.target.value)}
-            aria-label="Fecha de la bitácora"
-            className="rounded border border-subtle bg-surface px-1.5 py-0.5 text-xs font-medium text-fg outline-none focus:border-primary"
-          />
-        </label>
         <span className="inline-flex items-center gap-1.5">
           <User size={13} className="text-fg-subtle" aria-hidden="true" />
           Creado por <span className="font-semibold text-fg">{creatorName}</span>

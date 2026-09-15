@@ -1,6 +1,7 @@
 export interface Bitacora {
     id: string;
-    title: string;
+    /** Texto corto que identifica la bitácora en el listado. El título es la fecha. */
+    resumen: string;
     content: string;
     bitacora_date: string;
     created_at: string;
@@ -8,4 +9,4 @@ export interface Bitacora {
     created_by: string | null;
 }
 
-export type BitacoraPatch = Partial<Pick<Bitacora, 'title' | 'content' | 'bitacora_date'>>;
+export type BitacoraPatch = Partial<Pick<Bitacora, 'resumen' | 'content' | 'bitacora_date'>>;

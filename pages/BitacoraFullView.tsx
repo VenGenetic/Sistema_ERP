@@ -7,6 +7,9 @@ import { page } from '../components/ui/styles';
 import { BitacoraDetail } from '../components/bitacoras/BitacoraDetail';
 import { ArrowLeft, Loader2, NotebookPen } from 'lucide-react';
 
+const formatDate = (dateStr: string) =>
+  new Date(`${dateStr}T12:00:00`).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' });
+
 const BitacoraFullView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -126,7 +129,7 @@ const BitacoraFullView: React.FC = () => {
         isOpen={Boolean(pendingDelete)}
         title="Eliminar bitácora"
         description="Esta acción no se puede deshacer. Se eliminará el registro y todo su contenido."
-        cita={pendingDelete?.title}
+        cita={pendingDelete ? `${formatDate(pendingDelete.bitacora_date)}${pendingDelete.resumen ? ` — ${pendingDelete.resumen}` : ''}` : null}
         confirmLabel="Eliminar"
         tono="danger"
         loading={deleting}
