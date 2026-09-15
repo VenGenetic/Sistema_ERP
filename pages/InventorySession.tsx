@@ -287,45 +287,55 @@ export const InventorySession: React.FC = () => {
         setIsDirty(true);
     };
 
+    // Shared by both buttons below: pushes deletions + current counted_stock
+    // to inventory_group_items without touching real stock. Both
+    // "Guardar sin Aplicar" and "Finalizar y Aplicar" need this — the latter
+    // needs it so apply_inventory_group (which reads straight from the DB)
+    // sees items added or adjusted locally during this session, including
+    // ones that were never explicitly saved.
+    const persistItemCounts = async () => {
+        if (deletedIds.length > 0) {
+            const validDbIds = deletedIds.filter(dId => !dId.startsWith('temp-'));
+            if (validDbIds.length > 0) {
+                const { error: delErr } = await supabase
+                    .from('inventory_group_items')
+                    .delete()
+                    .in('id', validDbIds);
+                if (delErr) throw delErr;
+            }
+        }
+
+        if (items.length > 0) {
+            const upsertRows = items.map(i => {
+                const row: any = {
+                    group_id: id,
+                    product_id: i.product_id,
+                    counted_stock: i.counted_stock,
+                    is_manually_added: i.is_manually_added
+                };
+                if (!i.id.startsWith('temp-')) {
+                    row.id = i.id;
+                }
+                return row;
+            });
+
+            const { error: upsertErr } = await supabase
+                .from('inventory_group_items')
+                .upsert(upsertRows, { onConflict: 'group_id,product_id' });
+            if (upsertErr) throw upsertErr;
+        }
+
+        setDeletedIds([]);
+    };
+
     // BOTÓN 1: GUARDAR SIN APLICAR (Almacena progreso sin alterar stock real ni last_counted_at)
     const handleSaveWithoutApplying = async (shouldNavigateBack = false) => {
         try {
             setSavingWithoutApply(true);
 
-            // 1. Process deletions
-            if (deletedIds.length > 0) {
-                const validDbIds = deletedIds.filter(dId => !dId.startsWith('temp-'));
-                if (validDbIds.length > 0) {
-                    const { error: delErr } = await supabase
-                        .from('inventory_group_items')
-                        .delete()
-                        .in('id', validDbIds);
-                    if (delErr) throw delErr;
-                }
-            }
+            await persistItemCounts();
 
-            // 2. Process upserts of active items
-            if (items.length > 0) {
-                const upsertRows = items.map(i => {
-                    const row: any = {
-                        group_id: id,
-                        product_id: i.product_id,
-                        counted_stock: i.counted_stock,
-                        is_manually_added: i.is_manually_added
-                    };
-                    if (!i.id.startsWith('temp-')) {
-                        row.id = i.id;
-                    }
-                    return row;
-                });
-
-                const { error: upsertErr } = await supabase
-                    .from('inventory_group_items')
-                    .upsert(upsertRows, { onConflict: 'group_id,product_id' });
-                if (upsertErr) throw upsertErr;
-            }
-
-            // 3. Ensure session_started_at is initialized if it was null, WITHOUT touching last_counted_at
+            // Ensure session_started_at is initialized if it was null, WITHOUT touching last_counted_at
             if (!group?.session_started_at) {
                 const nowIso = new Date().toISOString();
                 await supabase
@@ -336,7 +346,6 @@ export const InventorySession: React.FC = () => {
             }
 
             setIsDirty(false);
-            setDeletedIds([]);
 
             if (shouldNavigateBack) {
                 navigate('/inventory-mode');
@@ -360,84 +369,20 @@ export const InventorySession: React.FC = () => {
 
         try {
             setLoading(true);
-            const { data: userData } = await supabase.auth.getUser();
-            const userId = userData.user?.id;
 
-            // 1. Process deletions first
-            if (deletedIds.length > 0) {
-                const validDbIds = deletedIds.filter(dId => !dId.startsWith('temp-'));
-                if (validDbIds.length > 0) {
-                    await supabase.from('inventory_group_items').delete().in('id', validDbIds);
-                }
-            }
+            // 1. Push local counts (deletions + counted_stock) to inventory_group_items
+            //    so the RPC below — which reads straight from the DB — sees the latest
+            //    state, including items added or adjusted during this session.
+            await persistItemCounts();
 
-            // 2. Iterate items and adjust actual inventory
-            for (const item of items) {
-                const theoretical = getTheoreticalStock(item.product, group?.warehouse_id);
-                const diff = item.counted_stock - theoretical;
-
-                if (diff !== 0) {
-                    const { data: levelData } = await supabase
-                        .from('inventory_levels')
-                        .select('id, current_stock')
-                        .eq('product_id', item.product_id)
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (levelData) {
-                        await supabase
-                            .from('inventory_levels')
-                            .update({
-                                current_stock: item.counted_stock,
-                                last_updated: new Date().toISOString()
-                            })
-                            .eq('id', levelData.id);
-                    } else {
-                        const defaultWarehouseId = group?.warehouse_id || 1;
-                        await supabase
-                            .from('inventory_levels')
-                            .insert({
-                                product_id: item.product_id,
-                                warehouse_id: defaultWarehouseId,
-                                current_stock: item.counted_stock
-                            });
-                    }
-
-                    await supabase
-                        .from('inventory_logs')
-                        .insert({
-                            product_id: item.product_id,
-                            warehouse_id: group?.warehouse_id || 1,
-                            quantity_change: diff,
-                            reason: `Ajuste Modo Inventario - Grupo: ${group?.name}`,
-                            user_id: userId,
-                            reference_type: 'inventory_mode',
-                            reference_id: id
-                        });
-                }
-            }
-
-            // 3. Ensure items exist in group and reset counted_stock to 0
-            const resetRows = items.map(i => ({
-                group_id: id,
-                product_id: i.product_id,
-                counted_stock: 0,
-                is_manually_added: i.is_manually_added,
-                ...(i.id.startsWith('temp-') ? {} : { id: i.id })
-            }));
-            if (resetRows.length > 0) {
-                await supabase.from('inventory_group_items').upsert(resetRows, { onConflict: 'group_id,product_id' });
-            }
-
-            // 4. Update group last_counted_at and clear session_started_at
-            const nowIso = new Date().toISOString();
-            await supabase
-                .from('inventory_groups')
-                .update({
-                    last_counted_at: nowIso,
-                    session_started_at: null // Resets 24-hour clock for next session
-                })
-                .eq('id', id);
+            // 2. Apply the whole group atomically in the database: locks the group and
+            //    each item's row at group.warehouse_id specifically (fixing the missing
+            //    warehouse filter), writes inventory_levels + inventory_logs together,
+            //    and resets the group for its next cycle — all in one transaction.
+            const { error: applyError } = await supabase.rpc('apply_inventory_group', {
+                p_group_id: id
+            });
+            if (applyError) throw applyError;
 
             setIsDirty(false);
             alert('Inventario actualizado y aplicado correctamente. Los conteos en sesión del grupo han sido encerados y el estado renovado.');
