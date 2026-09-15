@@ -1,12 +1,17 @@
 import React from 'react';
-import { CalendarDays, Check, Loader2, Maximize2, Plus, Trash2, TriangleAlert, User, X } from 'lucide-react';
+import { CalendarDays, Check, ImageDown, Loader2, Maximize2, Plus, Trash2, TriangleAlert, User, X } from 'lucide-react';
 import { Bitacora, BitacoraPatch } from '../../types/bitacora';
 import { parseBullets, serializeBullets } from '../../utils/bitacoraResumen';
+import { LIMITE_CARACTERES_POR_PUNTO, LIMITE_CONTENIDO, LIMITE_PUNTOS } from '../../utils/bitacoraLimites';
+import { copiarBitacoraComoImagen } from '../../utils/bitacoraImagen';
 import { Button } from '../ui';
 import { cn } from '../ui/styles';
 import { BitacoraRichTextEditor } from './BitacoraRichTextEditor';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+/** `copiada`/`descargada` son los dos finales buenos: ver copiarBitacoraComoImagen. */
+type EstadoImagen = 'idle' | 'generando' | 'copiada' | 'descargada' | 'error';
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -14,6 +19,18 @@ const formatDateTime = (iso: string) =>
   new Date(iso).toLocaleString('es-EC', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
+
+/** Para la imagen: la fecha en largo, que es el título de la tarjeta. */
+const formatFullDate = (dateStr: string) =>
+  new Date(`${dateStr}T12:00:00`).toLocaleDateString('es-EC', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  });
+
+const MENSAJE_IMAGEN: Record<Exclude<EstadoImagen, 'idle' | 'generando'>, string> = {
+  copiada: 'Imagen copiada · pégala en el chat',
+  descargada: 'Imagen descargada (el portapapeles no está disponible aquí)',
+  error: 'No se pudo generar la imagen',
+};
 
 const SaveStatusIndicator: React.FC<{ status: SaveStatus }> = ({ status }) => {
   if (status === 'idle') return null;
@@ -73,6 +90,7 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
   const [content, setContent] = React.useState(bitacora.content);
   const [saveStatus, setSaveStatus] = React.useState<SaveStatus>('idle');
   const [focusIndex, setFocusIndex] = React.useState<number | null>(null);
+  const [imagenEstado, setImagenEstado] = React.useState<EstadoImagen>('idle');
 
   const bulletRefs = React.useRef<(HTMLInputElement | null)[]>([]);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,10 +146,31 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
     scheduleSave({ content: html });
   };
 
+  const handleCopiarImagen = async () => {
+    setImagenEstado('generando');
+    try {
+      const resultado = await copiarBitacoraComoImagen({
+        fecha: formatFullDate(bitacoraDate),
+        resumen: serializeBullets(bullets).split('\n').filter(Boolean),
+        contenidoHtml: content,
+        autor: creatorName,
+        creado: formatDateTime(bitacora.created_at),
+        editado: bitacora.updated_at !== bitacora.created_at ? formatDateTime(bitacora.updated_at) : null,
+      });
+      setImagenEstado(resultado);
+      window.setTimeout(() => setImagenEstado('idle'), 3500);
+    } catch (err) {
+      console.error('Error generando la imagen de la bitácora:', err);
+      setImagenEstado('error');
+      window.setTimeout(() => setImagenEstado('idle'), 3500);
+    }
+  };
+
   const updateBullet = (index: number, value: string) =>
     setBullets(prev => prev.map((bullet, i) => (i === index ? value : bullet)));
 
   const addBulletAfter = (index: number) => {
+    if (bullets.length >= LIMITE_PUNTOS) return;
     setBullets(prev => [...prev.slice(0, index + 1), '', ...prev.slice(index + 1)]);
     setFocusIndex(index + 1);
   };
@@ -207,6 +246,7 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
                 value={bullet}
                 onChange={(e) => updateBullet(index, e.target.value)}
                 onKeyDown={(e) => handleBulletKeyDown(e, index)}
+                maxLength={LIMITE_CARACTERES_POR_PUNTO}
                 placeholder={index === 0 ? '¿De qué trata esta bitácora?' : 'Otro punto…'}
                 aria-label={`Punto ${index + 1} del resumen`}
                 className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-subtle"
@@ -223,14 +263,20 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
             </li>
           ))}
         </ul>
-        <button
-          type="button"
-          onClick={() => addBulletAfter(bullets.length - 1)}
-          className="mt-1.5 inline-flex items-center gap-1 rounded px-1 text-xs font-semibold text-primary hover:underline"
-        >
-          <Plus size={13} aria-hidden="true" />
-          Añadir punto
-        </button>
+        <div className="mt-1.5 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => addBulletAfter(bullets.length - 1)}
+            disabled={bullets.length >= LIMITE_PUNTOS}
+            className="inline-flex items-center gap-1 rounded px-1 text-xs font-semibold text-primary hover:underline disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Plus size={13} aria-hidden="true" />
+            Añadir punto
+          </button>
+          <span className="text-2xs tabular-nums text-fg-subtle">
+            {bullets.filter(Boolean).length} / {LIMITE_PUNTOS} puntos
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-subtle py-2.5 text-xs text-fg-muted">
@@ -249,10 +295,11 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
           content={content}
           onChange={handleContentChange}
           contentClassName={variant === 'full' ? 'min-h-[55vh]' : 'min-h-[320px]'}
+          limiteCaracteres={LIMITE_CONTENIDO}
         />
       </div>
 
-      <div className="flex items-center justify-between border-t border-subtle pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-subtle pt-3">
         <Button
           variant="dangerGhost"
           size="sm"
@@ -261,6 +308,30 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
         >
           Eliminar bitácora
         </Button>
+
+        <div className="flex items-center gap-2">
+          {imagenEstado !== 'idle' && imagenEstado !== 'generando' && (
+            <span
+              role="status"
+              className={cn(
+                'text-2xs font-medium',
+                imagenEstado === 'error' ? 'text-danger' : 'text-success',
+              )}
+            >
+              {MENSAJE_IMAGEN[imagenEstado]}
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<ImageDown size={14} aria-hidden="true" />}
+            loading={imagenEstado === 'generando'}
+            onClick={handleCopiarImagen}
+            title="Genera un PNG cuadrado con el resumen, el contenido y los datos de la bitácora"
+          >
+            Copiar como imagen
+          </Button>
+        </div>
       </div>
     </div>
   );

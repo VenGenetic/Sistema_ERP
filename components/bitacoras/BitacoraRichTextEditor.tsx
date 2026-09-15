@@ -3,7 +3,7 @@ import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
-import Placeholder from '@tiptap/extension-placeholder';
+import { CharacterCount, Placeholder } from '@tiptap/extensions';
 import {
   AlignCenter,
   AlignLeft,
@@ -63,6 +63,8 @@ interface BitacoraRichTextEditorProps {
   className?: string;
   contentClassName?: string;
   placeholder?: string;
+  /** Tope de caracteres. CharacterCount bloquea el tecleo al llegar. */
+  limiteCaracteres?: number;
 }
 
 const ToolbarDivider = () => <span className="mx-1 h-5 w-px shrink-0 bg-subtle" aria-hidden="true" />;
@@ -213,9 +215,15 @@ export const BitacoraRichTextEditor: React.FC<BitacoraRichTextEditorProps> = ({
   className,
   contentClassName,
   placeholder = 'Escribe el contenido de la bitácora...',
+  limiteCaracteres,
 }) => {
   const editor = useEditor({
     editable,
+    // En Tiptap v3 esto viene en false: sin activarlo el componente no se
+    // vuelve a dibujar con cada transacción y la barra se queda congelada
+    // (el botón de negrita no se ilumina al entrar en un texto en negrita,
+    // deshacer sigue apagado, el contador no avanza).
+    shouldRerenderOnTransaction: true,
     extensions: [
       // Link y Underline ya vienen dentro de StarterKit v3: registrarlos
       // aparte duplica la extensión y sus atajos de teclado.
@@ -226,10 +234,19 @@ export const BitacoraRichTextEditor: React.FC<BitacoraRichTextEditorProps> = ({
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Highlight,
       Placeholder.configure({ placeholder }),
+      // `autoTrim` viene en true y recorta al abrir lo que ya excedía el
+      // tope. Con el autoguardado eso borraría contenido de una bitácora
+      // vieja sin que nadie lo pida. En false, lo que ya está se conserva y
+      // solo se impide agrandarlo: se puede recortar a mano.
+      CharacterCount.configure({ limit: limiteCaracteres ?? null, autoTrim: false }),
     ],
     content,
     onUpdate: ({ editor: instance }) => onChange(instance.getHTML()),
   });
+
+  // El contador se lee del editor, que es quien manda: CharacterCount ya
+  // impide pasarse, así que acá solo se muestra cuánto queda.
+  const usados = editor?.storage.characterCount?.characters() ?? 0;
 
   React.useEffect(() => {
     if (editor) editor.setEditable(editable);
@@ -241,6 +258,20 @@ export const BitacoraRichTextEditor: React.FC<BitacoraRichTextEditorProps> = ({
       <div className={cn('flex-1 overflow-y-auto px-4 py-3 text-sm text-fg', PROSE_CLASSES, contentClassName)}>
         <EditorContent editor={editor} />
       </div>
+      {editable && limiteCaracteres != null && (
+        <div className="flex justify-end border-t border-subtle bg-surface-2 px-3 py-1.5">
+          <span
+            className={cn(
+              'text-2xs font-medium tabular-nums',
+              usados >= limiteCaracteres ? 'text-danger' : 'text-fg-subtle',
+            )}
+            title="La bitácora se comparte como una imagen cuadrada; por eso tiene un tope."
+          >
+            {usados} / {limiteCaracteres}
+            {usados >= limiteCaracteres && ' · límite alcanzado'}
+          </span>
+        </div>
+      )}
     </div>
   );
 };
