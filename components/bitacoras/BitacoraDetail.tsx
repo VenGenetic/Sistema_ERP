@@ -128,15 +128,28 @@ export const BitacoraDetail: React.FC<BitacoraDetailProps> = ({
         </label>
         <div className="flex shrink-0 items-center gap-1.5">
           <SaveStatusIndicator status={saveStatus} />
+          {/* El icono va en `icon`: con `iconOnly`, Button descarta children. */}
           {variant === 'peek' && onOpenFullView && (
-            <Button variant="ghost" size="sm" iconOnly aria-label="Ver completa" title="Vista completa" onClick={onOpenFullView}>
-              <Maximize2 size={15} aria-hidden="true" />
-            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              aria-label="Ver completa"
+              title="Vista completa"
+              icon={<Maximize2 size={15} aria-hidden="true" />}
+              onClick={onOpenFullView}
+            />
           )}
           {variant === 'peek' && onClose && (
-            <Button variant="ghost" size="sm" iconOnly aria-label="Cerrar" title="Cerrar" onClick={onClose}>
-              <X size={15} aria-hidden="true" />
-            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              aria-label="Cerrar"
+              title="Cerrar panel"
+              icon={<X size={16} aria-hidden="true" />}
+              onClick={onClose}
+            />
           )}
         </div>
       </div>
