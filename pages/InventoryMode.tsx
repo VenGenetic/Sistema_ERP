@@ -45,6 +45,16 @@ const SORT_DIR_LABEL: Record<SortKey, Record<SortDir, string>> = {
     name: { asc: 'A-Z', desc: 'Z-A' },
 };
 
+type GroupByOption = 'none' | 'class' | 'status';
+
+const GROUP_BY_OPTIONS: { key: GroupByOption; label: string }[] = [
+    { key: 'none', label: 'Sin agrupar' },
+    { key: 'class', label: 'Por clase de rotación' },
+    { key: 'status', label: 'Por estado' },
+];
+
+const STATUS_ORDER: NextCountInfo['status'][] = ['Por inventariar', 'Al día'];
+
 export const InventoryMode: React.FC = () => {
     const navigate = useNavigate();
     const [groups, setGroups] = useState<GroupData[]>([]);
@@ -53,7 +63,7 @@ export const InventoryMode: React.FC = () => {
     const [updatingId, setUpdatingId] = useState<string | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('nextDate');
     const [sortDir, setSortDir] = useState<SortDir>('asc'); // default: fecha límite, más urgente primero
-    const [groupByClass, setGroupByClass] = useState(false);
+    const [groupBy, setGroupBy] = useState<GroupByOption>('none');
 
     const handleSortKeyChange = (key: SortKey) => {
         setSortKey(key);
@@ -304,14 +314,27 @@ export const InventoryMode: React.FC = () => {
         return list;
     }, [enrichedGroups, sortKey, sortDir]);
 
-    const groupedSections: Record<RotationClass, EnrichedGroup[]> | null = useMemo(() => {
-        if (!groupByClass) return null;
-        const buckets: Record<RotationClass, EnrichedGroup[]> = { high: [], medium: [], low: [] };
-        sortedGroups.forEach(g => {
-            buckets[(g.rotation_class ?? 'medium') as RotationClass].push(g);
-        });
-        return buckets;
-    }, [sortedGroups, groupByClass]);
+    const groupedSections: { key: string; label: string; rows: EnrichedGroup[] }[] | null = useMemo(() => {
+        if (groupBy === 'class') {
+            return ROTATION_CLASSES
+                .map(rc => ({
+                    key: rc,
+                    label: `Rotación ${ROTATION_CLASS_BOUNDS[rc].label} · ${ROTATION_CLASS_BOUNDS[rc].min}-${ROTATION_CLASS_BOUNDS[rc].max}d`,
+                    rows: sortedGroups.filter(g => (g.rotation_class ?? 'medium') === rc)
+                }))
+                .filter(section => section.rows.length > 0);
+        }
+        if (groupBy === 'status') {
+            return STATUS_ORDER
+                .map(status => ({
+                    key: status,
+                    label: status,
+                    rows: sortedGroups.filter(g => g.nextCountInfo.status === status)
+                }))
+                .filter(section => section.rows.length > 0);
+        }
+        return null;
+    }, [sortedGroups, groupBy]);
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto">
@@ -369,17 +392,24 @@ export const InventoryMode: React.FC = () => {
                             </button>
                         </div>
 
-                        <button
-                            onClick={() => setGroupByClass(v => !v)}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${groupByClass
-                                ? 'bg-primary-soft text-primary border-primary/30'
-                                : 'bg-surface text-fg-muted border-subtle hover:bg-surface-2'
-                            }`}
-                            title="Agrupar la lista por clase de rotación"
-                        >
-                            <Layers className="w-3.5 h-3.5" />
-                            Agrupar por clase
-                        </button>
+                        <div className={`flex items-center gap-1.5 px-1 py-1 rounded-xl border transition-colors ${groupBy !== 'none'
+                            ? 'bg-primary-soft border-primary/30'
+                            : 'bg-surface border-subtle'
+                        }`}>
+                            <Layers className={`w-3.5 h-3.5 ml-1.5 ${groupBy !== 'none' ? 'text-primary' : 'text-fg-subtle'}`} />
+                            <select
+                                value={groupBy}
+                                onChange={(e) => setGroupBy(e.target.value as GroupByOption)}
+                                className={`pr-2 py-1 rounded-lg bg-surface text-xs font-bold outline-none cursor-pointer ${groupBy !== 'none' ? 'text-primary' : 'text-fg-muted'}`}
+                                title="Agrupar la lista de grupos"
+                            >
+                                {GROUP_BY_OPTIONS.map(opt => (
+                                    <option key={opt.key} value={opt.key} className="bg-surface text-fg">
+                                        {opt.key === 'none' ? opt.label : `Agrupar: ${opt.label}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
 
                         <span className="text-xs font-semibold text-fg-muted hidden sm:inline-block">
                             Total Grupos: <strong className="text-primary">{sortedGroups.length}</strong>
@@ -525,22 +555,17 @@ export const InventoryMode: React.FC = () => {
                                     );
                                     };
 
-                                    if (groupByClass && groupedSections) {
-                                        return ROTATION_CLASSES.map(rc => {
-                                            const rows = groupedSections[rc];
-                                            if (rows.length === 0) return null;
-                                            const bounds = ROTATION_CLASS_BOUNDS[rc];
-                                            return (
-                                                <React.Fragment key={rc}>
-                                                    <tr className="bg-surface-2/70">
-                                                        <td colSpan={6} className="px-4 py-2 text-xs font-bold text-fg-muted uppercase tracking-wider border-y border-subtle">
-                                                            Rotación {bounds.label} · {rows.length} {rows.length === 1 ? 'grupo' : 'grupos'} · {bounds.min}-{bounds.max}d
-                                                        </td>
-                                                    </tr>
-                                                    {rows.map(renderRow)}
-                                                </React.Fragment>
-                                            );
-                                        });
+                                    if (groupedSections) {
+                                        return groupedSections.map(section => (
+                                            <React.Fragment key={section.key}>
+                                                <tr className="bg-surface-2/70">
+                                                    <td colSpan={6} className="px-4 py-2 text-xs font-bold text-fg-muted uppercase tracking-wider border-y border-subtle">
+                                                        {section.label} · {section.rows.length} {section.rows.length === 1 ? 'grupo' : 'grupos'}
+                                                    </td>
+                                                </tr>
+                                                {section.rows.map(renderRow)}
+                                            </React.Fragment>
+                                        ));
                                     }
 
                                     return sortedGroups.map(renderRow);
