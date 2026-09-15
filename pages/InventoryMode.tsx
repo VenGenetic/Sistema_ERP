@@ -353,10 +353,10 @@ export const InventoryMode: React.FC = () => {
                             <select
                                 value={sortKey}
                                 onChange={(e) => handleSortKeyChange(e.target.value as SortKey)}
-                                className="pl-2.5 pr-1 py-1.5 bg-transparent text-xs font-bold text-fg outline-none cursor-pointer"
+                                className="pl-2.5 pr-1 py-1.5 rounded-lg bg-surface text-xs font-bold text-fg outline-none cursor-pointer"
                             >
                                 {SORT_OPTIONS.map(opt => (
-                                    <option key={opt.key} value={opt.key}>Ordenar: {opt.label}</option>
+                                    <option key={opt.key} value={opt.key} className="bg-surface text-fg">Ordenar: {opt.label}</option>
                                 ))}
                             </select>
                             <button
@@ -457,7 +457,7 @@ export const InventoryMode: React.FC = () => {
                                                         title={classBounds.examples}
                                                     >
                                                         {ROTATION_CLASSES.map(rc => (
-                                                            <option key={rc} value={rc}>
+                                                            <option key={rc} value={rc} className="bg-surface text-fg">
                                                                 {ROTATION_CLASS_BOUNDS[rc].label} · {ROTATION_CLASS_BOUNDS[rc].min}-{ROTATION_CLASS_BOUNDS[rc].max}d
                                                             </option>
                                                         ))}
