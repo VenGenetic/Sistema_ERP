@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Bitacora, BitacoraPatch } from '../types/bitacora';
-import { Button, ConfirmDialog, Input, Modal } from '../components/ui';
+import { Button, ConfirmDialog, Input, Modal, Select } from '../components/ui';
 import { cn, page } from '../components/ui/styles';
-import { Table, TableWrapper, Thead, Tbody, Tr, Th, Td, TableEmpty, TableSkeleton } from '../components/ui/Table';
+import { Table, TableWrapper, Thead, Tbody, Tr, Th, Td, TableEmpty, TableSkeleton, type SortDirection } from '../components/ui/Table';
 import { BitacoraDetail } from '../components/bitacoras/BitacoraDetail';
 import {
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
   BookText,
   ChevronRight,
   NotebookPen,
@@ -15,6 +17,15 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
+
+/** Las tres fechas por las que se puede ordenar el listado. */
+type SortField = 'bitacora_date' | 'created_at' | 'updated_at';
+
+const SORT_FIELDS: { value: SortField; label: string }[] = [
+  { value: 'bitacora_date', label: 'Fecha de bitácora' },
+  { value: 'created_at', label: 'Fecha de creación' },
+  { value: 'updated_at', label: 'Última edición' },
+];
 
 const todayLocal = (): string => {
   const now = new Date();
@@ -39,6 +50,8 @@ const Bitacoras: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Bitacora | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('bitacora_date');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -64,11 +77,31 @@ const Bitacoras: React.FC = () => {
 
   const filteredBitacoras = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase('es');
-    if (!query) return bitacoras;
-    return bitacoras.filter(b =>
-      b.resumen.toLocaleLowerCase('es').includes(query) || b.bitacora_date.includes(query),
-    );
-  }, [bitacoras, searchQuery]);
+    const rows = query
+      ? bitacoras.filter(b =>
+          b.resumen.toLocaleLowerCase('es').includes(query) || b.bitacora_date.includes(query),
+        )
+      : [...bitacoras];
+
+    // Las tres fechas llegan en formato ISO (YYYY-MM-DD…), así que ordenan
+    // bien como texto y no hace falta construir un Date por comparación.
+    return rows.sort((a, b) => {
+      const comparison = a[sortField] < b[sortField] ? -1 : a[sortField] > b[sortField] ? 1 : 0;
+      return sortDir === 'asc' ? comparison : -comparison;
+    });
+  }, [bitacoras, searchQuery, sortField, sortDir]);
+
+  const applySort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDir(current => (current === 'desc' ? 'asc' : 'desc'));
+      return;
+    }
+    setSortField(field);
+    setSortDir('desc');
+  };
+
+  const sortDirectionFor = (field: SortField): SortDirection | null =>
+    sortField === field ? sortDir : null;
 
   const selectedBitacora = useMemo(
     () => bitacoras.find(b => b.id === selectedId) || null,
@@ -163,7 +196,40 @@ const Bitacoras: React.FC = () => {
           aria-label="Buscar bitácoras por resumen o fecha"
           wrapperClassName="min-w-[240px] flex-1 max-w-sm"
         />
-        <span className="text-xs text-fg-muted">
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="bitacoras-sort-field" className="text-xs font-semibold text-fg-muted">
+            Ordenar por
+          </label>
+          {/* Select trae `w-full`: el ancho se fija en el contenedor para no
+              depender del orden en que Tailwind emita las dos utilidades. */}
+          <div className="w-[190px]">
+            <Select
+              id="bitacoras-sort-field"
+              inputSize="sm"
+              value={sortField}
+              onChange={(e) => setSortField(e.target.value as SortField)}
+            >
+              {SORT_FIELDS.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setSortDir(current => (current === 'desc' ? 'asc' : 'desc'))}
+          icon={sortDir === 'desc'
+            ? <ArrowDownWideNarrow size={15} aria-hidden="true" />
+            : <ArrowUpNarrowWide size={15} aria-hidden="true" />}
+          title="Cambiar el orden"
+        >
+          {sortDir === 'desc' ? 'Más recientes primero' : 'Más antiguas primero'}
+        </Button>
+
+        <span className="ml-auto text-xs text-fg-muted">
           {filteredBitacoras.length} bitácora{filteredBitacoras.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -178,11 +244,17 @@ const Bitacoras: React.FC = () => {
         <Table>
           <Thead>
             <Tr>
-              <Th>Bitácora</Th>
+              <Th sortable sortDirection={sortDirectionFor('bitacora_date')} onSort={() => applySort('bitacora_date')}>
+                Bitácora
+              </Th>
               <Th>Resumen</Th>
               <Th>Creado por</Th>
-              <Th>Creado el</Th>
-              <Th>Última edición</Th>
+              <Th sortable sortDirection={sortDirectionFor('created_at')} onSort={() => applySort('created_at')}>
+                Creado el
+              </Th>
+              <Th sortable sortDirection={sortDirectionFor('updated_at')} onSort={() => applySort('updated_at')}>
+                Última edición
+              </Th>
               <Th className="w-12" />
             </Tr>
           </Thead>
