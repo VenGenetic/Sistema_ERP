@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus, Loader2, X, Package, ShieldCheck, AlertCircle, Clock, Calendar, Check, SaveAll, Info } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus, Loader2, X, Package, ShieldCheck, AlertCircle, Clock, Calendar, Check, SaveAll, Info, TrendingUp, Gauge } from 'lucide-react';
+import { RotationClass, ROTATION_CLASS_BOUNDS, midpointOfClass, clampToClass, getAccuracyTier, suggestNextInterval, AccuracyTier } from '../utils/rotationClass';
 
 interface GroupItem {
     id: string;
@@ -14,6 +15,18 @@ interface GroupItem {
         name: string;
         inventory_levels: { current_stock: number; warehouse_id: number }[];
     };
+}
+
+interface CountPreview {
+    total: number;
+    matched: number;
+    faltantes: number;
+    sobrantes: number;
+    accuracyPct: number | null;
+    tier: AccuracyTier | null;
+    rotationClass: RotationClass;
+    currentInterval: number;
+    suggestedInterval: number | null;
 }
 
 export const InventorySession: React.FC = () => {
@@ -33,6 +46,14 @@ export const InventorySession: React.FC = () => {
     const [showExitModal, setShowExitModal] = useState(false);
     const [savedToast, setSavedToast] = useState(false);
     const [sessionExpiredWarning, setSessionExpiredWarning] = useState(false);
+
+    // "Finalizar y Aplicar" handshake: preview del conteo + decisión del
+    // manager sobre el próximo intervalo antes de escribir stock real.
+    const [showFinalizeModal, setShowFinalizeModal] = useState(false);
+    const [finalizePreview, setFinalizePreview] = useState<CountPreview | null>(null);
+    const [intervalChoice, setIntervalChoice] = useState<'suggested' | 'keep' | 'custom'>('suggested');
+    const [customIntervalDays, setCustomIntervalDays] = useState('');
+    const [applyingFinalize, setApplyingFinalize] = useState(false);
 
     // Add product state
     const [searchQuery, setSearchQuery] = useState('');
@@ -137,6 +158,41 @@ export const InventorySession: React.FC = () => {
         if (!product?.inventory_levels) return 0;
         const levels = warehouseId ? product.inventory_levels.filter((l: any) => l.warehouse_id === warehouseId) : product.inventory_levels;
         return levels.reduce((sum: number, l: any) => sum + (l.current_stock || 0), 0);
+    };
+
+    // Preview mostrado en el modal de "Finalizar y Aplicar" — usa los mismos
+    // datos locales que ya alimentan las columnas Faltantes/Sobrantes/Cuadrados,
+    // así que siempre coincide con lo que el operador acaba de ver en pantalla.
+    // Es solo para la UX: el valor que realmente se guarda lo recalcula
+    // apply_inventory_group con sus propios contadores del lado del servidor.
+    const computeCountPreview = (): CountPreview => {
+        const rotationClass: RotationClass = (group?.rotation_class as RotationClass) || 'medium';
+        const currentInterval = group?.interval_days ?? midpointOfClass(rotationClass);
+
+        let matched = 0, faltantes = 0, sobrantes = 0;
+        items.forEach(item => {
+            const theoretical = getTheoreticalStock(item.product, group?.warehouse_id);
+            if (item.counted_stock === theoretical) matched += 1;
+            else if (item.counted_stock < theoretical) faltantes += 1;
+            else sobrantes += 1;
+        });
+
+        const total = items.length;
+        const accuracyPct = total > 0 ? Math.round((matched / total) * 10000) / 100 : null;
+        const tier = accuracyPct !== null ? getAccuracyTier(accuracyPct) : null;
+        const suggestedInterval = accuracyPct !== null
+            ? suggestNextInterval(currentInterval, accuracyPct, rotationClass)
+            : null;
+
+        return { total, matched, faltantes, sobrantes, accuracyPct, tier, rotationClass, currentInterval, suggestedInterval };
+    };
+
+    const openFinalizeModal = () => {
+        const preview = computeCountPreview();
+        setFinalizePreview(preview);
+        setIntervalChoice(preview.accuracyPct === null ? 'keep' : 'suggested');
+        setCustomIntervalDays('');
+        setShowFinalizeModal(true);
     };
 
     const handleScan = async (e: React.FormEvent) => {
@@ -363,12 +419,25 @@ export const InventorySession: React.FC = () => {
         }
     };
 
-    // BOTÓN 2: FINALIZAR Y APLICAR (Ajusta stock real en sistema y renueva estado)
+    // BOTÓN 2 (confirmado desde el modal de auditoría): Ajusta stock real y
+    // renueva el intervalo del grupo con la decisión que aprobó el manager.
     const handleFinalizeAndApply = async () => {
-        if (!window.confirm("¿Finalizar conteo y aplicar el ajuste de inventario al sistema? Esto actualizará el stock real en almacenes.")) return;
+        if (!finalizePreview) return;
+
+        let nextIntervalDays: number | null;
+        if (intervalChoice === 'keep') {
+            nextIntervalDays = finalizePreview.currentInterval;
+        } else if (intervalChoice === 'custom') {
+            const parsed = parseInt(customIntervalDays, 10);
+            nextIntervalDays = Number.isFinite(parsed)
+                ? clampToClass(parsed, finalizePreview.rotationClass)
+                : null; // sin número válido, deja que el RPC conserve el intervalo actual
+        } else {
+            nextIntervalDays = finalizePreview.suggestedInterval; // 'suggested'
+        }
 
         try {
-            setLoading(true);
+            setApplyingFinalize(true);
 
             // 1. Push local counts (deletions + counted_stock) to inventory_group_items
             //    so the RPC below — which reads straight from the DB — sees the latest
@@ -378,20 +447,23 @@ export const InventorySession: React.FC = () => {
             // 2. Apply the whole group atomically in the database: locks the group and
             //    each item's row at group.warehouse_id specifically (fixing the missing
             //    warehouse filter), writes inventory_levels + inventory_logs together,
-            //    and resets the group for its next cycle — all in one transaction.
+            //    recalculates the real accuracy score server-side, and resets the group
+            //    for its next cycle — all in one transaction.
             const { error: applyError } = await supabase.rpc('apply_inventory_group', {
-                p_group_id: id
+                p_group_id: id,
+                p_next_interval_days: nextIntervalDays
             });
             if (applyError) throw applyError;
 
             setIsDirty(false);
+            setShowFinalizeModal(false);
             alert('Inventario actualizado y aplicado correctamente. Los conteos en sesión del grupo han sido encerados y el estado renovado.');
             navigate('/inventory-mode');
         } catch (error: any) {
             console.error('Error finalizando:', error);
             alert('Error al finalizar y aplicar: ' + error.message);
         } finally {
-            setLoading(false);
+            setApplyingFinalize(false);
         }
     };
 
@@ -406,21 +478,14 @@ export const InventorySession: React.FC = () => {
     // Calculate Status Badge based on interval and last_counted_at
     const statusInfo = useMemo(() => {
         if (!group) return { status: 'Por inventariar' as const, nextDateStr: 'Pendiente' };
-        const val = group.interval_value || 0;
-        const unit = group.interval_unit || 'days';
-        
-        if (!group.last_counted_at || val <= 0) {
+        const intervalDays = group.interval_days || 0;
+
+        if (!group.last_counted_at || intervalDays <= 0) {
             return { status: 'Por inventariar' as const, nextDateStr: 'Sin intervalo programado' };
         }
 
         const nextDate = new Date(group.last_counted_at);
-        if (unit === 'months') {
-            nextDate.setMonth(nextDate.getMonth() + val);
-        } else if (unit === 'weeks') {
-            nextDate.setDate(nextDate.getDate() + (val * 7));
-        } else {
-            nextDate.setDate(nextDate.getDate() + val);
-        }
+        nextDate.setDate(nextDate.getDate() + intervalDays);
 
         const isUpToDate = nextDate.getTime() > new Date().getTime();
         return {
@@ -641,6 +706,95 @@ export const InventorySession: React.FC = () => {
                 </div>
             )}
 
+            {/* MODAL: RESUMEN DE AUDITORÍA ANTES DE FINALIZAR Y APLICAR */}
+            {showFinalizeModal && finalizePreview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-surface rounded-2xl shadow-xl max-w-lg w-full p-6 border border-subtle animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="w-11 h-11 bg-primary-soft text-primary rounded-full flex items-center justify-center shrink-0">
+                                <Gauge className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-fg leading-tight">Resumen de Auditoría</h3>
+                                <p className="text-xs text-fg-muted">{group?.name}</p>
+                            </div>
+                        </div>
+
+                        {finalizePreview.total === 0 ? (
+                            <p className="text-sm text-fg-muted mt-4 mb-2">
+                                Este grupo no tiene ítems contados. Aplicar no modificará stock; el intervalo de conteo se mantiene igual.
+                            </p>
+                        ) : (
+                            <>
+                                <div className="mt-4 mb-3 p-3.5 bg-surface-2 rounded-xl border border-subtle">
+                                    <p className="text-sm font-bold text-fg">
+                                        Precisión del conteo: {finalizePreview.accuracyPct}%
+                                    </p>
+                                    <p className="text-xs text-fg-muted mt-0.5">
+                                        {finalizePreview.matched} cuadrados, {finalizePreview.sobrantes} sobrantes, {finalizePreview.faltantes} faltantes
+                                    </p>
+                                    {finalizePreview.tier && (
+                                        <p className="text-xs text-fg mt-2 leading-relaxed">
+                                            <strong>{finalizePreview.tier.headline}</strong> Este grupo es de Rotación {ROTATION_CLASS_BOUNDS[finalizePreview.rotationClass].label}. {finalizePreview.tier.detail}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="mb-4 flex items-center justify-center gap-3 text-sm py-2">
+                                    <span className="text-fg-muted">Actual: <strong className="text-fg font-mono">{finalizePreview.currentInterval}d</strong></span>
+                                    <TrendingUp className="w-4 h-4 text-fg-subtle" />
+                                    <span className="text-fg-muted">Sugerido: <strong className="text-primary font-mono">{finalizePreview.suggestedInterval}d</strong></span>
+                                </div>
+
+                                <div className="space-y-2 mb-5">
+                                    <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-subtle hover:bg-surface-2 cursor-pointer text-sm">
+                                        <input type="radio" name="intervalChoice" checked={intervalChoice === 'suggested'} onChange={() => setIntervalChoice('suggested')} className="accent-primary" />
+                                        Aceptar sugerencia del sistema ({finalizePreview.suggestedInterval} días)
+                                    </label>
+                                    <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-subtle hover:bg-surface-2 cursor-pointer text-sm">
+                                        <input type="radio" name="intervalChoice" checked={intervalChoice === 'keep'} onChange={() => setIntervalChoice('keep')} className="accent-primary" />
+                                        Mantener en {finalizePreview.currentInterval} días
+                                    </label>
+                                    <label className="flex items-center gap-2.5 p-2.5 rounded-xl border border-subtle hover:bg-surface-2 cursor-pointer text-sm">
+                                        <input type="radio" name="intervalChoice" checked={intervalChoice === 'custom'} onChange={() => setIntervalChoice('custom')} className="accent-primary" />
+                                        Forzar otro intervalo:
+                                        <input
+                                            type="number"
+                                            value={customIntervalDays}
+                                            onChange={(e) => { setCustomIntervalDays(e.target.value); setIntervalChoice('custom'); }}
+                                            placeholder={`${ROTATION_CLASS_BOUNDS[finalizePreview.rotationClass].min}-${ROTATION_CLASS_BOUNDS[finalizePreview.rotationClass].max}`}
+                                            className="w-20 px-2 py-1 bg-surface border border-strong rounded-lg text-xs font-mono text-center outline-none focus:ring-2 focus:ring-primary"
+                                        />
+                                        días
+                                    </label>
+                                    <p className="text-[11px] text-fg-subtle pl-1">
+                                        Cualquier opción se ajusta a los límites de Rotación {ROTATION_CLASS_BOUNDS[finalizePreview.rotationClass].label}: {ROTATION_CLASS_BOUNDS[finalizePreview.rotationClass].min}-{ROTATION_CLASS_BOUNDS[finalizePreview.rotationClass].max} días.
+                                    </p>
+                                </div>
+                            </>
+                        )}
+
+                        <div className="flex gap-2.5">
+                            <button
+                                onClick={() => setShowFinalizeModal(false)}
+                                disabled={applyingFinalize}
+                                className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-fg font-bold rounded-xl text-sm transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleFinalizeAndApply}
+                                disabled={applyingFinalize}
+                                className="flex-1 py-2.5 px-4 bg-success hover:bg-success text-white font-bold rounded-xl text-sm shadow-lg shadow-success/20 transition-colors flex items-center justify-center gap-2"
+                            >
+                                {applyingFinalize ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Confirmar y Aplicar Inventario
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ADVERTENCIA 24 HORAS EXPIRADA */}
             {sessionExpiredWarning && (
                 <div className="mb-4 p-4 bg-danger-soft border border-danger/20 text-danger-soft-fg rounded-2xl flex items-center justify-between shadow-sm">
@@ -714,9 +868,9 @@ export const InventorySession: React.FC = () => {
                     </button>
                     
                     <button
-                        onClick={handleFinalizeAndApply}
+                        onClick={openFinalizeModal}
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-success hover:bg-success text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-success/30 active:scale-95"
-                        title="Aplicar conteos al stock real del inventario, renovar fecha y encerar sesión"
+                        title="Revisar el resumen de auditoría y aplicar el conteo al stock real"
                     >
                         <Save className="w-4 h-4" />
                         <span>Finalizar y Aplicar</span>

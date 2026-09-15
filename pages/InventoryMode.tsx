@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { LayoutDashboard, Trash2, Edit2, RotateCcw, Plus, Search, Clock, Calendar, ShieldCheck, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Trash2, Edit2, RotateCcw, Plus, Search, Clock, Calendar, ShieldCheck, AlertCircle, Target } from 'lucide-react';
+import { RotationClass, ROTATION_CLASSES, ROTATION_CLASS_BOUNDS, midpointOfClass } from '../utils/rotationClass';
 
 interface GroupData {
     id: string;
@@ -9,8 +10,9 @@ interface GroupData {
     created_at: string;
     last_counted_at: string;
     session_started_at?: string;
-    interval_value?: number;
-    interval_unit?: string;
+    rotation_class?: RotationClass;
+    interval_days?: number;
+    last_accuracy_score?: number | null;
     inventory_group_items?: { count: number }[];
 }
 
@@ -27,26 +29,27 @@ export const InventoryMode: React.FC = () => {
             const { data, error } = await supabase
                 .from('inventory_groups')
                 .select(`
-                    id, 
-                    name, 
-                    created_at, 
+                    id,
+                    name,
+                    created_at,
                     last_counted_at,
                     session_started_at,
-                    interval_value,
-                    interval_unit,
+                    rotation_class,
+                    interval_days,
+                    last_accuracy_score,
                     inventory_group_items (count)
                 `)
                 .order('last_counted_at', { ascending: false });
 
             if (error) throw error;
-            
+
             // Normalize default values
             const formattedData = (data || []).map((g: any) => ({
                 ...g,
-                interval_value: g.interval_value ?? 0,
-                interval_unit: g.interval_unit ?? 'days'
+                rotation_class: (g.rotation_class ?? 'medium') as RotationClass,
+                interval_days: g.interval_days ?? midpointOfClass('medium')
             }));
-            
+
             setGroups(formattedData);
         } catch (error: any) {
             console.error('Error fetching inventory groups:', error);
@@ -68,11 +71,11 @@ export const InventoryMode: React.FC = () => {
             const { data: userData } = await supabase.auth.getUser();
             const { data, error } = await supabase
                 .from('inventory_groups')
-                .insert([{ 
-                    name, 
+                .insert([{
+                    name,
                     created_by: userData.user?.id,
-                    interval_value: 0,
-                    interval_unit: 'days',
+                    rotation_class: 'medium',
+                    interval_days: midpointOfClass('medium'),
                     session_started_at: new Date().toISOString()
                 }])
                 .select()
@@ -148,31 +151,35 @@ export const InventoryMode: React.FC = () => {
         }
     };
 
-    const handleIntervalChange = async (groupId: string, newVal: number, newUnit: string) => {
+    // Cambiar la clase de rotación reclasifica el grupo — el intervalo salta al
+    // punto medio de la nueva clase (misma convención que un grupo recién
+    // creado) hasta que el próximo conteo lo recalibre con datos reales.
+    const handleRotationClassChange = async (groupId: string, newClass: RotationClass) => {
         setUpdatingId(groupId);
-        setGroups(prev => prev.map(g => g.id === groupId ? { ...g, interval_value: newVal, interval_unit: newUnit } : g));
-        
+        const newInterval = midpointOfClass(newClass);
+        setGroups(prev => prev.map(g => g.id === groupId ? { ...g, rotation_class: newClass, interval_days: newInterval } : g));
+
         try {
             const { error } = await supabase
                 .from('inventory_groups')
                 .update({
-                    interval_value: newVal,
-                    interval_unit: newUnit
+                    rotation_class: newClass,
+                    interval_days: newInterval
                 })
                 .eq('id', groupId);
 
             if (error) throw error;
         } catch (error: any) {
-            console.error('Error guardando intervalo:', error);
-            alert('No se pudo actualizar el intervalo: ' + error.message);
+            console.error('Error guardando la clase de rotación:', error);
+            alert('No se pudo actualizar la clase de rotación: ' + error.message);
             fetchGroups();
         } finally {
             setUpdatingId(null);
         }
     };
 
-    const calculateNextCountInfo = (lastCountedAt?: string, intervalVal: number = 0, intervalUnit: string = 'days') => {
-        if (!lastCountedAt || intervalVal <= 0) {
+    const calculateNextCountInfo = (lastCountedAt?: string, intervalDays: number = 0) => {
+        if (!lastCountedAt || intervalDays <= 0) {
             return {
                 status: 'Por inventariar' as const,
                 nextDate: null,
@@ -189,14 +196,7 @@ export const InventoryMode: React.FC = () => {
             };
         }
 
-        if (intervalUnit === 'months') {
-            date.setMonth(date.getMonth() + intervalVal);
-        } else if (intervalUnit === 'weeks') {
-            date.setDate(date.getDate() + (intervalVal * 7));
-        } else {
-            // default days
-            date.setDate(date.getDate() + intervalVal);
-        }
+        date.setDate(date.getDate() + intervalDays);
 
         const now = new Date();
         const isUpToDate = date.getTime() > now.getTime();
@@ -266,7 +266,7 @@ export const InventoryMode: React.FC = () => {
                                     <th className="px-4 py-2.5">Nombre del Grupo</th>
                                     <th className="px-4 py-2.5 text-center">Productos</th>
                                     <th className="px-4 py-2.5">Última Vez Aplicado</th>
-                                    <th className="px-4 py-2.5">Intervalo de Conteo</th>
+                                    <th className="px-4 py-2.5">Clase de Rotación</th>
                                     <th className="px-4 py-2.5">Próximo Conteo & Estado</th>
                                     <th className="px-4 py-2.5 text-right">Acciones</th>
                                 </tr>
@@ -274,10 +274,11 @@ export const InventoryMode: React.FC = () => {
                             <tbody className="divide-y divide-subtle text-sm">
                                 {filteredGroups.map(group => {
                                     const nextCountInfo = calculateNextCountInfo(
-                                        group.last_counted_at, 
-                                        group.interval_value ?? 0, 
-                                        group.interval_unit ?? 'days'
+                                        group.last_counted_at,
+                                        group.interval_days ?? 0
                                     );
+                                    const rotationClass = group.rotation_class ?? 'medium';
+                                    const classBounds = ROTATION_CLASS_BOUNDS[rotationClass];
                                     
                                     return (
                                         <tr 
@@ -309,34 +310,29 @@ export const InventoryMode: React.FC = () => {
                                                 )}
                                             </td>
                                             
-                                            {/* Interval Selector Controls */}
+                                            {/* Rotation Class Selector */}
                                             <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-900 p-1 rounded-xl border border-subtle w-fit">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="365"
-                                                        value={group.interval_value ?? 0}
-                                                        onChange={(e) => {
-                                                            const val = parseInt(e.target.value, 10) || 0;
-                                                            setGroups(prev => prev.map(g => g.id === group.id ? { ...g, interval_value: val } : g));
-                                                        }}
-                                                        onBlur={(e) => {
-                                                            const val = parseInt(e.target.value, 10) || 0;
-                                                            handleIntervalChange(group.id, val, group.interval_unit ?? 'days');
-                                                        }}
-                                                        className="w-14 px-2 py-1 bg-surface border border-strong rounded-lg text-xs font-mono font-bold text-center text-fg outline-none focus:ring-2 focus:ring-primary shadow-2xs"
-                                                        title="Número de días/semanas/meses"
-                                                    />
+                                                <div className="flex flex-col gap-1 w-fit">
                                                     <select
-                                                        value={group.interval_unit ?? 'days'}
-                                                        onChange={(e) => handleIntervalChange(group.id, group.interval_value ?? 0, e.target.value)}
-                                                        className="px-2 py-1 bg-surface border border-strong rounded-lg text-xs font-bold text-fg outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs"
+                                                        value={rotationClass}
+                                                        onChange={(e) => handleRotationClassChange(group.id, e.target.value as RotationClass)}
+                                                        disabled={updatingId === group.id}
+                                                        className="px-2.5 py-1.5 bg-surface border border-strong rounded-lg text-xs font-bold text-fg outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs disabled:opacity-60"
+                                                        title={classBounds.examples}
                                                     >
-                                                        <option value="days">Días</option>
-                                                        <option value="weeks">Semanas</option>
-                                                        <option value="months">Meses</option>
+                                                        {ROTATION_CLASSES.map(rc => (
+                                                            <option key={rc} value={rc}>
+                                                                {ROTATION_CLASS_BOUNDS[rc].label} · {ROTATION_CLASS_BOUNDS[rc].min}-{ROTATION_CLASS_BOUNDS[rc].max}d
+                                                            </option>
+                                                        ))}
                                                     </select>
+                                                    <span className="text-[11px] text-fg-muted font-mono flex items-center gap-1 pl-0.5">
+                                                        <Target className="w-3 h-3 text-fg-subtle" />
+                                                        {group.interval_days ?? classBounds.min} días
+                                                        {typeof group.last_accuracy_score === 'number' && (
+                                                            <span className="text-fg-subtle">· últ. precisión {group.last_accuracy_score}%</span>
+                                                        )}
+                                                    </span>
                                                 </div>
                                             </td>
 
