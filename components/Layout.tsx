@@ -15,6 +15,7 @@ import {
   Home,
   Menu,
   MessageCircle,
+  NotebookPen,
   PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
@@ -72,6 +73,7 @@ const GROUPS: NavigationGroup[] = [
       { id: 'products', label: 'Catálogo', title: 'Catálogo de productos', to: '/products', icon: Boxes, permission: 'products', aliases: ['producto', 'productos'] },
       { id: 'orders', label: 'Órdenes', title: 'Gestión de órdenes', to: '/orders', icon: ShoppingCart, permission: 'orders', badge: 'orders', aliases: ['pedido', 'pedidos'] },
       { id: 'shipments', label: 'Envíos', title: 'Órdenes y envíos', to: '/orders/envios', icon: Truck, permission: 'orders', badge: 'shipments', aliases: ['despacho', 'entrega'] },
+      { id: 'bitacoras', label: 'Bitácoras', title: 'Bitácoras del equipo', to: '/bitacoras', icon: NotebookPen, aliases: ['bitacora', 'bitácora', 'registro diario', 'notas', 'diario'] },
     ],
   },
   {

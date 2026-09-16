@@ -42,6 +42,8 @@ const SourcingPipeline = React.lazy(() => import('./pages/SourcingPipeline'));
 const InventoryMode = React.lazy(() => import('./pages/InventoryMode').then(module => ({ default: module.InventoryMode })));
 const InventorySession = React.lazy(() => import('./pages/InventorySession').then(module => ({ default: module.InventorySession })));
 const POE = React.lazy(() => import('./pages/POE'));
+const Bitacoras = React.lazy(() => import('./pages/Bitacoras'));
+const BitacoraFullView = React.lazy(() => import('./pages/BitacoraFullView'));
 const WhatsAppInbox = React.lazy(() => import('./pages/WhatsAppInbox'));
 const WhatsAppAnalytics = React.lazy(() => import('./pages/WhatsAppAnalytics'));
 const AgentOperations = React.lazy(() => import('./pages/AgentOperations'));
@@ -118,6 +120,8 @@ const App: React.FC = () => {
                 <Route path="daily-registry" element={<DailyRegistry />} />
                 <Route path="expenses" element={<Expenses />} />
                 <Route path="poe" element={<POE />} />
+                <Route path="bitacoras" element={<Bitacoras />} />
+                <Route path="bitacoras/:id" element={<BitacoraFullView />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Route>
