@@ -12,6 +12,11 @@
 --   3. Deja en Guayaquil el total sumado de todas las bodegas, y crea la fila
 --      (en 0) para los productos que no tenian stock en ninguna parte.
 --   4. Pone en 0 las demas bodegas. Las filas se conservan, no se borran.
+--   5. Desactiva esas otras bodegas (is_active = false) para que dejen de
+--      aparecer en el ERP. No se borran: hay inventory_levels, inventory_logs
+--      y movimientos historicos apuntando a ellas, y un DELETE romperia esas
+--      referencias o se llevaria por delante la trazabilidad. Para revivir una
+--      basta con volver a ponerle is_active = true.
 --
 -- El total por producto no cambia: solo cambia de bodega. Es idempotente: al
 -- correrlo dos veces no queda nada que mover, asi que no duplica logs.
@@ -21,6 +26,7 @@ DECLARE
     v_reason TEXT := 'Consolidacion de bodegas en Guayaquil';
     v_productos INT;
     v_movidos INT;
+    v_desactivadas INT;
 BEGIN
     SELECT id INTO v_gye
     FROM public.warehouses
@@ -78,6 +84,14 @@ BEGIN
     WHERE warehouse_id <> v_gye
       AND current_stock <> 0;
 
-    RAISE NOTICE 'Guayaquil = bodega %. Productos con fila en Guayaquil: %. Filas de otras bodegas consolidadas: %.',
-        v_gye, v_productos, v_movidos;
+    -- 5. Guayaquil es la unica bodega operativa por ahora.
+    UPDATE public.warehouses
+    SET is_active = false
+    WHERE id <> v_gye
+      AND is_active IS DISTINCT FROM false;
+
+    GET DIAGNOSTICS v_desactivadas = ROW_COUNT;
+
+    RAISE NOTICE 'Guayaquil = bodega %. Productos con fila en Guayaquil: %. Filas de otras bodegas consolidadas: %. Bodegas desactivadas: %.',
+        v_gye, v_productos, v_movidos, v_desactivadas;
 END $$;

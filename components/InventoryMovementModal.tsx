@@ -46,7 +46,7 @@ const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({ isOpen,
             if (productsError) throw productsError;
             setProducts(productsData || []);
 
-            const { data: warehousesData, error: warehousesError } = await supabase.from('warehouses').select('*');
+            const { data: warehousesData, error: warehousesError } = await supabase.from('warehouses').select('*').eq('is_active', true);
             if (warehousesError) throw warehousesError;
             setWarehouses(warehousesData || []);
         } catch (err: any) {

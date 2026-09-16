@@ -66,7 +66,7 @@ const MobileInventory: React.FC = () => {
     const fetchWarehouses = useCallback(async () => {
         setLoadingWarehouses(true);
         setWarehouseError(null);
-        const { data, error } = await supabase.from('warehouses').select('*').order('id');
+        const { data, error } = await supabase.from('warehouses').select('*').eq('is_active', true).order('id');
         setLoadingWarehouses(false);
 
         if (error) {

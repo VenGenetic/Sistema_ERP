@@ -332,7 +332,7 @@ const Inventory: React.FC = () => {
     const fetchWarehouses = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.from('warehouses').select('*').order('id');
+            const { data, error } = await supabase.from('warehouses').select('*').eq('is_active', true).order('id');
             if (error) throw error;
             setWarehouses(data || []);
         } catch (error) {
