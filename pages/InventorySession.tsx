@@ -362,18 +362,19 @@ export const InventorySession: React.FC = () => {
         }
 
         if (items.length > 0) {
-            const upsertRows = items.map(i => {
-                const row: any = {
-                    group_id: id,
-                    product_id: i.product_id,
-                    counted_stock: i.counted_stock,
-                    is_manually_added: i.is_manually_added
-                };
-                if (!i.id.startsWith('temp-')) {
-                    row.id = i.id;
-                }
-                return row;
-            });
+            // Ojo: todas las filas del payload deben tener exactamente las mismas
+            // claves. Si a las ya guardadas les añadimos `id` y a las nuevas
+            // (temp-*) no, PostgREST manda un INSERT con la unión de columnas y
+            // rellena el `id` que falta con NULL en vez de con su DEFAULT
+            // gen_random_uuid() -> "null value in column id ... not-null".
+            // El upsert resuelve por (group_id, product_id), que es UNIQUE, así
+            // que no hace falta mandar el id: las filas existentes conservan el suyo.
+            const upsertRows = items.map(i => ({
+                group_id: id,
+                product_id: i.product_id,
+                counted_stock: i.counted_stock,
+                is_manually_added: i.is_manually_added
+            }));
 
             const { error: upsertErr } = await supabase
                 .from('inventory_group_items')
