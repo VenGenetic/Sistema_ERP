@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Activity,
   Archive,
   BarChart3,
   Building2,
@@ -99,6 +100,7 @@ const GROUPS: NavigationGroup[] = [
       { id: 'product-tags', label: 'Etiquetas de productos', title: 'Etiquetas de productos', to: '/tags', icon: Tags, permission: 'products' },
       { id: 'poe', label: 'Estándares (SOPs)', title: 'Estándares y procedimientos', to: '/poe', icon: FileText, aliases: ['poe', 'procedimientos'] },
       { id: 'settings-page', label: 'Ajustes', title: 'Configuración del sistema', to: '/settings', icon: Settings, adminOnly: true },
+      { id: 'agent-operations', label: 'Operación de agentes', title: 'Supervisor operativo de agentes', to: '/agent-operations', icon: Activity, adminOnly: true, aliases: ['salud', 'agentes', 'incidentes', 'reportes'] },
     ],
   },
 ];

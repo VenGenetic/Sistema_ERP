@@ -36,6 +36,7 @@ const Bitacoras = React.lazy(() => import('./pages/Bitacoras'));
 const BitacoraFullView = React.lazy(() => import('./pages/BitacoraFullView'));
 const WhatsAppInbox = React.lazy(() => import('./pages/WhatsAppInbox'));
 const WhatsAppAnalytics = React.lazy(() => import('./pages/WhatsAppAnalytics'));
+const AgentOperations = React.lazy(() => import('./pages/AgentOperations'));
 
 // Lazy load mobile pages
 const MobileLayout = React.lazy(() => import('./components/mobile/MobileLayout'));
@@ -101,6 +102,7 @@ const App: React.FC = () => {
                 <Route path="product-demands" element={<ProductDemands />} />
                 <Route path="whatsapp-inbox" element={<WhatsAppInbox />} />
                 <Route path="whatsapp-analytics" element={<WhatsAppAnalytics />} />
+                <Route path="agent-operations" element={<AgentOperations />} />
                 <Route path="sourcing" element={<SourcingPipeline />} />
                 <Route path="orders/*" element={<Orders />} />
                 <Route path="commissions" element={<CommissionDashboard />} />
