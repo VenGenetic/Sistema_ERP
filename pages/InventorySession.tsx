@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus, Loader2, X, Package, ShieldCheck, AlertCircle, Clock, Calendar, Check, SaveAll, Info, TrendingUp, Gauge } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, AlertTriangle, CheckCircle, Search, Minus, Plus, Loader2, X, Package, ShieldCheck, AlertCircle, Clock, Calendar, Check, SaveAll, Info, TrendingUp, Gauge, Warehouse } from 'lucide-react';
 import { RotationClass, ROTATION_CLASS_BOUNDS, midpointOfClass, clampToClass, getAccuracyTier, suggestNextInterval, AccuracyTier } from '../utils/rotationClass';
+import { fetchInventoryWarehouses, InventoryWarehouse, INVENTORY_WAREHOUSE_NAME } from '../utils/inventoryWarehouse';
 
 interface GroupItem {
     id: string;
@@ -54,6 +55,16 @@ export const InventorySession: React.FC = () => {
     const [intervalChoice, setIntervalChoice] = useState<'suggested' | 'keep' | 'custom'>('suggested');
     const [customIntervalDays, setCustomIntervalDays] = useState('');
     const [applyingFinalize, setApplyingFinalize] = useState(false);
+
+    // Bodega del grupo: apply_inventory_group la exige (aborta con "El grupo no
+    // tiene una bodega asignada") y getTheoreticalStock la usa para filtrar los
+    // inventory_levels, asi que se puede asignar desde aqui sin volver al listado.
+    const [warehouses, setWarehouses] = useState<InventoryWarehouse[]>([]);
+    const [savingWarehouse, setSavingWarehouse] = useState(false);
+    // Puerta de entrada al conteo: un grupo sin bodega no puede contarse (el
+    // teorico saldria sumando todas las bodegas y el RPC abortaria al aplicar),
+    // asi que se pide antes de dejar escanear nada.
+    const [pendingWarehouseId, setPendingWarehouseId] = useState('');
 
     // Add product state
     const [searchQuery, setSearchQuery] = useState('');
@@ -154,6 +165,39 @@ export const InventorySession: React.FC = () => {
     }, [isDirty]);
 
     // Calculate theoretical stock
+    useEffect(() => {
+        const loadWarehouses = async () => {
+            try {
+                const data = await fetchInventoryWarehouses();
+                setWarehouses(data);
+                // Hoy Guayaquil es la única opción: se deja preseleccionada para
+                // que el operador solo confirme, sin abrir un desplegable de uno.
+                if (data.length === 1) setPendingWarehouseId(String(data[0].id));
+            } catch (error: any) {
+                console.error('Error cargando bodegas:', error);
+            }
+        };
+        loadWarehouses();
+    }, []);
+
+    const handleWarehouseChange = async (rawValue: string) => {
+        const newWarehouseId = rawValue ? parseInt(rawValue, 10) : null;
+        setSavingWarehouse(true);
+        try {
+            const { error } = await supabase
+                .from('inventory_groups')
+                .update({ warehouse_id: newWarehouseId })
+                .eq('id', id);
+            if (error) throw error;
+            setGroup((prev: any) => ({ ...prev, warehouse_id: newWarehouseId }));
+        } catch (error: any) {
+            console.error('Error asignando la bodega:', error);
+            alert('No se pudo asignar la bodega: ' + error.message);
+        } finally {
+            setSavingWarehouse(false);
+        }
+    };
+
     const getTheoreticalStock = (product: any, warehouseId: number) => {
         if (!product?.inventory_levels) return 0;
         const levels = warehouseId ? product.inventory_levels.filter((l: any) => l.warehouse_id === warehouseId) : product.inventory_levels;
@@ -188,6 +232,10 @@ export const InventorySession: React.FC = () => {
     };
 
     const openFinalizeModal = () => {
+        if (!group?.warehouse_id) {
+            alert('Este grupo no tiene una bodega asignada. Elige la bodega en la cabecera antes de aplicar el conteo: es la que decide sobre que stock se escribe.');
+            return;
+        }
         const preview = computeCountPreview();
         setFinalizePreview(preview);
         setIntervalChoice(preview.accuracyPct === null ? 'keep' : 'suggested');
@@ -707,6 +755,57 @@ export const InventorySession: React.FC = () => {
                 </div>
             )}
 
+            {/* MODAL: ELEGIR BODEGA ANTES DE EMPEZAR EL CONTEO */}
+            {!loading && group && !group.warehouse_id && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-surface rounded-2xl shadow-xl max-w-md w-full p-6 border border-subtle animate-in zoom-in-95 duration-200">
+                        <div className="w-14 h-14 bg-primary-soft text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Warehouse className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-xl font-bold text-fg mb-2 text-center">
+                            ¿Qué bodega vas a contar?
+                        </h3>
+                        <p className="text-sm text-fg-muted mb-5 leading-relaxed text-center">
+                            El grupo <strong className="text-fg">{group.name}</strong> todavía no tiene bodega. Es la que decide qué stock teórico se compara y sobre cuál se escribe el ajuste al finalizar.
+                        </p>
+                        {warehouses.length === 0 ? (
+                            <div className="flex items-start gap-2.5 px-4 py-3 bg-warning-soft text-warning-soft-fg rounded-xl border border-warning/20 text-sm font-medium mb-4">
+                                <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                                <span>No hay ninguna bodega activa llamada <strong>{INVENTORY_WAREHOUSE_NAME}</strong>. Créala en Bodegas (o revisa que esté activa) para poder contar.</span>
+                            </div>
+                        ) : (
+                            <select
+                                value={pendingWarehouseId}
+                                onChange={(e) => setPendingWarehouseId(e.target.value)}
+                                autoFocus
+                                className="w-full px-4 py-3 bg-surface-2 border-2 border-subtle rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none transition-all text-fg font-bold text-sm mb-4"
+                            >
+                                <option value="">Selecciona una bodega...</option>
+                                {warehouses.map(w => (
+                                    <option key={w.id} value={w.id} className="bg-surface text-fg">{w.name}</option>
+                                ))}
+                            </select>
+                        )}
+                        <div className="flex flex-col gap-2.5">
+                            <button
+                                onClick={() => handleWarehouseChange(pendingWarehouseId)}
+                                disabled={!pendingWarehouseId || savingWarehouse}
+                                className="w-full py-3 px-4 bg-primary hover:bg-primary text-white font-bold rounded-xl text-sm shadow-lg shadow-primary/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {savingWarehouse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                Empezar el conteo
+                            </button>
+                            <button
+                                onClick={() => navigate('/inventory-mode')}
+                                className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-fg font-bold rounded-xl text-sm transition-colors"
+                            >
+                                Volver al listado
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL: RESUMEN DE AUDITORÍA ANTES DE FINALIZAR Y APLICAR */}
             {showFinalizeModal && finalizePreview && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
@@ -845,6 +944,31 @@ export const InventorySession: React.FC = () => {
                                     Cambios pendientes
                                 </span>
                             )}
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            <label className="text-xs font-bold text-fg-muted uppercase tracking-wider flex items-center gap-1.5">
+                                <Warehouse className="w-3.5 h-3.5 text-fg-subtle" />
+                                Bodega
+                            </label>
+                            <select
+                                value={group?.warehouse_id ?? ''}
+                                onChange={(e) => handleWarehouseChange(e.target.value)}
+                                disabled={savingWarehouse}
+                                className={`px-2.5 py-1.5 bg-surface border rounded-lg text-xs font-bold text-fg outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs disabled:opacity-60 ${group?.warehouse_id ? 'border-strong' : 'border-warning'}`}
+                                title="Bodega sobre la que se aplicara el conteo"
+                            >
+                                <option value="">Sin asignar</option>
+                                {warehouses.map(w => (
+                                    <option key={w.id} value={w.id} className="bg-surface text-fg">{w.name}</option>
+                                ))}
+                            </select>
+                            {!group?.warehouse_id && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-warning-soft text-warning-soft-fg rounded-full text-xs font-bold border border-warning/20">
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    Asigna una bodega para poder aplicar
+                                </span>
+                            )}
+                            {savingWarehouse && <Loader2 className="w-4 h-4 animate-spin text-fg-subtle" />}
                         </div>
                         <p className="text-xs font-medium text-fg-muted mt-1 flex items-center gap-4 flex-wrap">
                             <span>Total repuestos: <strong className="text-fg">{items.length}</strong></span>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { LayoutDashboard, Trash2, Edit2, RotateCcw, Plus, Search, Clock, Calendar, ShieldCheck, AlertCircle, Target, ArrowUp, ArrowDown, Layers } from 'lucide-react';
 import { RotationClass, ROTATION_CLASSES, ROTATION_CLASS_BOUNDS, midpointOfClass } from '../utils/rotationClass';
+import { fetchInventoryWarehouses, InventoryWarehouse } from '../utils/inventoryWarehouse';
 
 interface GroupData {
     id: string;
@@ -13,6 +14,7 @@ interface GroupData {
     rotation_class?: RotationClass;
     interval_days?: number;
     last_accuracy_score?: number | null;
+    warehouse_id?: number | null;
     inventory_group_items?: { count: number }[];
 }
 
@@ -64,6 +66,9 @@ export const InventoryMode: React.FC = () => {
     const [sortKey, setSortKey] = useState<SortKey>('nextDate');
     const [sortDir, setSortDir] = useState<SortDir>('asc'); // default: fecha límite, más urgente primero
     const [groupBy, setGroupBy] = useState<GroupByOption>('none');
+    // Sin bodega, apply_inventory_group aborta ("El grupo no tiene una bodega
+    // asignada"), asi que se asigna desde el propio listado.
+    const [warehouses, setWarehouses] = useState<InventoryWarehouse[]>([]);
 
     const handleSortKeyChange = (key: SortKey) => {
         setSortKey(key);
@@ -84,6 +89,7 @@ export const InventoryMode: React.FC = () => {
                     rotation_class,
                     interval_days,
                     last_accuracy_score,
+                    warehouse_id,
                     inventory_group_items (count)
                 `)
                 .order('last_counted_at', { ascending: false });
@@ -106,8 +112,17 @@ export const InventoryMode: React.FC = () => {
         }
     };
 
+    const fetchWarehouses = async () => {
+        try {
+            setWarehouses(await fetchInventoryWarehouses());
+        } catch (error: any) {
+            console.error('Error cargando bodegas:', error);
+        }
+    };
+
     useEffect(() => {
         fetchGroups();
+        fetchWarehouses();
     }, []);
 
     const handleCreateGroup = async () => {
@@ -195,6 +210,27 @@ export const InventoryMode: React.FC = () => {
             fetchGroups();
         } catch (error: any) {
             alert('Error al resetear: ' + error.message);
+        }
+    };
+
+    const handleWarehouseChange = async (groupId: string, rawValue: string) => {
+        const newWarehouseId = rawValue ? parseInt(rawValue, 10) : null;
+        setUpdatingId(groupId);
+        setGroups(prev => prev.map(g => g.id === groupId ? { ...g, warehouse_id: newWarehouseId } : g));
+
+        try {
+            const { error } = await supabase
+                .from('inventory_groups')
+                .update({ warehouse_id: newWarehouseId })
+                .eq('id', groupId);
+
+            if (error) throw error;
+        } catch (error: any) {
+            console.error('Error asignando la bodega:', error);
+            alert('No se pudo asignar la bodega: ' + error.message);
+            fetchGroups();
+        } finally {
+            setUpdatingId(null);
         }
     };
 
@@ -434,6 +470,7 @@ export const InventoryMode: React.FC = () => {
                                     <th className="px-4 py-2.5">Nombre del Grupo</th>
                                     <th className="px-4 py-2.5 text-center">Productos</th>
                                     <th className="px-4 py-2.5">Última Vez Aplicado</th>
+                                    <th className="px-4 py-2.5">Bodega</th>
                                     <th className="px-4 py-2.5">Clase de Rotación</th>
                                     <th className="px-4 py-2.5">Próximo Conteo & Estado</th>
                                     <th className="px-4 py-2.5 text-right">Acciones</th>
@@ -476,6 +513,22 @@ export const InventoryMode: React.FC = () => {
                                                 )}
                                             </td>
                                             
+                                            {/* Warehouse Selector — obligatorio para "Finalizar y Aplicar" */}
+                                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                                <select
+                                                    value={group.warehouse_id ?? ''}
+                                                    onChange={(e) => handleWarehouseChange(group.id, e.target.value)}
+                                                    disabled={updatingId === group.id}
+                                                    className={`px-2.5 py-1.5 bg-surface border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs disabled:opacity-60 ${group.warehouse_id ? 'border-strong text-fg' : 'border-warning text-warning'}`}
+                                                    title={group.warehouse_id ? 'Bodega sobre la que se aplica el conteo' : 'Sin bodega no se puede aplicar el conteo'}
+                                                >
+                                                    <option value="">Sin asignar</option>
+                                                    {warehouses.map(w => (
+                                                        <option key={w.id} value={w.id} className="bg-surface text-fg">{w.name}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
+
                                             {/* Rotation Class Selector */}
                                             <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex flex-col gap-1 w-fit">
@@ -559,7 +612,7 @@ export const InventoryMode: React.FC = () => {
                                         return groupedSections.map(section => (
                                             <React.Fragment key={section.key}>
                                                 <tr className="bg-surface-2/70">
-                                                    <td colSpan={6} className="px-4 py-2 text-xs font-bold text-fg-muted uppercase tracking-wider border-y border-subtle">
+                                                    <td colSpan={7} className="px-4 py-2 text-xs font-bold text-fg-muted uppercase tracking-wider border-y border-subtle">
                                                         {section.label} · {section.rows.length} {section.rows.length === 1 ? 'grupo' : 'grupos'}
                                                     </td>
                                                 </tr>
