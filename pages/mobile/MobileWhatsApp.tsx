@@ -27,6 +27,7 @@ import {
     Package,
     Pin,
     Plus,
+    QrCode,
     RefreshCw,
     RotateCw,
     Search,
@@ -67,7 +68,7 @@ import RespuestasRapidasModal from '../../components/whatsapp/RespuestasRapidasM
 const AvisarLlegadaModal = lazy(() => import('../../components/whatsapp/AvisarLlegadaModal'));
 import { contarPorAvisar, type ModoAviso } from '../../components/whatsapp/avisarLlegada';
 import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
-import { avisoDeEnvio, haceCuanto, useAgente } from '../../components/whatsapp/agente';
+import { avisoDeEnvio, haceCuanto, sePuedeRevincular, useAgente } from '../../components/whatsapp/agente';
 import { fusionarMensajes, useRepasoDelHilo } from '../../components/whatsapp/hiloEnVivo';
 import { useHistorialDelHilo } from '../../components/whatsapp/historialDelHilo';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
@@ -92,6 +93,7 @@ import { attributeMessage, attributeMessages } from '../../utils/messageAttribut
 import ReenviarModal, { type MensajeAReenviar } from '../../components/whatsapp/ReenviarModal';
 import AyudaWhatsAppModal from '../../components/whatsapp/AyudaWhatsAppModal';
 const MoverChatModal = lazy(() => import('../../components/whatsapp/MoverChatModal'));
+const VincularWhatsAppModal = lazy(() => import('../../components/whatsapp/VincularWhatsAppModal'));
 const EditarMensajeModal = lazy(() => import('../../components/whatsapp/EditarMensajeModal'));
 const RenombrarContactoModal = lazy(() => import('../../components/whatsapp/RenombrarContactoModal'));
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -386,6 +388,14 @@ const MobileWhatsApp: React.FC = () => {
      */
     const { estado: estadoAgente, globalEncendido, agentes, alternarGlobal, alternarAgente } = useAgente(userId);
     const aviso = useMemo(() => avisoDeEnvio(estadoAgente, haceCuanto), [estadoAgente]);
+    /*
+        El QR sólo se ofrece cuando puede servir de algo: el proceso vivo y
+        WhatsApp caído. Con el agente entero apagado no se ofrece nada --
+        ninguna pantalla levanta un proceso muerto. La regla es la misma
+        función que usa la bandeja de escritorio, no una copia.
+    */
+    const puedeRevincular = useMemo(() => sePuedeRevincular(estadoAgente), [estadoAgente]);
+    const [vinculando, setVinculando] = useState(false);
 
     const contarAvisos = useCallback(async () => {
         try {
@@ -1565,12 +1575,23 @@ const MobileWhatsApp: React.FC = () => {
                 {/* Lo que se encole ahora NO va a salir. Se avisa arriba de todo
                     y no en la caja de escribir: hay que verlo ANTES de escribir. */}
                 {aviso && (
-                    <div role="status" aria-live="polite" className="flex shrink-0 items-start gap-2 border-b border-wa-divider bg-wa-notice px-3 py-2">
-                        <RotateCw size={15} className="mt-0.5 shrink-0 text-wa-notice-text" aria-hidden="true" />
-                        <div className="min-w-0">
-                            <p className="text-[13px] font-semibold text-wa-notice-text">{aviso.titulo}</p>
-                            <p className="text-[12px] text-wa-notice-text/90">{aviso.detalle}</p>
+                    <div role="status" aria-live="polite" className="shrink-0 border-b border-wa-divider bg-wa-notice px-3 py-2">
+                        <div className="flex items-start gap-2">
+                            <RotateCw size={15} className="mt-0.5 shrink-0 text-wa-notice-text" aria-hidden="true" />
+                            <div className="min-w-0">
+                                <p className="text-[13px] font-semibold text-wa-notice-text">{aviso.titulo}</p>
+                                <p className="text-[12px] text-wa-notice-text/90">{aviso.detalle}</p>
+                            </div>
                         </div>
+                        {puedeRevincular && (
+                            <button
+                                onClick={() => setVinculando(true)}
+                                className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-wa-notice-text/25 bg-wa-panel/70 px-3 text-[13px] font-semibold text-wa-notice-text"
+                            >
+                                <QrCode size={16} aria-hidden="true" />
+                                Vincular con QR
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -2040,6 +2061,11 @@ const MobileWhatsApp: React.FC = () => {
                         </div>
                     </div>
                 )}
+                {vinculando && (
+                    <Suspense fallback={null}>
+                        <VincularWhatsAppModal isOpen onClose={() => setVinculando(false)} />
+                    </Suspense>
+                )}
             </div>
         );
     }
@@ -2309,12 +2335,24 @@ const MobileWhatsApp: React.FC = () => {
             )}
 
             {aviso && (
-                <div role="status" aria-live="polite" className="flex shrink-0 items-start gap-2 border-b border-wa-divider bg-wa-notice px-4 py-2">
-                    <RotateCw size={15} className="mt-0.5 shrink-0 text-wa-notice-text" aria-hidden="true" />
-                    <div className="min-w-0">
-                        <p className="text-[13px] font-semibold text-wa-notice-text">{aviso.titulo}</p>
-                        <p className="text-[12px] text-wa-notice-text/90">{aviso.detalle}</p>
+                <div role="status" aria-live="polite" className="shrink-0 border-b border-wa-divider bg-wa-notice px-4 py-2">
+                    <div className="flex items-start gap-2">
+                        <RotateCw size={15} className="mt-0.5 shrink-0 text-wa-notice-text" aria-hidden="true" />
+                        <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-wa-notice-text">{aviso.titulo}</p>
+                            <p className="text-[12px] text-wa-notice-text/90">{aviso.detalle}</p>
+                        </div>
                     </div>
+
+                    {puedeRevincular && (
+                        <button
+                            onClick={() => setVinculando(true)}
+                            className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-wa-notice-text/25 bg-wa-panel/70 px-3 text-[13px] font-semibold text-wa-notice-text"
+                        >
+                            <QrCode size={16} aria-hidden="true" />
+                            Vincular con QR
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -2619,6 +2657,11 @@ const MobileWhatsApp: React.FC = () => {
                         onAvisado={contarAvisos}
                         onAbrirChat={abrirChatPorId}
                     />
+                </Suspense>
+            )}
+            {vinculando && (
+                <Suspense fallback={null}>
+                    <VincularWhatsAppModal isOpen onClose={() => setVinculando(false)} />
                 </Suspense>
             )}
             <AyudaWhatsAppModal
