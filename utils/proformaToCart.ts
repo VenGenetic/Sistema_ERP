@@ -30,6 +30,12 @@ export interface ProformaConversionResult {
 export interface CompradorConocido {
     telefono?: string | null;
     nombre?: string | null;
+    /**
+     * Identificador interno de WhatsApp, cuando el cliente oculta su número.
+     * Viaja para poder DESCARTARLO: un LID tiene pinta de teléfono largo y
+     * sin esto se crearía una ficha de cliente con un número inventado.
+     */
+    lid?: string | null;
     /** Para dejar anotado en la conversacion a que cliente corresponde. */
     conversationId?: number | null;
 }
@@ -76,7 +82,7 @@ export const convertProformaToPosCart = async (
     // chat, el teléfono ya se conoce: se ata acá o se pierde para siempre, porque
     // en la caja nadie lo vuelve a pedir.
     if (comprador?.telefono) {
-        const cliente = await buscarOCrearComprador(comprador.telefono, comprador.nombre);
+        const cliente = await buscarOCrearComprador(comprador.telefono, comprador.nombre, comprador.lid);
         if (cliente) {
             setCustomer(cliente);
             if (comprador.conversationId) {

@@ -23,17 +23,67 @@ import { supabase } from '../supabaseClient';
 import { Customer, defaultConsumidorFinal } from '../store/cartStore';
 
 /**
- * Teléfono a E.164 sin '+', igual que lo normalizan los envíos a Meta y a Google
- * (`scripts/atribucion/ventas.js`). Si los dos lados no normalizan igual, el
- * mismo cliente entra dos veces y la atribución se parte.
+ * Un teléfono de verdad no es cualquier ristra de dígitos.
+ *
+ * En `agent_conversations.phone_number` conviven tres cosas distintas que se
+ * parecen entre sí:
+ *
+ *   teléfono   0982901125 / 593982901125 -- una persona a la que se le puede
+ *              vender y a la que se le puede atribuir una venta.
+ *   LID        51334019559612 -- el identificador interno de WhatsApp cuando
+ *              el cliente oculta su número. NO es un teléfono: nadie puede
+ *              llamar ahí ni emparejarlo con un anuncio.
+ *   grupo      120363427643222829 -- los dígitos del JID de un grupo de
+ *              trabajo. Detrás no hay un cliente, hay varias personas.
+ *
+ * Tratarlos igual crea CLIENTES FANTASMA: fichas con nombre «WhatsApp -
+ * 51334019559612» y un teléfono que no existe, que además ensucian la
+ * atribución publicitaria porque se envían como identificador a Meta y Google.
+ *
+ * El criterio de LID es el MISMO que ya usa la bandeja para decidir si muestra
+ * «ID interno» en vez de un número (`formatPhone` en WhatsAppInbox.tsx:
+ * `digits.length > 13`). Se repite a propósito: si un día la bandeja lo
+ * cambia, esto tiene que cambiar con ella, y el comentario lo dice.
  */
-export function telefonoNormalizado(tel: string | null | undefined): string | null {
+const PREFIJO_DE_GRUPO = '120363';
+
+/** ¿Estos dígitos son en realidad un grupo de WhatsApp? */
+export function pareceGrupo(digitos: string): boolean {
+    return digitos.startsWith(PREFIJO_DE_GRUPO) || digitos.length >= 16;
+}
+
+/** ¿Y un identificador interno de WhatsApp en vez de un número? */
+export function pareceLid(digitos: string, lid?: string | null): boolean {
+    if (lid && digitos === String(lid).replace(/\D/g, '')) return true;
+    // Un teléfono ecuatoriano en E.164 son 12 dígitos; el más largo del mundo,
+    // 15. Por encima de 13 en este negocio siempre ha sido un LID.
+    return digitos.length > 13;
+}
+
+/**
+ * Teléfono a E.164 sin '+', igual que lo normalizan los envíos a Meta y a
+ * Google (`scripts/atribucion/ventas.js`). Si los dos lados no normalizan
+ * igual, el mismo cliente entra dos veces y la atribución se parte.
+ *
+ * Devuelve `null` para LIDs, grupos y cualquier cosa que no sea un número al
+ * que se le pueda vender. `lid` es opcional: cuando se conoce (viene en la
+ * conversación) el descarte es exacto en vez de por longitud.
+ */
+export function telefonoNormalizado(
+    tel: string | null | undefined,
+    lid?: string | null,
+): string | null {
     if (!tel) return null;
     let d = String(tel).replace(/\D/g, '');
     if (d.startsWith('00')) d = d.slice(2);
+
+    // Se descarta ANTES de normalizar: aplicarle el prefijo de Ecuador a un
+    // LID produciría un número inventado con pinta de válido.
+    if (pareceGrupo(d) || pareceLid(d, lid)) return null;
+
     if (d.length === 10 && d.startsWith('0')) d = '593' + d.slice(1);
     else if (d.length === 9 && d.startsWith('9')) d = '593' + d;
-    return d.length >= 10 && d.length <= 15 ? d : null;
+    return d.length >= 10 && d.length <= 13 ? d : null;
 }
 
 /**
@@ -46,8 +96,11 @@ export function telefonoNormalizado(tel: string | null | undefined): string | nu
 export async function buscarOCrearComprador(
     telefono: string | null | undefined,
     nombre?: string | null,
+    lid?: string | null,
 ): Promise<Customer | null> {
-    const tel = telefonoNormalizado(telefono);
+    // Con el `lid` de la conversación el descarte es exacto; sin él,
+    // `telefonoNormalizado` cae a la heurística de longitud.
+    const tel = telefonoNormalizado(telefono, lid);
     if (!tel) return null;
 
     // Los chats viejos crearon clientes con el número sin normalizar ("0982901125"
@@ -123,15 +176,31 @@ export function esConsumidorFinal(cliente: Customer): boolean {
  */
 export async function compradorDeConversacion(
     conversationId: number,
-): Promise<{ telefono: string | null; nombre: string | null }> {
+): Promise<{ telefono: string | null; nombre: string | null; lid: string | null }> {
     const { data, error } = await supabase
         .from('agent_conversations')
-        .select('phone_number, customer_name')
+        .select('phone_number, customer_name, lid, is_group')
         .eq('id', conversationId)
         .maybeSingle();
 
-    if (error || !data) return { telefono: null, nombre: null };
-    return { telefono: data.phone_number ?? null, nombre: data.customer_name ?? null };
+    if (error || !data) return { telefono: null, nombre: null, lid: null };
+
+    /*
+        Un GRUPO no tiene dueño: detrás hay varias personas y su "teléfono"
+        son los dígitos del JID. Crearle una ficha de cliente produciría un
+        fantasma con el nombre del grupo, y peor, ataría una venta a algo que
+        no es nadie. Se devuelve vacío y quien llama sigue con consumidor
+        final, que es la respuesta correcta.
+    */
+    if ((data as { is_group?: boolean | null }).is_group === true) {
+        return { telefono: null, nombre: null, lid: null };
+    }
+
+    return {
+        telefono: data.phone_number ?? null,
+        nombre: data.customer_name ?? null,
+        lid: (data as { lid?: string | null }).lid ?? null,
+    };
 }
 
 /**

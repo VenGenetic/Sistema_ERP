@@ -20,6 +20,22 @@ const RepDashboard: React.FC = () => {
     });
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
+    /**
+     * Por qué no alcanza con `stats` en cero.
+     *
+     * Este panel leía la consulta, y si no venían datos mostraba ceros. El
+     * problema es que "hoy no vendiste nada" y "la consulta falló" se veían
+     * EXACTAMENTE igual, y son cosas opuestas: una es información y la otra
+     * es una avería que nadie reporta porque la pantalla parece funcionar.
+     *
+     * Hoy la consulta falla siempre: la vista `v_daily_sales_stats` no
+     * existe en la base (comprobado el 14/09/2026). Y aunque existiera,
+     * seguiría vacía, porque `orders.created_by` y `orders.closer_id` están
+     * en NULL en las 320 órdenes: no hay nada que diga QUIÉN hizo cada
+     * venta. Mientras eso no se registre en el punto de venta, este panel no
+     * puede tener datos -- y tiene que decirlo en vez de fingir un cero.
+     */
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -38,16 +54,47 @@ const RepDashboard: React.FC = () => {
 
                 // Get Today's Stats from the View
                 // Format YYYY-MM-DD for current local date
-                const today = new Date().toISOString().split('T')[0];
+                /*
+                    La fecha de ECUADOR, no la del navegador ni la UTC.
 
-                const { data: statsData, error } = await supabase
+                    `toISOString()` devuelve UTC. Ecuador es UTC-5, así que a
+                    partir de las 19:00 hora local el día ya cambió en UTC y el
+                    panel se reiniciaba solo: las ventas de la última hora
+                    aparecían como del día siguiente. El negocio cierra a las
+                    18:00, o sea que el error caía justo en el cierre de caja.
+
+                    Tampoco sirve la fecha local del dispositivo: un teléfono
+                    con la zona horaria mal puesta mostraría otro día. Se fija
+                    `America/Guayaquil`, que es la misma que usa la vista
+                    `v_daily_sales_stats` para agrupar. Las dos tienen que
+                    coincidir o el panel pediría un día que no existe.
+                */
+                const today = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'America/Guayaquil',
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                }).format(new Date());
+
+                const { data: statsData, error: errorStats } = await supabase
                     .from('v_daily_sales_stats')
                     .select('*')
                     .eq('user_id', session.user.id)
                     .eq('sale_date', today)
-                    .single();
+                    .maybeSingle();
 
-                if (statsData) {
+                /*
+                    `maybeSingle` y no `single`: sin ventas hoy no hay fila, y
+                    `single` convertía ese caso normal en un error, mezclándolo
+                    con los errores de verdad.
+
+                    42P01 / PGRST205 = la vista no existe. Es lo que pasa hoy.
+                */
+                if (errorStats) {
+                    setError(
+                        errorStats.code === '42P01' || errorStats.code === 'PGRST205'
+                            ? 'El panel todavía no está disponible: falta registrar en cada venta quién la hizo. No es que no tengas ventas hoy.'
+                            : 'No se pudieron leer tus ventas de hoy. Volvé a intentar en un momento.',
+                    );
+                } else if (statsData) {
                     setStats({
                         total_orders: statsData.total_orders,
                         total_items_sold: statsData.total_items_sold,
@@ -55,8 +102,9 @@ const RepDashboard: React.FC = () => {
                         total_commission: statsData.total_commission
                     });
                 }
-            } catch (error) {
-                console.error('Error fetching dashboard data:', error);
+            } catch (err) {
+                console.error('Error fetching dashboard data:', err);
+                setError('No se pudieron leer tus ventas de hoy. Volvé a intentar en un momento.');
             } finally {
                 setLoading(false);
             }
@@ -87,6 +135,20 @@ const RepDashboard: React.FC = () => {
             </header>
 
             <main className="flex-1 p-4 flex flex-col gap-6 max-w-md mx-auto w-full mt-4">
+
+                {/* El aviso va ARRIBA de las cifras, no debajo: si queda abajo,
+                    quien mira ve primero los ceros, saca su conclusión y no
+                    baja. Con `role="alert"` lo anuncia también un lector de
+                    pantalla, que es cuando más falta hace. */}
+                {!loading && error && (
+                    <div
+                        role="alert"
+                        className="rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-fg"
+                    >
+                        <p className="font-semibold">Las cifras de abajo no son tus ventas</p>
+                        <p className="mt-0.5 text-xs leading-relaxed">{error}</p>
+                    </div>
+                )}
 
                 {/* Hero Section: Tus Ganancias de Hoy */}
                 <section className="bg-primary rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
