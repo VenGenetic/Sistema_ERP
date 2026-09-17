@@ -276,3 +276,17 @@ export function sePuedeRevincular(estado: EstadoAgente | null): boolean {
     if (!ultimo || Date.now() - ultimo > LATIDO_PARA_REVINCULAR_MS) return false;
     return estado.agent_connection !== 'connected';
 }
+
+/**
+ * ¿Puede un administrador cerrar la sesión actual para volver a vincularla?
+ *
+ * A diferencia de `sePuedeRevincular`, acá SÍ interesa el caso conectado:
+ * es la salida de recuperación cuando una sesión parece viva pero dejó de
+ * sincronizar. El agente debe tener un latido fresco porque es quien aparta
+ * las credenciales y genera el QR; la web no puede hacerlo por sí sola.
+ */
+export function sePuedeForzarRevinculacion(estado: EstadoAgente | null): boolean {
+    if (!estado) return false;
+    const ultimo = estado.agent_last_seen_at ? new Date(estado.agent_last_seen_at).getTime() : 0;
+    return Boolean(ultimo) && Date.now() - ultimo <= LATIDO_PARA_REVINCULAR_MS;
+}

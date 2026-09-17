@@ -34,6 +34,7 @@ import {
     Send,
     SlidersHorizontal,
     Sparkles,
+    Unplug,
     UserPen,
     X,
     Zap,
@@ -68,7 +69,7 @@ import RespuestasRapidasModal from '../../components/whatsapp/RespuestasRapidasM
 const AvisarLlegadaModal = lazy(() => import('../../components/whatsapp/AvisarLlegadaModal'));
 import { contarPorAvisar, type ModoAviso } from '../../components/whatsapp/avisarLlegada';
 import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../../components/whatsapp/ColaDeSalida';
-import { avisoDeEnvio, haceCuanto, sePuedeRevincular, useAgente } from '../../components/whatsapp/agente';
+import { avisoDeEnvio, haceCuanto, sePuedeForzarRevinculacion, sePuedeRevincular, useAgente } from '../../components/whatsapp/agente';
 import { fusionarMensajes, useRepasoDelHilo } from '../../components/whatsapp/hiloEnVivo';
 import { useHistorialDelHilo } from '../../components/whatsapp/historialDelHilo';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
@@ -396,6 +397,11 @@ const MobileWhatsApp: React.FC = () => {
     */
     const puedeRevincular = useMemo(() => sePuedeRevincular(estadoAgente), [estadoAgente]);
     const [vinculando, setVinculando] = useState(false);
+    const [forzandoDesconexion, setForzandoDesconexion] = useState(false);
+    const puedeForzarRevinculacion = useMemo(
+        () => sePuedeForzarRevinculacion(estadoAgente),
+        [estadoAgente],
+    );
 
     const contarAvisos = useCallback(async () => {
         try {
@@ -1585,13 +1591,32 @@ const MobileWhatsApp: React.FC = () => {
                         </div>
                         {puedeRevincular && (
                             <button
-                                onClick={() => setVinculando(true)}
+                                onClick={() => {
+                                    setForzandoDesconexion(false);
+                                    setVinculando(true);
+                                }}
                                 className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-wa-notice-text/25 bg-wa-panel/70 px-3 text-[13px] font-semibold text-wa-notice-text"
                             >
                                 <QrCode size={16} aria-hidden="true" />
                                 Vincular con QR
                             </button>
                         )}
+                        <button
+                            onClick={() => {
+                                setForzandoDesconexion(true);
+                                setVinculando(true);
+                            }}
+                            disabled={!puedeForzarRevinculacion}
+                            title={
+                                puedeForzarRevinculacion
+                                    ? 'Cierra la sesión actual y genera un QR nuevo para vincularla otra vez'
+                                    : 'El agente está caído. Inícialo primero para que pueda generar el QR.'
+                            }
+                            className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-wa-notice-text/25 bg-wa-panel/70 px-3 text-[13px] font-semibold text-wa-notice-text disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <Unplug size={16} aria-hidden="true" />
+                            Desconectar y QR
+                        </button>
                     </div>
                 )}
 
@@ -2063,7 +2088,14 @@ const MobileWhatsApp: React.FC = () => {
                 )}
                 {vinculando && (
                     <Suspense fallback={null}>
-                        <VincularWhatsAppModal isOpen onClose={() => setVinculando(false)} />
+                        <VincularWhatsAppModal
+                            isOpen
+                            forzarDesconexion={forzandoDesconexion}
+                            onClose={() => {
+                                setVinculando(false);
+                                setForzandoDesconexion(false);
+                            }}
+                        />
                     </Suspense>
                 )}
             </div>
@@ -2346,13 +2378,32 @@ const MobileWhatsApp: React.FC = () => {
 
                     {puedeRevincular && (
                         <button
-                            onClick={() => setVinculando(true)}
+                            onClick={() => {
+                                setForzandoDesconexion(false);
+                                setVinculando(true);
+                            }}
                             className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-wa-notice-text/25 bg-wa-panel/70 px-3 text-[13px] font-semibold text-wa-notice-text"
                         >
                             <QrCode size={16} aria-hidden="true" />
                             Vincular con QR
                         </button>
                     )}
+                    <button
+                        onClick={() => {
+                            setForzandoDesconexion(true);
+                            setVinculando(true);
+                        }}
+                        disabled={!puedeForzarRevinculacion}
+                        title={
+                            puedeForzarRevinculacion
+                                ? 'Cierra la sesión actual y genera un QR nuevo para vincularla otra vez'
+                                : 'El agente está caído. Inícialo primero para que pueda generar el QR.'
+                        }
+                        className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-wa-notice-text/25 bg-wa-panel/70 px-3 text-[13px] font-semibold text-wa-notice-text disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <Unplug size={16} aria-hidden="true" />
+                        Desconectar y QR
+                    </button>
                 </div>
             )}
 
@@ -2661,7 +2712,14 @@ const MobileWhatsApp: React.FC = () => {
             )}
             {vinculando && (
                 <Suspense fallback={null}>
-                    <VincularWhatsAppModal isOpen onClose={() => setVinculando(false)} />
+                    <VincularWhatsAppModal
+                        isOpen
+                        forzarDesconexion={forzandoDesconexion}
+                        onClose={() => {
+                            setVinculando(false);
+                            setForzandoDesconexion(false);
+                        }}
+                    />
                 </Suspense>
             )}
             <AyudaWhatsAppModal

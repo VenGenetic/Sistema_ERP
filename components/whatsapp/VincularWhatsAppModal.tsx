@@ -69,6 +69,8 @@ interface FilaVinculo {
 interface Props {
     isOpen: boolean;
     onClose: () => void;
+    /** Cierra una sesión que todavía aparece conectada antes de mostrar el QR. */
+    forzarDesconexion?: boolean;
 }
 
 type Metodo = 'codigo' | 'qr';
@@ -87,6 +89,11 @@ const MENSAJE_SIN_CODIGO =
     'Falta aplicar la migración 0081 del agente ' +
     '(supabase/migrations/0081_vincular_whatsapp_con_codigo.sql). ' +
     'Mientras tanto se vincula con el QR, que sí funciona.';
+
+const MENSAJE_SIN_REINICIO_FORZADO =
+    'Falta aplicar la migración de recuperación ' +
+    '(supabase/migrations/20260917130000_force_whatsapp_relink.sql). ' +
+    'Mientras tanto hay que desvincular desde la máquina del agente.';
 
 /**
  * Un paso de las instrucciones.
@@ -147,7 +154,7 @@ const CodigoGrande: React.FC<{ codigo: string }> = ({ codigo }) => {
     );
 };
 
-export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
+export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose, forzarDesconexion = false }) => {
     const [fila, setFila] = useState<FilaVinculo | null>(null);
     const [pidiendo, setPidiendo] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -160,6 +167,8 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
     const [metodo, setMetodo] = useState<Metodo>('codigo');
     const [telefono, setTelefono] = useState('');
     const [copiado, setCopiado] = useState(false);
+    const [reinicioSolicitado, setReinicioSolicitado] = useState(false);
+    const [reinicioEnMarcha, setReinicioEnMarcha] = useState(false);
 
     const panelRef = useRef<HTMLDivElement>(null);
 
@@ -204,6 +213,9 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (!isOpen) return;
         setError(null);
         setCopiado(false);
+        setMetodo(forzarDesconexion ? 'qr' : 'codigo');
+        setReinicioSolicitado(false);
+        setReinicioEnMarcha(false);
         leer();
 
         /*
@@ -225,9 +237,13 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
             .subscribe();
 
         return () => { supabase.removeChannel(canal); };
-    }, [isOpen, leer]);
+    }, [isOpen, leer, forzarDesconexion]);
 
     const estado = fila?.state ?? 'idle';
+
+    useEffect(() => {
+        if (reinicioSolicitado && estado !== 'linked') setReinicioEnMarcha(true);
+    }, [estado, reinicioSolicitado]);
 
     /**
      * ¿La base sabe de códigos?
@@ -274,16 +290,25 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
         if (pidiendo) return;
         setPidiendo(true);
         setError(null);
-        const { error: err } = await supabase.rpc('solicitar_vinculacion_whatsapp');
+        const { error: err } = await supabase.rpc(
+            forzarDesconexion ? 'forzar_vinculacion_whatsapp' : 'solicitar_vinculacion_whatsapp',
+        );
         setPidiendo(false);
         if (err) {
             // Los mensajes de la función están escritos para leerse tal
             // cual ("el agente no está corriendo...", "ya está conectado").
             // Reemplazarlos por uno genérico perdería justo lo accionable.
-            setError(faltaLaMigracion(err) ? MENSAJE_SIN_MIGRACION : err.message);
+            setError(
+                faltaLaMigracion(err)
+                    ? forzarDesconexion
+                        ? MENSAJE_SIN_REINICIO_FORZADO
+                        : MENSAJE_SIN_MIGRACION
+                    : err.message,
+            );
             return;
         }
         // La fila la trae Realtime; no hace falta releerla acá.
+        if (forzarDesconexion) setReinicioSolicitado(true);
     };
 
     const pedirCodigo = async () => {
@@ -324,7 +349,9 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 
     const enCurso = estado === 'waiting_scan' || estado === 'waiting_code';
-    const esperando = estado === 'preparing' || (pidiendo && !enCurso);
+    const esperandoCambioForzado = forzarDesconexion && reinicioSolicitado && !reinicioEnMarcha && estado === 'linked';
+    const sesionActualParaForzar = forzarDesconexion && estado === 'linked' && !reinicioSolicitado;
+    const esperando = estado === 'preparing' || esperandoCambioForzado || (pidiendo && !enCurso);
 
     return (
         <div className={modal.overlay} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -338,9 +365,13 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
             >
                 <div className={modal.header}>
                     <div className="min-w-0">
-                        <h2 id="vincular-wa-titulo" className={modal.title}>Vincular WhatsApp</h2>
+                        <h2 id="vincular-wa-titulo" className={modal.title}>
+                            {forzarDesconexion ? 'Desconectar y vincular WhatsApp' : 'Vincular WhatsApp'}
+                        </h2>
                         <p className={modal.subtitle}>
-                            Como en WhatsApp Web: con un código o escaneando.
+                            {forzarDesconexion
+                                ? 'Se cerrará la sesión actual y se mostrará un QR nuevo.'
+                                : 'Como en WhatsApp Web: con un código o escaneando.'}
                         </p>
                     </div>
                     <button onClick={onClose} className={cn(modal.close, focusRing)} aria-label="Cerrar">
@@ -377,7 +408,7 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
                     {permitido === true && (
                         <>
-                            {estado === 'linked' && (
+                            {estado === 'linked' && !sesionActualParaForzar && !esperandoCambioForzado && (
                                 <div className="flex flex-col items-center gap-2 py-5">
                                     <span className="flex h-11 w-11 items-center justify-center rounded-full bg-success-soft">
                                         <CheckCircle2 size={22} className="text-success-soft-fg" aria-hidden="true" />
@@ -392,7 +423,7 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
                             {/* El selector aparece sólo cuando hay algo que elegir Y
                                 cuando elegir todavía sirve: con un código ya en
                                 pantalla, cambiar de pestaña sólo sirve para perderlo. */}
-                            {estado !== 'linked' && hayCodigo && !enCurso && !esperando && (
+                            {estado !== 'linked' && hayCodigo && !forzarDesconexion && !enCurso && !esperando && (
                                 <div role="tablist" aria-label="Cómo vincular" className="flex w-full rounded-xl bg-surface-3 p-1">
                                     {([
                                         ['codigo', 'Con un código'],
@@ -547,14 +578,22 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                 </div>
                             )}
 
-                            {estado === 'idle' && !pidiendo && (
+                            {(estado === 'idle' || sesionActualParaForzar) && !pidiendo && (
                                 <div className="flex flex-col items-center gap-2 py-3">
-                                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-3">
-                                        <Smartphone size={22} className="text-fg-muted" aria-hidden="true" />
+                                    <span className={cn(
+                                        'flex h-11 w-11 items-center justify-center rounded-full',
+                                        forzarDesconexion ? 'bg-warning-soft' : 'bg-surface-3',
+                                    )}>
+                                        <Smartphone
+                                            size={22}
+                                            className={forzarDesconexion ? 'text-warning-soft-fg' : 'text-fg-muted'}
+                                            aria-hidden="true"
+                                        />
                                     </span>
                                     <p className="max-w-[17rem] text-xs leading-relaxed text-fg-muted">
-                                        Esto cierra la sesión actual de WhatsApp y pide una nueva. Vas a necesitar el
-                                        teléfono del negocio a mano.
+                                        {forzarDesconexion
+                                            ? 'Vas a cerrar la sesión que ahora figura conectada. Los mensajes quedan en cola hasta escanear el QR nuevo.'
+                                            : 'Esto cierra la sesión actual de WhatsApp y pide una nueva. Vas a necesitar el teléfono del negocio a mano.'}
                                     </p>
                                 </div>
                             )}
@@ -592,7 +631,7 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                 </p>
                             )}
 
-                            {estado !== 'linked' && (
+                            {(estado !== 'linked' || sesionActualParaForzar) && (
                                 <button
                                     onClick={metodo === 'codigo' && hayCodigo ? pedirCodigo : pedirQr}
                                     disabled={pidiendo || esperando}
@@ -613,7 +652,9 @@ export const VincularWhatsAppModal: React.FC<Props> = ({ isOpen, onClose }) => {
                                         ? 'Generar otro'
                                         : metodo === 'codigo' && hayCodigo
                                             ? 'Pedir el código'
-                                            : 'Generar código QR'}
+                                            : forzarDesconexion
+                                                ? 'Desconectar y generar QR'
+                                                : 'Generar código QR'}
                                 </button>
                             )}
                         </>

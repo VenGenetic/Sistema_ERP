@@ -5,6 +5,7 @@ import { badge, button, cn, focusRing, input } from '../components/ui/styles';
 import {
     AlertTriangle, Archive, ArrowLeft, ArrowRight, Bell, BellOff, BellRing, Bot, BotOff, CheckCheck, ChevronLeft, ChevronRight, Clock, Copy, FileText, HandCoins,
     CircleHelp, FolderInput, Headset, Truck, UserPen, Images, Inbox, MailQuestion, Maximize2, MessageSquarePlus, Minimize2, Pin, RefreshCw, RotateCw, Search, Sparkles,
+    Unplug,
     User, X,
 } from 'lucide-react';
 import { MediaLightbox, type MediaItem } from '../components/MediaLightbox';
@@ -14,6 +15,7 @@ import MediaGallery from '../components/whatsapp/MediaGallery';
 import { AvisosAccionesFallidas, BurbujasEnCola, useColaDeSalida } from '../components/whatsapp/ColaDeSalida';
 import {
     avisoDeEnvio as avisoDelAgente,
+    sePuedeForzarRevinculacion,
     sePuedeRevincular,
     haceCuanto as timeAgo,
     type EstadoAgente,
@@ -1539,6 +1541,11 @@ const WhatsAppInbox: React.FC = () => {
     */
     const puedeRevincular = useMemo(() => sePuedeRevincular(estadoAgente), [estadoAgente]);
     const [vinculando, setVinculando] = useState(false);
+    const [forzandoDesconexion, setForzandoDesconexion] = useState(false);
+    const puedeForzarRevinculacion = useMemo(
+        () => sePuedeForzarRevinculacion(estadoAgente),
+        [estadoAgente],
+    );
 
     const selectedEscalation = escalations.find((e) => e.id === selectedId) ?? null;
 
@@ -2659,7 +2666,10 @@ const WhatsAppInbox: React.FC = () => {
                         arreglarlo. */}
                     {puedeRevincular && (
                         <button
-                            onClick={() => setVinculando(true)}
+                            onClick={() => {
+                                setForzandoDesconexion(false);
+                                setVinculando(true);
+                            }}
                             className={cn(
                                 focusRing,
                                 'shrink-0 self-center rounded-lg border border-warning/40 bg-surface px-2.5 py-1.5 text-xs font-semibold text-warning-soft-fg hover:bg-surface-hover',
@@ -2668,9 +2678,35 @@ const WhatsAppInbox: React.FC = () => {
                             Vincular WhatsApp
                         </button>
                     )}
+                    <button
+                        onClick={() => {
+                            setForzandoDesconexion(true);
+                            setVinculando(true);
+                        }}
+                        disabled={!puedeForzarRevinculacion}
+                        title={
+                            puedeForzarRevinculacion
+                                ? 'Cierra la sesión actual y genera un QR nuevo para vincularla otra vez'
+                                : 'El agente está caído. Inícialo primero para que pueda generar el QR.'
+                        }
+                        className={cn(
+                            focusRing,
+                            'flex shrink-0 self-center items-center gap-1.5 rounded-lg border border-warning/40 bg-surface px-2.5 py-1.5 text-xs font-semibold text-warning-soft-fg hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60',
+                        )}
+                    >
+                        <Unplug size={14} aria-hidden="true" />
+                        Desconectar y QR
+                    </button>
                 </div>
             )}
-            <VincularWhatsAppModal isOpen={vinculando} onClose={() => setVinculando(false)} />
+            <VincularWhatsAppModal
+                isOpen={vinculando}
+                forzarDesconexion={forzandoDesconexion}
+                onClose={() => {
+                    setVinculando(false);
+                    setForzandoDesconexion(false);
+                }}
+            />
 
             {/* WhatsApp Web en una sola lámina: la lista, la conversación y la
                 ficha del cliente pegadas, con altura fija y cada columna con su
