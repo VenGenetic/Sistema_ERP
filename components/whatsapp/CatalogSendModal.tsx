@@ -15,6 +15,8 @@ import {
     type ProductoCatalogo,
 } from '../../utils/whatsappOutbox';
 import { traerGalerias, useBusquedaCatalogo } from '../../utils/catalogoRapido';
+import { BANDEJA_VACIA, useBandejaStore } from '../../store/useBandejaStore';
+import { useChatProformaStore } from '../../store/useChatProformaStore';
 import { MenuRepuesto, usarGestoMenu, type MenuAbierto } from './MenuRepuesto';
 import { EditarRepuestoDesdeChat } from './EditarRepuestoDesdeChat';
 
@@ -204,6 +206,17 @@ const TarjetaResultado: React.FC<{
 
 export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversationId, clienteLabel, onEnviar, onAnotarPedido }) => {
     const [termino, setTermino] = useState('');
+    /*
+        La bandeja y la proforma se tocan DIRECTO desde acá, sin pasar por
+        props. No es una excepción al criterio de `onAnotarPedido`: anotar un
+        pedido necesita el teléfono y el usuario, que no llegan a este
+        componente; guardar en la bandeja y cotizar sólo necesitan la
+        conversación y el repuesto, y los dos están acá. Pedírselos a quien
+        abre el modal sería ceremonia sin nada que decidir.
+    */
+    const enBandeja = useBandejaStore((s) => s.porConversacion[conversationId]) ?? BANDEJA_VACIA;
+    const alternarBandeja = useBandejaStore((s) => s.alternar);
+    const agregarAProforma = useChatProformaStore((s) => s.agregar);
     const [armados, setArmados] = useState<Armado[]>([]);
     const [enviando, setEnviando] = useState(false);
     const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
@@ -490,6 +503,9 @@ export const CatalogSendModal: React.FC<Props> = ({ isOpen, onClose, conversatio
                                                 x,
                                                 y,
                                                 onEnviar: yaElegido(p.product_id) ? undefined : () => alternarProducto(p),
+                                                onGuardar: () => alternarBandeja(conversationId, p),
+                                                enBandeja: enBandeja.some((r) => r.productId === p.product_id),
+                                                onCotizar: () => agregarAProforma(conversationId, p),
                                                 onEditar: () => setEditando(p.product_id),
                                                 // `undefined` y no `() => onAnotarPedido?.(p)`: una flecha
                                                 // siempre es una función, así que la opción se

@@ -5,6 +5,7 @@ import { useBackDismiss } from '../../hooks/useBackDismiss';
 import { convertProformaToPosCart } from '../../utils/proformaToCart';
 import { compradorDeConversacion } from '../../utils/compradorDeChat';
 import { useBusquedaCatalogo } from '../../utils/catalogoRapido';
+import { BANDEJA_VACIA, useBandejaStore } from '../../store/useBandejaStore';
 import { MenuRepuesto, usarGestoMenu, type MenuAbierto } from './MenuRepuesto';
 import { EditarRepuestoDesdeChat } from './EditarRepuestoDesdeChat';
 import { badge, button, cn, focusRing, input, modal } from '../ui/styles';
@@ -158,6 +159,12 @@ export const ProformaBuilder: React.FC<Props> = ({
     onAnotarPedido,
 }) => {
     const proforma: ChatProforma = useChatProformaStore((s) => s.obtener(conversationId));
+    // Guardar en la bandeja también desde acá: quien busca un repuesto para
+    // cotizarlo suele querer mandárselo además al cliente, y sin esto tendría
+    // que volver a buscarlo en el catálogo -- que es exactamente el viaje que
+    // la bandeja existe para ahorrar.
+    const enBandeja = useBandejaStore((s) => s.porConversacion[conversationId]) ?? BANDEJA_VACIA;
+    const alternarBandeja = useBandejaStore((s) => s.alternar);
     const agregar = useChatProformaStore((s) => s.agregar);
     const quitar = useChatProformaStore((s) => s.quitar);
     const cambiarCantidad = useChatProformaStore((s) => s.cambiarCantidad);
@@ -522,6 +529,8 @@ export const ProformaBuilder: React.FC<Props> = ({
                                             x,
                                             y,
                                             onEnviar: () => agregar(conversationId, p),
+                                            onGuardar: () => alternarBandeja(conversationId, p),
+                                            enBandeja: enBandeja.some((r) => r.productId === p.product_id),
                                             onEditar: () => setEditando(p.product_id),
                                             // `undefined` y no `() => onAnotarPedido?.(p)`: una flecha
                                                 // siempre es una función, así que la opción se

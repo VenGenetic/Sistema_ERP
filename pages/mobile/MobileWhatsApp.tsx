@@ -73,6 +73,7 @@ import { avisoDeEnvio, haceCuanto, sePuedeForzarRevinculacion, sePuedeRevincular
 import { fusionarMensajes, useRepasoDelHilo } from '../../components/whatsapp/hiloEnVivo';
 import { useHistorialDelHilo } from '../../components/whatsapp/historialDelHilo';
 import { useChatProformaStore } from '../../store/useChatProformaStore';
+import BandejaDeRepuestos from '../../components/whatsapp/BandejaDeRepuestos';
 import type { ProductoCatalogo } from '../../utils/whatsappOutbox';
 import { precalentarCatalogo } from '../../utils/catalogoRapido';
 import ChatThread, {
@@ -97,6 +98,7 @@ const MoverChatModal = lazy(() => import('../../components/whatsapp/MoverChatMod
 const VincularWhatsAppModal = lazy(() => import('../../components/whatsapp/VincularWhatsAppModal'));
 const EditarMensajeModal = lazy(() => import('../../components/whatsapp/EditarMensajeModal'));
 const RenombrarContactoModal = lazy(() => import('../../components/whatsapp/RenombrarContactoModal'));
+import ConfirmarSincronizacionModal from '../../components/whatsapp/ConfirmarSincronizacionModal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { textoPlano } from '../../utils/formatoWhatsApp';
 import { BANDEJAS, bandejaDe, type BandejaManual } from '../../components/whatsapp/bandejas';
@@ -115,6 +117,8 @@ import {
     CAMPOS_CONV_ORGANIZADA,
     CAMPOS_CONV_PREVIEW,
     encolarMensajes,
+    leerRepuesto,
+    mensajesDeRepuesto,
     faltaColumna,
     marcarLeidoEnWhatsApp,
     marcarNoLeido,
@@ -381,6 +385,7 @@ const MobileWhatsApp: React.FC = () => {
     const [cuantosEscalados, setCuantosEscalados] = useState(0);
     const [cambiandoBot, setCambiandoBot] = useState(false);
     const [eligiendoAgente, setEligiendoAgente] = useState(false);
+    const [confirmandoSync, setConfirmandoSync] = useState<Conversacion | null>(null);
 
     /**
      * Estado del proceso del agente y el interruptor maestro. El MISMO
@@ -1245,6 +1250,21 @@ const MobileWhatsApp: React.FC = () => {
         } : c)));
     };
 
+    const aplicarSyncConfirmada = useCallback((conversationId: number) => {
+        const parchear = (conversation: Conversacion) =>
+            conversation.id === conversationId
+                ? {
+                    ...conversation,
+                    possible_gap: false,
+                    sync_confidence: 'synced' as const,
+                    sync_uncertain_reason: null,
+                }
+                : conversation;
+        setConversaciones((prev) => prev.map(parchear));
+        setAbierta((prev) => (prev ? parchear(prev) : prev));
+        setAvisoAccion('Sincronización confirmada. La IA podrá responder si está activada en este chat.');
+    }, []);
+
     const estaSinLeer = useCallback(
         (conversation: Pick<Conversacion, 'id' | 'unread_count'>) =>
             conversation.unread_count > 0 || noLeidosConservados.has(conversation.id),
@@ -1397,13 +1417,20 @@ const MobileWhatsApp: React.FC = () => {
                     </div>
 
                     {(abierta.possible_gap || abierta.sync_confidence === 'uncertain') && (
-                        <span
-                            title="Sincronización incierta: la IA está bloqueada"
-                            aria-label="Sincronización incierta: la IA está bloqueada en este chat"
-                            className="flex h-11 w-9 shrink-0 items-center justify-center text-warning"
+                        <button
+                            type="button"
+                            onClick={() => !esGrupoAbierto && setConfirmandoSync(abierta)}
+                            disabled={esGrupoAbierto}
+                            title={esGrupoAbierto
+                                ? 'La IA no atiende grupos'
+                                : 'Confirmar que revisaste el historial para permitir que la IA responda'}
+                            aria-label={esGrupoAbierto
+                                ? 'Sincronización incierta: la IA no atiende grupos'
+                                : 'Confirmar la sincronización para permitir respuestas de la IA'}
+                            className="flex h-11 w-9 shrink-0 items-center justify-center text-warning disabled:cursor-not-allowed disabled:opacity-75"
                         >
                             <AlertTriangle size={19} aria-hidden="true" />
-                        </span>
+                        </button>
                     )}
 
                     {/* El agente de ESTE chat. Es botón y a la vez semáforo: si
@@ -1476,6 +1503,19 @@ const MobileWhatsApp: React.FC = () => {
                                         <Search size={19} className="text-wa-meta" aria-hidden="true" />
                                         Buscar en la conversación
                                     </button>
+                                    {!esGrupoAbierto && (abierta.possible_gap || abierta.sync_confidence === 'uncertain') && (
+                                        <button
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setMenuChat(false);
+                                                setConfirmandoSync(abierta);
+                                            }}
+                                            className="flex min-h-[48px] w-full items-center gap-3 px-4 text-left text-[15px] text-warning active:bg-wa-hover"
+                                        >
+                                            <AlertTriangle size={19} aria-hidden="true" />
+                                            Confirmar sync y permitir IA
+                                        </button>
+                                    )}
                                     <button
                                         role="menuitem"
                                         onClick={abrirSiguientePendiente}
@@ -1718,6 +1758,44 @@ const MobileWhatsApp: React.FC = () => {
                     <AvisosAccionesFallidas items={accionesFallidas} onResolver={resolverAccion} />
                     </div>
                 </div>
+
+                {/* La bandeja va ENCIMA de la caja: es lo que se mira justo
+                    antes de decidir qué mandar. Y es el atajo que evita volver a
+                    buscar un repuesto que ya se encontró una vez. */}
+                <BandejaDeRepuestos
+                    conversationId={abierta.id}
+                    clienteLabel={abierta.customer_name || formatearTelefono(abierta)}
+                    onEnviar={async (producto) => {
+                        try {
+                            const mensajes = await mensajesDeRepuesto(abierta.id, producto.product_id);
+                            if (mensajes.length === 0) {
+                                setAvisoAccion('Ese repuesto ya no está en el catálogo.');
+                                return;
+                            }
+                            await enviar(mensajes);
+                        } catch {
+                            // En pantalla y no sólo en la consola: sin aviso, quien
+                            // tocó "Mandar" da por enviado un mensaje que no salió.
+                            setAvisoAccion('No se pudo mandar el repuesto. Revisá la conexión y probá de nuevo.');
+                        }
+                    }}
+                    onCotizar={async (producto) => {
+                        // Precio fresco, igual que al mandarlo: la bandeja guarda
+                        // el del momento en que se guardó y la proforma es dinero.
+                        const fresco = await leerRepuesto(producto.product_id).catch(() => null);
+                        agregarAProforma(abierta.id, fresco ?? producto);
+                    }}
+                    onPedido={
+                        esGrupoAbierto
+                            ? undefined
+                            : async (producto) => {
+                                  const fresco = await leerRepuesto(producto.product_id).catch(() => null);
+                                  setRepuestoParaPedido(fresco ?? producto);
+                                  setPedidoAbierto(true);
+                              }
+                    }
+                    tactil
+                />
 
                 {/* ------------------------ Caja de escribir ----------------------- */}
                 {/* El botón central de la barra inferior sobresale por encima de
@@ -2662,6 +2740,14 @@ const MobileWhatsApp: React.FC = () => {
                     setBorrandoMensaje(null);
                     setErrorBorrado(null);
                 }}
+            />
+
+            <ConfirmarSincronizacionModal
+                isOpen={!!confirmandoSync}
+                conversationId={confirmandoSync?.id ?? null}
+                nombre={confirmandoSync?.customer_name || (confirmandoSync ? formatearTelefono(confirmandoSync) : '')}
+                onClose={() => setConfirmandoSync(null)}
+                onConfirmed={aplicarSyncConfirmada}
             />
 
             {renombrando && (

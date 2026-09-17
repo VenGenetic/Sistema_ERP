@@ -24,6 +24,7 @@ import CustomerPanel from '../components/whatsapp/CustomerPanel';
 import ProformaBuilder from '../components/whatsapp/ProformaBuilder';
 import RegistrarPedidoModal from '../components/whatsapp/RegistrarPedidoModal';
 import VincularWhatsAppModal from '../components/whatsapp/VincularWhatsAppModal';
+import BandejaDeRepuestos from '../components/whatsapp/BandejaDeRepuestos';
 import { precalentarCatalogo } from '../utils/catalogoRapido';
 import type { ProductoCatalogo } from '../utils/whatsappOutbox';
 import ProductMessagePanel from '../components/whatsapp/ProductMessagePanel';
@@ -70,6 +71,7 @@ import MoverChatModal from '../components/whatsapp/MoverChatModal';
 import EditarMensajeModal from '../components/whatsapp/EditarMensajeModal';
 import RenombrarContactoModal from '../components/whatsapp/RenombrarContactoModal';
 import GuiasPorEnviarModal from '../components/whatsapp/GuiasPorEnviarModal';
+import ConfirmarSincronizacionModal from '../components/whatsapp/ConfirmarSincronizacionModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useNotificacionesEscritorio } from '../hooks/useNotificacionesEscritorio';
 import { useIntervaloVisible } from '../hooks/useIntervaloVisible';
@@ -81,6 +83,8 @@ import {
     CAMPOS_CONV_ORGANIZADA,
     CAMPOS_CONV_PREVIEW,
     encolarMensajes,
+    leerRepuesto,
+    mensajesDeRepuesto,
     faltaColumna,
     marcarLeidoEnWhatsApp,
     marcarNoLeido,
@@ -592,6 +596,7 @@ const WhatsAppInbox: React.FC = () => {
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [eligiendoAgente, setEligiendoAgente] = useState<SelectedContext | null>(null);
+    const [confirmandoSync, setConfirmandoSync] = useState<SelectedContext | null>(null);
     const [closeInsteadOfReopen, setCloseInsteadOfReopen] = useState(false);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     /**
@@ -822,6 +827,20 @@ const WhatsAppInbox: React.FC = () => {
         setSelectedConversationCache((prev) => (prev ? parchear(prev) : prev));
         const nombre = destino ? BANDEJAS.find((item) => item.id === destino)?.texto : 'clasificación automática';
         setAvisoAccion(destino ? `Chat movido a «${nombre}».` : 'El chat volvió a clasificación automática.');
+    }, []);
+    const aplicarSyncConfirmada = useCallback((conversationId: number) => {
+        const parchear = (conversation: Conversation) =>
+            conversation.id === conversationId
+                ? {
+                    ...conversation,
+                    possible_gap: false,
+                    sync_confidence: 'synced' as const,
+                    sync_uncertain_reason: null,
+                }
+                : conversation;
+        setConversations((prev) => prev.map(parchear));
+        setSelectedConversationCache((prev) => (prev ? parchear(prev) : prev));
+        setAvisoAccion('Sincronización confirmada. La IA podrá responder cuando esté activada en este chat.');
     }, []);
     const [renombrando, setRenombrando] = useState<Conversation | null>(null);
     /**
@@ -2202,6 +2221,42 @@ const WhatsAppInbox: React.FC = () => {
         [userId, citando?.whatsapp_message_id, cargarCola],
     );
 
+
+    /*
+        Mandar un repuesto desde la bandeja, sin abrir el catálogo.
+
+        Es el atajo que justifica la tira: el 90 % de las veces se manda el
+        repuesto tal cual -- nombre, precio y disponibilidad con su foto --, y
+        para eso abrir el modal era buscar de nuevo algo que ya estaba
+        encontrado. Quien quiera elegir fotos o ajustar el precio sigue
+        teniendo el catálogo entero.
+
+        Sale por la cola de salida como cualquier otro mensaje, así que si
+        salió el que no era, se cancela desde ahí antes de que llegue.
+    */
+    const mandarDesdeBandeja = useCallback(
+        async (conversationId: number, producto: ProductoCatalogo) => {
+            try {
+                const mensajes = await mensajesDeRepuesto(conversationId, producto.product_id);
+                if (mensajes.length === 0) {
+                    setAvisoAccion('Ese repuesto ya no está en el catálogo.');
+                    return;
+                }
+                await enviarMensajes(mensajes);
+            } catch {
+                /*
+                    Se avisa en pantalla y no sólo en la consola: quien tocó
+                    "Mandar" se queda mirando el hilo esperando ver el mensaje,
+                    y si no aparece nada da por hecho que salió. Un fallo mudo
+                    acá termina en un cliente esperando un precio que nunca se
+                    envió.
+                */
+                setAvisoAccion('No se pudo mandar el repuesto. Revisá la conexión y probá de nuevo.');
+            }
+        },
+        [enviarMensajes],
+    );
+
     // Una cita pertenece al chat donde se eligio. Nunca se arrastra al
     // siguiente cliente al cambiar de conversacion.
     useEffect(() => {
@@ -3351,13 +3406,24 @@ const WhatsAppInbox: React.FC = () => {
                                 </div>
 
                                 {(selected.possibleGap || selected.syncConfidence === 'uncertain') && (
-                                    <span
-                                        title="No se pudo demostrar que este chat esté completo; la IA no responderá"
-                                        className="flex shrink-0 items-center gap-1 rounded-full border border-warning/40 bg-warning-soft px-2 py-1 text-xs font-semibold text-warning-soft-fg"
+                                    <button
+                                        type="button"
+                                        onClick={() => !selected.esGrupo && setConfirmandoSync(selected)}
+                                        disabled={selected.esGrupo || actionLoading}
+                                        aria-label={selected.esGrupo
+                                            ? 'Sincronización incierta: la IA no atiende grupos'
+                                            : 'Confirmar la sincronización para permitir respuestas de la IA'}
+                                        title={selected.esGrupo
+                                            ? 'La IA no atiende grupos'
+                                            : 'Confirmar que revisaste el historial para permitir que la IA responda'}
+                                        className={cn(
+                                            focusRing,
+                                            'flex shrink-0 items-center gap-1 rounded-full border border-warning/40 bg-warning-soft px-2 py-1 text-xs font-semibold text-warning-soft-fg disabled:cursor-not-allowed disabled:opacity-75',
+                                        )}
                                     >
                                         <AlertTriangle size={14} aria-hidden="true" />
                                         <span className="hidden xl:inline">Sync incierta</span>
-                                    </span>
+                                    </button>
                                 )}
 
                                 {selected.escalation && (
@@ -3574,6 +3640,38 @@ const WhatsAppInbox: React.FC = () => {
                                 en el teléfono llega cifrado al agente y no queda registrado
                                 en la conversación. */}
                             <div className="shrink-0 bg-wa-header">
+                                {/* Va ENTRE el hilo y la caja de escribir: es lo que
+                                    se mira justo antes de decidir qué mandar, y ahí
+                                    no hay que ir a buscarlo. */}
+                                <BandejaDeRepuestos
+                                    conversationId={selected.conversationId}
+                                    clienteLabel={
+                                        selected.customerName ||
+                                        formatPhone({ phone_number: selected.phoneNumber, lid: selected.lid })
+                                    }
+                                    onEnviar={(producto) => { void mandarDesdeBandeja(selected.conversationId, producto); }}
+                                    /*
+                                        Cotizar y anotar vuelven a leer el repuesto, por lo
+                                        mismo que mandarlo: la bandeja guarda el precio del
+                                        momento en que se guardó, y entre eso y la cotización
+                                        pueden pasar horas. Una proforma con el precio de ayer
+                                        es dinero, no un detalle. Si la lectura falla se usa lo
+                                        guardado: peor que un precio viejo es que el botón no
+                                        haga nada.
+                                    */
+                                    onCotizar={async (producto) => {
+                                        const fresco = await leerRepuesto(producto.product_id).catch(() => null);
+                                        agregarAProforma(selected.conversationId, fresco ?? producto);
+                                    }}
+                                    onPedido={
+                                        selected.esGrupo
+                                            ? undefined
+                                            : async (producto) => {
+                                                  const fresco = await leerRepuesto(producto.product_id).catch(() => null);
+                                                  setRepuestoParaPedido(fresco ?? producto);
+                                              }
+                                    }
+                                />
                                 {citando && (
                                     <div className="px-3 pt-2">
                                         <CitaEnComposer texto={textoPlano(textoDe(citando))} onQuitar={() => setCitando(null)} />
@@ -3968,6 +4066,14 @@ const WhatsAppInbox: React.FC = () => {
                 onClose={() => setGuiasAbierto(false)}
                 telefonoOrigen={telefonoDeGuias()}
                 userId={userId}
+            />
+
+            <ConfirmarSincronizacionModal
+                isOpen={!!confirmandoSync}
+                conversationId={confirmandoSync?.conversationId ?? null}
+                nombre={confirmandoSync?.customerName || (confirmandoSync ? formatPhone({ phone_number: confirmandoSync.phoneNumber, lid: confirmandoSync.lid }) : '')}
+                onClose={() => setConfirmandoSync(null)}
+                onConfirmed={aplicarSyncConfirmada}
             />
 
             <RenombrarContactoModal

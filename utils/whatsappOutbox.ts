@@ -675,3 +675,79 @@ export function fotosDe(p: ProductoCatalogo): string[] {
     const urls = [p.image_url, ...(p.gallery ?? []).filter((g) => g?.type !== 'video').map((g) => g?.url)];
     return [...new Set(urls.filter((u): u is string => typeof u === 'string' && u.length > 0))];
 }
+
+/**
+ * El mensaje por defecto de un repuesto, listo para encolar.
+ *
+ * Es lo que arma el modal de catálogo cuando se elige un repuesto y no se
+ * le toca nada: nombre, precio al cliente y disponibilidad, con la foto
+ * principal. Existe como función aparte porque la bandeja del chat manda
+ * desde la tira, sin abrir el modal -- y si cada sitio armara su propio
+ * texto, el mismo repuesto se vería distinto según por dónde se mandó.
+ *
+ * VUELVE A LEER EL PRODUCTO, a propósito.
+ *
+ * La bandeja guarda una foto del catálogo del momento en que se guardó, y
+ * entre eso y el envío pueden pasar horas: el precio pudo cambiarlo otro
+ * vendedor y el stock pudo irse a cero. Cotizar con datos viejos es peor
+ * que no cotizar, porque el cliente se queda con el precio que leyó.
+ *
+ * Devuelve lista vacía si el repuesto ya no existe; quien llama decide qué
+ * decir, que acá no hay pantalla donde decirlo.
+ */
+export async function leerRepuesto(productId: number): Promise<ProductoCatalogo | null> {
+  const { data } = await supabase
+    .from('products')
+    .select('id, name, sku, price, image_url, local_stock, importer_stock, importer_unavailable_override')
+    .eq('id', productId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  return {
+    product_id: data.id,
+    name: data.name,
+    sku: data.sku,
+    price: data.price,
+    image_url: data.image_url,
+    local_stock: data.local_stock,
+    importer_stock: data.importer_stock,
+    importer_unavailable_override: data.importer_unavailable_override,
+  };
+}
+
+export async function mensajesDeRepuesto(
+  conversationId: number,
+  productId: number,
+): Promise<NuevoMensaje[]> {
+  const producto = await leerRepuesto(productId);
+  if (!producto) return [];
+
+  const texto = textoDeProducto(producto, {
+    // Mismo criterio que `armadoInicial` en CatalogSendModal: sin precio en
+    // el catálogo, el precio no se escribe. Un repuesto que nadie cargó no
+    // puede salir diciendo "Precio: $0.00".
+    incluirPrecio: producto.price != null,
+    incluirDisponibilidad: true,
+  }).trim();
+
+  if (!producto.image_url) {
+    return texto ? [{ conversationId, body: texto, kind: 'text', productId }] : [];
+  }
+
+  // `mimeDeUrl` y no una comprobación propia: ya vive en este archivo,
+  // ignora el query string y conoce webp, avif y gif. Deducirlo a mano acá
+  // mandaba un .webp etiquetado como JPEG.
+  const mime = mimeDeUrl(producto.image_url);
+  return [
+    {
+      conversationId,
+      body: texto || null,
+      kind: 'image',
+      mediaUrl: producto.image_url,
+      mediaMime: mime,
+      mediaFilename: `${producto.sku}.${mime.split('/')[1]}`,
+      productId,
+    },
+  ];
+}

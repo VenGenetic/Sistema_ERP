@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ClipboardList, Pencil, Send } from 'lucide-react';
+import { BookmarkCheck, BookmarkPlus, ClipboardList, FileText, Pencil, Send } from 'lucide-react';
 import { cn, focusRing } from '../ui/styles';
 import type { ProductoCatalogo } from '../../utils/whatsappOutbox';
 
@@ -32,6 +32,18 @@ export interface AccionesRepuesto {
      * función la opción no se dibuja.
      */
     onPedido?: () => void;
+    /**
+     * Dejarlo a mano en la bandeja de la conversación.
+     *
+     * Es la opción que evita la segunda búsqueda: guardado acá, el repuesto
+     * queda pegado al chat y las demás acciones se hacen desde la tira, sin
+     * volver a escribir el nombre.
+     */
+    onGuardar?: () => void;
+    /** true si ya está en la bandeja: la opción pasa a quitarlo. */
+    enBandeja?: boolean;
+    /** Sumarlo al borrador de proforma de esta conversación. */
+    onCotizar?: () => void;
 }
 
 export interface MenuAbierto extends AccionesRepuesto {
@@ -151,6 +163,26 @@ export const MenuRepuesto: React.FC<Props> = ({ menu, onCerrar, clienteLabel }) 
                 'Precio, stock, fotos y descripción',
                 menu.onEditar,
             )}
+
+            {menu.onGuardar &&
+                opcion(
+                    menu.enBandeja
+                        ? <BookmarkCheck size={15} aria-hidden="true" />
+                        : <BookmarkPlus size={15} aria-hidden="true" />,
+                    menu.enBandeja ? 'Quitar de la bandeja' : 'Guardar en la bandeja',
+                    menu.enBandeja
+                        ? 'Deja de estar a mano en este chat'
+                        : 'Queda a mano acá, sin volver a buscarlo',
+                    menu.onGuardar,
+                )}
+
+            {menu.onCotizar &&
+                opcion(
+                    <FileText size={15} aria-hidden="true" />,
+                    'Sumar a la proforma',
+                    'Al borrador de cotización de este chat',
+                    menu.onCotizar,
+                )}
 
             {menu.onPedido &&
                 opcion(
