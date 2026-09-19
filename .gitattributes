@@ -17,3 +17,4 @@
 *.woff   binary
 *.woff2  binary
 *.ttf    binary
+graphify-out/graph.json merge=graphify

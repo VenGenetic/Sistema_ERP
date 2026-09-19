@@ -1852,6 +1852,10 @@ const Products: React.FC = () => {
 
     const hasAnyFilter = activeFilterChips.length > 0 || searchTerms.some(t => t.trim().length > 0);
 
+    const clearFilters = () => {
+        setFilters({});
+    };
+
     const clearEverything = () => {
         setFilters({});
         setSearchTerms(['']);
@@ -2074,14 +2078,16 @@ const Products: React.FC = () => {
                         );
                     })}
 
-                    {hasAnyFilter && (
+                    {activeFilterChips.length > 0 && (
                         <button
-                            onClick={clearEverything}
-                            className={cn(button.base, button.variant.ghost, button.size.md, 'text-danger hover:bg-danger-soft hover:text-danger')}
-                            title="Quitar búsqueda y todos los filtros"
+                            type="button"
+                            onClick={clearFilters}
+                            className={cn(button.base, button.variant.ghost, button.size.md, 'text-fg-muted hover:bg-surface-hover hover:text-fg')}
+                            title="Quitar todos los filtros y conservar la búsqueda"
+                            aria-label="Limpiar todos los filtros"
                         >
                             <FilterX size={15} aria-hidden="true" />
-                            Limpiar todo
+                            Limpiar filtros
                         </button>
                     )}
 

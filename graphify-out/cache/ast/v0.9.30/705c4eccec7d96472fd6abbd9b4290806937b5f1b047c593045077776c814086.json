@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_supabase_migrations_20260219004000_add_opening_balance_account_sql", "label": "20260219004000_add_opening_balance_account.sql", "file_type": "code", "source_file": "supabase/migrations/20260219004000_add_opening_balance_account.sql", "source_location": null}], "edges": []}

@@ -54,6 +54,7 @@ import {
     Copy,
     FilePen,
     FileText,
+    FilterX,
     Hourglass,
     Image as ImageIcon,
     Info,
@@ -226,8 +227,22 @@ const useMobileScrollLock = (active: boolean) => {
 const SHEET_DISMISS_DISTANCE = 96;
 
 /** Hoja inferior. Toda ventana del móvil entra por abajo, al alcance del pulgar. */
-const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string; icon?: React.ElementType; children: React.ReactNode }> =
-({ open, onClose, title, icon: Icon, children }) => {
+interface SheetHeaderAction {
+    label: string;
+    onClick: () => void;
+    icon?: React.ElementType;
+    disabled?: boolean;
+}
+
+const Sheet: React.FC<{
+    open: boolean;
+    onClose: () => void;
+    title: string;
+    icon?: React.ElementType;
+    headerAction?: SheetHeaderAction;
+    children: React.ReactNode;
+}> =
+({ open, onClose, title, icon: Icon, headerAction, children }) => {
     // El «atrás» del teléfono baja la hoja; antes se llevaba por delante la pantalla entera.
     useBackDismiss(open, onClose);
     useMobileScrollLock(open);
@@ -258,6 +273,7 @@ const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string; icon?
     };
 
     if (!open) return null;
+    const HeaderActionIcon = headerAction?.icon;
     return (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={title}>
             <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-fade-in" onClick={onClose} />
@@ -281,9 +297,23 @@ const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string; icon?
                             {Icon && <Icon size={20} className="text-amber-400" aria-hidden="true" />}
                             {title}
                         </h2>
-                        <button onClick={onClose} className={`${TAP} flex items-center justify-center text-slate-400 rounded-xl active:bg-slate-800`} aria-label="Cerrar">
-                            <X size={22} aria-hidden="true" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            {headerAction && (
+                                <button
+                                    type="button"
+                                    onClick={headerAction.onClick}
+                                    disabled={headerAction.disabled}
+                                    className={`${TAP} px-3 rounded-xl text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors active:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:opacity-40 disabled:pointer-events-none`}
+                                    aria-label={headerAction.label}
+                                >
+                                    {HeaderActionIcon && <HeaderActionIcon size={16} aria-hidden="true" />}
+                                    <span>{headerAction.label}</span>
+                                </button>
+                            )}
+                            <button onClick={onClose} className={`${TAP} flex items-center justify-center text-slate-400 rounded-xl active:bg-slate-800`} aria-label="Cerrar">
+                                <X size={22} aria-hidden="true" />
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="overflow-y-auto px-5 pt-2" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
@@ -1691,7 +1721,18 @@ const MobileCatalog: React.FC = () => {
             )}
 
             {/* ── HOJA: FILTROS ── */}
-            <Sheet open={isFiltersOpen} onClose={() => setIsFiltersOpen(false)} title="Filtros" icon={SlidersHorizontal}>
+            <Sheet
+                open={isFiltersOpen}
+                onClose={() => setIsFiltersOpen(false)}
+                title="Filtros"
+                icon={SlidersHorizontal}
+                headerAction={{
+                    label: 'Limpiar filtros',
+                    icon: FilterX,
+                    onClick: () => setFilters({}),
+                    disabled: activeFilterCount === 0,
+                }}
+            >
                 <div className="flex flex-col gap-5">
                     {FILTER_GROUPS.map(group => {
                         const Icon = group.icon;
@@ -1717,20 +1758,12 @@ const MobileCatalog: React.FC = () => {
                     })}
                 </div>
 
-                <div className="flex gap-2 mt-6">
-                    <button
-                        onClick={() => setFilters({})}
-                        className="flex-1 min-h-[52px] rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-semibold active:bg-slate-700"
-                    >
-                        Limpiar
-                    </button>
-                    <button
-                        onClick={() => setIsFiltersOpen(false)}
-                        className="flex-[2] min-h-[52px] rounded-xl bg-amber-500 text-slate-950 font-bold active:bg-amber-600 flex items-center justify-center gap-2"
-                    >
-                        Ver {filteredAllProducts.length.toLocaleString('es-EC')} repuestos
-                    </button>
-                </div>
+                <button
+                    onClick={() => setIsFiltersOpen(false)}
+                    className="w-full min-h-[52px] mt-6 rounded-xl bg-amber-500 text-slate-950 font-bold active:bg-amber-600 flex items-center justify-center gap-2"
+                >
+                    Ver {filteredAllProducts.length.toLocaleString('es-EC')} repuestos
+                </button>
             </Sheet>
 
             {/* ── HOJA: ORDENAR ── */}

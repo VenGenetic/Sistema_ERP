@@ -65,6 +65,17 @@ Schema lives entirely in `supabase/migrations/*.sql` (timestamp-ordered, applied
 
 ### Repo hygiene note
 
-The repo root has a lot of one-off scripts, exported data dumps, and scratch files (`scripts/`, `scratch/`, `inventario desorganizado/`, `graphify-out/`, `*.xlsx`, `refactor*.py`, `check_db.js`, `tsc_output.txt`, etc.) accumulated from past debugging/migration sessions. These are not part of the app's runtime and can generally be ignored unless a task specifically references one.
+The repo root has a lot of one-off scripts, exported data dumps, and scratch files (`scripts/`, `scratch/`, `inventario desorganizado/`, `*.xlsx`, `refactor*.py`, `check_db.js`, `tsc_output.txt`, etc.) accumulated from past debugging/migration sessions. These are not part of the app's runtime and can generally be ignored unless a task specifically references one. `graphify-out/` is the exception: it is generated rather than runtime code, but it is the knowledge graph described under `## graphify` below - query it instead of ignoring it, and never edit it by hand (the post-commit hook rebuilds it).
 
 Those scripts read every credential from `.env` (`SUPABASE_SERVICE_ROLE_KEY` for the ones that bypass RLS) and fail loudly when it is missing. Never reintroduce a literal key as a fallback: this repo is public on GitHub, and a `service_role` key committed here grants full read/write on the whole Supabase project.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- For questions that span BOTH projects (`agente` and `erp`), query the global graph instead: `graphify query "<question>" --graph C:\Users\ASUS\.graphify\global-graph.json`. It carries both repos' nodes, tagged by repo, and is refreshed on every commit. It is a merge of the two per-repo graphs, so today it has ZERO edges crossing between them: use it to locate a symbol on the other side, never as evidence that two things are wired together. Treat any cross-repo relationship as low confidence and verify it against the actual code before building on it.

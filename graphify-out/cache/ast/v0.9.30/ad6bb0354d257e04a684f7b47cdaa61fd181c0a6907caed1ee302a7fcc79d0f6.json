@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_supabase_migrations_20260406180000_reset_bank_balances_sql", "label": "20260406180000_reset_bank_balances.sql", "file_type": "code", "source_file": "supabase/migrations/20260406180000_reset_bank_balances.sql", "source_location": null}], "edges": []}

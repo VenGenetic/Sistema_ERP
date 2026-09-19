@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_supabase_migrations_20260916140000_consolidar_stock_en_guayaquil_sql", "label": "20260916140000_consolidar_stock_en_guayaquil.sql", "file_type": "code", "source_file": "supabase/migrations/20260916140000_consolidar_stock_en_guayaquil.sql", "source_location": null}], "edges": []}
